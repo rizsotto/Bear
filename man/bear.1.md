@@ -138,6 +138,9 @@ format:
   arguments:
     from_response_files: false
     from_environment: true
+headers:
+  enabled: true
+  strategy: siblings
 ```
 
 This example configuration file:
@@ -149,7 +152,8 @@ This example configuration file:
  instructs to detect duplicates based on the `file` and `arguments` fields of the output file,
  instructs to format the output to use canonical path for the `file` and `directory` fields of the output file,
  instructs to use the `arguments` over the `command` field in the output file,
- instructs to include the `output` field in the output file.
+ instructs to include the `output` field in the output file,
+ instructs to synthesize compilation entries for header files using the same-directory sibling strategy.
 
 ## Configuration Sections
 
@@ -239,6 +243,26 @@ Output formatting configuration:
 - **entries.include_output_field**: Include output field in entries
 - **arguments.from_response_files**: Replace `@file` response-file references in each entry's arguments with the file's tokenized contents (resolved relative to the compiler's working directory, expanded recursively, MSVC/clang-cl using Windows quoting and other compilers using GCC/Clang quoting). Disabled by default, in which case an `@file` argument is recorded verbatim. Missing or unreadable files are left literal with a warning.
 - **arguments.from_environment**: Fold compiler environment variables that act as implicit flags into each entry's arguments -- GCC/Clang header-search paths (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`, `OBJC_INCLUDE_PATH`) become include flags, and MSVC's `CL` / `_CL_` become leading / trailing options. Enabled by default. Set to `false` to record only the flags that appeared on the command line. (This is unrelated to the `CC="gcc -std=c11"` convention handled during interception.)
+
+### headers
+
+Editors and linters often need compile flags for header files, not only for the translation units that were compiled. When enabled, Bear synthesizes a compilation-database entry for a header file by cloning the arguments of a compiled C/C++/Objective-C translation unit, with the source path replaced by the header path and the output flag removed (the synthesized entry has no `output` field). This is off by default: with `enabled: false` the output is unchanged.
+
+- **enabled**: Turn header-entry synthesis on or off. Default `false`.
+- **strategy**: How header files are discovered and which translation unit donates the flags. One of:
+  - `siblings` (default): for each directory that contains a compiled source, header files in that same directory receive an entry cloned from a same-directory source. Zero prerequisites, but the flags are approximate (a header gets its directory sibling's flags), and it produces nothing for headers in directories that hold no compiled source -- notably the common split `include/` + `src/` layout.
+  - `include-dirs`: a superset of `siblings` that additionally scans the compiled unit's own `-I`/`-iquote` include directories, but only those that resolve under the project root (Bear's working directory). System include directories (`-isystem`, `-idirafter`) and absolute directories outside the project are skipped, so the database is not flooded with system headers. This reaches split `include/`+`src/` layouts without needing dependency files.
+  - `dependency-files`: reads the make-style dependency file (`.d`) the build already emitted (for example via `-MMD`/`-MF`) and synthesizes an entry for each in-project header prerequisite it lists. This is the most accurate option -- it records exactly the headers each unit included, across directories -- but it requires the build to have emitted dependency files and for them to still be on disk.
+
+Which file extensions count as headers is fixed (the built-in C-family header set) and is not configurable. Only C, C++, and Objective-C translation units are eligible donors. Synthesized entries pass through duplicate detection and validation like any other entry, so a header that already has a real compilation entry is not duplicated. Entries recorded in `command`-string form (rather than the default `arguments` array) cannot donate and are skipped.
+
+A recipe for a project that keeps headers under `include/` and sources under `src/`:
+
+```yaml
+headers:
+  enabled: true
+  strategy: include-dirs
+```
 
 ## Default Configuration
 
