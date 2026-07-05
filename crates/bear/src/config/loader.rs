@@ -233,6 +233,7 @@ mod test {
                 entries: EntryFormat { use_array_format: true, include_output_field: true },
                 arguments: ArgumentsFormat::default(),
             },
+            headers: Headers::default(),
         };
 
         assert_eq!(expected, result);
@@ -266,6 +267,7 @@ mod test {
                 entries: EntryFormat { use_array_format: true, include_output_field: true },
                 arguments: ArgumentsFormat::default(),
             },
+            headers: Headers::default(),
         };
 
         assert_eq!(expected, result);
@@ -298,6 +300,36 @@ mod test {
                 entries: EntryFormat { use_array_format: true, include_output_field: true },
                 arguments: ArgumentsFormat::default(),
             },
+            headers: Headers::default(),
+        };
+
+        assert_eq!(expected, result);
+    }
+
+    // Requirements: output-header-entries
+    #[test]
+    fn test_header_entries_config_round_trips_through_loader() {
+        let content: &[u8] = br#"
+            schema: 4.1
+
+            intercept:
+                mode: wrapper
+
+            headers:
+                enabled: true
+                strategy: dependency-files
+            "#;
+
+        let result = Loader::from_reader(content).unwrap();
+
+        let expected = Main {
+            schema: String::from("4.1"),
+            intercept: Intercept::Wrapper,
+            compilers: vec![],
+            sources: SourceFilter::default(),
+            duplicates: DuplicateFilter::default(),
+            format: Format::default(),
+            headers: Headers { enabled: true, strategy: HeaderStrategy::DependencyFiles },
         };
 
         assert_eq!(expected, result);
@@ -314,6 +346,7 @@ mod test {
             sources: SourceFilter::default(),
             duplicates: DuplicateFilter::default(),
             format: Format::default(),
+            headers: Headers::default(),
         };
 
         assert_eq!(expected, result);

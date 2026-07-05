@@ -19,6 +19,8 @@ pub struct Main {
     pub duplicates: DuplicateFilter,
     #[serde(default)]
     pub format: Format,
+    #[serde(default)]
+    pub headers: Headers,
 }
 
 impl Default for Main {
@@ -30,6 +32,7 @@ impl Default for Main {
             sources: SourceFilter::default(),
             duplicates: DuplicateFilter::default(),
             format: Format::default(),
+            headers: Headers::default(),
         }
     }
 }
@@ -310,6 +313,33 @@ impl Default for EntryFormat {
     }
 }
 
+/// Configuration for synthesizing compilation database entries for header files.
+///
+/// Off by default: with `enabled: false` the output is unchanged. When enabled,
+/// `strategy` selects how header files are discovered and which translation unit
+/// donates the compile flags. Which file extensions count as headers is fixed
+/// (a built-in C-family header set), not configurable here.
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct Headers {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub strategy: HeaderStrategy,
+}
+
+/// Strategy for discovering header files and their donor translation unit.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum HeaderStrategy {
+    /// Clone from a compiled source in the same directory as the header.
+    #[default]
+    Siblings,
+    /// Also scan the donor's user include directories that resolve in-project.
+    IncludeDirs,
+    /// Read the dependency files the build already emitted.
+    DependencyFiles,
+}
+
 pub(crate) const SUPPORTED_SCHEMA_VERSION: &str = "4.1";
 
 fn default_enabled() -> bool {
@@ -329,5 +359,51 @@ where
         )))
     } else {
         Ok(schema)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_header_strategy_default_is_siblings() {
+        let sut = HeaderStrategy::default();
+
+        assert_eq!(sut, HeaderStrategy::Siblings);
+    }
+
+    #[test]
+    fn test_headers_default_is_disabled_with_siblings_strategy() {
+        let sut = Headers::default();
+
+        assert!(!sut.enabled, "headers should be disabled by default");
+        assert_eq!(sut.strategy, HeaderStrategy::Siblings);
+    }
+
+    #[test]
+    fn test_header_strategy_deserializes_kebab_case_variants() {
+        let cases = [
+            ("siblings", HeaderStrategy::Siblings),
+            ("include-dirs", HeaderStrategy::IncludeDirs),
+            ("dependency-files", HeaderStrategy::DependencyFiles),
+        ];
+
+        for (input, expected) in cases {
+            let yaml = format!("strategy: {input}");
+
+            let sut: Headers = serde_saphyr::from_str(&yaml).unwrap();
+
+            assert_eq!(sut.strategy, expected, "case: strategy: {input}");
+        }
+    }
+
+    #[test]
+    fn test_header_strategy_rejects_unknown_variant() {
+        let yaml = "strategy: unknown";
+
+        let sut: Result<Headers, _> = serde_saphyr::from_str(yaml);
+
+        assert!(sut.is_err(), "expected deserialization to fail for: {yaml}");
     }
 }
