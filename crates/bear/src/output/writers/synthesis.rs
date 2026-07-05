@@ -206,11 +206,7 @@ impl DirectoryCollector {
             header_names.sort();
 
             for name in header_names {
-                let header_file = if rec.display_dir.as_os_str().is_empty() {
-                    PathBuf::from(&name)
-                } else {
-                    rec.display_dir.join(&name)
-                };
+                let header_file = join_header_path(&rec.display_dir, &name, &rec.source_file);
 
                 let Some(rewritten) = rewrite_arguments(&rec.arguments, &rec.source_file, &header_file)
                 else {
@@ -490,6 +486,32 @@ fn lexical_normalize(path: &Path) -> PathBuf {
     out
 }
 
+/// Joins a directory prefix and a header file name into the header's path.
+///
+/// The separator mirrors the donor's own paths rather than the host OS
+/// separator, so a synthesized entry reads like the compilation it clones and
+/// its `file`/argument strings stay stable across platforms (`PathBuf::join`
+/// would emit a backslash on Windows even when the donor used `/`). POSIX `/`
+/// is the default; `dir`'s own separators, when it has any, are left intact.
+/// `sample` is the donor's source file, consulted for the style only when
+/// `dir` is a single component with no separator of its own.
+fn join_header_path(dir: &Path, name: &std::ffi::OsStr, sample: &Path) -> PathBuf {
+    if dir.as_os_str().is_empty() {
+        return PathBuf::from(name);
+    }
+    let dir = dir.to_string_lossy();
+    let backslash = if dir.contains('/') {
+        false
+    } else if dir.contains('\\') {
+        true
+    } else {
+        let sample = sample.to_string_lossy();
+        sample.contains('\\') && !sample.contains('/')
+    };
+    let separator = if backslash { '\\' } else { '/' };
+    PathBuf::from(format!("{dir}{separator}{}", name.to_string_lossy()))
+}
+
 /// Resolves the physical directory a source file lives in, given the entry's
 /// working directory and (possibly relative) file path.
 fn physical_parent(dir: &Path, file: &Path) -> PathBuf {
@@ -635,6 +657,70 @@ mod tests {
             if let Some(actual) = &sut {
                 assert!(!actual.iter().any(|a| a == "-o" || a.starts_with("-o") && a.len() > 2));
             }
+        }
+    }
+
+    // --- join_header_path ---
+
+    #[test]
+    fn test_join_header_path_mirrors_donor_separator() {
+        struct Case {
+            name: &'static str,
+            dir: &'static str,
+            file: &'static str,
+            sample: &'static str,
+            expected: &'static str,
+        }
+
+        // String-based, so the outcome is the same on every platform (this is
+        // the whole point: not the host OS separator). Verifies the Windows
+        // behavior from any host.
+        let cases = [
+            Case {
+                name: "forward-slash donor keeps forward slashes",
+                dir: "src",
+                file: "util.h",
+                sample: "src/main.c",
+                expected: "src/util.h",
+            },
+            Case {
+                name: "backslash donor keeps backslashes",
+                dir: "src",
+                file: "util.h",
+                sample: "src\\main.c",
+                expected: "src\\util.h",
+            },
+            Case {
+                name: "include-dir prefix keeps forward slashes",
+                dir: "include",
+                file: "util.h",
+                sample: "src/main.c",
+                expected: "include/util.h",
+            },
+            Case {
+                name: "separator already in the prefix is respected",
+                dir: "a/b",
+                file: "x.h",
+                sample: "irrelevant",
+                expected: "a/b/x.h",
+            },
+            Case {
+                name: "empty prefix yields the bare name",
+                dir: "",
+                file: "util.h",
+                sample: "main.c",
+                expected: "util.h",
+            },
+        ];
+
+        for case in cases {
+            let sut = join_header_path(
+                Path::new(case.dir),
+                std::ffi::OsStr::new(case.file),
+                Path::new(case.sample),
+            );
+
+            assert_eq!(sut.to_string_lossy(), case.expected, "case: {}", case.name);
         }
     }
 
