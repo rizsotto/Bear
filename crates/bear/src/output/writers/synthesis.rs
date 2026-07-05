@@ -142,7 +142,7 @@ struct DirectoryCollector {
 
 impl DirectoryCollector {
     fn new(strategy: HeaderStrategy, project_root: PathBuf) -> Self {
-        Self { strategy, project_root, records: HashMap::new() }
+        Self { strategy, project_root: lexical_normalize(&project_root), records: HashMap::new() }
     }
 
     /// Records `entry`'s own directory as a scan target, and, for the
@@ -163,10 +163,12 @@ impl DirectoryCollector {
 
         if self.strategy == HeaderStrategy::IncludeDirs {
             for inc in extract_include_dirs(&entry.arguments) {
-                let physical = if inc.is_absolute() { inc.clone() } else { entry.directory.join(&inc) };
+                let raw = if inc.is_absolute() { inc.clone() } else { entry.directory.join(&inc) };
+                let physical = lexical_normalize(&raw);
                 if !physical.starts_with(&self.project_root) {
                     // Out of scope: system or out-of-project include dirs
-                    // are not scanned, to avoid flooding the database.
+                    // are not scanned, to avoid flooding the database. Normalized
+                    // first so a `..` sequence cannot textually escape the root.
                     continue;
                 }
                 self.record(physical, entry, inc);
@@ -274,7 +276,7 @@ struct DepFilesCollector {
 
 impl DepFilesCollector {
     fn new(project_root: PathBuf) -> Self {
-        Self { project_root, donors: Vec::new() }
+        Self { project_root: lexical_normalize(&project_root), donors: Vec::new() }
     }
 }
 
@@ -330,10 +332,12 @@ impl HeaderCollector for DepFilesCollector {
                     continue;
                 }
 
-                let phys = if prereq.is_absolute() { prereq.clone() } else { donor.directory.join(&prereq) };
+                let raw = if prereq.is_absolute() { prereq.clone() } else { donor.directory.join(&prereq) };
+                let phys = lexical_normalize(&raw);
                 if !phys.starts_with(&self.project_root) {
                     // Out of scope: system or out-of-project headers are not
-                    // synthesized, to avoid flooding the database.
+                    // synthesized, to avoid flooding the database. Normalized
+                    // first so a `..` sequence cannot textually escape the root.
                     continue;
                 }
 
@@ -461,6 +465,32 @@ fn extract_include_dirs(args: &[String]) -> Vec<PathBuf> {
     }
 
     result
+}
+
+/// Lexically normalizes a path by folding `.` and `..` components without
+/// touching the filesystem. The project-root scope check relies on this so a
+/// `..` sequence cannot textually escape the root (e.g. an include dir of
+/// `-I../../shared` resolving outside the project must not pass the guard).
+/// Symlinks are deliberately not resolved: that needs disk access and would
+/// fail on directories the build has not created.
+fn lexical_normalize(path: &Path) -> PathBuf {
+    use std::path::Component;
+
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if matches!(out.components().next_back(), Some(Component::Normal(_))) {
+                    out.pop();
+                } else {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 /// Resolves the physical directory a source file lives in, given the entry's
@@ -870,6 +900,54 @@ mod tests {
         let out = collected.lock().unwrap();
         assert_eq!(out.len(), 1, "expected donor only, no synthesized entries: {:?}", *out);
         assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_include_dirs_scope_rejects_parent_dir_escape() {
+        // proj is the project root; shared sits outside it. A relative include
+        // dir with `..` that resolves outside the root must be rejected even
+        // though it textually shares the root's prefix before normalization.
+        let root = tempfile::tempdir().unwrap();
+        let proj = root.path().join("proj");
+        let build = proj.join("build");
+        std::fs::create_dir_all(&build).unwrap();
+        std::fs::write(build.join("main.c"), "").unwrap();
+
+        let in_project_inc = proj.join("include");
+        std::fs::create_dir_all(&in_project_inc).unwrap();
+        std::fs::write(in_project_inc.join("kept.h"), "").unwrap();
+
+        let escaped = root.path().join("shared");
+        std::fs::create_dir_all(&escaped).unwrap();
+        std::fs::write(escaped.join("escaped.h"), "").unwrap();
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let sut =
+            HeaderEntrySynthesizer::new(writer, include_dirs_config(), proj.clone(), Arc::clone(&stats));
+
+        // From build/: `../include` -> proj/include (in project, kept);
+        // `../../shared` -> root/shared (outside proj, must be rejected).
+        let entry = Entry::from_arguments_str(
+            "main.c",
+            vec!["cc", "-c", "main.c", "-I../include", "-I../../shared", "-o", "main.o"],
+            build.to_str().unwrap(),
+            None,
+        );
+
+        sut.write(vec![entry].into_iter()).unwrap();
+
+        let out = collected.lock().unwrap();
+        assert_eq!(out.len(), 2, "expected donor + only the in-project header: {:?}", *out);
+        assert!(
+            out.iter().any(|e| e.file.as_path() == Path::new("../include/kept.h")),
+            "in-project header kept"
+        );
+        assert!(
+            !out.iter().any(|e| e.file.file_name() == Some(std::ffi::OsStr::new("escaped.h"))),
+            "out-of-project header reached via .. must not be synthesized"
+        );
+        assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 1);
     }
 
     // --- parse_make_prerequisites ---
