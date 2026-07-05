@@ -412,6 +412,127 @@ format:
     Ok(())
 }
 
+/// Test header-entry synthesis with the `siblings` strategy.
+/// Verifies that a header file sharing a directory with a compiled source
+/// receives a synthesized entry cloning that source's arguments, through the
+/// YAML config -> output pipeline path.
+// Requirements: output-header-entries
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn header_entries_siblings_config() -> Result<()> {
+    let env = TestEnvironment::new("header_entries_siblings")?;
+
+    // A compiled source and a sibling header that is never compiled itself.
+    env.create_source_files(&[("main.c", "int main() { return 0; }"), ("util.h", "int util(void);")])?;
+
+    let build_commands = format!("{} -c main.c -o main.o", COMPILER_C_PATH);
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+headers:
+  enabled: true
+  strategy: siblings
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.c"))?;
+
+    let synthesized_args = vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "util.h".to_string()];
+
+    let synthesized_matcher = CompilationEntryMatcher::new()
+        .file("util.h")
+        .directory(env.test_dir().to_str().unwrap())
+        .arguments(synthesized_args);
+
+    db.assert_contains(&synthesized_matcher)?;
+
+    Ok(())
+}
+
+/// Test that with no `headers` configuration, no synthesized header entries
+/// appear in the output: behaviour is unchanged from before header-entry
+/// synthesis existed.
+// Requirements: output-header-entries
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn header_entries_default_off() -> Result<()> {
+    let env = TestEnvironment::new("header_entries_default_off")?;
+
+    env.create_source_files(&[("main.c", "int main() { return 0; }"), ("util.h", "int util(void);")])?;
+
+    let build_commands = format!("{} -c main.c -o main.o", COMPILER_C_PATH);
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.c"))?;
+
+    let has_header_entry =
+        db.entries().iter().any(|entry| entry.get("file").and_then(|v| v.as_str()) == Some("util.h"));
+    assert!(!has_header_entry, "util.h should not have a synthesized entry when headers are not enabled");
+
+    Ok(())
+}
+
 /// Test path format configuration
 /// Verifies different path formatting options
 // Requirements: output-path-format
