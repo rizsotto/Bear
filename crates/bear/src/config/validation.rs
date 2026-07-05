@@ -21,6 +21,8 @@ pub enum ValidationError {
     DuplicateEntry { field: &'static str, idx: usize },
     #[error("Path format error: {message}")]
     PathFormatError { message: &'static str },
+    #[error("Invalid glob pattern for field '{field}': {message}")]
+    InvalidPattern { field: String, message: String },
     #[error("Multiple validation errors: {errors:?}")]
     Multiple { errors: Vec<ValidationError> },
 }
@@ -92,7 +94,7 @@ impl Validator<SourceFilter> for SourceFilter {
     type Error = ValidationError;
 
     fn validate(config: &SourceFilter) -> Result<(), Self::Error> {
-        let errors = config
+        let mut errors: Vec<ValidationError> = config
             .directories
             .iter()
             .enumerate()
@@ -101,6 +103,21 @@ impl Validator<SourceFilter> for SourceFilter {
                 field: format!("sources.directories[{}].path", idx),
             })
             .collect();
+
+        for (idx, rule) in config.files.iter().enumerate() {
+            if rule.pattern.is_empty() {
+                errors
+                    .push(ValidationError::EmptyString { field: format!("sources.files[{}].pattern", idx) });
+                continue;
+            }
+            if let Err(source) = glob::Pattern::new(&rule.pattern) {
+                errors.push(ValidationError::InvalidPattern {
+                    field: format!("sources.files[{}].pattern", idx),
+                    message: source.to_string(),
+                });
+            }
+        }
+
         collapse(errors)
     }
 }
@@ -182,6 +199,7 @@ mod tests {
                 DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Exclude },
             ],
+            files: vec![],
         };
 
         let result = SourceFilter::validate(&config);
@@ -203,6 +221,7 @@ mod tests {
                 DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Exclude },
                 DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Include },
             ],
+            files: vec![],
         };
 
         let result = SourceFilter::validate(&config);
@@ -223,15 +242,69 @@ mod tests {
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
             ],
+            files: vec![],
         };
 
         let result = SourceFilter::validate(&config);
         assert!(result.is_ok());
     }
 
+    // Requirements: output-generated-file-filter
+    #[test]
+    fn test_validate_source_filter_valid_file_rules() {
+        let config = SourceFilter {
+            directories: vec![],
+            files: vec![
+                FileRule { pattern: "moc_*.cpp".to_string(), action: DirectoryAction::Exclude },
+                FileRule { pattern: "generated/*.pb.cc".to_string(), action: DirectoryAction::Exclude },
+            ],
+        };
+
+        let result = SourceFilter::validate(&config);
+        assert!(result.is_ok());
+    }
+
+    // Requirements: output-generated-file-filter
+    #[test]
+    fn test_validate_source_filter_empty_pattern() {
+        let config = SourceFilter {
+            directories: vec![],
+            files: vec![FileRule { pattern: String::new(), action: DirectoryAction::Exclude }],
+        };
+
+        let result = SourceFilter::validate(&config);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ValidationError::EmptyString { field } => {
+                assert_eq!(field, "sources.files[0].pattern");
+            }
+            other => panic!("Expected EmptyString validation error, got: {:?}", other),
+        }
+    }
+
+    // Requirements: output-generated-file-filter
+    #[test]
+    fn test_validate_source_filter_invalid_pattern() {
+        let config = SourceFilter {
+            directories: vec![],
+            files: vec![FileRule { pattern: "moc_[.cpp".to_string(), action: DirectoryAction::Exclude }],
+        };
+
+        let result = SourceFilter::validate(&config);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ValidationError::InvalidPattern { field, .. } => {
+                assert_eq!(field, "sources.files[0].pattern");
+            }
+            other => panic!("Expected InvalidPattern validation error, got: {:?}", other),
+        }
+    }
+
     #[test]
     fn test_validate_source_filter_empty_directories() {
-        let config = SourceFilter { directories: vec![] };
+        let config = SourceFilter { directories: vec![], files: vec![] };
 
         let result = SourceFilter::validate(&config);
         assert!(result.is_ok());

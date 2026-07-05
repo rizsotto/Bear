@@ -218,6 +218,7 @@ mod tests {
                     path: std::path::PathBuf::from("/usr/include"),
                     action: config::DirectoryAction::Exclude,
                 }],
+                files: vec![],
             },
             ..config::Main::default()
         };

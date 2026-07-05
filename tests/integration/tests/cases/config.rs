@@ -288,6 +288,130 @@ format:
     Ok(())
 }
 
+/// Test source filename-pattern filter excluding a generated file by basename glob.
+/// Verifies that a `sources.files` exclude rule drops the matching file while keeping
+/// hand-written sources, through the YAML config -> output pipeline path.
+// Requirements: output-generated-file-filter
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn source_file_pattern_filter_config() -> Result<()> {
+    let env = TestEnvironment::new("source_file_pattern_filter")?;
+
+    // A hand-written source and a Qt-moc-style generated source.
+    env.create_source_files(&[
+        ("main.cpp", "int main() { return 0; }"),
+        ("moc_window.cpp", "int moc_window() { return 0; }"),
+    ])?;
+
+    let build_commands = [
+        format!("{} -c main.cpp -o main.o", COMPILER_C_PATH),
+        format!("{} -c moc_window.cpp -o moc_window.o", COMPILER_C_PATH),
+    ]
+    .join("\n");
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+sources:
+  files:
+    - pattern: "moc_*.cpp"
+      action: exclude
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.cpp"))?;
+
+    let excluded =
+        db.entries().iter().any(|entry| entry.get("file").and_then(|v| v.as_str()) == Some("moc_window.cpp"));
+    assert!(!excluded, "moc_window.cpp should have been excluded by the `moc_*.cpp` pattern rule");
+
+    Ok(())
+}
+
+/// Test that with no `sources.files` configuration, generated-looking sources are not
+/// filtered: behaviour is unchanged from before the file-pattern filter existed.
+// Requirements: output-generated-file-filter
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn source_file_pattern_filter_default_off() -> Result<()> {
+    let env = TestEnvironment::new("source_file_pattern_filter_default_off")?;
+
+    env.create_source_files(&[
+        ("main.cpp", "int main() { return 0; }"),
+        ("moc_window.cpp", "int moc_window() { return 0; }"),
+    ])?;
+
+    let build_commands = [
+        format!("{} -c main.cpp -o main.o", COMPILER_C_PATH),
+        format!("{} -c moc_window.cpp -o moc_window.o", COMPILER_C_PATH),
+    ]
+    .join("\n");
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.cpp"))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("moc_window.cpp"))?;
+
+    Ok(())
+}
+
 /// Test path format configuration
 /// Verifies different path formatting options
 // Requirements: output-path-format

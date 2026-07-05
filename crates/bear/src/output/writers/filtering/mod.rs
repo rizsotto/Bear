@@ -115,6 +115,7 @@ mod tests {
                     action: config::DirectoryAction::Exclude,
                 },
             ],
+            files: vec![],
         });
 
         let sut =

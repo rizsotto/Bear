@@ -218,6 +218,7 @@ mod test {
                         action: DirectoryAction::Exclude,
                     },
                 ],
+                files: vec![],
             },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Directory] },
             format: Format {
@@ -251,7 +252,7 @@ mod test {
             schema: String::from("4.1"),
             intercept: Intercept::Wrapper,
             compilers: vec![],
-            sources: SourceFilter { directories: vec![] },
+            sources: SourceFilter { directories: vec![], files: vec![] },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::Directory, OutputFields::File] },
             format: Format {
                 paths: PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
@@ -283,7 +284,7 @@ mod test {
             schema: String::from("4.1"),
             intercept: Intercept::Preload,
             compilers: vec![],
-            sources: SourceFilter { directories: vec![] },
+            sources: SourceFilter { directories: vec![], files: vec![] },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::Directory, OutputFields::File] },
             format: Format {
                 paths: PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },

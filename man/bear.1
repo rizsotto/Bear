@@ -139,6 +139,11 @@ sources\f[B]:\f[R]
   directories\f[B]:\f[R]
     \f[B]\-\f[R] path\f[B]:\f[R] /project/tests
       action\f[B]:\f[R] exclude
+  files\f[B]:\f[R]
+    \f[B]\-\f[R] pattern\f[B]:\f[R] \(dqmoc_*.cpp\(dq
+      action\f[B]:\f[R] exclude
+    \f[B]\-\f[R] pattern\f[B]:\f[R] \(dq*.pb.cc\(dq
+      action\f[B]:\f[R] exclude
 duplicates\f[B]:\f[R]
   match_on\f[B]:\f[R]
     \f[B]\-\f[R] file
@@ -159,13 +164,15 @@ This example configuration file: sets the interception mode to
 \f[CR]wrapper\f[R], hints the \f[CR]/usr/bin/cc\f[R] to be the main
 compiler in this project, which is the GNU compiler, hints to ignore the
 \f[CR]/usr/local/bin/gcc\f[R] compilers from the project, instructs to
-ignore files from \f[CR]/project/tests\f[R], instructs to detect
-duplicates based on the \f[CR]file\f[R] and \f[CR]arguments\f[R] fields
-of the output file, instructs to format the output to use canonical path
-for the \f[CR]file\f[R] and \f[CR]directory\f[R] fields of the output
-file, instructs to use the \f[CR]arguments\f[R] over the
-\f[CR]command\f[R] field in the output file, instructs to include the
-\f[CR]output\f[R] field in the output file.
+ignore files from \f[CR]/project/tests\f[R], instructs to drop generated
+Qt moc output (\f[CR]moc_*.cpp\f[R]) and protobuf stubs
+(\f[CR]*.pb.cc\f[R]) by filename, instructs to detect duplicates based
+on the \f[CR]file\f[R] and \f[CR]arguments\f[R] fields of the output
+file, instructs to format the output to use canonical path for the
+\f[CR]file\f[R] and \f[CR]directory\f[R] fields of the output file,
+instructs to use the \f[CR]arguments\f[R] over the \f[CR]command\f[R]
+field in the output file, instructs to include the \f[CR]output\f[R]
+field in the output file.
 .SS Configuration Sections
 The configuration file uses schema version \f[CR]4.1\f[R] and has the
 following structure:
@@ -297,7 +304,7 @@ The \f[CR]swift\f[R] subcommand driver (\f[CR]swift build\f[R],
 \f[CR]swift run\f[R], \f[CR]swift package\f[R]) is not recognized \(en
 it is a subcommand dispatcher, not a compiler invocation.
 .SS sources
-Filtering functionality based on the source file location.
+Filtering functionality based on the source file location and filename.
 .IP \(bu 2
 \f[B]directories\f[R]: List of directory\-based inclusion/exclusion
 rules
@@ -305,6 +312,42 @@ rules
 Directory rules are evaluated in order, with the last matching rule
 determining inclusion/exclusion.
 Empty directories list means include everything.
+.IP \(bu 2
+\f[B]files\f[R]: List of filename\-glob inclusion/exclusion rules, each
+with a \f[B]pattern\f[R] and an \f[B]action\f[R] (\f[CR]include\f[R] or
+\f[CR]exclude\f[R])
+.PP
+Filename\-pattern rules exist to drop machine\-generated sources \(en Qt
+\f[CR]moc\f[R] output, protobuf stubs, and the output of other code
+generators \(en from the compilation database, so that linters and
+editors act only on hand\-written code.
+This is off by default: with no \f[CR]files\f[R] rules configured, the
+output is unchanged.
+A pattern with no path separator (\f[CR]/\f[R], or \f[CR]\(rs\f[R] on
+Windows) matches the source file\(cqs basename; a pattern containing a
+separator matches the full source path as it appears in the entry, so
+patterns should use the same path format as configured in
+\f[CR]format.paths.file\f[R].
+File\-pattern rules are evaluated in order, with the last matching rule
+determining inclusion/exclusion, the same precedence the directory rules
+use; a file matched by no pattern rule is included.
+Directory rules and file\-pattern rules compose: an entry is emitted
+only when both accept it.
+An invalid pattern is rejected during configuration validation with an
+error identifying the offending rule.
+.PP
+A common recipe for a Qt/protobuf project:
+.IP
+.EX
+sources\f[B]:\f[R]
+  files\f[B]:\f[R]
+    \f[B]\-\f[R] pattern\f[B]:\f[R] \(dqmoc_*.cpp\(dq
+      action\f[B]:\f[R] exclude
+    \f[B]\-\f[R] pattern\f[B]:\f[R] \(dq*.pb.cc\(dq
+      action\f[B]:\f[R] exclude
+    \f[B]\-\f[R] pattern\f[B]:\f[R] \(dq*.pb.h\(dq
+      action\f[B]:\f[R] exclude
+.EE
 .SS duplicates
 Filtering functionality based on duplicate detection.
 Here you can define which fields of the output file should be used in

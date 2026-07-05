@@ -29,6 +29,7 @@ crossbeam-channel.workspace = true
 regex-lite.workspace = true
 which.workspace = true
 libc.workspace = true
+glob.workspace = true
 
 [build-dependencies]
 compilers-codegen = { path = "../../build-support/compilers-codegen" }

@@ -1,6 +1,6 @@
 ---
 title: Generated-file exclusion by filename pattern
-status: in-progress
+status: implemented
 ---
 
 ## Intent

@@ -171,27 +171,43 @@ pub struct DirectoryRule {
     pub action: DirectoryAction,
 }
 
+/// A rule that specifies how to handle files matching a filename glob pattern.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct FileRule {
+    pub pattern: String,
+    pub action: DirectoryAction,
+}
+
 /// Source filter configuration for controlling which files are included in the compilation database.
 ///
-/// Uses directory-based rules with order-based evaluation semantics:
+/// Uses directory-based rules and filename-pattern rules with order-based evaluation semantics:
 ///
 /// 1. **Order-based evaluation**: For each source file, the *last* rule whose path prefix
-///    matches determines inclusion/exclusion.
-/// 2. **Empty directories list**: Interpreted as "include everything" (no filtering).
+///    matches determines inclusion/exclusion. Filename-pattern rules are evaluated the same
+///    way, independently: the *last* rule whose glob matches determines inclusion/exclusion.
+/// 2. **Empty directories/files list**: Interpreted as "include everything" (no filtering) for
+///    that list.
 /// 3. **No-match behavior**: If no rule matches a file, the file is *included*.
-/// 4. **Path matching**: Simple prefix matching, no normalization.
+/// 4. **Path matching**: Simple prefix matching for directory rules, no normalization.
 /// 5. **Case sensitivity**: Always case-sensitive on all platforms.
 /// 6. **Path separators**: Platform-specific (`/` on Unix, `\` on Windows).
 /// 7. **Symlinks**: No symlink resolution — match literal paths only.
 /// 8. **Directory matching**: A rule matches both files directly in the directory and files in subdirectories.
-/// 9. **Empty path fields**: Invalid — validation must fail.
+/// 9. **Empty path/pattern fields**: Invalid — validation must fail.
+/// 10. **Filename-pattern matching**: A pattern without a path separator matches the source
+///     file's basename; a pattern containing a separator matches the full source path as it
+///     appears in the entry.
+/// 11. **Composition**: An entry is emitted only when both the directory rules and the
+///     filename-pattern rules accept it (logical AND of the two independent verdicts).
 ///
-/// **Important**: For matching to work correctly, rule paths should use the same format as
-/// configured in `format.paths.file`. This consistency is the user's responsibility.
+/// **Important**: For matching to work correctly, rule paths/patterns should use the same
+/// format as configured in `format.paths.file`. This consistency is the user's responsibility.
 #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct SourceFilter {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub directories: Vec<DirectoryRule>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<FileRule>,
 }
 
 /// Duplicate filter configuration matching the YAML format.

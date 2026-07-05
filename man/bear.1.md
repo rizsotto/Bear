@@ -119,6 +119,11 @@ sources:
   directories:
     - path: /project/tests
       action: exclude
+  files:
+    - pattern: "moc_*.cpp"
+      action: exclude
+    - pattern: "*.pb.cc"
+      action: exclude
 duplicates:
   match_on:
     - file
@@ -140,6 +145,7 @@ This example configuration file:
  hints the `/usr/bin/cc` to be the main compiler in this project, which is the GNU compiler,
  hints to ignore the `/usr/local/bin/gcc` compilers from the project,
  instructs to ignore files from `/project/tests`,
+ instructs to drop generated Qt moc output (`moc_*.cpp`) and protobuf stubs (`*.pb.cc`) by filename,
  instructs to detect duplicates based on the `file` and `arguments` fields of the output file,
  instructs to format the output to use canonical path for the `file` and `directory` fields of the output file,
  instructs to use the `arguments` over the `command` field in the output file,
@@ -191,11 +197,28 @@ The Swift compiler `swiftc` is recognized automatically; see "Swift Projects" be
 
 ### sources
 
-Filtering functionality based on the source file location.
+Filtering functionality based on the source file location and filename.
 
 - **directories**: List of directory-based inclusion/exclusion rules
 
 Directory rules are evaluated in order, with the last matching rule determining inclusion/exclusion. Empty directories list means include everything.
+
+- **files**: List of filename-glob inclusion/exclusion rules, each with a **pattern** and an **action** (`include` or `exclude`)
+
+Filename-pattern rules exist to drop machine-generated sources -- Qt `moc` output, protobuf stubs, and the output of other code generators -- from the compilation database, so that linters and editors act only on hand-written code. This is off by default: with no `files` rules configured, the output is unchanged. A pattern with no path separator (`/`, or `\` on Windows) matches the source file's basename; a pattern containing a separator matches the full source path as it appears in the entry, so patterns should use the same path format as configured in `format.paths.file`. File-pattern rules are evaluated in order, with the last matching rule determining inclusion/exclusion, the same precedence the directory rules use; a file matched by no pattern rule is included. Directory rules and file-pattern rules compose: an entry is emitted only when both accept it. An invalid pattern is rejected during configuration validation with an error identifying the offending rule.
+
+A common recipe for a Qt/protobuf project:
+
+```yaml
+sources:
+  files:
+    - pattern: "moc_*.cpp"
+      action: exclude
+    - pattern: "*.pb.cc"
+      action: exclude
+    - pattern: "*.pb.h"
+      action: exclude
+```
 
 ### duplicates
 
