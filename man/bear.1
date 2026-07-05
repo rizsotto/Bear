@@ -438,22 +438,9 @@ compiled source, header files in that same directory receive an entry
 cloned from a same\-directory source.
 Zero prerequisites, but the flags are approximate (a header gets its
 directory sibling\(cqs flags), and it produces nothing for headers in
-directories that hold no compiled source \(en notably the common split
-\f[CR]include/\f[R] + \f[CR]src/\f[R] layout.
-.IP \(bu 2
-\f[CR]include\-dirs\f[R]: a superset of \f[CR]siblings\f[R] that
-additionally scans the compiled unit\(cqs own
-\f[CR]\-I\f[R]/\f[CR]\-iquote\f[R] include directories, but only those
-that resolve inside the compilation\(cqs own working directory (the
-directory the compiler ran in, which it uses to resolve relative include
-paths).
-System include directories (\f[CR]\-isystem\f[R],
-\f[CR]\-idirafter\f[R]) and directories that escape the working
-directory \(en absolute system paths, or paths reached via \f[CR]..\f[R]
-\(en are skipped, so the database is not flooded with system headers.
-This reaches a split \f[CR]include/\f[R]+\f[CR]src/\f[R] layout when the
-build compiles from a directory that contains both, without needing
-dependency files.
+directories that hold no compiled source \(en notably the split
+\f[CR]include/\f[R] + \f[CR]src/\f[R] layout, for which
+\f[CR]dependency\-files\f[R] is the answer.
 .IP \(bu 2
 \f[CR]dependency\-files\f[R]: reads the make\-style dependency file
 (\f[CR].d\f[R]) the build already emitted (for example via
@@ -461,8 +448,10 @@ dependency files.
 header prerequisite it lists that resolves inside the compilation\(cqs
 working directory.
 This is the most accurate option for the headers a compilation actually
-included, but it requires the build to have emitted dependency files and
-for them to still be on disk.
+included \(en it reaches headers in other directories (a split
+\f[CR]include/\f[R]+\f[CR]src/\f[R] layout) precisely \(en but it
+requires the build to have emitted dependency files and for them to
+still be on disk.
 .RE
 .PP
 Which file extensions count as headers is fixed (the built\-in C\-family
@@ -475,12 +464,12 @@ Entries recorded in \f[CR]command\f[R]\-string form (rather than the
 default \f[CR]arguments\f[R] array) cannot donate and are skipped.
 .PP
 A recipe for a project that keeps headers under \f[CR]include/\f[R] and
-sources under \f[CR]src/\f[R]:
+sources under \f[CR]src/\f[R], whose build emits dependency files:
 .IP
 .EX
 headers\f[B]:\f[R]
   enabled\f[B]:\f[R] true
-  strategy\f[B]:\f[R] include\-dirs
+  strategy\f[B]:\f[R] dependency\-files
 .EE
 .SS Default Configuration
 If no configuration file is specified, Bear uses built\-in defaults

@@ -334,8 +334,6 @@ pub enum HeaderStrategy {
     /// Clone from a compiled source in the same directory as the header.
     #[default]
     Siblings,
-    /// Also scan the donor's user include directories that resolve in-project.
-    IncludeDirs,
     /// Read the dependency files the build already emitted.
     DependencyFiles,
 }
@@ -383,11 +381,8 @@ mod tests {
 
     #[test]
     fn test_header_strategy_deserializes_kebab_case_variants() {
-        let cases = [
-            ("siblings", HeaderStrategy::Siblings),
-            ("include-dirs", HeaderStrategy::IncludeDirs),
-            ("dependency-files", HeaderStrategy::DependencyFiles),
-        ];
+        let cases =
+            [("siblings", HeaderStrategy::Siblings), ("dependency-files", HeaderStrategy::DependencyFiles)];
 
         for (input, expected) in cases {
             let yaml = format!("strategy: {input}");

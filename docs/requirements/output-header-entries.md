@@ -17,14 +17,12 @@ configuration the output is byte-identical to today.
 - A configuration option enables header entries and selects a discovery
   strategy. When enabled, header files receive a synthesized entry whose flags
   are derived from a compiled translation unit.
-- Three discovery strategies are available, chosen by configuration:
+- Two discovery strategies are available, chosen by configuration:
   - A default strategy considers header files that sit in the same directory
     as a compiled source.
-  - An opt-in strategy additionally considers a translation unit's own user
-    include directories, when those directories resolve inside the
-    compilation's own working directory.
   - An opt-in strategy reads the dependency files the build already emitted
-    to find the exact headers each translation unit included.
+    to find the exact headers each translation unit included, scoped to those
+    that resolve inside the compilation's own working directory.
 - A synthesized entry clones a compiled translation unit's arguments with the
   source path replaced by the header path and the output-file flag removed;
   the synthesized entry has no output field.
@@ -80,17 +78,9 @@ are a pair like:
 ]
 ```
 
-Given a build whose compilation uses a user include directory that resolves
-inside the compilation's working directory, with a header file in that
-directory:
-
-> When Bear generates the database with the include-directories strategy,
-> then the database contains a synthesized entry for that header,
-> and a header reachable only through a system directory, or a directory that
-> escapes the compilation's working directory, does not receive an entry.
-
 Given a build whose compilation emitted a dependency file listing the headers
-it included:
+it included, some inside the compilation's working directory and some (system
+headers) outside it:
 
 > When Bear generates the database with the dependency-files strategy,
 > then the database contains a synthesized entry for exactly the in-scope

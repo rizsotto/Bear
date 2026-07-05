@@ -7,21 +7,16 @@
 //! editors and linters can resolve compile flags for headers as well as
 //! sources. See `docs/requirements/output-header-entries.md`.
 //!
-//! Three discovery strategies are implemented here:
+//! Two discovery strategies are implemented here:
 //!
 //! - `Siblings`: header files that live in the same directory as a compiled
 //!   C, C++, or Objective-C source.
-//! - `IncludeDirs`: a superset of `Siblings` that also scans a donor's own
-//!   `-I`/`-iquote` include directories, but only those that resolve inside
-//!   the compilation's own working directory (the frame the compiler resolves
-//!   relative includes against), to avoid flooding the database with system
-//!   headers.
 //! - `DependencyFiles`: reads the make-style dependency file (`.d`) a
 //!   donor's build already emitted, and synthesizes an entry per header
 //!   prerequisite listed there, scoped to headers that resolve inside the
 //!   compilation's working directory.
 //!
-//! All three strategies stream: entries observed as they pass through are
+//! Both strategies stream: entries observed as they pass through are
 //! recorded, and the synthesized header entries are emitted once, in an
 //! epilogue, after the input iterator is exhausted. See
 //! [`HeaderCollector`].
@@ -101,12 +96,8 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for HeaderEntrySynthesizer<
             return self.writer.write(entries);
         }
 
-        let strategy = self.config.strategy;
-
-        match strategy {
-            HeaderStrategy::Siblings | HeaderStrategy::IncludeDirs => {
-                self.write_with_collector(entries, DirectoryCollector::new(strategy))
-            }
+        match self.config.strategy {
+            HeaderStrategy::Siblings => self.write_with_collector(entries, DirectoryCollector::new()),
             HeaderStrategy::DependencyFiles => self.write_with_collector(entries, DepFilesCollector::new()),
         }
     }
@@ -121,25 +112,21 @@ struct DirRecord {
     display_dir: PathBuf,
 }
 
-/// Collects the first eligible donor observed per physical directory (the
-/// source's own directory, and, for the `IncludeDirs` strategy, its
-/// in-project `-I`/`-iquote` directories), then synthesizes header entries
-/// for each recorded directory's header files.
+/// Collects the first eligible donor observed per source directory, then
+/// synthesizes header entries for each recorded directory's header files.
 struct DirectoryCollector {
-    strategy: HeaderStrategy,
     /// Keyed by the physical directory to scan for headers.
     records: HashMap<PathBuf, DirRecord>,
 }
 
 impl DirectoryCollector {
-    fn new(strategy: HeaderStrategy) -> Self {
-        Self { strategy, records: HashMap::new() }
+    fn new() -> Self {
+        Self { records: HashMap::new() }
     }
 
-    /// Records `entry`'s own directory as a scan target, and, for the
-    /// `IncludeDirs` strategy, each of its in-project include directories,
-    /// unless it is command-form (no `arguments` to clone) or not a C-family
-    /// source. First-seen donor wins per physical directory.
+    /// Records `entry`'s own directory as a scan target, unless it is
+    /// command-form (no `arguments` to clone) or not a C-family source.
+    /// First-seen donor wins per physical directory.
     fn observe(&mut self, entry: &Entry) {
         if entry.arguments.is_empty() {
             return;
@@ -151,24 +138,6 @@ impl DirectoryCollector {
         let physical = physical_parent(&entry.directory, &entry.file);
         let display = entry.file.parent().map(Path::to_path_buf).unwrap_or_default();
         self.record(physical, entry, display);
-
-        if self.strategy == HeaderStrategy::IncludeDirs {
-            // The compilation's own working directory is the reference frame:
-            // the compiler resolves relative include paths against it, so an
-            // include dir is in scope only when it resolves inside that
-            // directory. Absolute system paths and `..` sequences that escape
-            // it are left out, so the database is not flooded with headers the
-            // compilation did not treat as project-local.
-            let base = lexical_normalize(&entry.directory);
-            for inc in extract_include_dirs(&entry.arguments) {
-                let raw = if inc.is_absolute() { inc.clone() } else { entry.directory.join(&inc) };
-                let physical = lexical_normalize(&raw);
-                if !physical.starts_with(&base) {
-                    continue;
-                }
-                self.record(physical, entry, inc);
-            }
-        }
     }
 
     fn record(&mut self, physical_dir: PathBuf, entry: &Entry, display_dir: PathBuf) {
@@ -427,45 +396,12 @@ fn parse_make_prerequisites(content: &str) -> Vec<PathBuf> {
     tokens
 }
 
-/// Extracts `-I`/`-iquote` include directory values from `args`, in both
-/// separate (`-I dir`, `-iquote dir`) and glued (`-Idir`, `-iquotedir`)
-/// forms. Does not extract `-isystem` or `-idirafter` (nor any other flag):
-/// only these two are eligible donors of in-project header synthesis.
-fn extract_include_dirs(args: &[String]) -> Vec<PathBuf> {
-    let mut result = Vec::new();
-    let mut iter = args.iter();
-
-    while let Some(arg) = iter.next() {
-        if let Some(rest) = arg.strip_prefix("-iquote") {
-            if rest.is_empty() {
-                if let Some(dir) = iter.next() {
-                    result.push(PathBuf::from(dir));
-                }
-            } else {
-                result.push(PathBuf::from(rest));
-            }
-            continue;
-        }
-        if let Some(rest) = arg.strip_prefix("-I") {
-            if rest.is_empty() {
-                if let Some(dir) = iter.next() {
-                    result.push(PathBuf::from(dir));
-                }
-            } else {
-                result.push(PathBuf::from(rest));
-            }
-        }
-    }
-
-    result
-}
-
 /// Lexically normalizes a path by folding `.` and `..` components without
-/// touching the filesystem. The project-root scope check relies on this so a
-/// `..` sequence cannot textually escape the root (e.g. an include dir of
-/// `-I../../shared` resolving outside the project must not pass the guard).
-/// Symlinks are deliberately not resolved: that needs disk access and would
-/// fail on directories the build has not created.
+/// touching the filesystem. The dependency-files scope check relies on this so
+/// a `..` sequence cannot textually escape the working directory (e.g. a
+/// prerequisite of `../../shared/foo.h` resolving outside it must not pass the
+/// guard). Symlinks are deliberately not resolved: that needs disk access and
+/// would fail on directories the build has not created.
 fn lexical_normalize(path: &Path) -> PathBuf {
     use std::path::Component;
 
@@ -823,184 +759,6 @@ mod tests {
         let out = collected.lock().unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 0);
-    }
-
-    // --- extract_include_dirs ---
-
-    #[test]
-    fn test_extract_include_dirs() {
-        struct Case {
-            name: &'static str,
-            args: Vec<&'static str>,
-            expected: Vec<&'static str>,
-        }
-
-        let cases = vec![
-            Case { name: "separate -I", args: vec!["-I", "inc"], expected: vec!["inc"] },
-            Case { name: "glued -I", args: vec!["-Iinc"], expected: vec!["inc"] },
-            Case { name: "separate -iquote", args: vec!["-iquote", "q"], expected: vec!["q"] },
-            Case { name: "glued -iquote", args: vec!["-iquoteq"], expected: vec!["q"] },
-            Case { name: "-isystem is not extracted", args: vec!["-isystem", "sys"], expected: vec![] },
-            Case { name: "-idirafter is not extracted", args: vec!["-idirafter", "d"], expected: vec![] },
-            Case {
-                name: "mixed realistic arg list",
-                args: vec![
-                    "cc",
-                    "-c",
-                    "src/main.c",
-                    "-Iinclude",
-                    "-isystem",
-                    "/usr/include",
-                    "-iquote",
-                    "q",
-                    "-o",
-                    "a.o",
-                ],
-                expected: vec!["include", "q"],
-            },
-            Case { name: "trailing bare -I with no arg", args: vec!["-I"], expected: vec![] },
-        ];
-
-        for case in cases {
-            let args: Vec<String> = case.args.iter().map(|s| s.to_string()).collect();
-
-            let sut = extract_include_dirs(&args);
-
-            let expected: Vec<PathBuf> = case.expected.iter().map(PathBuf::from).collect();
-            assert_eq!(sut, expected, "case: {}", case.name);
-        }
-    }
-
-    // --- HeaderEntrySynthesizer / include-dirs strategy ---
-
-    fn include_dirs_config() -> Headers {
-        Headers { enabled: true, strategy: HeaderStrategy::IncludeDirs }
-    }
-
-    #[test]
-    fn test_synthesizes_header_entries_for_include_dirs() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::create_dir_all(root.join("include")).unwrap();
-        std::fs::write(root.join("src").join("main.c"), "").unwrap();
-        std::fs::write(root.join("include").join("util.h"), "").unwrap();
-
-        let stats = OutputStatistics::new();
-        let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(writer, include_dirs_config(), Arc::clone(&stats));
-
-        let entry = Entry::from_arguments_str(
-            "src/main.c",
-            vec!["cc", "-c", "src/main.c", "-Iinclude", "-o", "src/main.o"],
-            root.to_str().unwrap(),
-            None,
-        );
-
-        sut.write(vec![entry].into_iter()).unwrap();
-
-        let out = collected.lock().unwrap();
-        assert_eq!(out.len(), 2, "expected donor + 1 synthesized header entry: {:?}", *out);
-
-        assert_eq!(out[0].file, PathBuf::from("src/main.c"));
-
-        assert_eq!(out[1].file, PathBuf::from("include/util.h"));
-        assert_eq!(out[1].arguments, vec!["cc", "-c", "include/util.h", "-Iinclude"]);
-        assert_eq!(out[1].directory, root);
-        assert_eq!(out[1].output, None);
-
-        assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
-    fn test_include_dirs_scope_excludes_out_of_project_and_isystem() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-        let outside = tempfile::tempdir().unwrap();
-
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::write(root.join("src").join("main.c"), "").unwrap();
-
-        // In-project, but reached only via -isystem: never extracted, so its
-        // header must not be synthesized.
-        let sys_dir = root.join("sysinc");
-        std::fs::create_dir_all(&sys_dir).unwrap();
-        std::fs::write(sys_dir.join("sys.h"), "").unwrap();
-
-        // Absolute, out-of-project include dir: extracted, but filtered out
-        // by the project-root scope rule.
-        std::fs::write(outside.path().join("outside.h"), "").unwrap();
-
-        let stats = OutputStatistics::new();
-        let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(writer, include_dirs_config(), Arc::clone(&stats));
-
-        let entry = Entry::from_arguments_str(
-            "src/main.c",
-            vec![
-                "cc",
-                "-c",
-                "src/main.c",
-                "-isystem",
-                "sysinc",
-                "-I",
-                outside.path().to_str().unwrap(),
-                "-o",
-                "src/main.o",
-            ],
-            root.to_str().unwrap(),
-            None,
-        );
-
-        sut.write(vec![entry].into_iter()).unwrap();
-
-        let out = collected.lock().unwrap();
-        assert_eq!(out.len(), 1, "expected donor only, no synthesized entries: {:?}", *out);
-        assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 0);
-    }
-
-    #[test]
-    fn test_include_dirs_scope_rejects_parent_dir_escape() {
-        // The compilation runs in `work`. An include dir under it is in scope;
-        // one that escapes via `..` resolves outside `work` and must be
-        // rejected even though it textually shares the prefix before its `..`
-        // components are folded.
-        let root = tempfile::tempdir().unwrap();
-        let work = root.path().join("work");
-        std::fs::create_dir_all(work.join("local")).unwrap();
-        std::fs::write(work.join("main.c"), "").unwrap();
-        std::fs::write(work.join("local").join("kept.h"), "").unwrap();
-
-        let escaped = root.path().join("outside");
-        std::fs::create_dir_all(&escaped).unwrap();
-        std::fs::write(escaped.join("escaped.h"), "").unwrap();
-
-        let stats = OutputStatistics::new();
-        let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(writer, include_dirs_config(), Arc::clone(&stats));
-
-        // From work/: `local` stays inside (kept); `../outside` -> root/outside
-        // escapes the working directory (rejected).
-        let entry = Entry::from_arguments_str(
-            "main.c",
-            vec!["cc", "-c", "main.c", "-Ilocal", "-I../outside", "-o", "main.o"],
-            work.to_str().unwrap(),
-            None,
-        );
-
-        sut.write(vec![entry].into_iter()).unwrap();
-
-        let out = collected.lock().unwrap();
-        assert_eq!(out.len(), 2, "expected donor + only the in-directory header: {:?}", *out);
-        assert!(
-            out.iter().any(|e| e.file.as_path() == Path::new("local/kept.h")),
-            "header inside the working directory kept"
-        );
-        assert!(
-            !out.iter().any(|e| e.file.file_name() == Some(std::ffi::OsStr::new("escaped.h"))),
-            "header reached via .. outside the working directory must not be synthesized"
-        );
-        assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 1);
     }
 
     // --- parse_make_prerequisites ---

@@ -250,18 +250,17 @@ Editors and linters often need compile flags for header files, not only for the 
 
 - **enabled**: Turn header-entry synthesis on or off. Default `false`.
 - **strategy**: How header files are discovered and which translation unit donates the flags. One of:
-  - `siblings` (default): for each directory that contains a compiled source, header files in that same directory receive an entry cloned from a same-directory source. Zero prerequisites, but the flags are approximate (a header gets its directory sibling's flags), and it produces nothing for headers in directories that hold no compiled source -- notably the common split `include/` + `src/` layout.
-  - `include-dirs`: a superset of `siblings` that additionally scans the compiled unit's own `-I`/`-iquote` include directories, but only those that resolve inside the compilation's own working directory (the directory the compiler ran in, which it uses to resolve relative include paths). System include directories (`-isystem`, `-idirafter`) and directories that escape the working directory -- absolute system paths, or paths reached via `..` -- are skipped, so the database is not flooded with system headers. This reaches a split `include/`+`src/` layout when the build compiles from a directory that contains both, without needing dependency files.
-  - `dependency-files`: reads the make-style dependency file (`.d`) the build already emitted (for example via `-MMD`/`-MF`) and synthesizes an entry for each header prerequisite it lists that resolves inside the compilation's working directory. This is the most accurate option for the headers a compilation actually included, but it requires the build to have emitted dependency files and for them to still be on disk.
+  - `siblings` (default): for each directory that contains a compiled source, header files in that same directory receive an entry cloned from a same-directory source. Zero prerequisites, but the flags are approximate (a header gets its directory sibling's flags), and it produces nothing for headers in directories that hold no compiled source -- notably the split `include/` + `src/` layout, for which `dependency-files` is the answer.
+  - `dependency-files`: reads the make-style dependency file (`.d`) the build already emitted (for example via `-MMD`/`-MF`) and synthesizes an entry for each header prerequisite it lists that resolves inside the compilation's working directory. This is the most accurate option for the headers a compilation actually included -- it reaches headers in other directories (a split `include/`+`src/` layout) precisely -- but it requires the build to have emitted dependency files and for them to still be on disk.
 
 Which file extensions count as headers is fixed (the built-in C-family header set) and is not configurable. Only C, C++, and Objective-C translation units are eligible donors. Synthesized entries pass through duplicate detection and validation like any other entry, so a header that already has a real compilation entry is not duplicated. Entries recorded in `command`-string form (rather than the default `arguments` array) cannot donate and are skipped.
 
-A recipe for a project that keeps headers under `include/` and sources under `src/`:
+A recipe for a project that keeps headers under `include/` and sources under `src/`, whose build emits dependency files:
 
 ```yaml
 headers:
   enabled: true
-  strategy: include-dirs
+  strategy: dependency-files
 ```
 
 ## Default Configuration
