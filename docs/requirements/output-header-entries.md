@@ -1,6 +1,6 @@
 ---
 title: Header file entries in the output
-status: in-progress
+status: implemented
 ---
 
 ## Intent

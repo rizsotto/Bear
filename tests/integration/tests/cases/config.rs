@@ -553,6 +553,84 @@ format:
     Ok(())
 }
 
+/// Test header-entry synthesis with the `dependency-files` strategy.
+/// Verifies that headers listed as prerequisites in the make-style
+/// dependency file a build emits (via `-MMD -MF`) receive synthesized
+/// entries, cloning the donor's arguments with the source swapped and the
+/// output-file flag removed.
+// Requirements: output-header-entries
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn header_entries_dependency_files_config() -> Result<()> {
+    let env = TestEnvironment::new("header_entries_dependency_files")?;
+
+    // main.c actually includes util.h, so the compiler's dependency file
+    // lists it as a prerequisite.
+    env.create_source_files(&[
+        ("main.c", "#include \"util.h\"\nint main() { return 0; }"),
+        ("util.h", "int util(void);"),
+    ])?;
+
+    let build_commands = format!("{} -c main.c -MMD -MF main.d -o main.o", COMPILER_C_PATH);
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+headers:
+  enabled: true
+  strategy: dependency-files
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.c"))?;
+
+    let synthesized_args = vec![
+        COMPILER_C_PATH.to_string(),
+        "-c".to_string(),
+        "util.h".to_string(),
+        "-MMD".to_string(),
+        "-MF".to_string(),
+        "main.d".to_string(),
+    ];
+
+    let synthesized_matcher = CompilationEntryMatcher::new()
+        .file("util.h")
+        .directory(env.test_dir().to_str().unwrap())
+        .arguments(synthesized_args);
+
+    db.assert_contains(&synthesized_matcher)?;
+
+    Ok(())
+}
+
 /// Test that with no `headers` configuration, no synthesized header entries
 /// appear in the output: behaviour is unchanged from before header-entry
 /// synthesis existed.

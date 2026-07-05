@@ -19,7 +19,7 @@ use thiserror::Error;
 pub use converter::CommandConverter;
 
 /// Represents an entry of the compilation database.
-#[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Entry {
     /// The main translation unit source processed by this compilation step.
     /// This is used by tools as the key into the compilation database.

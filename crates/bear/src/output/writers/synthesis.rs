@@ -7,7 +7,7 @@
 //! editors and linters can resolve compile flags for headers as well as
 //! sources. See `docs/requirements/output-header-entries.md`.
 //!
-//! Two discovery strategies are implemented here:
+//! Three discovery strategies are implemented here:
 //!
 //! - `Siblings`: header files that live in the same directory as a compiled
 //!   C, C++, or Objective-C source.
@@ -15,9 +15,15 @@
 //!   `-I`/`-iquote` include directories, but only those that resolve under
 //!   the project root (bear's current working directory), to avoid flooding
 //!   the database with system headers.
+//! - `DependencyFiles`: reads the make-style dependency file (`.d`) a
+//!   donor's build already emitted, and synthesizes an entry per header
+//!   prerequisite listed there, scoped to headers that resolve under the
+//!   project root.
 //!
-//! The `DependencyFiles` strategy is recognized by configuration but
-//! currently forwards entries unchanged.
+//! All three strategies stream: entries observed as they pass through are
+//! recorded, and the synthesized header entries are emitted once, in an
+//! epilogue, after the input iterator is exhausted. See
+//! [`HeaderCollector`].
 
 use crate::config::{HeaderStrategy, Headers};
 use crate::output::WriterError;
@@ -25,13 +31,27 @@ use crate::output::clang::Entry;
 use crate::output::statistics::OutputStatistics;
 use crate::semantic::interpreters::matchers::{is_c_family_source, is_header_file, looks_like_a_source_file};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use super::IteratorWriter;
+
+/// Collects donor observations while entries stream through, then yields the
+/// synthesized header entries once the stream is exhausted. Implementations
+/// hold whatever state they need (e.g. one donor per directory, or a
+/// dedup set) so that memory stays proportional to the number of donors or
+/// directories considered, not to the number of entries in the database.
+trait HeaderCollector {
+    /// Called once per entry as it streams through, in order.
+    fn observe(&mut self, entry: &Entry);
+
+    /// Called once, after all entries have been observed, to produce the
+    /// synthesized header entries.
+    fn synthesize(&self) -> Vec<Entry>;
+}
 
 /// Synthesizes compilation database entries for header files by cloning a
 /// donor translation unit's arguments, per the configured discovery strategy.
@@ -52,13 +72,15 @@ impl<T: IteratorWriter<Entry>> HeaderEntrySynthesizer<T> {
         Self { writer, config, project_root, stats }
     }
 
-    /// Siblings/include-dirs strategies: for each directory recorded as a
-    /// scan target, scan the directory once (in the epilogue, after all
-    /// entries have streamed through) and synthesize an entry for each header
-    /// file found there, cloning the first-seen donor's arguments.
-    fn write_directory_scan(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
-        let collector =
-            Rc::new(RefCell::new(DirectoryCollector::new(self.config.strategy, self.project_root.clone())));
+    /// Drives `collector` over `entries`: each entry is observed as it
+    /// streams through, and once the stream is exhausted, an epilogue asks
+    /// the collector to synthesize the header entries and appends them.
+    fn write_with_collector(
+        self,
+        entries: impl Iterator<Item = Entry>,
+        collector: impl HeaderCollector + 'static,
+    ) -> Result<(), WriterError> {
+        let collector = Rc::new(RefCell::new(collector));
         let collector1 = Rc::clone(&collector);
         let collector2 = Rc::clone(&collector);
         let stats = Arc::clone(&self.stats);
@@ -84,10 +106,16 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for HeaderEntrySynthesizer<
             return self.writer.write(entries);
         }
 
-        match self.config.strategy {
-            HeaderStrategy::Siblings | HeaderStrategy::IncludeDirs => self.write_directory_scan(entries),
-            // Implemented in a later commit; forward untouched until then.
-            HeaderStrategy::DependencyFiles => self.writer.write(entries),
+        let strategy = self.config.strategy;
+        let project_root = self.project_root.clone();
+
+        match strategy {
+            HeaderStrategy::Siblings | HeaderStrategy::IncludeDirs => {
+                self.write_with_collector(entries, DirectoryCollector::new(strategy, project_root))
+            }
+            HeaderStrategy::DependencyFiles => {
+                self.write_with_collector(entries, DepFilesCollector::new(project_root))
+            }
         }
     }
 }
@@ -207,6 +235,199 @@ impl DirectoryCollector {
 
         result
     }
+}
+
+impl HeaderCollector for DirectoryCollector {
+    fn observe(&mut self, entry: &Entry) {
+        DirectoryCollector::observe(self, entry)
+    }
+
+    fn synthesize(&self) -> Vec<Entry> {
+        DirectoryCollector::synthesize(self)
+    }
+}
+
+/// One eligible donor: its own compile flags, and the dependency file its
+/// build is expected to have emitted. The dependency file is a build
+/// artifact that does not exist yet at the time its compiler invocation is
+/// intercepted (interception happens before the compiler runs, not after),
+/// so it must be read later, in the epilogue - never during `observe`.
+struct DepRecord {
+    arguments: Vec<String>,
+    directory: PathBuf,
+    source_file: PathBuf,
+    dep_path: PathBuf,
+}
+
+/// Collects, per eligible donor, the dependency file (`.d`) its build is
+/// expected to emit, then - once all entries have streamed through, in the
+/// epilogue - reads each recorded dependency file and synthesizes an entry
+/// for each in-project header prerequisite listed there. Unlike
+/// [`DirectoryCollector`], no directory is scanned: the exact header set
+/// comes from the dependency file, so headers reached from other
+/// directories (e.g. via `-I`) are picked up precisely, without scanning
+/// those directories wholesale.
+struct DepFilesCollector {
+    project_root: PathBuf,
+    donors: Vec<DepRecord>,
+}
+
+impl DepFilesCollector {
+    fn new(project_root: PathBuf) -> Self {
+        Self { project_root, donors: Vec::new() }
+    }
+}
+
+impl HeaderCollector for DepFilesCollector {
+    /// Records `entry` as a donor, with the dependency file its build is
+    /// expected to have emitted, unless it is command-form (no `arguments`
+    /// to clone), not a C-family source, or its arguments do not locate a
+    /// dependency file at all.
+    fn observe(&mut self, entry: &Entry) {
+        if entry.arguments.is_empty() {
+            return;
+        }
+        if !is_c_family_source(&entry.file) {
+            return;
+        }
+
+        let Some(dep_rel) = locate_dep_file(&entry.arguments) else {
+            return;
+        };
+        let dep_path = if dep_rel.is_absolute() { dep_rel } else { entry.directory.join(&dep_rel) };
+
+        self.donors.push(DepRecord {
+            arguments: entry.arguments.clone(),
+            directory: entry.directory.clone(),
+            source_file: entry.file.clone(),
+            dep_path,
+        });
+    }
+
+    /// Reads each recorded donor's dependency file once and synthesizes an
+    /// entry per in-project header prerequisite listed there, deduplicated
+    /// across donors that share a header.
+    fn synthesize(&self) -> Vec<Entry> {
+        let mut seen: HashSet<(PathBuf, PathBuf)> = HashSet::new();
+        let mut result = Vec::new();
+
+        for donor in &self.donors {
+            let content = match std::fs::read_to_string(&donor.dep_path) {
+                Ok(content) => content,
+                Err(err) => {
+                    log::debug!(
+                        "Skipping header synthesis for dependency file {:?}: {}",
+                        donor.dep_path,
+                        err
+                    );
+                    continue;
+                }
+            };
+
+            for prereq in parse_make_prerequisites(&content) {
+                if !is_header_file(&prereq) {
+                    // The source file itself is also listed as a prerequisite.
+                    continue;
+                }
+
+                let phys = if prereq.is_absolute() { prereq.clone() } else { donor.directory.join(&prereq) };
+                if !phys.starts_with(&self.project_root) {
+                    // Out of scope: system or out-of-project headers are not
+                    // synthesized, to avoid flooding the database.
+                    continue;
+                }
+
+                if !seen.insert((donor.directory.clone(), prereq.clone())) {
+                    continue;
+                }
+
+                if let Some(args) = rewrite_arguments(&donor.arguments, &donor.source_file, &prereq) {
+                    result.push(Entry::with_arguments(
+                        prereq.clone(),
+                        args,
+                        donor.directory.clone(),
+                        None::<PathBuf>,
+                    ));
+                }
+            }
+        }
+
+        result
+    }
+}
+
+/// Locates the dependency file a donor's build would have emitted, from its
+/// own compile arguments: prefers an explicit `-MF <path>` (or glued
+/// `-MF<path>`); else derives it from the object output (`-o <path>` ->
+/// `<path>.d`); else from the target name (`-MT <path>` -> `<path>.d`).
+/// Returns `None` when no dependency file can be located.
+fn locate_dep_file(args: &[String]) -> Option<PathBuf> {
+    if let Some(value) = extract_flag_value(args, "-MF") {
+        return Some(PathBuf::from(value));
+    }
+    if let Some(value) = extract_flag_value(args, "-o") {
+        return Some(PathBuf::from(value).with_extension("d"));
+    }
+    if let Some(value) = extract_flag_value(args, "-MT") {
+        return Some(PathBuf::from(value).with_extension("d"));
+    }
+    None
+}
+
+/// Extracts the value of `flag` from `args`, in both separate (`flag value`)
+/// and glued (`flagvalue`) forms. Returns the first match.
+fn extract_flag_value(args: &[String], flag: &str) -> Option<String> {
+    let mut iter = args.iter();
+
+    while let Some(arg) = iter.next() {
+        if arg == flag {
+            return iter.next().cloned();
+        }
+        if let Some(rest) = arg.strip_prefix(flag)
+            && !rest.is_empty()
+        {
+            return Some(rest.to_string());
+        }
+    }
+
+    None
+}
+
+/// Parses the prerequisites of the first rule in a make-style dependency
+/// file (as emitted by `-MD`/`-MMD`/`-MF`). `-MP` emits extra phony rules
+/// for each header on later lines (`header:` with no prerequisites), which
+/// are not the first rule and are ignored here.
+fn parse_make_prerequisites(content: &str) -> Vec<PathBuf> {
+    // Unfold line continuations (backslash-newline) into spaces so the
+    // first rule becomes one logical line.
+    let unfolded = content.replace("\\\r\n", " ").replace("\\\n", " ");
+    let first_line = unfolded.lines().next().unwrap_or("");
+    let Some((_, prereqs)) = first_line.split_once(':') else { return Vec::new() };
+
+    // Tokenize on unescaped whitespace, treating "\ " as a literal space
+    // (make escapes spaces in filenames this way).
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = prereqs.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' if chars.peek() == Some(&' ') => {
+                current.push(' ');
+                chars.next();
+            }
+            c if c.is_whitespace() => {
+                if !current.is_empty() {
+                    tokens.push(PathBuf::from(std::mem::take(&mut current)));
+                }
+            }
+            c => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(PathBuf::from(current));
+    }
+
+    tokens
 }
 
 /// Extracts `-I`/`-iquote` include directory values from `args`, in both
@@ -640,6 +861,173 @@ mod tests {
                 "-o",
                 "src/main.o",
             ],
+            root.to_str().unwrap(),
+            None,
+        );
+
+        sut.write(vec![entry].into_iter()).unwrap();
+
+        let out = collected.lock().unwrap();
+        assert_eq!(out.len(), 1, "expected donor only, no synthesized entries: {:?}", *out);
+        assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 0);
+    }
+
+    // --- parse_make_prerequisites ---
+
+    #[test]
+    fn test_parse_make_prerequisites() {
+        struct Case {
+            name: &'static str,
+            content: &'static str,
+            expected: Vec<&'static str>,
+        }
+
+        let cases = vec![
+            Case {
+                name: "single line",
+                content: "main.o: main.c util.h\n",
+                expected: vec!["main.c", "util.h"],
+            },
+            Case {
+                name: "line continuation joins two lines",
+                content: "main.o: main.c \\\n  util.h\n",
+                expected: vec!["main.c", "util.h"],
+            },
+            Case {
+                name: "escaped space in a filename",
+                content: "main.o: main.c a\\ b.h\n",
+                expected: vec!["main.c", "a b.h"],
+            },
+            Case {
+                name: "-MP phony rules on later lines are ignored",
+                content: "main.o: main.c util.h\n\nutil.h:\n",
+                expected: vec!["main.c", "util.h"],
+            },
+            Case { name: "no ':' yields empty", content: "not a rule at all\n", expected: vec![] },
+        ];
+
+        for case in cases {
+            let sut = parse_make_prerequisites(case.content);
+
+            let expected: Vec<PathBuf> = case.expected.iter().map(PathBuf::from).collect();
+            assert_eq!(sut, expected, "case: {}", case.name);
+        }
+    }
+
+    // --- locate_dep_file ---
+
+    #[test]
+    fn test_locate_dep_file() {
+        struct Case {
+            name: &'static str,
+            args: Vec<&'static str>,
+            expected: Option<&'static str>,
+        }
+
+        let cases = vec![
+            Case {
+                name: "explicit -MF",
+                args: vec!["cc", "-c", "main.c", "-MF", "dep.d", "-o", "main.o"],
+                expected: Some("dep.d"),
+            },
+            Case {
+                name: "glued -MF",
+                args: vec!["cc", "-c", "main.c", "-MFdep.d", "-o", "main.o"],
+                expected: Some("dep.d"),
+            },
+            Case {
+                name: "derived from -o",
+                args: vec!["cc", "-c", "main.c", "-o", "main.o"],
+                expected: Some("main.d"),
+            },
+            Case {
+                name: "derived from -MT",
+                args: vec!["cc", "-c", "main.c", "-MT", "main.o"],
+                expected: Some("main.d"),
+            },
+            Case { name: "none present", args: vec!["cc", "-c", "main.c"], expected: None },
+            Case {
+                name: "-MF wins over -o",
+                args: vec!["cc", "-c", "main.c", "-MF", "custom.d", "-o", "main.o"],
+                expected: Some("custom.d"),
+            },
+        ];
+
+        for case in cases {
+            let args: Vec<String> = case.args.iter().map(|s| s.to_string()).collect();
+
+            let sut = locate_dep_file(&args);
+
+            let expected = case.expected.map(PathBuf::from);
+            assert_eq!(sut, expected, "case: {}", case.name);
+        }
+    }
+
+    // --- HeaderEntrySynthesizer / dependency-files strategy ---
+
+    fn dependency_files_config() -> Headers {
+        Headers { enabled: true, strategy: HeaderStrategy::DependencyFiles }
+    }
+
+    #[test]
+    fn test_synthesizes_header_entries_for_dependency_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src").join("main.c"), "").unwrap();
+        std::fs::write(root.join("src").join("util.h"), "").unwrap();
+        std::fs::write(root.join("main.d"), "main.o: src/main.c src/util.h /usr/include/stdio.h\n").unwrap();
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let sut = HeaderEntrySynthesizer::new(
+            writer,
+            dependency_files_config(),
+            root.to_path_buf(),
+            Arc::clone(&stats),
+        );
+
+        let entry = Entry::from_arguments_str(
+            "src/main.c",
+            vec!["cc", "-c", "src/main.c", "-MF", "main.d", "-o", "src/main.o"],
+            root.to_str().unwrap(),
+            None,
+        );
+
+        sut.write(vec![entry].into_iter()).unwrap();
+
+        let out = collected.lock().unwrap();
+        assert_eq!(out.len(), 2, "expected donor + 1 synthesized header entry: {:?}", *out);
+
+        assert_eq!(out[0].file, PathBuf::from("src/main.c"));
+
+        assert_eq!(out[1].file, PathBuf::from("src/util.h"));
+        assert_eq!(out[1].arguments, vec!["cc", "-c", "src/util.h", "-MF", "main.d"]);
+        assert_eq!(out[1].directory, root);
+        assert_eq!(out[1].output, None);
+
+        assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn test_dependency_files_missing_dep_file_synthesizes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src").join("main.c"), "").unwrap();
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let sut = HeaderEntrySynthesizer::new(
+            writer,
+            dependency_files_config(),
+            root.to_path_buf(),
+            Arc::clone(&stats),
+        );
+
+        let entry = Entry::from_arguments_str(
+            "src/main.c",
+            vec!["cc", "-c", "src/main.c", "-MF", "missing.d", "-o", "src/main.o"],
             root.to_str().unwrap(),
             None,
         );
