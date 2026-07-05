@@ -1,9 +1,9 @@
 ---
-source: bear-codegen/tests/snapshots.rs
+source: build-support/compilers-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"armclang\")"
 ---
 // Generated from compilers/armclang.yaml -- DO NOT EDIT
-static ARMCLANG_FLAGS: [FlagRule; 205] = [
+static ARMCLANG_FLAGS: [FlagRule; 207] = [
     FlagRule::new(FlagPattern::Exactly("--no_depend_system_headers", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--depend_system_headers", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--depend_single_line", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -46,6 +46,7 @@ static ARMCLANG_FLAGS: [FlagRule; 205] = [
     FlagRule::new(FlagPattern::Exactly("--target-help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Prefix("-fplugin-arg-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-nostartfiles", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Exactly("--precompile", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-client_name", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-dumpmachine", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Exactly("-dumpversion", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
@@ -114,6 +115,7 @@ static ARMCLANG_FLAGS: [FlagRule; 205] = [
     FlagRule::new(FlagPattern::Exactly("-iprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fuse-ld"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Prefix("-fmodule", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-ObjC++", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-bundle", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Prefix("-objcmt", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),

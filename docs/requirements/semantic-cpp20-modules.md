@@ -1,6 +1,6 @@
 ---
 title: Recognize C++20 module compilations
-status: in-progress
+status: implemented
 ---
 
 ## Intent

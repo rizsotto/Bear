@@ -3,7 +3,7 @@ source: build-support/compilers-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"mpi\")"
 ---
 // Generated from compilers/mpi.yaml -- DO NOT EDIT
-static MPI_FLAGS: [FlagRule; 110] = [
+static MPI_FLAGS: [FlagRule; 111] = [
     FlagRule::new(FlagPattern::Exactly("-iwithprefixbefore", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-ffile-prefix-map"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-pass-exit-codes", 0), ArgumentKind::Other(PassEffect::DriverOption)),
@@ -43,6 +43,7 @@ static MPI_FLAGS: [FlagRule; 110] = [
     FlagRule::new(FlagPattern::Exactly("-iprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fuse-ld"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Prefix("-fmodule", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-showme", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Exactly("-iquote", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-nolibc", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),

@@ -1,9 +1,9 @@
 ---
-source: bear-codegen/tests/snapshots.rs
+source: build-support/compilers-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"ibm_xl\")"
 ---
 // Generated from compilers/ibm_xl.yaml -- DO NOT EDIT
-static IBM_XL_FLAGS: [FlagRule; 223] = [
+static IBM_XL_FLAGS: [FlagRule; 225] = [
     FlagRule::new(FlagPattern::Exactly("-iwithprefixbefore", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-allowable_client", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("--analyzer-output"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -40,6 +40,7 @@ static IBM_XL_FLAGS: [FlagRule; 223] = [
     FlagRule::new(FlagPattern::Exactly("--target-help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Prefix("-fplugin-arg-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-nostartfiles", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Exactly("--precompile", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-client_name", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-dumpmachine", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Exactly("-dumpversion", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
@@ -120,6 +121,7 @@ static IBM_XL_FLAGS: [FlagRule; 223] = [
     FlagRule::new(FlagPattern::Exactly("-iprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fuse-ld"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Prefix("-fmodule", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-qnohot", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-qnosmp", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-qnoipa", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),

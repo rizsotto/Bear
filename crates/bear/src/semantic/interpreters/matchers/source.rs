@@ -7,6 +7,7 @@ enum FileKind {
     CFamilyHeader,
     CFamilySource,
     ObjCSource,
+    CxxModule,
     OtherCompilable,
 }
 
@@ -22,6 +23,9 @@ fn file_kind(extension: &str) -> Option<FileKind> {
         // ObjectiveC
         "m" | "mi" | "mm" | "M" | "mii" =>
             Some(FileKind::ObjCSource),
+        // C++20 module interfaces
+        "cppm" | "ixx" | "mxx" | "ccm" | "cxxm" | "c++m" =>
+            Some(FileKind::CxxModule),
         // Preprocessed
         "i" | "ii" |
         // CUDA
@@ -61,6 +65,11 @@ pub fn is_header_file(path: &Path) -> bool {
 
 /// True when the path is a C, C++, or Objective-C translation unit - the file
 /// types eligible to donate compile flags to a synthesized header entry.
+///
+/// C++20 module interfaces (`.cppm`, `.ixx`, ...) are intentionally excluded:
+/// a module-interface compile carries module-specific flags (e.g.
+/// `--precompile`) that would be wrong to clone onto a plain header entry, so
+/// they never donate.
 pub fn is_c_family_source(path: &Path) -> bool {
     matches!(kind_of(path), Some(FileKind::CFamilySource | FileKind::ObjCSource))
 }
@@ -73,6 +82,7 @@ fn kind_of(path: &Path) -> Option<FileKind> {
 mod test {
     use super::*;
 
+    // Requirements: semantic-cpp20-modules
     #[test]
     fn test_filenames() {
         assert!(looks_like_a_source_file("source.c"));
@@ -82,6 +92,11 @@ mod test {
 
         assert!(looks_like_a_source_file("source.h"));
         assert!(looks_like_a_source_file("source.hpp"));
+
+        assert!(looks_like_a_source_file("mod.cppm"));
+        assert!(looks_like_a_source_file("mod.ixx"));
+        // Precompiled module artifacts must never be treated as sources.
+        assert!(!looks_like_a_source_file("foo.pcm"));
 
         assert!(looks_like_a_source_file("source.vala"));
         assert!(looks_like_a_source_file("source.gs"));
@@ -98,6 +113,7 @@ mod test {
         assert!(!looks_like_a_source_file("/o"));
     }
 
+    // Requirements: semantic-cpp20-modules
     #[test]
     fn test_file_kind() {
         let cases = [
@@ -108,11 +124,18 @@ mod test {
             ("c", Some(FileKind::CFamilySource)),
             ("mm", Some(FileKind::ObjCSource)),
             ("m", Some(FileKind::ObjCSource)),
+            ("cppm", Some(FileKind::CxxModule)),
+            ("ixx", Some(FileKind::CxxModule)),
+            ("mxx", Some(FileKind::CxxModule)),
+            ("ccm", Some(FileKind::CxxModule)),
+            ("cxxm", Some(FileKind::CxxModule)),
+            ("c++m", Some(FileKind::CxxModule)),
             ("swift", Some(FileKind::OtherCompilable)),
             ("cu", Some(FileKind::OtherCompilable)),
             ("f90", Some(FileKind::OtherCompilable)),
             ("o", None),
             ("vapi", None),
+            ("pcm", None),
         ];
 
         for (extension, expected) in cases {
@@ -122,6 +145,7 @@ mod test {
         }
     }
 
+    // Requirements: semantic-cpp20-modules
     #[test]
     fn test_is_header_file_and_is_c_family_source() {
         let cases = [
@@ -130,6 +154,9 @@ mod test {
             ("a.mm", false, true),
             ("a.swift", false, false),
             ("a.o", false, false),
+            // Module interfaces are recognized as sources (looks_like_a_source_file)
+            // but are deliberately excluded as header-synthesis donors.
+            ("mod.cppm", false, false),
         ];
 
         for (path, expected_header, expected_source) in cases {

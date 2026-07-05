@@ -1022,6 +1022,27 @@ mod tests {
                 panic!("Expected compiler command");
             }
         }
+
+        // Requirements: semantic-cpp20-modules
+        #[test]
+        fn modules_ts_flag_recognizes_module_interface_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "g++",
+                vec!["g++", "-std=c++20", "-fmodules-ts", "-c", "mod.cppm"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(execution),
+                vec![
+                    (Compiler, vec!["g++"]),
+                    (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
+                    (configures(CompilerPass::Compiling), vec!["-fmodules-ts"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (Source { binary: false }, vec!["mod.cppm"]),
+                ],
+            );
+        }
     }
 
     mod clang {
@@ -1614,6 +1635,48 @@ mod tests {
                 "/home/user/project",
             );
             assert_ignored(sut.recognize(cc1_execution), "internal invocation");
+        }
+
+        // Requirements: semantic-cpp20-modules
+        #[test]
+        fn precompile_module_interface_does_not_source_the_output() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "clang++",
+                vec!["clang++", "--precompile", "-std=c++20", "foo.cppm", "-o", "foo.pcm"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(execution),
+                vec![
+                    (Compiler, vec!["clang++"]),
+                    (stops_at(CompilerPass::Compiling), vec!["--precompile"]),
+                    (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
+                    (Source { binary: false }, vec!["foo.cppm"]),
+                    (Output, vec!["-o", "foo.pcm"]),
+                ],
+            );
+        }
+
+        // Requirements: semantic-cpp20-modules
+        #[test]
+        fn module_file_flag_consumes_precompiled_module_without_sourcing_it() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "clang++",
+                vec!["clang++", "-std=c++20", "-fmodule-file=foo=foo.pcm", "-c", "main.cpp"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(execution),
+                vec![
+                    (Compiler, vec!["clang++"]),
+                    (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
+                    (configures(CompilerPass::Compiling), vec!["-fmodule-file=foo=foo.pcm"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (Source { binary: false }, vec!["main.cpp"]),
+                ],
+            );
         }
     }
 

@@ -1,9 +1,9 @@
 ---
-source: bear-codegen/tests/snapshots.rs
+source: build-support/compilers-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"intel_cc\")"
 ---
 // Generated from compilers/intel_cc.yaml -- DO NOT EDIT
-static INTEL_CC_FLAGS: [FlagRule; 260] = [
+static INTEL_CC_FLAGS: [FlagRule; 262] = [
     FlagRule::new(FlagPattern::Exactly("-qopt-multiple-gather-scatter-by-shuffles", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-qopt-assume-safe-padding", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-qopt-streaming-stores"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -71,6 +71,7 @@ static INTEL_CC_FLAGS: [FlagRule; 260] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-diag-remark"), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-no-prec-div", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-heap-arrays"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("--precompile", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-client_name", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-dumpmachine", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Exactly("-dumpversion", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
@@ -152,6 +153,7 @@ static INTEL_CC_FLAGS: [FlagRule; 260] = [
     FlagRule::new(FlagPattern::Exactly("-iprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fuse-ld"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Prefix("-fmodule", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-no-ipo", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-no-ftz", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-no-vec", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),

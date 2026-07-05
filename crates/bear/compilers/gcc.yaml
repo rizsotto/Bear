@@ -204,6 +204,10 @@ flags:
     result: configures_compiling
   - match: {pattern: "-g*"}
     result: configures_compiling
+  # C++20 modules: explicit so the family stands out; the remaining
+  # -f...modules spellings ride the -f* catch-all below.
+  - match: {pattern: "-fmodule*"}
+    result: configures_compiling
   - match: {pattern: "-f*"}
     result: configures_compiling
   - match: {pattern: "-m*"}

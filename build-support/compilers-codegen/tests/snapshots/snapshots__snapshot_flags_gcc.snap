@@ -1,9 +1,9 @@
 ---
-source: bear-codegen/tests/snapshots.rs
+source: build-support/compilers-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"gcc\")"
 ---
 // Generated from compilers/gcc.yaml -- DO NOT EDIT
-static GCC_FLAGS: [FlagRule; 103] = [
+static GCC_FLAGS: [FlagRule; 104] = [
     FlagRule::new(FlagPattern::Exactly("-iwithprefixbefore", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-ffile-prefix-map"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-pass-exit-codes", 0), ArgumentKind::Other(PassEffect::DriverOption)),
@@ -41,6 +41,7 @@ static GCC_FLAGS: [FlagRule; 103] = [
     FlagRule::new(FlagPattern::Exactly("-iprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fuse-ld"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Prefix("-fmodule", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-iquote", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-nolibc", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-no-pie", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),

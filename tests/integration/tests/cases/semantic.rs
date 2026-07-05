@@ -1241,3 +1241,200 @@ fn swiftc_version_flag_yields_no_entry() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: semantic-cpp20-modules
+//
+// A C++20 module-interface compile (`clang++ --precompile ... -o foo.pcm`)
+// must produce exactly one entry for the interface source (`foo.cppm`), with
+// `--precompile` and the input/output paths preserved verbatim. The `.pcm`
+// output is consumed by the `-o` flag and must never itself surface as a
+// `file` or a standalone source argument.
+#[test]
+fn clang_precompile_module_interface_yields_single_entry_for_source() -> Result<()> {
+    let env = TestEnvironment::new("clang_precompile_module_interface")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    // PATH shield: without it, a host that ships a real clang++ resolves the
+    // bare name to its absolute path and the literal-argv assertion below
+    // fails on that platform only.
+    let shield = env.test_dir().join("path-shield");
+    std::fs::create_dir_all(&shield)?;
+
+    let event = json!({
+        "executable": "clang++",
+        "arguments": ["clang++", "--precompile", "-std=c++20", "foo.cppm", "-o", "foo.pcm"],
+        "working_dir": temp_dir,
+        "environment": { "PATH": shield.to_str().unwrap() }
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string()), ("foo.cppm", "export module foo;\n")])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "foo.cppm".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "clang++".to_string(),
+            "--precompile".to_string(),
+            "-std=c++20".to_string(),
+            "foo.cppm".to_string(),
+            "-o".to_string(),
+            "foo.pcm".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: semantic-cpp20-modules
+//
+// Consuming a precompiled module via `-fmodule-file=<name>=<file>` must not
+// break recognition of the real source (`main.cpp`), and the referenced
+// `.pcm` must never surface as its own entry.
+#[test]
+fn clang_module_file_flag_yields_single_entry_for_main_source() -> Result<()> {
+    let env = TestEnvironment::new("clang_module_file_flag")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let shield = env.test_dir().join("path-shield");
+    std::fs::create_dir_all(&shield)?;
+
+    let event = json!({
+        "executable": "clang++",
+        "arguments": ["clang++", "-std=c++20", "-fmodule-file=foo=foo.pcm", "-c", "main.cpp"],
+        "working_dir": temp_dir,
+        "environment": { "PATH": shield.to_str().unwrap() }
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("main.cpp", "import foo;\nint main() { return 0; }\n"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "main.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "clang++".to_string(),
+            "-std=c++20".to_string(),
+            "-fmodule-file=foo=foo.pcm".to_string(),
+            "-c".to_string(),
+            "main.cpp".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: semantic-cpp20-modules
+//
+// A mixed build with one module interface and one consumer, processed in a
+// single semantic run, must yield exactly two entries: no cross-talk between
+// the `--precompile` invocation and the `-fmodule-file=` invocation.
+#[test]
+fn clang_module_interface_and_consumer_yield_two_entries() -> Result<()> {
+    let env = TestEnvironment::new("clang_module_interface_and_consumer")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let shield = env.test_dir().join("path-shield");
+    std::fs::create_dir_all(&shield)?;
+    let path = shield.to_str().unwrap();
+
+    let event1 = json!({
+        "executable": "clang++",
+        "arguments": ["clang++", "--precompile", "-std=c++20", "foo.cppm", "-o", "foo.pcm"],
+        "working_dir": temp_dir,
+        "environment": { "PATH": path }
+    });
+    let event2 = json!({
+        "executable": "clang++",
+        "arguments": ["clang++", "-std=c++20", "-fmodule-file=foo=foo.pcm", "-c", "main.cpp"],
+        "working_dir": temp_dir,
+        "environment": { "PATH": path }
+    });
+
+    let events_content = format!("{}\n{}", event1, event2);
+
+    env.create_source_files(&[
+        ("events.json", &events_content),
+        ("foo.cppm", "export module foo;\n"),
+        ("main.cpp", "import foo;\nint main() { return 0; }\n"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+    db.assert_contains(&compilation_entry!(
+        file: "foo.cppm".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "clang++".to_string(),
+            "--precompile".to_string(),
+            "-std=c++20".to_string(),
+            "foo.cppm".to_string(),
+            "-o".to_string(),
+            "foo.pcm".to_string(),
+        ]
+    ))?;
+    db.assert_contains(&compilation_entry!(
+        file: "main.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "clang++".to_string(),
+            "-std=c++20".to_string(),
+            "-fmodule-file=foo=foo.pcm".to_string(),
+            "-c".to_string(),
+            "main.cpp".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: semantic-cpp20-modules
+//
+// GCC's transitional module flag `-fmodules-ts` must not break recognition
+// of the module-interface source (`mod.cppm`).
+#[test]
+fn gcc_modules_ts_flag_yields_single_entry_for_module_interface() -> Result<()> {
+    let env = TestEnvironment::new("gcc_modules_ts_flag")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let shield = env.test_dir().join("path-shield");
+    std::fs::create_dir_all(&shield)?;
+
+    let event = json!({
+        "executable": "g++",
+        "arguments": ["g++", "-std=c++20", "-fmodules-ts", "-c", "mod.cppm"],
+        "working_dir": temp_dir,
+        "environment": { "PATH": shield.to_str().unwrap() }
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string()), ("mod.cppm", "export module mod;\n")])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "mod.cppm".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "g++".to_string(),
+            "-std=c++20".to_string(),
+            "-fmodules-ts".to_string(),
+            "-c".to_string(),
+            "mod.cppm".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}

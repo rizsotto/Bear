@@ -277,6 +277,17 @@ are recognized automatically, using GCC flag semantics; the
 \f[CR]xc16\-gcc\f[R] and \f[CR]xc32\-gcc\f[R] names were already covered
 by the existing cross\-compiler prefix recognition.
 .PP
+C++20 module\-interface units (\f[CR].cppm\f[R], \f[CR].ixx\f[R],
+\f[CR].mxx\f[R], \f[CR].ccm\f[R], \f[CR].cxxm\f[R], \f[CR].c++m\f[R])
+are recognized as sources, so their compilations are captured the same
+way ordinary \f[CR].cpp\f[R] translation units are \(en for example
+\f[CR]clang++ \-\-precompile foo.cppm \-o foo.pcm\f[R], or a consumer
+built with GCC\(cqs \f[CR]\-fmodules\-ts\f[R] or with
+\f[CR]\-fmodule\-file=\f[R].
+Precompiled module artifacts (\f[CR].pcm\f[R]) are never recorded as
+sources: they appear on the command line but never as an entry\(cqs
+\f[CR]file\f[R].
+.PP
 Compiler launchers (\f[CR]ccache\f[R], \f[CR]distcc\f[R],
 \f[CR]sccache\f[R], \f[CR]icecc\f[R]) that carry the real compiler in
 their arguments are recorded as the real compiler\(cqs compilation:

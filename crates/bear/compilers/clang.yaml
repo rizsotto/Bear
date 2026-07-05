@@ -51,6 +51,9 @@ flags:
     result: configures_compiling
   - match: {pattern: "--analyzer-output{ }*"}
     result: configures_compiling
+  # C++20 module-interface precompile: a compile action, not a link
+  - match: {pattern: "--precompile"}
+    result: stops_at_compiling
   - match: {pattern: "-Xanalyzer", count: 1}
     result: configures_compiling
   - match: {pattern: "-arch", count: 1}
