@@ -101,7 +101,12 @@ pub(crate) fn create_pipeline(
         FilteredOutputWriter::new(validating_writer, duplicate_filter, Arc::clone(&stats), |s| {
             &s.duplicates_detected
         });
-    let synthesizer = HeaderEntrySynthesizer::new(unique_writer, config.headers.clone(), Arc::clone(&stats));
+    // Project root = bear's current working directory: the scope boundary
+    // the `IncludeDirs` header strategy uses to decide which of a donor's
+    // `-I`/`-iquote` directories are eligible for header synthesis.
+    let project_root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let synthesizer =
+        HeaderEntrySynthesizer::new(unique_writer, config.headers.clone(), project_root, Arc::clone(&stats));
     let source_filter_writer = FilteredOutputWriter::new(
         synthesizer,
         SourceEntryFilter::from(config.sources.clone()),
