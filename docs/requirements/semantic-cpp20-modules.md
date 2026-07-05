@@ -1,6 +1,6 @@
 ---
 title: Recognize C++20 module compilations
-status: proposed
+status: in-progress
 ---
 
 ## Intent
@@ -15,9 +15,12 @@ inputs and module-path flags to follow imports and produce accurate
 diagnostics.
 
 Today these entries are dropped: the module-interface extensions are not
-in the source-extension table, and the module-related driver flags are not
-in the per-compiler flag tables, so the heuristic finds no source and
-filters the invocation out.
+in the source-extension table, so the heuristic finds no source and
+filters the invocation out. The module-related driver flags do not by
+themselves break recognition -- an unrecognized single-token flag is
+consumed individually and never fabricates or destroys arity -- but the
+per-compiler flag tables must still classify them so pass detection stays
+accurate (e.g. `--precompile` is a compile action, not a link).
 
 ## Acceptance criteria
 
