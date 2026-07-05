@@ -156,6 +156,7 @@ mod test {
     use super::*;
     use std::fs;
 
+    // Requirements: output-generated-file-filter
     #[test]
     fn test_wrapper_config() {
         let content: &[u8] = br#"
@@ -179,6 +180,9 @@ mod test {
                   - path: "/opt/project/sources"
                     action: include
                   - path: "/opt/project/tests"
+                    action: exclude
+                files:
+                  - pattern: "moc_*.cpp"
                     action: exclude
 
             duplicates:
@@ -218,7 +222,10 @@ mod test {
                         action: DirectoryAction::Exclude,
                     },
                 ],
-                files: vec![],
+                files: vec![FileRule {
+                    pattern: String::from("moc_*.cpp"),
+                    action: DirectoryAction::Exclude,
+                }],
             },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Directory] },
             format: Format {

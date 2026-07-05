@@ -35,6 +35,9 @@
 //!       action: include
 //!     - path: "/opt/project/tests"
 //!       action: exclude
+//!   files:
+//!     - pattern: "moc_*.cpp"
+//!       action: exclude
 //!
 //! duplicates:
 //!   match_on: [file, directory]
