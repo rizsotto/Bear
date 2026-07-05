@@ -24,9 +24,11 @@ Ship three selectable strategies rather than one. The default is same-directory
 sibling cloning (option 4): zero prerequisites, at the cost of accepting
 approximate flags when a header's true flags differ from its directory
 siblings'. An opt-in extension additionally follows a translation unit's own
-user include directories, scoped to those that resolve under the project
-root, so that split `include/`+`src/` layouts are reachable without
-dependency files. A second opt-in strategy reads the dependency files the
+user include directories, scoped to those that resolve inside the
+compilation's own working directory - the frame the compiler itself resolves
+relative include paths against - so that a split `include/`+`src/` layout is
+reachable without dependency files when the build compiles from a directory
+containing both. A second opt-in strategy reads the dependency files the
 build emitted (option 2), for users who need accurate, cross-directory header
 lists and whose build produces those files. Running the compiler ourselves
 (option 1) stays rejected: parsing artifacts the build already produced is
@@ -39,11 +41,14 @@ source, which is common in split `include/`+`src/` layouts; the
 include-directories and dependency-file strategies exist to cover that case,
 the first without needing dependency files, the second with better accuracy.
 The dependency-file strategy adds a make-syntax parser and logic to locate
-each translation unit's dependency file. The include-directories strategy
-needs a project-root scope rule, because duplicate detection and validation
-do not filter out real system headers on their own - without the scope rule,
-following system include directories would flood the database with
-system-header noise.
+each translation unit's dependency file. Both the include-directories and
+dependency-file strategies scope discovered headers to the compilation's own
+working directory, because duplicate detection and validation do not filter
+out real system headers on their own - without the scope, following system
+include directories, or dependency files emitted with `-MD` (which lists
+system headers), would flood the database with system-header noise. Anchoring
+the scope to each compilation's working directory rather than a single global
+project root keeps the frame the same one the compiler used.
 
 ## References
 

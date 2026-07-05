@@ -12,13 +12,14 @@
 //! - `Siblings`: header files that live in the same directory as a compiled
 //!   C, C++, or Objective-C source.
 //! - `IncludeDirs`: a superset of `Siblings` that also scans a donor's own
-//!   `-I`/`-iquote` include directories, but only those that resolve under
-//!   the project root (bear's current working directory), to avoid flooding
-//!   the database with system headers.
+//!   `-I`/`-iquote` include directories, but only those that resolve inside
+//!   the compilation's own working directory (the frame the compiler resolves
+//!   relative includes against), to avoid flooding the database with system
+//!   headers.
 //! - `DependencyFiles`: reads the make-style dependency file (`.d`) a
 //!   donor's build already emitted, and synthesizes an entry per header
-//!   prerequisite listed there, scoped to headers that resolve under the
-//!   project root.
+//!   prerequisite listed there, scoped to headers that resolve inside the
+//!   compilation's working directory.
 //!
 //! All three strategies stream: entries observed as they pass through are
 //! recorded, and the synthesized header entries are emitted once, in an
@@ -58,18 +59,12 @@ trait HeaderCollector {
 pub(crate) struct HeaderEntrySynthesizer<T: IteratorWriter<Entry>> {
     writer: T,
     config: Headers,
-    project_root: PathBuf,
     stats: Arc<OutputStatistics>,
 }
 
 impl<T: IteratorWriter<Entry>> HeaderEntrySynthesizer<T> {
-    pub(crate) fn new(
-        writer: T,
-        config: Headers,
-        project_root: PathBuf,
-        stats: Arc<OutputStatistics>,
-    ) -> Self {
-        Self { writer, config, project_root, stats }
+    pub(crate) fn new(writer: T, config: Headers, stats: Arc<OutputStatistics>) -> Self {
+        Self { writer, config, stats }
     }
 
     /// Drives `collector` over `entries`: each entry is observed as it
@@ -107,15 +102,12 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for HeaderEntrySynthesizer<
         }
 
         let strategy = self.config.strategy;
-        let project_root = self.project_root.clone();
 
         match strategy {
             HeaderStrategy::Siblings | HeaderStrategy::IncludeDirs => {
-                self.write_with_collector(entries, DirectoryCollector::new(strategy, project_root))
+                self.write_with_collector(entries, DirectoryCollector::new(strategy))
             }
-            HeaderStrategy::DependencyFiles => {
-                self.write_with_collector(entries, DepFilesCollector::new(project_root))
-            }
+            HeaderStrategy::DependencyFiles => self.write_with_collector(entries, DepFilesCollector::new()),
         }
     }
 }
@@ -135,14 +127,13 @@ struct DirRecord {
 /// for each recorded directory's header files.
 struct DirectoryCollector {
     strategy: HeaderStrategy,
-    project_root: PathBuf,
     /// Keyed by the physical directory to scan for headers.
     records: HashMap<PathBuf, DirRecord>,
 }
 
 impl DirectoryCollector {
-    fn new(strategy: HeaderStrategy, project_root: PathBuf) -> Self {
-        Self { strategy, project_root: lexical_normalize(&project_root), records: HashMap::new() }
+    fn new(strategy: HeaderStrategy) -> Self {
+        Self { strategy, records: HashMap::new() }
     }
 
     /// Records `entry`'s own directory as a scan target, and, for the
@@ -162,13 +153,17 @@ impl DirectoryCollector {
         self.record(physical, entry, display);
 
         if self.strategy == HeaderStrategy::IncludeDirs {
+            // The compilation's own working directory is the reference frame:
+            // the compiler resolves relative include paths against it, so an
+            // include dir is in scope only when it resolves inside that
+            // directory. Absolute system paths and `..` sequences that escape
+            // it are left out, so the database is not flooded with headers the
+            // compilation did not treat as project-local.
+            let base = lexical_normalize(&entry.directory);
             for inc in extract_include_dirs(&entry.arguments) {
                 let raw = if inc.is_absolute() { inc.clone() } else { entry.directory.join(&inc) };
                 let physical = lexical_normalize(&raw);
-                if !physical.starts_with(&self.project_root) {
-                    // Out of scope: system or out-of-project include dirs
-                    // are not scanned, to avoid flooding the database. Normalized
-                    // first so a `..` sequence cannot textually escape the root.
+                if !physical.starts_with(&base) {
                     continue;
                 }
                 self.record(physical, entry, inc);
@@ -270,13 +265,12 @@ struct DepRecord {
 /// directories (e.g. via `-I`) are picked up precisely, without scanning
 /// those directories wholesale.
 struct DepFilesCollector {
-    project_root: PathBuf,
     donors: Vec<DepRecord>,
 }
 
 impl DepFilesCollector {
-    fn new(project_root: PathBuf) -> Self {
-        Self { project_root: lexical_normalize(&project_root), donors: Vec::new() }
+    fn new() -> Self {
+        Self { donors: Vec::new() }
     }
 }
 
@@ -326,6 +320,12 @@ impl HeaderCollector for DepFilesCollector {
                 }
             };
 
+            // The compilation's own working directory is the reference frame:
+            // dependency-file paths are relative to it, and a header is in
+            // scope only when it resolves inside that directory. System headers
+            // (absolute, or reached via `..`) are left out.
+            let base = lexical_normalize(&donor.directory);
+
             for prereq in parse_make_prerequisites(&content) {
                 if !is_header_file(&prereq) {
                     // The source file itself is also listed as a prerequisite.
@@ -334,10 +334,7 @@ impl HeaderCollector for DepFilesCollector {
 
                 let raw = if prereq.is_absolute() { prereq.clone() } else { donor.directory.join(&prereq) };
                 let phys = lexical_normalize(&raw);
-                if !phys.starts_with(&self.project_root) {
-                    // Out of scope: system or out-of-project headers are not
-                    // synthesized, to avoid flooding the database. Normalized
-                    // first so a `..` sequence cannot textually escape the root.
+                if !phys.starts_with(&base) {
                     continue;
                 }
 
@@ -661,12 +658,7 @@ mod tests {
         let fixture = fixture::Fixture::new();
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            enabled_config(),
-            fixture.path().to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, enabled_config(), Arc::clone(&stats));
 
         sut.write(vec![donor_entry(fixture.path())].into_iter()).unwrap();
 
@@ -697,8 +689,7 @@ mod tests {
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
         let config = Headers { enabled: false, strategy: HeaderStrategy::Siblings };
-        let sut =
-            HeaderEntrySynthesizer::new(writer, config, fixture.path().to_path_buf(), Arc::clone(&stats));
+        let sut = HeaderEntrySynthesizer::new(writer, config, Arc::clone(&stats));
 
         sut.write(vec![donor_entry(fixture.path())].into_iter()).unwrap();
 
@@ -713,12 +704,7 @@ mod tests {
         let fixture = fixture::Fixture::new();
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            enabled_config(),
-            fixture.path().to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, enabled_config(), Arc::clone(&stats));
 
         let entry =
             Entry::from_command_str("src/main.c", "cc -c src/main.c", fixture.path().to_str().unwrap(), None);
@@ -737,12 +723,7 @@ mod tests {
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            enabled_config(),
-            fixture.path().to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, enabled_config(), Arc::clone(&stats));
 
         let entry = Entry::from_arguments_str(
             "src/thing.swift",
@@ -821,12 +802,7 @@ mod tests {
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            include_dirs_config(),
-            root.to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, include_dirs_config(), Arc::clone(&stats));
 
         let entry = Entry::from_arguments_str(
             "src/main.c",
@@ -871,12 +847,7 @@ mod tests {
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            include_dirs_config(),
-            root.to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, include_dirs_config(), Arc::clone(&stats));
 
         let entry = Entry::from_arguments_str(
             "src/main.c",
@@ -904,48 +875,44 @@ mod tests {
 
     #[test]
     fn test_include_dirs_scope_rejects_parent_dir_escape() {
-        // proj is the project root; shared sits outside it. A relative include
-        // dir with `..` that resolves outside the root must be rejected even
-        // though it textually shares the root's prefix before normalization.
+        // The compilation runs in `work`. An include dir under it is in scope;
+        // one that escapes via `..` resolves outside `work` and must be
+        // rejected even though it textually shares the prefix before its `..`
+        // components are folded.
         let root = tempfile::tempdir().unwrap();
-        let proj = root.path().join("proj");
-        let build = proj.join("build");
-        std::fs::create_dir_all(&build).unwrap();
-        std::fs::write(build.join("main.c"), "").unwrap();
+        let work = root.path().join("work");
+        std::fs::create_dir_all(work.join("local")).unwrap();
+        std::fs::write(work.join("main.c"), "").unwrap();
+        std::fs::write(work.join("local").join("kept.h"), "").unwrap();
 
-        let in_project_inc = proj.join("include");
-        std::fs::create_dir_all(&in_project_inc).unwrap();
-        std::fs::write(in_project_inc.join("kept.h"), "").unwrap();
-
-        let escaped = root.path().join("shared");
+        let escaped = root.path().join("outside");
         std::fs::create_dir_all(&escaped).unwrap();
         std::fs::write(escaped.join("escaped.h"), "").unwrap();
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut =
-            HeaderEntrySynthesizer::new(writer, include_dirs_config(), proj.clone(), Arc::clone(&stats));
+        let sut = HeaderEntrySynthesizer::new(writer, include_dirs_config(), Arc::clone(&stats));
 
-        // From build/: `../include` -> proj/include (in project, kept);
-        // `../../shared` -> root/shared (outside proj, must be rejected).
+        // From work/: `local` stays inside (kept); `../outside` -> root/outside
+        // escapes the working directory (rejected).
         let entry = Entry::from_arguments_str(
             "main.c",
-            vec!["cc", "-c", "main.c", "-I../include", "-I../../shared", "-o", "main.o"],
-            build.to_str().unwrap(),
+            vec!["cc", "-c", "main.c", "-Ilocal", "-I../outside", "-o", "main.o"],
+            work.to_str().unwrap(),
             None,
         );
 
         sut.write(vec![entry].into_iter()).unwrap();
 
         let out = collected.lock().unwrap();
-        assert_eq!(out.len(), 2, "expected donor + only the in-project header: {:?}", *out);
+        assert_eq!(out.len(), 2, "expected donor + only the in-directory header: {:?}", *out);
         assert!(
-            out.iter().any(|e| e.file.as_path() == Path::new("../include/kept.h")),
-            "in-project header kept"
+            out.iter().any(|e| e.file.as_path() == Path::new("local/kept.h")),
+            "header inside the working directory kept"
         );
         assert!(
             !out.iter().any(|e| e.file.file_name() == Some(std::ffi::OsStr::new("escaped.h"))),
-            "out-of-project header reached via .. must not be synthesized"
+            "header reached via .. outside the working directory must not be synthesized"
         );
         assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 1);
     }
@@ -1058,12 +1025,7 @@ mod tests {
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            dependency_files_config(),
-            root.to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, dependency_files_config(), Arc::clone(&stats));
 
         let entry = Entry::from_arguments_str(
             "src/main.c",
@@ -1096,12 +1058,7 @@ mod tests {
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
-        let sut = HeaderEntrySynthesizer::new(
-            writer,
-            dependency_files_config(),
-            root.to_path_buf(),
-            Arc::clone(&stats),
-        );
+        let sut = HeaderEntrySynthesizer::new(writer, dependency_files_config(), Arc::clone(&stats));
 
         let entry = Entry::from_arguments_str(
             "src/main.c",

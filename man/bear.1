@@ -444,20 +444,25 @@ directories that hold no compiled source \(en notably the common split
 \f[CR]include\-dirs\f[R]: a superset of \f[CR]siblings\f[R] that
 additionally scans the compiled unit\(cqs own
 \f[CR]\-I\f[R]/\f[CR]\-iquote\f[R] include directories, but only those
-that resolve under the project root (Bear\(cqs working directory).
+that resolve inside the compilation\(cqs own working directory (the
+directory the compiler ran in, which it uses to resolve relative include
+paths).
 System include directories (\f[CR]\-isystem\f[R],
-\f[CR]\-idirafter\f[R]) and absolute directories outside the project are
-skipped, so the database is not flooded with system headers.
-This reaches split \f[CR]include/\f[R]+\f[CR]src/\f[R] layouts without
-needing dependency files.
+\f[CR]\-idirafter\f[R]) and directories that escape the working
+directory \(en absolute system paths, or paths reached via \f[CR]..\f[R]
+\(en are skipped, so the database is not flooded with system headers.
+This reaches a split \f[CR]include/\f[R]+\f[CR]src/\f[R] layout when the
+build compiles from a directory that contains both, without needing
+dependency files.
 .IP \(bu 2
 \f[CR]dependency\-files\f[R]: reads the make\-style dependency file
 (\f[CR].d\f[R]) the build already emitted (for example via
 \f[CR]\-MMD\f[R]/\f[CR]\-MF\f[R]) and synthesizes an entry for each
-in\-project header prerequisite it lists.
-This is the most accurate option \(en it records exactly the headers
-each unit included, across directories \(en but it requires the build to
-have emitted dependency files and for them to still be on disk.
+header prerequisite it lists that resolves inside the compilation\(cqs
+working directory.
+This is the most accurate option for the headers a compilation actually
+included, but it requires the build to have emitted dependency files and
+for them to still be on disk.
 .RE
 .PP
 Which file extensions count as headers is fixed (the built\-in C\-family

@@ -21,8 +21,8 @@ configuration the output is byte-identical to today.
   - A default strategy considers header files that sit in the same directory
     as a compiled source.
   - An opt-in strategy additionally considers a translation unit's own user
-    include directories, when those directories resolve under the project
-    root.
+    include directories, when those directories resolve inside the
+    compilation's own working directory.
   - An opt-in strategy reads the dependency files the build already emitted
     to find the exact headers each translation unit included.
 - A synthesized entry clones a compiled translation unit's arguments with the
@@ -47,23 +47,54 @@ translation units or headers it contains.
 
 ## Testing
 
-- Given events compiling `src/main.c` next to `src/util.h`, when bear runs
-  with header entries disabled (the default), then the database contains an
-  entry for `main.c` only.
-- Given the same events, when bear runs with header entries enabled using the
-  default strategy, then the database also contains an entry for `src/util.h`
-  whose arguments match `main.c`'s with the source path swapped for the
-  header path and with no output-file flag.
-- Given a translation unit compiled with a user include directory that
-  resolves under the project root, and a header file in that directory, when
-  bear runs with the include-directories strategy enabled, then the database
-  contains a synthesized entry for that header; a header reachable only
-  through a system or out-of-project include directory does not receive an
-  entry.
-- Given a translation unit whose build emitted a dependency file listing a
-  set of included headers, when bear runs with the dependency-files strategy
-  enabled, then the database contains a synthesized entry for exactly the
-  headers listed in that dependency file, and no others.
+Given a build that compiles `src/main.c`, which sits next to an uncompiled
+`src/util.h`:
+
+> When Bear generates the database with header entries disabled (the default),
+> then the database contains an entry for `src/main.c` only.
+
+Given the same build:
+
+> When Bear generates the database with header entries enabled using the
+> default (same-directory) strategy,
+> then the database also contains an entry for `src/util.h`
+> whose arguments are `src/main.c`'s with the source path swapped for the
+> header path and the output-file flag removed,
+> and which has no output field.
+
+For that second scenario, the source entry and its synthesized header entry
+are a pair like:
+
+```json
+[
+  {
+    "directory": "/home/user/project",
+    "file": "src/main.c",
+    "arguments": ["cc", "-c", "src/main.c", "-o", "src/main.o"]
+  },
+  {
+    "directory": "/home/user/project",
+    "file": "src/util.h",
+    "arguments": ["cc", "-c", "src/util.h"]
+  }
+]
+```
+
+Given a build whose compilation uses a user include directory that resolves
+inside the compilation's working directory, with a header file in that
+directory:
+
+> When Bear generates the database with the include-directories strategy,
+> then the database contains a synthesized entry for that header,
+> and a header reachable only through a system directory, or a directory that
+> escapes the compilation's working directory, does not receive an entry.
+
+Given a build whose compilation emitted a dependency file listing the headers
+it included:
+
+> When Bear generates the database with the dependency-files strategy,
+> then the database contains a synthesized entry for exactly the in-scope
+> headers that dependency file lists, and no others.
 
 ## Rationale
 
