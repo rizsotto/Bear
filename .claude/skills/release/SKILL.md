@@ -112,7 +112,10 @@ order, when applicable:
 - `### Internal Refactoring`
 - `### Documentation`
 - `### Closed Issues` - bullet list of `#NNN - one-line description`
-- `### Thanks` - issue reporters and external PR authors, by `@handle`
+- `### Thanks` - issue reporters and external PR authors, by `@handle`;
+  plus the downstream packagers currently shipping Bear, by name or
+  `@handle` where known (see the repology command below). Packagers are
+  chronically invisible volunteers - name them every release.
 - `### New Contributors` - first-time contributors only
 
 Trailer:
@@ -135,6 +138,11 @@ gh issue list --state closed --search "closed:>=YYYY-MM-DD" --limit 50
 
 # PRs merged since the previous tag
 gh pr list --state merged --search "merged:>=YYYY-MM-DD" --limit 50
+
+# downstream packagers shipping the latest Bear (repology needs a User-Agent;
+# "newest" entries are the repos that kept up with the previous release)
+curl -s -A 'Bear-release-notes' 'https://repology.org/api/v1/project/bear-clang' |
+    python3 -c "import json,sys; [print(p['repo'], p['version'], ', '.join(p.get('maintainers',[]))) for p in json.load(sys.stdin) if p.get('status')=='newest']"
 ```
 
 Save the notes to a temporary file (e.g. `/tmp/release-notes.md`) - they are
