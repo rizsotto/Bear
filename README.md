@@ -8,17 +8,37 @@
 ʕ·ᴥ·ʔ Build EAR
 ===============
 
-Bear generates a compilation database for Clang tooling.
+Bear gives you working code navigation, autocomplete, and diagnostics on
+any C/C++ project, whatever the build system. Prefix your build command
+with `bear --` and it produces the `compile_commands.json` file that
+Clang tooling (clangd, clang-tidy, and friends) needs to understand your
+code.
 
 The [JSON compilation database][JSONCDB] describes how each translation unit
-is compiled. Clang-based tools use it to understand compiler flags, include
-paths, and other build settings.
-
-Some build systems can generate a JSON compilation database directly. For
-build systems that cannot, Bear captures compiler invocations during the
-build and writes the database for you.
+is compiled. Bear captures the compiler invocations while your build runs
+and writes the database for you - no changes to your build system required.
 
   [JSONCDB]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
+
+When to use Bear
+-----------------
+
+Bear is the tool of choice when the build system cannot produce a
+compilation database for you:
+
+- Make, autotools, or custom script builds - most of the C world.
+- A build you cannot or do not want to modify: a third-party project,
+  a codebase you are just exploring, a CI job.
+- Unusual toolchains: embedded (ARM, TI, Microchip, QNX), HPC (Cray,
+  Intel, NVIDIA, MPI wrappers), CUDA, cross-compilers, and compiler
+  launchers such as ccache, distcc, and icecc.
+
+Because Bear observes the build instead of parsing build files, it records
+what the compiler was actually invoked with - including flags injected by
+wrappers and entries for generated sources.
+
+If your project uses CMake, Meson, or Bazel, those tools can export a
+compilation database directly; use that when it is available.
 
 How to install
 --------------
@@ -36,22 +56,11 @@ After installation, run:
 
 Bear writes `compile_commands.json` to the current working directory.
 
-For more options, see the man page or run `bear --help`. Pass Bear’s own
+For more options, see the man page or run `bear --help`. Pass Bear's own
 options before `--`; everything after that is treated as part of the build command.
-
-Please be aware that some package managers still ship the 2.4.x release. In
-that case, please omit the extra `--` or consult your local documentation.
 
 For more information, read the man pages or the project [wiki][WIKI], which
 talks about limitations, known issues, and platform-specific usage.
-
-When to use Bear
------------------
-
-Use Bear when your build system does not natively support generating a
-[JSON compilation database][JSONCDB]. If your project already uses CMake, Meson,
-or Bazel, prefer the built-in compilation database export those tools provide;
-it is usually faster and more reliable.
 
 Supported platforms
 -------------------
@@ -63,7 +72,7 @@ Limitations
 -----------
 
 Bear works by intercepting compiler calls during a build. This means certain
-environments may need extra configuration — for example, macOS System
+environments may need extra configuration - for example, macOS System
 Integrity Protection (SIP) or sandboxed builds (Nix, Flatpak). See the
 [wiki][WIKI] for details and workarounds.
 
