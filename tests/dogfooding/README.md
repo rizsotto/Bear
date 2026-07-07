@@ -14,7 +14,7 @@ each check works the way it does, and how to extend one) live in `SPEC.md`.
 
 ## Targets and checks
 
-The harness ships five targets. Each has a default way of validating a capture:
+The harness ships six targets. Each has a default way of validating a capture:
 
 | Target | Build system | Default validation |
 |---|---|---|
@@ -23,6 +23,7 @@ The harness ships five targets. Each has a default way of validating a capture:
 | `ffmpeg` | custom `configure` | None -- run with an on-demand check below |
 | `kernel` | Kbuild | None -- run with an on-demand check below |
 | `nasm` | x264, custom `configure` | None -- run with an on-demand check below |
+| `openmpi` | OSU benchmarks, autotools | None -- run with an on-demand check below |
 
 On top of the default, every target supports these on-demand checks, each
 selected by a flag. They need no baseline, so they run against any target:
@@ -34,10 +35,10 @@ selected by a flag. They need no baseline, so they run against any target:
 | `--replay[=N]` | the compiler re-accepts a sample of recorded commands |
 | `--consumer[=N]` | a real clang tool (clang-tidy) can parse a sample of entries |
 
-`ffmpeg`, `kernel`, and `nasm` have no default gate (no golden, no CMake
-oracle), so they are run *only* with the on-demand checks; a plain run against
-them is rejected with a pointer to those flags. `ffmpeg` and `kernel` are scale
-targets. `nasm` exercises a specific toolchain on a real build:
+`ffmpeg`, `kernel`, `nasm`, and `openmpi` have no default gate (no golden, no
+CMake oracle), so they are run *only* with the on-demand checks; a plain run
+against them is rejected with a pointer to those flags. `ffmpeg` and `kernel`
+are scale targets. The other two exercise specific toolchains on a real build:
 
 - `nasm` builds x264 (nasm-heavy, mixing nasm and gcc) to confirm Bear records
   a well-formed entry for each nasm assembly compile alongside the C ones. x264
@@ -45,6 +46,10 @@ targets. `nasm` exercises a specific toolchain on a real build:
   target runs Bear with a config (`targets/nasm/bear.yaml`) that adds
   `arguments` to the duplicate match key, keeping both compiles; the
   `--invariants` entry count then matches the on-disk object count exactly.
+- `openmpi` builds the OSU Micro-Benchmarks with the Open MPI `mpicc`/`mpicxx`
+  wrappers to confirm, in a real LD_PRELOAD build, that Bear records the wrapper
+  command verbatim and collapses the wrapper+gcc-child pair to a single entry
+  per translation unit (`--invariants`' no-true-duplicates and entry count).
 
 ## Prerequisites
 

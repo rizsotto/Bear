@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# OSU Micro-Benchmarks target image (Stage 7, MPI compiler wrapper). Layers on
+# the locally-built dogfooding base (which carries Bear-under-test + cdb-compare
+# + clang tooling) and installs the Open MPI wrappers plus gcc/make, then the
+# pinned, sha256-verified source at the fixed path /src (dogfood-fixed-paths).
+# The OSU benchmarks build with autotools (mpicc/mpicxx). The actual 'make' is
+# wrapped by Bear at 'podman run' time, NOT here, so the image build stays free
+# of any Bear call.
+
+ARG BASE_TAG
+FROM ${BASE_TAG}
+
+ARG SRC_DIR=/src
+
+# Target build deps: openmpi-devel provides the mpicc/mpicxx wrappers (under
+# /usr/lib64/openmpi/bin) and the MPI headers/libs they splice in; gcc is the
+# compiler the wrappers exec; make drives the autotools build. curl fetches the
+# source; tar + gzip unpack the .tar.gz. The wrappers are the reason this target
+# exists (the driver+child interception path).
+RUN dnf -y install openmpi-devel gcc gcc-c++ make curl tar gzip \
+    && dnf -y clean all \
+    && rm -rf /var/cache/dnf
+
+# Pinned OSU Micro-Benchmarks source. Like ffmpeg, the URL and sha256 are
+# HARDCODED here (not build-args): the pin is part of this target's definition
+# and run.sh does not thread an OSU_URL through. 7.5 is the current release from
+# the upstream MVAPICH download archive; the sha256 was verified against the
+# downloaded tarball. A checksum mismatch fails the build (caught by the harness
+# as INCONCLUSIVE: target infra).
+ARG OSU_URL="https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-7.5.tar.gz"
+ARG OSU_SHA256="1cf84ac5419456202757a757c5f9a4f5c6ecd05c65783c7976421cfd6020b3b3"
+
+# Fetch, verify by sha256, extract to the fixed SRC_DIR.
+RUN mkdir -p "${SRC_DIR}" \
+    && curl --proto '=https' --tlsv1.2 -fsSL -o /tmp/osu.tar.gz "${OSU_URL}" \
+    && echo "${OSU_SHA256}  /tmp/osu.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/osu.tar.gz -C "${SRC_DIR}" --strip-components=1 \
+    && rm -f /tmp/osu.tar.gz
+
+WORKDIR ${SRC_DIR}
