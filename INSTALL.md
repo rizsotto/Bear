@@ -53,7 +53,10 @@ Ensure that `cargo` and `rustc` are available in your `PATH`:
 **C compiler**: A C compiler is required to build the preload library
 (`intercept-preload`). The `cc` crate will typically find one automatically;
 ensure `gcc` or `clang` is installed.
-If your are building for Linux/ELF platform, ensure `lld` is installed, as `ld` lacks an essetial feature.
+On Linux/ELF platforms the preload library links with `lld` or `mold`;
+GNU `ld` cannot combine the Rust compiler's linker version script with
+Bear's. Toolchains installed via rustup bundle `rust-lld`, which the
+build picks up automatically; otherwise install `lld` or `mold`.
 
 ## Simple installation
 

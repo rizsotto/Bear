@@ -90,9 +90,13 @@ The workspace builds in three layers before linking the user-facing binaries:
 ## Host requirements
 
 - `cc` toolchain (gcc or clang).
-- `lld` linker (Linux only). The ELF version script uses multiple
-  version tags, which GNU ld does not support; the link step on
-  Linux fails without lld. macOS uses the system linker.
+- `lld` or `mold` linker (ELF platforms, and only when the Rust
+  toolchain does not bundle rust-lld; rustup toolchains do). rustc
+  injects its own linker version script into the cdylib link next to
+  Bear's, and GNU ld refuses to combine the two. The build script
+  picks the first available of: bundled rust-lld, system lld, system
+  mold (see `docs/rationale/preload-linker-selection.md`). macOS uses
+  the system linker.
 - `ccache` (optional). When present and on PATH, the integration tests
   exercise a ccache-masquerade-aware test path.
 

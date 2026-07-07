@@ -33,8 +33,9 @@ supported platforms:
    `exports.txt` on macOS) into `OUT_DIR`.
 4. Emits cdylib link args:
    - Linux: `-Wl,--whole-archive`, `-Wl,--version-script=...`,
-     `-Wl,-rpath,$ORIGIN`, `-fuse-ld=lld` (required; see Host
-     requirements in the top-level `CLAUDE.md`).
+     `-Wl,-rpath,$ORIGIN`, plus a linker selection (bundled rust-lld,
+     then system lld, then mold; GNU ld cannot link this library --
+     see `docs/rationale/preload-linker-selection.md`).
    - macOS: `-Wl,-force_load,...`,
      `-Wl,-exported_symbols_list,...`, `-Wl,-rpath,@loader_path`.
 
