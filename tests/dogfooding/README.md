@@ -14,7 +14,7 @@ each check works the way it does, and how to extend one) live in `SPEC.md`.
 
 ## Targets and checks
 
-The harness ships four targets. Each has a default way of validating a capture:
+The harness ships five targets. Each has a default way of validating a capture:
 
 | Target | Build system | Default validation |
 |---|---|---|
@@ -22,6 +22,7 @@ The harness ships four targets. Each has a default way of validating a capture:
 | `curl` | CMake | Oracle (compare against the database CMake itself emits) |
 | `ffmpeg` | custom `configure` | None -- run with an on-demand check below |
 | `kernel` | Kbuild | None -- run with an on-demand check below |
+| `nasm` | x264, custom `configure` | None -- run with an on-demand check below |
 
 On top of the default, every target supports these on-demand checks, each
 selected by a flag. They need no baseline, so they run against any target:
@@ -33,9 +34,17 @@ selected by a flag. They need no baseline, so they run against any target:
 | `--replay[=N]` | the compiler re-accepts a sample of recorded commands |
 | `--consumer[=N]` | a real clang tool (clang-tidy) can parse a sample of entries |
 
-`ffmpeg` and `kernel` are too large to bless a golden or to build under CMake,
-so they are run *only* with the on-demand checks. A plain run against them is
-rejected with a pointer to those flags.
+`ffmpeg`, `kernel`, and `nasm` have no default gate (no golden, no CMake
+oracle), so they are run *only* with the on-demand checks; a plain run against
+them is rejected with a pointer to those flags. `ffmpeg` and `kernel` are scale
+targets. `nasm` exercises a specific toolchain on a real build:
+
+- `nasm` builds x264 (nasm-heavy, mixing nasm and gcc) to confirm Bear records
+  a well-formed entry for each nasm assembly compile alongside the C ones. x264
+  compiles every bit-depth-dependent source twice (8-bit and 10-bit), so this
+  target runs Bear with a config (`targets/nasm/bear.yaml`) that adds
+  `arguments` to the duplicate match key, keeping both compiles; the
+  `--invariants` entry count then matches the on-disk object count exactly.
 
 ## Prerequisites
 

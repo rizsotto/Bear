@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# x264 target image (Stage 7, assembler dialect). Layers on the locally-built
+# dogfooding base (which carries Bear-under-test + cdb-compare + clang tooling)
+# and installs x264's minimal build dependencies - gcc, make, and nasm - plus
+# the pinned, sha256-verified source at the fixed path /src (dogfood-fixed-
+# paths). x264 uses a hand-written POSIX-sh `configure` (no autotools, no
+# CMake); the nasm assembler is the reason this target exists. The actual 'make'
+# is wrapped by Bear at 'podman run' time, NOT here, so the image build stays
+# free of any Bear call.
+
+ARG BASE_TAG
+FROM ${BASE_TAG}
+
+ARG SRC_DIR=/src
+
+# Target build deps: gcc + make build the C translation units and link, nasm
+# assembles the x86_64 .asm sources (the dialect this target dogfoods); curl
+# fetches the source; tar + bzip2 unpack the .tar.bz2 snapshot. No pkgconfig or
+# external libraries: a bare configure builds x264 from just gcc + nasm + make.
+RUN dnf -y install gcc make nasm curl tar bzip2 \
+    && dnf -y clean all \
+    && rm -rf /var/cache/dnf
+
+# Pinned x264 source. Like ffmpeg, the URL and sha256 are HARDCODED here (not
+# build-args): the pin is part of this target's definition and run.sh does not
+# thread an X264_URL through. This is the head of x264's 'stable' branch at
+# commit b35605ac (2025-06-08), fetched as a VideoLAN GitLab archive snapshot
+# and pinned by the sha256 of that archive. A checksum mismatch fails the build
+# (caught by the harness as INCONCLUSIVE: target infra).
+ARG X264_URL="https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2"
+ARG X264_SHA256="6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224"
+
+# Fetch, verify by sha256, extract to the fixed SRC_DIR.
+RUN mkdir -p "${SRC_DIR}" \
+    && curl --proto '=https' --tlsv1.2 -fsSL -o /tmp/x264.tar.bz2 "${X264_URL}" \
+    && echo "${X264_SHA256}  /tmp/x264.tar.bz2" | sha256sum -c - \
+    && tar -xjf /tmp/x264.tar.bz2 -C "${SRC_DIR}" --strip-components=1 \
+    && rm -f /tmp/x264.tar.bz2
+
+# Bear config that adds `arguments` to the duplicate match key so x264's 8-bit
+# and 10-bit double-compiles are BOTH captured (see bear.yaml and config.env).
+# The build context is this target dir (run.sh builds with -f Containerfile
+# TARGET_DIR), so bear.yaml is COPYable from here. config.env's TARGET_BUILD_CMD
+# passes it to bear with --config.
+COPY bear.yaml /opt/bear-config/duplicates.yaml
+
+WORKDIR ${SRC_DIR}

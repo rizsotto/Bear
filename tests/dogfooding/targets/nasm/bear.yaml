@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Bear configuration for the x264 dogfooding target (Stage 7). x264 compiles
+# every bit-depth-dependent source TWICE - once for 8-bit and once for 10-bit
+# high-bit-depth - producing two distinct objects (predict-c-8.o and
+# predict-c-10.o) from ONE source path (common/x86/predict-c.c) that differ only
+# in their arguments (-DBIT_DEPTH=8 vs =10, and the -o object). Bear's DEFAULT
+# duplicate filter keys on (directory, file), so it would collapse each such pair
+# to a single entry and drop the 10-bit compile - leaving a tool like clangd
+# blind to the high-bit-depth translation unit.
+#
+# Adding `arguments` to the duplicate match key keeps both compiles: they share a
+# directory and file but differ in arguments, so they are no longer duplicates.
+# The captured database then holds every real compile (both depths, C and asm),
+# which is what an x264 developer actually wants AND makes the invariants
+# entry-count cross-check a true "did Bear capture every compile?" gate against
+# the on-disk object count. This is the one target that exercises Bear's
+# duplicate-detection config surface in a real build.
+schema: "4.1"
+duplicates:
+  match_on:
+    - directory
+    - file
+    - arguments
