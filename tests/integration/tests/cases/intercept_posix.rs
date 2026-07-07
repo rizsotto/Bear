@@ -856,3 +856,53 @@ int main() {
 
     Ok(())
 }
+
+/// The preload mechanism only works if the dynamic linker can see the
+/// interposer symbols. rustc adds its own version script to the cdylib
+/// link, so a linker or build-script change can silently stop exporting
+/// the C shim's wrappers (see docs/rationale/preload-linker-selection.md).
+/// Inspect the built library's dynamic symbol table directly.
+// Requirements: interception-preload-mechanism
+#[test]
+#[cfg(all(not(target_os = "macos"), has_executable_nm))]
+fn preload_library_exports_the_interposer_symbols() -> Result<()> {
+    // arrange: the POSIX-portable interposers plus the version marker;
+    // extension symbols (execvpe, execvP, exect) are host-dependent and
+    // covered by the behavioural tests above.
+    let library = env!("PRELOAD_LIBRARY_PATH");
+    let expected_symbols = [
+        "execl",
+        "execle",
+        "execlp",
+        "execv",
+        "execve",
+        "execvp",
+        "posix_spawn",
+        "posix_spawnp",
+        "popen",
+        "pclose",
+        "system",
+        "LIBEXEC_VERSION",
+    ];
+
+    // act
+    let output = std::process::Command::new(env!("NM_PATH"))
+        .args(["--dynamic", "--defined-only", library])
+        .output()?;
+    assert!(output.status.success(), "nm failed on {}: {}", library, String::from_utf8_lossy(&output.stderr));
+    let sut: Vec<&str> = std::str::from_utf8(&output.stdout)?
+        .lines()
+        .filter_map(|line| line.split_whitespace().last())
+        .collect();
+
+    // assert
+    for symbol in expected_symbols {
+        assert!(
+            sut.contains(&symbol),
+            "symbol {} is missing from the dynamic symbol table of {}",
+            symbol,
+            library
+        );
+    }
+    Ok(())
+}

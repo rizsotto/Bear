@@ -61,6 +61,11 @@ chain instead of hard-coding `-fuse-ld=lld`:
   distro packages) need `lld` or `mold` installed; both are widely
   packaged. The failure without them is an early, explicit warning
   followed by the linker error, instead of only the cryptic error.
+- The system probes scan `PATH` only. A compiler-internal `ld.lld`
+  that `cc` would find through its own exec-prefix (but which is not
+  on `PATH`) falls through to the warning branch; probing
+  `cc -print-prog-name=ld.lld` could close that gap if it ever
+  matters in practice.
 - The `rust_<name>` union-export remains. Removing it would need a
   function-pointer indirection between the shim and the Rust
   implementation (so the Rust side has no `#[no_mangle]` symbols), or

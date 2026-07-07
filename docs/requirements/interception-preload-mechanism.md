@@ -167,3 +167,7 @@ Given a build on macOS with SIP enabled:
   for details on which commands appear in the output.
 - Related requirement: `interception-wrapper-mechanism` (alternative
   interception mode).
+
+## Rationale
+
+- [Linker selection for the preload library](../rationale/preload-linker-selection.md)

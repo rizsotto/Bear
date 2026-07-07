@@ -72,6 +72,7 @@ fn main() {
     check_executable_exists("ls");
     check_executable_exists("mkdir");
     check_executable_exists("rm");
+    check_executable_exists("nm");
     check_one_executable_exists("shell", &["sh", "zsh", "bash"]);
     check_one_executable_exists("make", &["make", "gmake", "mingw32-make"]);
     check_one_executable_exists("compiler_c", &["gcc", "clang", "cc"]);
