@@ -6,9 +6,13 @@ ENV RUSTUP_HOME=/root/.rustup \
 
 # time/bc/file/which: small diagnostics used by agent-driven measurement
 # and inspection sessions (GNU time and bc are not in the base image).
+#
+# mdbook is pinned (--locked) to build the docs site under site/. Keep this
+# version identical to the one the Pages CI workflow installs.
 RUN dnf -y install curl ca-certificates git gh pandoc time bc file which \
     && dnf -y group install c-development \
     && dnf -y clean all \
     && rm -rf /var/cache/dnf \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile default \
-    && curl -fsSL https://claude.ai/install.sh | sh
+    && curl -fsSL https://claude.ai/install.sh | sh \
+    && cargo install mdbook --version 0.5.4 --locked
