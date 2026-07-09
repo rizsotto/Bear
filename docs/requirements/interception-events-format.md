@@ -1,6 +1,6 @@
 ---
 title: Events file as external interchange format
-status: proposed
+status: accepted
 ---
 
 ## Intent
@@ -19,16 +19,35 @@ schema, encoding rules, and stability promise written down so external
 tools can produce or consume it without reverse-engineering Bear's
 sources.
 
+## Event schema
+
+Each event object has exactly these four keys. All four are required:
+a line missing any of them, or carrying one with the wrong JSON type, is
+a non-conforming line. The source-of-truth type is `intercept::Execution`
+in `crates/intercept/src/lib.rs`.
+
+| JSON key      | Type                     | Meaning                                                                    |
+|---------------|--------------------------|----------------------------------------------------------------------------|
+| `executable`  | string (filesystem path) | Path to the program run. May be absolute or a bare name resolved via PATH. |
+| `arguments`   | array of strings         | The argument vector; element zero is the program name (`argv[0]`).         |
+| `working_dir` | string (filesystem path) | Absolute working directory the program ran in.                             |
+| `environment` | object (string->string)  | Environment variables in effect for the program.                           |
+
+The stable subset is the four key names and their JSON types: changing
+any of them requires a major-version bump of the format. Within that
+promise, the *contents* of `environment` are advisory, not stable: Bear
+filters captured variables to a build-relevant subset, so a consumer must
+not assume any particular variable is present, and a producer may include
+or omit variables freely. The `PATH` variable, when present, is what
+resolves a bare `executable`; a producer that wants bare names resolved
+should supply it.
+
 ## Acceptance criteria
 
 - One line of the events file is one JSON object describing a single
-  execution event. Lines are newline-terminated (`\n`); no comments;
-  no trailing comma; UTF-8 encoded.
-- The schema for an event object is documented in this requirement and
-  pinned to the source-of-truth type in `bear` (link or filename).
-- A non-empty subset of fields is marked stable: changes to stable
-  fields require a major-version bump of the format. Optional/internal
-  fields are marked as such.
+  execution event, conforming to the schema above. Lines are
+  newline-terminated (`\n`); no comments; no trailing comma; UTF-8
+  encoded.
 - `bear semantic --input <file>` accepts any file conforming to the
   documented schema. The producer of the file does not need to be Bear.
 - `bear semantic --input <file>` is order-independent across lines: the
@@ -37,12 +56,20 @@ sources.
   `output-append`).
 - A non-conforming line (invalid JSON, missing required field, wrong
   type) is reported with line number and reason, and processing
-  continues with subsequent lines. The exit code is unchanged unless
-  every line is rejected.
-- `bear intercept --output -` and `bear semantic --input -` read/write
-  the events stream from stdout/stdin respectively, enabling pipelines
-  of the form `bear intercept --output - -- make | bear semantic --input -`.
-  (Optional; in scope as a stability requirement once implemented.)
+  continues with subsequent lines. Empty input succeeds with an empty
+  database. Non-empty input from which at least one event was accepted
+  succeeds. Non-empty input in which every line was rejected exits
+  non-zero. (Any additional producer, such as one parsing shell text,
+  applies the same skip-and-continue rule to its own input; see
+  [`interception-events-from-shell-text`](interception-events-from-shell-text.md).)
+- `bear semantic --input -` reads the event stream from standard input,
+  and any non-executing producer may write the stream to standard output,
+  so the format is pipeable (`<producer> | bear semantic --input -`).
+  Diagnostics go to stderr, keeping stdout machine-readable. A mode that
+  runs the build does not accept `-` for output: the intercepted build's
+  own stdout shares that stream and would corrupt it (a non-atomic write
+  can split a JSON line), so `bear intercept` writes events only to a
+  file.
 
 ## Non-functional constraints
 
@@ -92,11 +119,16 @@ within the same major-version line:
   declined to ship a build-log parser (build-system-specific, out of
   scope), but `bear semantic --input` already provides the consumer
   half. This requirement documents the contract so users can build
-  their own log-to-events converters.
-- Out of scope: a build-log parser. Out of scope: backward compatibility
-  guarantees across major versions; those are explicitly allowed to
-  break.
-- The current event schema is defined by the Rust types in
-  `crates/intercept/src/`. Before promoting status to `accepted`, the
-  field list and stable-field subset must be enumerated explicitly in
-  this requirement (currently a forward reference).
+  their own log-to-events converters. Bear now also ships one such
+  producer on this seam; see
+  [`interception-events-from-shell-text`](interception-events-from-shell-text.md).
+- Only the consumer side (`semantic --input -`) and non-executing
+  producers use `-`. Modes that run the build cannot, because the build's
+  own stdout is the same stream. Redirecting the build's stdout to stderr
+  to free the channel was considered and rejected: it silently changes
+  observable build behavior (tools that detect a tty or write results to
+  stdout would break) for a pipeline no producer needs.
+- Out of scope: backward compatibility guarantees across major versions;
+  those are explicitly allowed to break. A build-log parser is out of
+  scope *for this requirement* - it defines only the interchange
+  contract; a producer is a separate contract that depends on this one.
