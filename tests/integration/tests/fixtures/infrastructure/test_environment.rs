@@ -196,6 +196,33 @@ impl TestEnvironment {
         Ok(bear_output)
     }
 
+    /// Run bear with the given arguments, feeding `stdin_bytes` to its
+    /// standard input. Used to exercise `bear semantic --input -`, which
+    /// reads the event stream from stdin instead of a file.
+    ///
+    /// See `run_bear` for the `RUST_LOG`/`RUST_BACKTRACE` defaults; this
+    /// mirrors that behaviour and only adds the stdin payload.
+    #[allow(dead_code)]
+    pub fn run_bear_with_stdin(&self, args: &[&str], stdin_bytes: &[u8]) -> Result<BearOutput> {
+        let mut cmd = Command::new(self.install.path());
+        cmd.current_dir(self.test_dir())
+            .env("RUST_BACKTRACE", "1")
+            .args(args)
+            .write_stdin(stdin_bytes.to_vec());
+        if std::env::var_os("RUST_LOG").is_none() {
+            cmd.env("RUST_LOG", "info");
+        }
+
+        let output = cmd.output()?;
+
+        let bear_output = BearOutput { output, temp_dir: self.test_dir().to_path_buf() };
+
+        // Store the output for potential later display
+        *self.last_bear_output.borrow_mut() = Some(bear_output.clone());
+
+        Ok(bear_output)
+    }
+
     /// Run bear and expect success
     #[allow(dead_code)]
     pub fn run_bear_success(&self, args: &[&str]) -> Result<BearOutput> {

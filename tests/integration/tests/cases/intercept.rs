@@ -1010,3 +1010,24 @@ fn non_utf8_argv_does_not_break_interception() -> Result<()> {
 
     Ok(())
 }
+
+/// `bear intercept` runs the build, so its own stdout shares the stream with
+/// the events output: `--output -` must be rejected with a clear error
+/// instead of silently creating a file literally named `-`.
+// Requirements: interception-events-format
+#[test]
+#[cfg(has_executable_true)]
+fn intercept_output_dash_is_rejected() -> Result<()> {
+    let env = TestEnvironment::new("intercept_output_dash_is_rejected")?;
+
+    let result = env.run_bear(&["intercept", "--output", "-", "--", TRUE_PATH])?;
+    result.assert_failure()?;
+    assert!(
+        result.stderr().contains("cannot write events to stdout"),
+        "stderr did not explain the rejection: {}",
+        result.stderr()
+    );
+    assert!(!env.file_exists("-"), "must not create a file literally named `-`");
+
+    Ok(())
+}

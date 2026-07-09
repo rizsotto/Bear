@@ -1399,6 +1399,63 @@ fn clang_module_interface_and_consumer_yield_two_entries() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-events-format
+//
+// `bear semantic --input -` must read the event stream from standard input
+// and produce the same compilation database as the equivalent file-backed
+// run, so the pipeline `<producer> | bear semantic --input -` works.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn semantic_input_stdin_matches_file_input() -> Result<()> {
+    let env = TestEnvironment::new("semantic_input_stdin")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event1 = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "test.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let event2 = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "other.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let events_content = format!("{}\n{}\n", event1, event2);
+
+    env.create_source_files(&[
+        ("events.json", &events_content),
+        ("test.c", "int main() { return 0; }"),
+        ("other.c", "int main() { return 0; }"),
+    ])?;
+
+    // Baseline: the same event stream read from a file.
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "from_file.json"])?;
+    let from_file = env.load_compilation_database("from_file.json")?;
+    from_file.assert_count(2)?;
+
+    // Under test: the identical stream read from standard input via `-`.
+    let stdin_result = env.run_bear_with_stdin(
+        &["semantic", "--input", "-", "--output", "from_stdin.json"],
+        events_content.as_bytes(),
+    )?;
+    stdin_result.assert_success()?;
+    let from_stdin = env.load_compilation_database("from_stdin.json")?;
+
+    let mut file_entries: Vec<String> = from_file.entries().iter().map(|entry| entry.to_string()).collect();
+    let mut stdin_entries: Vec<String> = from_stdin.entries().iter().map(|entry| entry.to_string()).collect();
+    file_entries.sort();
+    stdin_entries.sort();
+
+    assert_eq!(
+        stdin_entries, file_entries,
+        "semantic --input - must produce the same compilation database as semantic --input <file>"
+    );
+
+    Ok(())
+}
+
 // Requirements: semantic-cpp20-modules
 //
 // GCC's transitional module flag `-fmodules-ts` must not break recognition

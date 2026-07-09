@@ -47,6 +47,12 @@ source filtering, and duplicate handling.
 Specify the output file path (default:
 \f[CR]compile_commands.json\f[R]).
 The output is a JSON compilation database.
+This option runs the build (combined mode, and
+\f[CR]bear intercept\f[R]\(cqs own \f[CR]\-\-output\f[R]), so it does
+not accept \f[CR]\-\f[R] for standard output: the build\(cqs own stdout
+shares that stream, and a non\-atomic write could corrupt it.
+Use a file path, or split into \f[CR]bear intercept\f[R] followed by
+\f[CR]bear semantic \-\-input \-\f[R] (see below).
 .TP
 \f[B]\-a, \-\-append\f[R]
 Append results to an existing output file instead of overwriting it.
@@ -70,11 +76,34 @@ them to an events file for later processing.
 .PP
 \f[B]bear intercept\f[R] [\f[I]OPTIONS\f[R]] [\-\-]
 \f[I]BUILD_COMMAND\f[R]\&...
+.TP
+\f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
+Path of the event file (default: \f[CR]events.json\f[R]).
+Rejects \f[CR]\-\f[R]: \f[CR]bear intercept\f[R] runs the build, so its
+stdout is the build\(cqs stdout, and writing events there would corrupt
+the stream.
 .SS bear semantic
 Processes previously captured events to generate a compilation database
 through semantic analysis.
 .PP
 \f[B]bear semantic\f[R] [\f[I]OPTIONS\f[R]]
+.TP
+\f[B]\-i, \-\-input\f[R] \f[I]FILE\f[R]
+Path of the event file to read (default: \f[CR]events.json\f[R]).
+Pass \f[CR]\-\f[R] to read the event stream from standard input instead
+of a file, so the events format is pipeable: any non\-executing producer
+of a conforming event stream can feed \f[CR]bear semantic\f[R] directly,
+for example:
+.RS
+.PP
+\ | bear semantic \(eninput \-
+.RE
+.PP
+Since \f[CR]bear semantic\f[R] does not run the build, it has no
+conflicting use for its own stdout; diagnostics still go to stderr,
+keeping stdout machine\-readable.
+This option concerns only the event input; the compilation\-database
+\f[CR]\-\-output\f[R] of \f[CR]bear semantic\f[R] is unaffected.
 .SH OUTPUT
 Bear generates a JSON compilation database conforming to the \c
 .UR https://clang.llvm.org/docs/JSONCompilationDatabase.html

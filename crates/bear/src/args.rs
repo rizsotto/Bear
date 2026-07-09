@@ -218,7 +218,7 @@ pub fn cli() -> Command {
             Command::new(MODE_SEMANTIC_SUBCOMMAND)
                 .about("detect semantics of command executions")
                 .args(&[
-                    arg!(-i --input <FILE> "Path of the event file")
+                    arg!(-i --input <FILE> "Path of the event file (`-` reads from standard input)")
                         .default_value(DEFAULT_EVENT_FILE)
                         .hide_default_value(false),
                     arg!(-o --output <FILE> "Path of the result file")
@@ -323,6 +323,53 @@ mod test {
                 mode: Mode::Semantic {
                     input: BuildEvents { path: "events.json".into() },
                     output: BuildSemantic { path: "compile_commands.json".into(), append: false },
+                },
+            }
+        );
+    }
+
+    // Requirements: interception-events-format
+    #[test]
+    fn test_semantic_input_stdin() {
+        let execution = vec!["bear", "semantic", "-i", "-"];
+
+        let matches = cli().get_matches_from(execution);
+        let arguments = Arguments::try_from(matches).unwrap();
+
+        assert_eq!(
+            arguments,
+            Arguments {
+                config: None,
+                mode: Mode::Semantic {
+                    input: BuildEvents { path: "-".into() },
+                    output: BuildSemantic { path: "compile_commands.json".into(), append: false },
+                },
+            }
+        );
+    }
+
+    // Requirements: interception-events-format
+    //
+    // `-` parses successfully here: the CLI layer treats it as an ordinary
+    // path value. The rejection (a mode that runs the build must not accept
+    // `-` for output) happens at `Mode::configure` time, not at parse time,
+    // and is covered by the integration tests for that requirement.
+    #[test]
+    fn test_intercept_output_dash_parses() {
+        let execution = vec!["bear", "intercept", "-o", "-", "--", "make", "all"];
+
+        let matches = cli().get_matches_from(execution);
+        let arguments = Arguments::try_from(matches).unwrap();
+
+        assert_eq!(
+            arguments,
+            Arguments {
+                config: None,
+                mode: Mode::Intercept {
+                    input: BuildCommand {
+                        arguments: vec!["make", "all"].into_iter().map(String::from).collect()
+                    },
+                    output: BuildEvents { path: "-".into() },
                 },
             }
         );

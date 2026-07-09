@@ -34,7 +34,7 @@ Bear can operate in three modes:
 : Specify a configuration file path. The configuration file controls output formatting, compiler recognition, source filtering, and duplicate handling.
 
 **-o, \-\-output** *FILE*
-: Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database.
+: Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database. This option runs the build (combined mode, and `bear intercept`'s own `--output`), so it does not accept `-` for standard output: the build's own stdout shares that stream, and a non-atomic write could corrupt it. Use a file path, or split into `bear intercept` followed by `bear semantic --input -` (see below).
 
 **-a, \-\-append**
 : Append results to an existing output file instead of overwriting it. This allows incremental updates to the compilation database. New entries are placed before the existing ones, so when a source file is rebuilt its newest invocation survives duplicate filtering and replaces the stale entry (see the `duplicates` section).
@@ -57,11 +57,21 @@ Intercepts command execution events during the build process and saves them to a
 
 **bear intercept** [*OPTIONS*] [\-\-] *BUILD_COMMAND*...
 
+**-o, \-\-output** *FILE*
+: Path of the event file (default: `events.json`). Rejects `-`: `bear intercept` runs the build, so its stdout is the build's stdout, and writing events there would corrupt the stream.
+
 ## bear semantic
 
 Processes previously captured events to generate a compilation database through semantic analysis.
 
 **bear semantic** [*OPTIONS*]
+
+**-i, \-\-input** *FILE*
+: Path of the event file to read (default: `events.json`). Pass `-` to read the event stream from standard input instead of a file, so the events format is pipeable: any non-executing producer of a conforming event stream can feed `bear semantic` directly, for example:
+
+      <producer> | bear semantic --input -
+
+  Since `bear semantic` does not run the build, it has no conflicting use for its own stdout; diagnostics still go to stderr, keeping stdout machine-readable. This option concerns only the event input; the compilation-database `--output` of `bear semantic` is unaffected.
 
 
 # OUTPUT

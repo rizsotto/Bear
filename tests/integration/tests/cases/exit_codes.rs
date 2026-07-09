@@ -129,6 +129,27 @@ fn exit_code_when_signaled() -> Result<()> {
     Ok(())
 }
 
+/// The combined mode (no subcommand) runs the build too, so it must reject
+/// `--output -` for the same reason `bear intercept --output -` does: the
+/// build's own stdout shares the stream and a non-atomic write could split
+/// a JSON line.
+// Requirements: interception-events-format
+#[test]
+#[cfg(has_executable_true)]
+fn combined_output_dash_is_rejected() -> Result<()> {
+    let env = TestEnvironment::new("combined_output_dash_is_rejected")?;
+
+    let result = env.run_bear(&["--output", "-", "--", TRUE_PATH])?;
+    result.assert_failure()?;
+    assert!(
+        result.stderr().contains("cannot write the compilation database to stdout"),
+        "stderr did not explain the rejection: {}",
+        result.stderr()
+    );
+    assert!(!env.file_exists("-"), "must not create a file literally named `-`");
+    Ok(())
+}
+
 // Intercept mode exit code tests
 
 /// Test that intercept command returns 0 for successful interception

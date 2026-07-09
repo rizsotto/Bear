@@ -16,6 +16,17 @@ use intercept_supervisor::context;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+/// Returns true when `path` is the `-` sentinel meaning standard input or
+/// standard output, depending on context.
+///
+/// `semantic --input -` reads the event stream from stdin (see
+/// `docs/requirements/interception-events-format.md`). Modes that run the
+/// build never accept `-` for output: the build's own stdout shares the
+/// stream and would corrupt it.
+fn is_stdio(path: &std::path::Path) -> bool {
+    path.as_os_str() == "-"
+}
+
 /// Represents the application execution modes.
 ///
 /// Bear supports three user-facing modes:
@@ -87,6 +98,15 @@ impl Mode {
             }
             args::Mode::Combined { input, output } => {
                 log::debug!("Mode: intercept build and semantic analysis");
+
+                if is_stdio(&output.path) {
+                    return Err(ConfigurationError::InvalidConfiguration(
+                        "cannot write the compilation database to stdout while running the build: \
+                         it would mix with build output; write to a file, or split into \
+                         `bear intercept` then `bear semantic`"
+                            .to_string(),
+                    ));
+                }
 
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
@@ -213,9 +233,10 @@ mod impls {
     impl RawEventReader {
         /// Create a new raw event reader.
         ///
-        /// This reader will read the intercepted events from a file in a raw format.
+        /// This reader will read the intercepted events from a file in a raw format,
+        /// or from standard input when the path is the `-` sentinel.
         pub(super) fn create(path: &std::path::Path) -> Result<Self, ConfigurationError> {
-            if !path.exists() || !path.is_file() {
+            if !super::is_stdio(path) && (!path.exists() || !path.is_file()) {
                 return Err(ConfigurationError::InvalidConfiguration(format!(
                     "Event file not found: {path:?}"
                 )));
@@ -223,15 +244,14 @@ mod impls {
 
             Ok(Self { path: path.to_path_buf() })
         }
-    }
 
-    impl execution::Producer for RawEventReader {
-        /// Opens the event file and reads the executions while dispatching them
-        /// to the destination channel. Errors are logged and ignored.
-        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), ReporterError> {
-            let source =
-                fs::File::open(&self.path).map(io::BufReader::new).map_err(ReporterError::Network)?;
-
+        /// Reads events from `source` and dispatches them to `destination`.
+        /// Shared by the file and stdin code paths in `produce` so both keep
+        /// identical parsing and error-reporting behaviour.
+        fn forward(
+            source: impl io::Read,
+            destination: Sender<intercept::Execution>,
+        ) -> Result<(), ReporterError> {
             let executions = ExecutionEventDatabase::read_and_ignore(source, |error| {
                 log::warn!("Event file reading issue: {error:?}");
             });
@@ -244,6 +264,24 @@ mod impls {
             }
 
             Ok(())
+        }
+    }
+
+    impl execution::Producer for RawEventReader {
+        /// Opens the event source (a file, or standard input when the path is
+        /// `-`) and reads the executions while dispatching them to the
+        /// destination channel. Errors are logged and ignored.
+        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), ReporterError> {
+            if super::is_stdio(&self.path) {
+                let stdin = io::stdin();
+                let source = stdin.lock();
+                return Self::forward(source, destination);
+            }
+
+            let source =
+                fs::File::open(&self.path).map(io::BufReader::new).map_err(ReporterError::Network)?;
+
+            Self::forward(source, destination)
         }
     }
 
@@ -260,7 +298,18 @@ mod impls {
         /// Create a new raw event writer.
         ///
         /// This writer will write the intercepted events to a file in a raw format.
+        /// Rejects the `-` sentinel: interception runs the build, and the
+        /// build's own stdout shares that stream, so a non-atomic write here
+        /// could split a JSON line and corrupt the output.
         pub(super) fn create(path: &std::path::Path) -> Result<Self, WriterCreationError> {
+            if super::is_stdio(path) {
+                return Err(WriterCreationError::Configuration(
+                    "cannot write events to stdout: interception shares stdout with the build \
+                     and would corrupt the stream; write to a file instead"
+                        .to_string(),
+                ));
+            }
+
             let destination = fs::File::create(path)
                 .map(io::BufWriter::new)
                 .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
