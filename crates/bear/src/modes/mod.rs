@@ -7,12 +7,14 @@
 //! used throughout the application.
 
 mod execution;
+mod parse_sh_runner;
 
 use crate::environment;
 use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, output};
 use intercept_supervisor::CollectorOnTcp;
 use intercept_supervisor::context;
+use parse_sh_runner::ParseShRunner;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -43,6 +45,7 @@ fn is_stdio(path: &std::path::Path) -> bool {
 pub enum Mode {
     Intercept(execution::Interceptor, args::BuildCommand),
     Replay(execution::Replayer),
+    ParseSh(ParseShRunner),
 }
 
 impl Mode {
@@ -133,6 +136,13 @@ impl Mode {
 
                 Ok(Self::Intercept(intercept, input))
             }
+            args::Mode::ParseSh { input, output, directory } => {
+                log::debug!("Mode: parse shell text into events");
+
+                let runner = ParseShRunner::new(input, output.path, directory);
+
+                Ok(Self::ParseSh(runner))
+            }
         }
     }
 
@@ -145,6 +155,10 @@ impl Mode {
         let status = match self {
             Self::Intercept(interceptor, command) => interceptor.run(command),
             Self::Replay(semantic) => semantic.run(),
+            // `ParseShRunner::run` already resolves its own exit code (which
+            // depends on emitted/skipped counts, not merely Ok/Err), so it
+            // bypasses the shared `RuntimeError` handling below.
+            Self::ParseSh(runner) => return runner.run(),
         };
         status.unwrap_or_else(|error| {
             log::error!("{error}");

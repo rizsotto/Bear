@@ -10,6 +10,8 @@ Bear \- a tool to generate compilation database for Clang tooling.
 \f[I]BUILD_COMMAND\f[R]\&...
 .PP
 \f[B]bear semantic\f[R] [\f[I]OPTIONS\f[R]]
+.PP
+\f[B]bear parse\-sh\f[R] [\f[I]OPTIONS\f[R]]
 .SH DESCRIPTION
 Bear is a tool that generates a JSON compilation database for Clang
 tooling by intercepting command executions during the build process.
@@ -26,7 +28,7 @@ The captured commands are then filtered through semantic analysis to
 identify actual compiler invocations and generate the final compilation
 database.
 .PP
-Bear can operate in three modes:
+Bear can operate in four modes:
 .IP \(bu 2
 \f[B]Combined mode\f[R] (default): Runs both interception and semantic
 analysis in sequence
@@ -36,6 +38,10 @@ file
 .IP \(bu 2
 \f[B]Semantic mode\f[R]: Processes previously captured events to
 generate the compilation database
+.IP \(bu 2
+\f[B]Parse\-sh mode\f[R]: Reconstructs the event stream from shell
+command text (for example, \f[CR]make \-n\f[R] dry\-run output), without
+running a build at all
 .SS OPTIONS
 .TP
 \f[B]\-c, \-\-config\f[R] \f[I]FILE\f[R]
@@ -104,6 +110,83 @@ conflicting use for its own stdout; diagnostics still go to stderr,
 keeping stdout machine\-readable.
 This option concerns only the event input; the compilation\-database
 \f[CR]\-\-output\f[R] of \f[CR]bear semantic\f[R] is unaffected.
+.SS bear parse\-sh
+Parses shell command text \(en typically the output of a build
+system\(cqs dry\-run mode, such as \f[CR]make \-n\f[R] (or
+\f[CR]make \-n \-w\f[R] for recursive builds), or a saved build log \(en
+into the same event stream \f[CR]bear intercept\f[R] produces, without
+running anything.
+Feed that stream to \f[CR]bear semantic\f[R] to get a compilation
+database:
+.IP
+.EX
+  make \-n | bear parse\-sh | bear semantic \-\-input \-
+.EE
+.PP
+\f[B]bear parse\-sh\f[R] [\f[I]OPTIONS\f[R]]
+.TP
+\f[B]\-i, \-\-input\f[R] \f[I]FILE\f[R]
+Path of the shell text to parse (default: \f[CR]\-\f[R], reads from
+standard input).
+.TP
+\f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
+Path of the event file to write (default: \f[CR]\-\f[R], writes to
+standard output).
+Because \f[CR]bear parse\-sh\f[R] runs no build, it has no conflicting
+use for its own stdout, so \f[CR]\-\f[R] is the default here (unlike
+\f[CR]bear intercept\f[R]\(cqs \f[CR]\-\-output\f[R], which rejects it).
+.TP
+\f[B]\-C, \-\-directory\f[R] \f[I]DIR\f[R]
+Sets the initial working directory for the parsed commands, for input
+captured elsewhere (a CI log, or a dry run from another checkout) whose
+paths would otherwise be interpreted relative to \f[CR]bear\f[R]\(cqs
+own working directory.
+Not validated: the directory need not exist on this machine.
+.PP
+This is a best\-effort front end over a documented subset of shell
+syntax (word splitting and quoting,
+\f[CR];\f[R]/\f[CR]&&\f[R]/\f[CR]||\f[R]/\f[CR]&\f[R]/\f[CR]|\f[R]
+separators, comments, redirections, \f[CR]cd\f[R], and recursive
+make\(cqs \f[CR]Entering directory\f[R]/\f[CR]Leaving directory\f[R]
+markers).
+Anything outside that subset \(en subshells, command substitution,
+parameter expansion, glob in the executable position, here\-documents,
+and shell keywords (\f[CR]if\f[R], \f[CR]for\f[R], \f[CR]while\f[R],
+\f[CR]case\f[R]) \(en causes that one line to be skipped, reported on
+standard error with its line number and reason; the run still succeeds
+as long as at least one line produced an event.
+.PP
+\f[B]Interception remains the higher\-fidelity, recommended
+default.\f[R] It observes the real \f[CR]exec()\f[R] calls a build
+makes; \f[CR]bear parse\-sh\f[R] only reconstructs approximate events
+from text the build system chose to print during a dry run.
+In particular:
+.IP \(bu 2
+A dry run can omit commands entirely: recursive \f[CR]make\f[R] does not
+always propagate \f[CR]\-n\f[R] to sub\-makes, commands behind
+not\-yet\-generated sources never print because the generator never ran,
+and \f[CR]$(shell ...)\f[R] output captured at parse time can differ
+from a real build\(cqs.
+.IP \(bu 2
+The build system must both support a dry\-run mode and print real
+commands in it; silent rules, custom launchers, and response files
+reduce what \f[CR]bear parse\-sh\f[R] can see.
+.IP \(bu 2
+The environment and \f[CR]PATH\f[R] used to resolve bare executable
+names are \f[CR]bear parse\-sh\f[R]\(cqs own at parse time, which may
+differ from the real build\(cqs \(en especially when parsing a log
+captured on another machine, where \f[CR]\-\-directory\f[R] fixes the
+working directory but not the environment.
+.IP \(bu 2
+Only POSIX \f[CR]sh\f[R] command text is supported; non\-POSIX shells
+and Windows \f[CR]cmd\f[R] are out of scope, and interleaved
+non\-command output (compiler banners, warnings) in a saved log is
+skipped loudly like any other unsupported line.
+.PP
+Prefer \f[CR]bear \-\- <build command>\f[R] (or
+\f[CR]bear intercept\f[R]) whenever the build can actually be run; reach
+for \f[CR]bear parse\-sh\f[R] when it cannot \(en for example,
+reconstructing a compilation database from a CI log after the fact.
 .SH OUTPUT
 Bear generates a JSON compilation database conforming to the \c
 .UR https://clang.llvm.org/docs/JSONCompilationDatabase.html

@@ -12,8 +12,13 @@ use std::fmt;
 /// Common constants used in the module.
 const MODE_INTERCEPT_SUBCOMMAND: &str = "intercept";
 const MODE_SEMANTIC_SUBCOMMAND: &str = "semantic";
+const MODE_PARSE_SH_SUBCOMMAND: &str = "parse-sh";
 const DEFAULT_OUTPUT_FILE: &str = "compile_commands.json";
 const DEFAULT_EVENT_FILE: &str = "events.json";
+/// Default for `parse-sh`'s `--input`/`--output`: the `-` sentinel, meaning
+/// standard input or standard output respectively, so the mode is a plain
+/// filter by default.
+const DEFAULT_STDIO: &str = "-";
 
 /// Represents the command line arguments of the application.
 #[derive(Debug, PartialEq)]
@@ -30,6 +35,7 @@ pub enum Mode {
     Intercept { input: BuildCommand, output: BuildEvents },
     Semantic { input: BuildEvents, output: BuildSemantic },
     Combined { input: BuildCommand, output: BuildSemantic },
+    ParseSh { input: std::path::PathBuf, output: BuildEvents, directory: Option<std::path::PathBuf> },
 }
 
 /// Represents the execution of a command.
@@ -83,6 +89,15 @@ impl fmt::Display for Mode {
                 writeln!(f, "Combined (Intercept + Semantic Analysis)")?;
                 writeln!(f, "  Input: {}", input)?;
                 write!(f, "  Output: {}", output)
+            }
+            Mode::ParseSh { input, output, directory } => {
+                writeln!(f, "Parse Shell Text")?;
+                writeln!(f, "  Input: {}", input.display())?;
+                writeln!(f, "  Output: {}", output)?;
+                match directory {
+                    Some(dir) => write!(f, "  Directory: {}", dir.display()),
+                    None => write!(f, "  Directory: <current>"),
+                }
             }
         }
     }
@@ -139,6 +154,19 @@ impl TryFrom<ArgMatches> for Mode {
 
                 let output = BuildSemantic::try_from(semantic_matches)?;
                 Ok(Mode::Semantic { input: BuildEvents { path }, output })
+            }
+            Some((MODE_PARSE_SH_SUBCOMMAND, parse_sh_matches)) => {
+                let input = parse_sh_matches
+                    .get_one::<String>("input")
+                    .map(std::path::PathBuf::from)
+                    .expect("input is defaulted");
+                let path = parse_sh_matches
+                    .get_one::<String>("output")
+                    .map(std::path::PathBuf::from)
+                    .expect("output is defaulted");
+                let directory = parse_sh_matches.get_one::<String>("directory").map(std::path::PathBuf::from);
+
+                Ok(Mode::ParseSh { input, output: BuildEvents { path }, directory })
             }
             None => {
                 let input = BuildCommand::try_from(&matches)?;
@@ -225,6 +253,20 @@ pub fn cli() -> Command {
                         .default_value(DEFAULT_OUTPUT_FILE)
                         .hide_default_value(false),
                     arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
+                ])
+                .arg_required_else_help(false),
+        )
+        .subcommand(
+            Command::new(MODE_PARSE_SH_SUBCOMMAND)
+                .about("parses shell command text (e.g. `make -n` output) into an event stream")
+                .args(&[
+                    arg!(-i --input <FILE> "Path of the shell text to parse (`-` reads from standard input)")
+                        .default_value(DEFAULT_STDIO)
+                        .hide_default_value(false),
+                    arg!(-o --output <FILE> "Path of the event file to write (`-` writes to standard output)")
+                        .default_value(DEFAULT_STDIO)
+                        .hide_default_value(false),
+                    arg!(-C --directory <DIR> "Initial working directory for the parsed commands (not validated; the directory need not exist locally)"),
                 ])
                 .arg_required_else_help(false),
         )
@@ -370,6 +412,48 @@ mod test {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildEvents { path: "-".into() },
+                },
+            }
+        );
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn test_parse_sh_defaults() {
+        let execution = vec!["bear", "parse-sh"];
+
+        let matches = cli().get_matches_from(execution);
+        let arguments = Arguments::try_from(matches).unwrap();
+
+        assert_eq!(
+            arguments,
+            Arguments {
+                config: None,
+                mode: Mode::ParseSh {
+                    input: "-".into(),
+                    output: BuildEvents { path: "-".into() },
+                    directory: None,
+                },
+            }
+        );
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn test_parse_sh_call() {
+        let execution = vec!["bear", "parse-sh", "-i", "in.sh", "-o", "out.jsonl", "-C", "/build"];
+
+        let matches = cli().get_matches_from(execution);
+        let arguments = Arguments::try_from(matches).unwrap();
+
+        assert_eq!(
+            arguments,
+            Arguments {
+                config: None,
+                mode: Mode::ParseSh {
+                    input: "in.sh".into(),
+                    output: BuildEvents { path: "out.jsonl".into() },
+                    directory: Some("/build".into()),
                 },
             }
         );

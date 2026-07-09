@@ -15,6 +15,8 @@ Bear - a tool to generate compilation database for Clang tooling.
 
 **bear semantic** [*OPTIONS*]
 
+**bear parse-sh** [*OPTIONS*]
+
 
 # DESCRIPTION
 
@@ -22,11 +24,12 @@ Bear is a tool that generates a JSON compilation database for Clang tooling by i
 
 Bear operates by intercepting system calls during the build process to capture compilation commands. It supports two main interception methods: dynamic library preloading (on Unix-like systems) and wrapper executables (cross-platform). The captured commands are then filtered through semantic analysis to identify actual compiler invocations and generate the final compilation database.
 
-Bear can operate in three modes:
+Bear can operate in four modes:
 
 - **Combined mode** (default): Runs both interception and semantic analysis in sequence
 - **Intercept mode**: Only captures build events to an intermediate file
 - **Semantic mode**: Processes previously captured events to generate the compilation database
+- **Parse-sh mode**: Reconstructs the event stream from shell command text (for example, `make -n` dry-run output), without running a build at all
 
 ## OPTIONS
 
@@ -72,6 +75,34 @@ Processes previously captured events to generate a compilation database through 
       <producer> | bear semantic --input -
 
   Since `bear semantic` does not run the build, it has no conflicting use for its own stdout; diagnostics still go to stderr, keeping stdout machine-readable. This option concerns only the event input; the compilation-database `--output` of `bear semantic` is unaffected.
+
+## bear parse-sh
+
+Parses shell command text -- typically the output of a build system's dry-run mode, such as `make -n` (or `make -n -w` for recursive builds), or a saved build log -- into the same event stream `bear intercept` produces, without running anything. Feed that stream to `bear semantic` to get a compilation database:
+
+      make -n | bear parse-sh | bear semantic --input -
+
+**bear parse-sh** [*OPTIONS*]
+
+**-i, \-\-input** *FILE*
+: Path of the shell text to parse (default: `-`, reads from standard input).
+
+**-o, \-\-output** *FILE*
+: Path of the event file to write (default: `-`, writes to standard output). Because `bear parse-sh` runs no build, it has no conflicting use for its own stdout, so `-` is the default here (unlike `bear intercept`'s `--output`, which rejects it).
+
+**-C, \-\-directory** *DIR*
+: Sets the initial working directory for the parsed commands, for input captured elsewhere (a CI log, or a dry run from another checkout) whose paths would otherwise be interpreted relative to `bear`'s own working directory. Not validated: the directory need not exist on this machine.
+
+This is a best-effort front end over a documented subset of shell syntax (word splitting and quoting, `;`/`&&`/`||`/`&`/`|` separators, comments, redirections, `cd`, and recursive make's `Entering directory`/`Leaving directory` markers). Anything outside that subset -- subshells, command substitution, parameter expansion, glob in the executable position, here-documents, and shell keywords (`if`, `for`, `while`, `case`) -- causes that one line to be skipped, reported on standard error with its line number and reason; the run still succeeds as long as at least one line produced an event.
+
+**Interception remains the higher-fidelity, recommended default.** It observes the real `exec()` calls a build makes; `bear parse-sh` only reconstructs approximate events from text the build system chose to print during a dry run. In particular:
+
+- A dry run can omit commands entirely: recursive `make` does not always propagate `-n` to sub-makes, commands behind not-yet-generated sources never print because the generator never ran, and `$(shell ...)` output captured at parse time can differ from a real build's.
+- The build system must both support a dry-run mode and print real commands in it; silent rules, custom launchers, and response files reduce what `bear parse-sh` can see.
+- The environment and `PATH` used to resolve bare executable names are `bear parse-sh`'s own at parse time, which may differ from the real build's -- especially when parsing a log captured on another machine, where `--directory` fixes the working directory but not the environment.
+- Only POSIX `sh` command text is supported; non-POSIX shells and Windows `cmd` are out of scope, and interleaved non-command output (compiler banners, warnings) in a saved log is skipped loudly like any other unsupported line.
+
+Prefer `bear -- <build command>` (or `bear intercept`) whenever the build can actually be run; reach for `bear parse-sh` when it cannot -- for example, reconstructing a compilation database from a CI log after the fact.
 
 
 # OUTPUT
