@@ -8,6 +8,8 @@
 //! the CLI and folding its output into the execution-event stream are later
 //! stages, not implemented here.
 
+pub mod interpreter;
 pub mod lexer;
 
+pub use interpreter::{Context, Interpretation, SkippedLine, interpret};
 pub use lexer::{LexedCommand, SimpleCommand, SkipReason, lex};
