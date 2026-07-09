@@ -17,8 +17,13 @@ use std::path::Path;
 
 /// A real `make -n` capture of zlib 1.3.1's build (77 lines; 34 compile
 /// commands among the gcc/ar/mv/mkdir/ln/subshell/redirect noise). See
-/// `tests/integration/tests/fixtures/data/zlib.sh`.
-const ZLIB_SH: &str = include_str!("../fixtures/data/zlib.sh");
+/// `tests/integration/tests/fixtures/data/zlib.make-n.sh`.
+const ZLIB_SH: &str = include_str!("../fixtures/data/zlib.make-n.sh");
+
+/// The same zlib 1.3.1 build, captured with `make -n -w`: byte-identical to
+/// `ZLIB_SH` except for a leading `make: Entering directory '/tmp/build'`
+/// and a trailing `make: Leaving directory '/tmp/build'` marker.
+const ZLIB_SH_W: &str = include_str!("../fixtures/data/zlib.make-n-w.sh");
 
 // Requirements: interception-events-from-shell-text
 #[test]
@@ -219,6 +224,41 @@ fn parse_sh_zlib_capture_piped_into_semantic_yields_default_deduped_database() -
     for file in ZLIB_EXPECTED_FILES {
         db.assert_contains(&CompilationEntryMatcher::new().file(file.to_string()))
             .with_context(|| format!("missing expected file entry: {file}"))?;
+    }
+    assert_all_entries_use_gcc(&db)?;
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text, interception-events-format
+//
+// Same real zlib capture as above, but recorded with `make -n -w`, which
+// wraps it in a top-level `make: Entering directory '/tmp/build'` /
+// `Leaving directory '/tmp/build'` pair. Proves real GNU make `-w` directory
+// markers drive the recorded `directory` end to end, on a real capture: the
+// markers add no entries of their own (still 17, via the default dedup), but
+// every entry's `directory` must come from the announced `/tmp/build`.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_zlib_make_n_w_capture_records_marker_directory() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_zlib_make_n_w")?;
+
+    let parse_result = env.run_bear_with_stdin(&["parse-sh"], ZLIB_SH_W.as_bytes())?;
+    parse_result.assert_success()?;
+
+    let semantic_result = env.run_bear_with_stdin(
+        &["semantic", "--input", "-", "--output", "compile_commands.json"],
+        parse_result.stdout().as_bytes(),
+    )?;
+    semantic_result.assert_success()?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(17)?;
+    for entry in db.entries() {
+        assert_eq!(
+            entry["directory"], "/tmp/build",
+            "entry directory must come from the 'Entering directory' marker: {entry}"
+        );
     }
     assert_all_entries_use_gcc(&db)?;
 
