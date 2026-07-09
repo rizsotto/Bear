@@ -102,6 +102,8 @@ This is a best-effort front end over a documented subset of shell syntax (word s
 - The environment and `PATH` used to resolve bare executable names are `bear parse-sh`'s own at parse time, which may differ from the real build's -- especially when parsing a log captured on another machine, where `--directory` fixes the working directory but not the environment.
 - Only POSIX `sh` command text is supported; non-POSIX shells and Windows `cmd` are out of scope, and interleaved non-command output (compiler banners, warnings) in a saved log is skipped loudly like any other unsupported line.
 
+The source files named in the parsed commands need not exist on the machine running `bear parse-sh`: entries are reconstructed from the text alone, and the default path format (`format.paths: as-is`) never touches the filesystem. The one exception is `format.paths: canonical`, which resolves symlinks and so requires every path to exist on disk; when parsing a log whose sources are absent (a CI log, another checkout) use `format.paths: absolute` for existence-free normalization instead.
+
 Prefer `bear -- <build command>` (or `bear intercept`) whenever the build can actually be run; reach for `bear parse-sh` when it cannot -- for example, reconstructing a compilation database from a CI log after the fact.
 
 

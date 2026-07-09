@@ -183,6 +183,16 @@ and Windows \f[CR]cmd\f[R] are out of scope, and interleaved
 non\-command output (compiler banners, warnings) in a saved log is
 skipped loudly like any other unsupported line.
 .PP
+The source files named in the parsed commands need not exist on the
+machine running \f[CR]bear parse\-sh\f[R]: entries are reconstructed
+from the text alone, and the default path format
+(\f[CR]format.paths: as\-is\f[R]) never touches the filesystem.
+The one exception is \f[CR]format.paths: canonical\f[R], which resolves
+symlinks and so requires every path to exist on disk; when parsing a log
+whose sources are absent (a CI log, another checkout) use
+\f[CR]format.paths: absolute\f[R] for existence\-free normalization
+instead.
+.PP
 Prefer \f[CR]bear \-\- <build command>\f[R] (or
 \f[CR]bear intercept\f[R]) whenever the build can actually be run; reach
 for \f[CR]bear parse\-sh\f[R] when it cannot \(en for example,

@@ -1,6 +1,6 @@
 ---
 title: Events file as external interchange format
-status: accepted
+status: implemented
 ---
 
 ## Intent

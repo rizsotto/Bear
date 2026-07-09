@@ -1,6 +1,6 @@
 ---
 title: Execution events from shell command text
-status: proposed
+status: implemented
 ---
 
 ## Intent
@@ -31,9 +31,10 @@ dry-run text contains.
   [`interception-events-format`](interception-events-format.md) to
   standard output or a named file. Standard input and standard output
   are the defaults, so the mode is a plain filter.
-- Each line that lexes as a simple command becomes one execution event.
-  The mode does not decide what a compiler is; `mv`, `ar`, `ln`, and
-  `mkdir` lines produce valid events just as compiler lines do. Filtering
+- Each line that lexes as a simple command becomes one execution event,
+  with one exception: `cd` (see working-directory tracking below). The
+  mode does not decide what a compiler is; `mv`, `ar`, `ln`, and `mkdir`
+  lines produce valid events just as compiler lines do. Filtering
   non-compiler commands is the consumer's job, not this producer's.
 - The `executable` field is the first word that is not a leading
   assignment, taken verbatim. Bare names stay bare; the consumer resolves
@@ -59,7 +60,10 @@ dry-run text contains.
 - The working directory of each event is tracked:
   - it starts at the mode's own working directory, or at a caller-set
     value when the input came from elsewhere (such as a CI log);
-  - a `cd <dir>` command updates it for subsequent commands;
+  - a `cd <dir>` command updates it for subsequent commands, and is
+    consumed only for that effect: `cd` produces no execution event,
+    because it is a shell builtin that never reaches `exec()` and so would
+    not appear in an intercepted stream;
   - `make[N]: Entering directory '...'` and `Leaving directory '...'`
     markers push and pop it, so recursive `make -n -w` output tracks
     directories correctly. These markers are an explicit, documented
@@ -98,6 +102,13 @@ inherent to dry-run text. These must also appear in the man page:
   `cmd` are out of scope. A saved full-build log is accepted only insofar
   as its lines happen to be `sh` commands; interleaved compiler output is
   skipped loudly like any other unsupported line.
+- Whether a source file exists on the parsing machine does not affect the
+  output: entries are reconstructed from the parsed text alone, so a log
+  whose sources are absent (a CI log parsed elsewhere) still produces a
+  full database. The one exception is Bear's canonicalizing path format,
+  which resolves paths against the real filesystem and therefore needs the
+  sources present; the man page documents the existence-free alternative
+  for that case.
 
 ## Testing
 
