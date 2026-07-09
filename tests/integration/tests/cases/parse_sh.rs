@@ -9,10 +9,16 @@
 //! `crates/bear/src/parse_sh/interpreter.rs` cover the parsing rules
 //! themselves, so these tests focus on the mode's I/O behavior.
 
-use crate::fixtures::infrastructure::compilation_entry;
+use crate::fixtures::infrastructure::{CompilationEntryMatcher, compilation_entry};
 use crate::fixtures::*;
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
+use std::path::Path;
+
+/// A real `make -n` capture of zlib 1.3.1's build (77 lines; 34 compile
+/// commands among the gcc/ar/mv/mkdir/ln/subshell/redirect noise). See
+/// `tests/integration/tests/fixtures/data/zlib.sh`.
+const ZLIB_SH: &str = include_str!("../fixtures/data/zlib.sh");
 
 // Requirements: interception-events-from-shell-text
 #[test]
@@ -135,6 +141,172 @@ fn parse_sh_output_piped_into_semantic_yields_compilation_database() -> Result<(
         directory: temp_dir.to_string(),
         arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "foo.c".to_string()]
     ))?;
+
+    Ok(())
+}
+
+/// The 17 distinct source files the zlib fixture compiles, in the order
+/// `make -n` first mentions them (the default duplicate key collapses each
+/// source's plain and `-fPIC` compile into one entry, keeping the first
+/// occurrence).
+const ZLIB_EXPECTED_FILES: [&str; 17] = [
+    "../zlib-1.3.1/test/example.c",
+    "../zlib-1.3.1/adler32.c",
+    "../zlib-1.3.1/crc32.c",
+    "../zlib-1.3.1/deflate.c",
+    "../zlib-1.3.1/infback.c",
+    "../zlib-1.3.1/inffast.c",
+    "../zlib-1.3.1/inflate.c",
+    "../zlib-1.3.1/inftrees.c",
+    "../zlib-1.3.1/trees.c",
+    "../zlib-1.3.1/zutil.c",
+    "../zlib-1.3.1/compress.c",
+    "../zlib-1.3.1/uncompr.c",
+    "../zlib-1.3.1/gzclose.c",
+    "../zlib-1.3.1/gzlib.c",
+    "../zlib-1.3.1/gzread.c",
+    "../zlib-1.3.1/gzwrite.c",
+    "../zlib-1.3.1/test/minigzip.c",
+];
+
+/// Asserts that every entry in `db` records a bare `gcc` invocation: its
+/// `arguments[0]` basename is `gcc`, never a literal path. `bear semantic`'s
+/// shared `ResolveExecutable` rewrites the fixture's bare `gcc` token to an
+/// absolute host path (`/usr/bin/gcc`, or a ccache masquerade path), so the
+/// path itself is host-specific and only the basename is portable.
+fn assert_all_entries_use_gcc(db: &CompilationDatabase) -> Result<()> {
+    for entry in db.entries() {
+        let arg0 =
+            entry["arguments"][0].as_str().with_context(|| format!("entry missing arguments[0]: {entry}"))?;
+        let basename = Path::new(arg0).file_name().and_then(|name| name.to_str()).unwrap_or(arg0);
+        assert_eq!(basename, "gcc", "arguments[0] basename must be gcc, got: {arg0} (entry: {entry})");
+    }
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text, interception-events-format
+//
+// End-to-end coverage over a REAL `make -n` capture (zlib 1.3.1): pipes
+// `bear parse-sh` into `bear semantic` with the default config, proving the
+// whole producer (parse-sh) and consumer (semantic) agree on the event
+// format. The default duplicate key (directory+file) collapses each
+// source's plain and `-fPIC` compile into one entry (first occurrence -
+// the plain compile - wins), so 34 compile commands over 17 distinct
+// sources yield 17 database entries.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_zlib_capture_piped_into_semantic_yields_default_deduped_database() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_zlib_default")?;
+
+    let parse_result = env.run_bear_with_stdin(&["parse-sh"], ZLIB_SH.as_bytes())?;
+    parse_result.assert_success()?;
+    let parse_stderr = parse_result.stderr();
+    assert!(parse_stderr.contains("skipped"), "stderr must report the skip: {parse_stderr}");
+    assert!(parse_stderr.contains("line 18"), "stderr must cite the skipped line number: {parse_stderr}");
+    assert!(
+        parse_stderr.contains("subshell"),
+        "stderr must name the subshell as the skip reason: {parse_stderr}"
+    );
+
+    let semantic_result = env.run_bear_with_stdin(
+        &["semantic", "--input", "-", "--output", "compile_commands.json"],
+        parse_result.stdout().as_bytes(),
+    )?;
+    semantic_result.assert_success()?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(17)?;
+    for file in ZLIB_EXPECTED_FILES {
+        db.assert_contains(&CompilationEntryMatcher::new().file(file.to_string()))
+            .with_context(|| format!("missing expected file entry: {file}"))?;
+    }
+    assert_all_entries_use_gcc(&db)?;
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text, interception-events-format
+//
+// Same real zlib capture as above, but with a config that adds `arguments`
+// to the duplicate key: the plain and `-fPIC` compiles of each source now
+// differ (different flags), so none collapse and all 34 compile commands
+// survive as distinct entries. Confirms parse-sh's event stream carries
+// enough detail (distinct argv per invocation) for `bear semantic`'s
+// arguments-aware deduplication to tell them apart.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_zlib_capture_with_arguments_dedup_yields_all_compile_entries() -> Result<()> {
+    const CONFIG: &str = r#"schema: '4.1'
+
+duplicates:
+  match_on:
+    - directory
+    - file
+    - arguments
+"#;
+
+    let env = TestEnvironment::new("parse_sh_zlib_arguments_dedup")?;
+    let config_path = env.create_config(CONFIG)?;
+    let config_path = config_path.to_str().context("config path is not valid UTF-8")?;
+
+    let parse_result = env.run_bear_with_stdin(&["parse-sh"], ZLIB_SH.as_bytes())?;
+    parse_result.assert_success()?;
+
+    let semantic_result = env.run_bear_with_stdin(
+        &["-c", config_path, "semantic", "--input", "-", "--output", "compile_commands.json"],
+        parse_result.stdout().as_bytes(),
+    )?;
+    semantic_result.assert_success()?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(34)?;
+    assert_all_entries_use_gcc(&db)?;
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+//
+// Synthetic recursive-make directory tracking, end to end: `make[1]:
+// Entering directory` / `Leaving directory` markers must drive parse-sh's
+// working directory, and that working directory must flow through
+// `bear semantic` into each entry's recorded `directory`. `a.c` is compiled
+// inside the announced subdirectory; `b.c` is compiled after the matching
+// `Leaving directory`, back in parse-sh's own cwd (the test dir).
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_recursive_make_markers_drive_semantic_directory() -> Result<()> {
+    const SCRIPT: &str = "\
+make[1]: Entering directory '/build/sub'
+gcc -c a.c
+make[1]: Leaving directory '/build/sub'
+gcc -c b.c
+";
+
+    let env = TestEnvironment::new("parse_sh_recursive_make_directory")?;
+
+    let parse_result = env.run_bear_with_stdin(&["parse-sh"], SCRIPT.as_bytes())?;
+    parse_result.assert_success()?;
+
+    let semantic_result = env.run_bear_with_stdin(
+        &["semantic", "--input", "-", "--output", "compile_commands.json"],
+        parse_result.stdout().as_bytes(),
+    )?;
+    semantic_result.assert_success()?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+
+    let a_entry =
+        db.entries().iter().find(|entry| entry["file"] == "a.c").context("expected an entry for a.c")?;
+    assert_eq!(a_entry["directory"], "/build/sub");
+
+    let b_entry =
+        db.entries().iter().find(|entry| entry["file"] == "b.c").context("expected an entry for b.c")?;
+    assert_ne!(
+        b_entry["directory"], "/build/sub",
+        "b.c must be recorded in parse-sh's own cwd, not the entered subdirectory"
+    );
 
     Ok(())
 }
