@@ -204,7 +204,11 @@ fn parse_sh_output_piped_into_semantic_stdout_yields_compilation_database() -> R
         .context("stdout must be a valid JSON compilation database")?;
     assert_eq!(entries.len(), 1, "expected exactly one compilation entry: {entries:?}");
     assert_eq!(entries[0]["file"], "foo.c");
-    assert_eq!(entries[0]["directory"], temp_dir);
+    // Compare canonically: on macOS the process cwd resolves the
+    // `/var` -> `/private/var` symlink, so the recorded directory differs
+    // from the temp dir's symlinked path even though they are the same dir.
+    let recorded_dir = entries[0]["directory"].as_str().context("directory must be a string")?;
+    assert_eq!(std::fs::canonicalize(recorded_dir)?, std::fs::canonicalize(temp_dir)?);
     assert_eq!(entries[0]["arguments"], json!([COMPILER_C_PATH, "-c", "foo.c"]));
 
     assert!(!env.file_exists("-"), "must not create a file literally named `-`");

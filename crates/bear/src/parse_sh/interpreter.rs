@@ -460,6 +460,11 @@ mod tests {
     }
 
     // Requirements: interception-events-from-shell-text
+    // `cd`/`..` resolution goes through `std::path`, so these POSIX
+    // absolute-path assertions hold on Unix only; on Windows the same
+    // input yields backslash-separated, drive-relative paths. parse-sh
+    // targets POSIX `sh` dry-run output, so Unix is where this matters.
+    #[cfg(unix)]
     #[test]
     fn cd_on_same_line_affects_the_following_command_only() {
         let sut = interpret("cd sub && gcc -c foo.c", &context("/build", &[]));
@@ -469,6 +474,7 @@ mod tests {
     }
 
     // Requirements: interception-events-from-shell-text
+    #[cfg(unix)]
     #[test]
     fn cd_persists_across_logical_lines() {
         let sut = interpret("cd sub\ngcc -c foo.c", &context("/build", &[]));
@@ -477,6 +483,7 @@ mod tests {
     }
 
     // Requirements: interception-events-from-shell-text
+    #[cfg(unix)]
     #[test]
     fn relative_cd_with_dotdot_normalizes_lexically() {
         let sut = interpret("cd ../bar && gcc x.c", &context("/build/foo", &[]));
@@ -485,6 +492,7 @@ mod tests {
     }
 
     // Requirements: interception-events-from-shell-text
+    #[cfg(unix)]
     #[test]
     fn cd_dotdot_stays_pinned_at_the_filesystem_root() {
         let cases: Vec<(&str, &str, &str)> = vec![
