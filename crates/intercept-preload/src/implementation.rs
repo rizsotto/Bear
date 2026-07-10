@@ -1016,10 +1016,8 @@ unsafe fn as_string_vec(s: *const *const c_char) -> Result<Vec<String>, c_int> {
 
     let mut i = 0;
     while !unsafe { (*s.add(i)).is_null() } {
-        match unsafe { as_string(*s.add(i)) } {
-            Ok(arg) => vec.push(arg),
-            Err(e) => return Err(e),
-        }
+        let arg = unsafe { as_string(*s.add(i)) }?;
+        vec.push(arg);
         i += 1;
     }
 
@@ -1035,18 +1033,14 @@ unsafe fn as_environment(s: *const *const c_char) -> Result<HashMap<String, Stri
 
     let mut i = 0;
     while !unsafe { (*s.add(i)).is_null() } {
-        match unsafe { as_string(*s.add(i)) } {
-            Ok(key_and_value) => {
-                if let Some(pos) = key_and_value.find('=') {
-                    let key = key_and_value[..pos].to_string();
-                    let value = key_and_value[pos + 1..].to_string();
+        let key_and_value = unsafe { as_string(*s.add(i)) }?;
+        if let Some(pos) = key_and_value.find('=') {
+            let key = key_and_value[..pos].to_string();
+            let value = key_and_value[pos + 1..].to_string();
 
-                    map.insert(key, value);
-                }
-                // Note: entries without '=' are technically valid but unusual
-            }
-            Err(e) => return Err(e),
+            map.insert(key, value);
         }
+        // Note: entries without '=' are technically valid but unusual
         i += 1;
     }
 
