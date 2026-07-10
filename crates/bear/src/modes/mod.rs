@@ -262,19 +262,49 @@ mod impls {
         /// Reads events from `source` and dispatches them to `destination`.
         /// Shared by the file and stdin code paths in `produce` so both keep
         /// identical parsing and error-reporting behaviour.
+        ///
+        /// Line-based and resilient, per
+        /// `docs/requirements/interception-events-format.md`: a malformed
+        /// line is reported with its (1-based) physical line number and
+        /// parsing continues with the remaining lines, rather than one bad
+        /// line silently dropping everything after it. Blank lines are
+        /// skipped silently. If the input had at least one non-empty line
+        /// and none of them parsed, the run fails so the caller does not
+        /// exit successfully having analyzed nothing.
         fn forward(
-            source: impl io::Read,
+            source: impl io::BufRead,
             destination: Sender<intercept::Execution>,
         ) -> Result<(), ReporterError> {
-            let executions = ExecutionEventDatabase::read_and_ignore(source, |error| {
-                log::warn!("Event file reading issue: {error:?}");
-            });
+            let mut nonempty_count = 0usize;
+            let mut accepted_count = 0usize;
 
-            for execution in executions {
-                if destination.send(execution).is_err() {
-                    log::debug!("Consumer channel closed; stopping execution forwarding");
-                    break;
+            for (index, line) in source.lines().enumerate() {
+                let line = line.map_err(ReporterError::Network)?;
+                let line_number = index + 1;
+
+                if line.trim().is_empty() {
+                    continue;
                 }
+                nonempty_count += 1;
+
+                match serde_json::from_str::<intercept::Execution>(&line) {
+                    Ok(execution) => {
+                        accepted_count += 1;
+                        if destination.send(execution).is_err() {
+                            log::debug!("Consumer channel closed; stopping execution forwarding");
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        log::warn!("event stream line {line_number}: {error}");
+                    }
+                }
+            }
+
+            if nonempty_count > 0 && accepted_count == 0 {
+                return Err(ReporterError::Network(std::io::Error::other(format!(
+                    "every one of {nonempty_count} event line(s) was rejected; no events to analyze"
+                ))));
             }
 
             Ok(())
@@ -284,7 +314,9 @@ mod impls {
     impl execution::Producer for RawEventReader {
         /// Opens the event source (a file, or standard input when the path is
         /// `-`) and reads the executions while dispatching them to the
-        /// destination channel. Errors are logged and ignored.
+        /// destination channel. A malformed line is reported and skipped
+        /// (see `forward`); the run only fails when every non-empty line was
+        /// rejected.
         fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), ReporterError> {
             if super::is_stdio(&self.path) {
                 let stdin = io::stdin();

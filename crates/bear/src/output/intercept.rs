@@ -9,8 +9,7 @@
 //! The output format is not stable and may change in future versions.
 
 use super::{SerializationError, SerializationFormat};
-use serde_json::StreamDeserializer;
-use serde_json::de::IoRead;
+use std::io::BufRead;
 
 /// The type represents a database format for execution events.
 pub struct ExecutionEventDatabase;
@@ -28,11 +27,26 @@ impl SerializationFormat<intercept::Execution> for ExecutionEventDatabase {
         Ok(())
     }
 
+    /// Reads line-delimited JSON events, one `Result` per non-blank line.
+    ///
+    /// Unlike a single `StreamDeserializer` over the whole reader, this
+    /// parses each line independently: a malformed line yields `Err` for
+    /// that line only, and parsing continues with subsequent lines. This
+    /// is required by `docs/requirements/interception-events-format.md`
+    /// (a non-conforming line must not silently drop every line after it).
+    /// Blank/whitespace-only lines are skipped rather than yielded as
+    /// errors or empty results.
     fn read(
         reader: impl std::io::Read,
     ) -> impl Iterator<Item = Result<intercept::Execution, SerializationError>> {
-        let stream = StreamDeserializer::new(IoRead::new(reader));
-        stream.map(|value| value.map_err(SerializationError::Syntax))
+        let buffered = std::io::BufReader::new(reader);
+        buffered.lines().filter_map(|line| match line {
+            Ok(line) if line.trim().is_empty() => None,
+            Ok(line) => {
+                Some(serde_json::from_str::<intercept::Execution>(&line).map_err(SerializationError::Syntax))
+            }
+            Err(error) => Some(Err(SerializationError::Io(error))),
+        })
     }
 }
 
@@ -72,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn read_stops_on_errors() {
+    fn read_continues_past_errors() {
         let line1 = json!({
             "executable": "/usr/bin/clang",
             "arguments": ["clang", "-c", "main.c"],
@@ -98,9 +112,24 @@ mod tests {
         })
         .collect();
 
-        // Only the first execution is read, all other lines are ignored.
-        assert_eq!(expected_values()[0..1], read_back);
+        // Both valid executions are read; only the malformed middle line is dropped.
+        assert_eq!(expected_values()[0..2], read_back);
         assert_eq!(warnings.borrow().len(), 1);
+    }
+
+    #[test]
+    fn read_all_malformed_yields_no_executions_and_one_warning_per_line() {
+        let content = "{\"executable\": 42}\nnot json at all\n{\"executable\": true}\n".to_string();
+
+        let mut cursor = Cursor::new(content);
+        let warnings = std::cell::RefCell::new(Vec::new());
+        let read_back: Vec<_> = Sut::read_and_ignore(&mut cursor, |error| {
+            warnings.borrow_mut().push(format!("Warning: {error:?}"));
+        })
+        .collect();
+
+        assert_eq!(Vec::<Execution>::new(), read_back);
+        assert_eq!(warnings.borrow().len(), 3);
     }
 
     fn expected_values() -> Vec<Execution> {

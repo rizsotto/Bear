@@ -355,6 +355,12 @@ fn semantic_empty_events() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-events-format
+//
+// Every one of these three lines is rejected (an unterminated object, a
+// valid-but-incomplete object missing required fields, and another
+// unterminated object): non-empty input from which nothing parsed must
+// exit non-zero rather than silently succeed with an empty database.
 #[test]
 fn semantic_malformed_events() -> Result<()> {
     let env = TestEnvironment::new("semantic_malformed")?;
@@ -366,12 +372,9 @@ fn semantic_malformed_events() -> Result<()> {
 {malformed json"#,
     )])?;
 
-    // Bear should handle malformed events gracefully
-    let _output =
-        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(0)?;
+    let result =
+        env.run_bear(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+    result.assert_failure()?;
 
     Ok(())
 }
@@ -1492,6 +1495,87 @@ fn gcc_modules_ts_flag_yields_single_entry_for_module_interface() -> Result<()> 
             "mod.cppm".to_string(),
         ]
     ))?;
+
+    Ok(())
+}
+
+// Requirements: interception-events-format
+//
+// A malformed line in the middle of the event stream must not drop every
+// valid line that follows it: both the line before and the line after the
+// malformed one must still become compilation-database entries, and the
+// malformed line is reported with its physical line number on stderr at
+// the default log level (no `RUST_LOG` opt-in required).
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn semantic_input_mixed_valid_and_malformed_lines_keeps_both_valid_entries() -> Result<()> {
+    let env = TestEnvironment::new("semantic_mixed_valid_malformed")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event1 = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "test.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let event2 = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "other.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    // Line 2 is deliberately not valid JSON at all.
+    let events_content = format!("{event1}\nthis is not json\n{event2}\n");
+
+    env.create_source_files(&[
+        ("test.c", "int main() { return 0; }"),
+        ("other.c", "int main() { return 0; }"),
+    ])?;
+
+    let result = env.run_bear_with_stdin_default_log(
+        &["semantic", "--input", "-", "--output", "compile_commands.json"],
+        events_content.as_bytes(),
+    )?;
+    result.assert_success()?;
+
+    let stderr = result.stderr();
+    assert!(
+        stderr.contains("line 2"),
+        "stderr must cite the malformed line's physical line number: {stderr}"
+    );
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test.c".to_string()]
+    ))?;
+    db.assert_contains(&compilation_entry!(
+        file: "other.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "other.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: interception-events-format
+//
+// When every line of a non-empty event stream is rejected, the run must
+// not silently succeed with an empty compilation database: it exits
+// non-zero so the failure is visible.
+#[test]
+fn semantic_input_all_malformed_lines_exits_non_zero() -> Result<()> {
+    let env = TestEnvironment::new("semantic_all_malformed")?;
+
+    let events_content = "not json\n{\"executable\": 42}\nalso not json\n";
+
+    let result = env.run_bear_with_stdin(
+        &["semantic", "--input", "-", "--output", "compile_commands.json"],
+        events_content.as_bytes(),
+    )?;
+    result.assert_failure()?;
 
     Ok(())
 }
