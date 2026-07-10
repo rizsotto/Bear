@@ -24,6 +24,7 @@ impl SerializationFormat<intercept::Execution> for ExecutionEventDatabase {
             serde_json::to_writer(&mut writer, &execution).map_err(SerializationError::Syntax)?;
             writer.write_all(b"\n").map_err(SerializationError::Io)?;
         }
+        writer.flush().map_err(SerializationError::Io)?;
         Ok(())
     }
 
