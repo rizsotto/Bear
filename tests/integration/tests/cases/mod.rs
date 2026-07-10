@@ -37,6 +37,11 @@ pub mod hardened_intercept;
 pub mod intercept;
 #[cfg(has_preload_library)]
 pub mod intercept_posix;
+// parse-sh parses POSIX `sh` dry-run output; its end-to-end tests feed shell
+// commands and native compiler paths through that parser, which treats `\` as
+// an escape. On Windows those paths (e.g. `C:\mingw64\bin\gcc.exe`) mangle, so
+// the feature and its integration tests are Unix-only.
+#[cfg(unix)]
 pub mod parse_sh;
 #[cfg(all(has_preload_library, has_executable_compiler_c, has_executable_shell))]
 pub mod response_files;
