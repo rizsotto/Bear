@@ -32,6 +32,8 @@ pub enum SkipReason {
     HereDoc,
     /// A shell keyword (`case`, `for`, `while`, ...) in command position.
     Keyword,
+    /// A `'` or `"` quote opened but never closed before end of input.
+    UnterminatedQuote,
 }
 
 impl fmt::Display for SkipReason {
@@ -43,6 +45,7 @@ impl fmt::Display for SkipReason {
             Self::GlobInExecutable => "glob in executable",
             Self::HereDoc => "here-document",
             Self::Keyword => "shell keyword",
+            Self::UnterminatedQuote => "unterminated quote",
         };
         f.write_str(text)
     }
@@ -525,6 +528,18 @@ impl<'a> Scanner<'a> {
             }
         }
 
+        if quote != Quote::None {
+            // The read loop only exits mid-quote by running out of input
+            // (the `Quote::None` arm is the only one that `break`s on a
+            // delimiter); a real, closed quote never reaches here. Since
+            // the interpreter feeds one physical line at a time, this is
+            // also what catches a quoted value that a real newline split
+            // across two logical lines: each half looks like an
+            // unterminated quote to this lexer, and both must be skipped
+            // loudly rather than lexed into a fabricated command.
+            skip = Some(SkipReason::UnterminatedQuote);
+        }
+
         Word { text, skip, has_unquoted_glob }
     }
 }
@@ -663,6 +678,22 @@ mod tests {
     fn skips_the_zlib_subshell_line_loudly() {
         let sut = lex("(ranlib libz.a || true) >/dev/null 2>&1");
         assert_eq!(sut, vec![skipped(1, SkipReason::Subshell)], "zlib subshell line");
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn skips_unterminated_quotes_loudly() {
+        let cases: Vec<(&str, Vec<LexedCommand>)> = vec![
+            ("gcc 'unterminated", vec![skipped(1, SkipReason::UnterminatedQuote)]),
+            ("gcc \"also unterminated", vec![skipped(1, SkipReason::UnterminatedQuote)]),
+            // Regression: a properly closed quote still lexes normally.
+            ("gcc 'closed' foo.c", vec![command(&["gcc", "closed", "foo.c"], 1)]),
+        ];
+
+        for (input, expected) in cases {
+            let sut = lex(input);
+            assert_eq!(sut, expected, "case: {input:?}");
+        }
     }
 
     // Requirements: interception-events-from-shell-text

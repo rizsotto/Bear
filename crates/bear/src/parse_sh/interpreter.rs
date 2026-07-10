@@ -46,6 +46,7 @@ pub fn interpret(input: &str, context: &Context) -> Interpretation {
         executions: Vec::new(),
         skipped: Vec::new(),
         initial_working_dir: context.working_dir.clone(),
+        heredoc_terminator: None,
     };
 
     for (logical_line, start_line) in logical_lines(input) {
@@ -65,13 +66,33 @@ struct State<'a> {
     skipped: Vec<SkippedLine>,
     /// Fallback for an unmatched `Leaving directory` (empty stack).
     initial_working_dir: PathBuf,
+    /// Set while consuming a here-document body: the delimiter that ends
+    /// it. `None` means "not currently inside a here-document".
+    heredoc_terminator: Option<String>,
 }
 
 impl State<'_> {
     fn process_logical_line(&mut self, logical_line: &str, start_line: usize) {
+        if let Some(terminator) = self.heredoc_terminator.take() {
+            // Here-document body lines (and the terminator line itself) are
+            // data, not commands: they must never reach the lexer, or they
+            // would fabricate execution events. Pragmatic match: a plain
+            // `.trim()` of the candidate line against the delimiter, which
+            // also covers `<<-`'s "strip leading tabs" rule without
+            // threading a separate dash flag through the state.
+            if logical_line.trim() != terminator {
+                self.heredoc_terminator = Some(terminator);
+            }
+            return;
+        }
+
         if let Some(marker) = parse_make_marker(logical_line) {
             self.apply_marker(marker);
             return;
+        }
+
+        if let Some(delimiter) = detect_heredoc(logical_line) {
+            self.heredoc_terminator = Some(delimiter);
         }
 
         for item in lex(logical_line) {
@@ -236,37 +257,158 @@ fn extract_quoted_path(rest: &str) -> Option<String> {
 /// `base` outright, a relative one is joined onto it; `.` components are
 /// dropped and `..` pops the previous normal component. Purely textual --
 /// no filesystem access, so symlinks are not resolved.
+///
+/// The result is only ever built from a stack of "normal" (real) path
+/// segments; root-ness is tracked separately as a flag rather than as a
+/// poppable stack entry. That is what pins `..` at the filesystem root:
+/// popping an empty stack is a no-op, so an absolute base can never be
+/// popped past its root (real `cd /..` stays at `/`, it does not become a
+/// relative or empty path) while `cd /abs/x` still replaces the base
+/// outright.
 fn resolve_path(base: &Path, target: &str) -> PathBuf {
     let target_path = Path::new(target);
-    let is_absolute = target_path.is_absolute();
+    let target_is_absolute = target_path.is_absolute();
+    let result_is_absolute = target_is_absolute || base.is_absolute();
 
-    let mut result: Vec<std::ffi::OsString> = if is_absolute {
-        Vec::new()
+    let mut stack: Vec<std::ffi::OsString> = Vec::new();
+    if !target_is_absolute {
+        push_components(base, &mut stack);
+    }
+    push_components(target_path, &mut stack);
+
+    let mut resolved = if result_is_absolute {
+        PathBuf::from(std::path::MAIN_SEPARATOR.to_string())
     } else {
-        base.components().map(|c| c.as_os_str().to_os_string()).collect()
+        PathBuf::new()
     };
+    for part in &stack {
+        resolved.push(part);
+    }
+    resolved
+}
 
-    for comp in target_path.components() {
+/// Folds `path`'s components onto `stack`: `.` is dropped, `..` pops the
+/// previous normal segment (a no-op on an empty stack), and root/prefix
+/// markers contribute nothing (root-ness is tracked separately by the
+/// caller).
+fn push_components(path: &Path, stack: &mut Vec<std::ffi::OsString>) {
+    for comp in path.components() {
         match comp {
             std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
-                result.pop();
+                stack.pop();
             }
-            std::path::Component::Normal(part) => result.push(part.to_os_string()),
-            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
-                // Already accounted for by `is_absolute` above (`result`
-                // starts empty and the root separator is prepended below);
-                // nothing to push here.
+            std::path::Component::Normal(part) => stack.push(part.to_os_string()),
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {}
+        }
+    }
+}
+
+/// Finds the first unquoted, unescaped here-document redirection (`<<`,
+/// never the `<<<` herestring) in `line` and returns its delimiter, with
+/// any surrounding quotes stripped. Pragmatic, not a full shell tokenizer:
+/// it walks the raw line tracking only enough quote state to skip a `<<`
+/// that appears inside quotes or is backslash-escaped, then reads the word
+/// that follows as the delimiter. Handles `<<WORD`, `<< WORD`, `<<-WORD`,
+/// `<<'WORD'`, `<<"WORD"`. Multiple here-documents on one line are not
+/// supported: only the first is honored, which is enough for the dry-run
+/// build logs this lexer targets.
+fn detect_heredoc(line: &str) -> Option<String> {
+    let chars: Vec<char> = line.chars().collect();
+    let mut i = 0;
+    let mut quote: Option<char> = None;
+
+    while i < chars.len() {
+        let c = chars[i];
+        match quote {
+            Some(q) => {
+                // Single quotes take everything literally, including
+                // backslash; only double quotes let backslash escape the
+                // next character.
+                if c == '\\' && q == '"' {
+                    i += 2;
+                    continue;
+                }
+                if c == q {
+                    quote = None;
+                }
+                i += 1;
+            }
+            None => {
+                if c == '\\' {
+                    i += 2;
+                    continue;
+                }
+                if c == '\'' || c == '"' {
+                    quote = Some(c);
+                    i += 1;
+                    continue;
+                }
+                if c == '<' {
+                    let mut run = 0usize;
+                    while chars.get(i + run) == Some(&'<') {
+                        run += 1;
+                    }
+                    if run == 2 {
+                        let mut j = i + 2;
+                        if chars.get(j) == Some(&'-') {
+                            j += 1;
+                        }
+                        while chars.get(j).is_some_and(|c| c.is_whitespace() && *c != '\n') {
+                            j += 1;
+                        }
+                        return read_heredoc_delimiter(&chars, j);
+                    }
+                    // A single `<` is an ordinary redirect, `<<<` is a
+                    // herestring: neither is a here-document. Skip the
+                    // whole run so `<<<` is not re-scanned as `<<` starting
+                    // one character in.
+                    i += run.max(1);
+                    continue;
+                }
+                i += 1;
+            }
+        }
+    }
+    None
+}
+
+/// Reads the here-document delimiter word starting at `chars[start]`:
+/// either a bare word, or a single run of `'...'` / `"..."` with the
+/// quotes stripped. Returns `None` if there is no word there at all.
+fn read_heredoc_delimiter(chars: &[char], start: usize) -> Option<String> {
+    let mut i = start;
+    let quote = match chars.get(i) {
+        Some(q @ ('\'' | '"')) => {
+            i += 1;
+            Some(*q)
+        }
+        _ => None,
+    };
+
+    let mut word = String::new();
+    while let Some(&c) = chars.get(i) {
+        match quote {
+            Some(q) => {
+                if c == q {
+                    // `i` is not consulted after the loop; only `word`
+                    // escapes this function.
+                    break;
+                }
+                word.push(c);
+                i += 1;
+            }
+            None => {
+                if c.is_whitespace() || matches!(c, ';' | '&' | '|' | '<' | '>') {
+                    break;
+                }
+                word.push(c);
+                i += 1;
             }
         }
     }
 
-    let mut resolved =
-        if is_absolute { PathBuf::from(std::path::MAIN_SEPARATOR.to_string()) } else { PathBuf::new() };
-    for part in &result {
-        resolved.push(part);
-    }
-    resolved
+    if word.is_empty() { None } else { Some(word) }
 }
 
 #[cfg(test)]
@@ -341,6 +483,27 @@ mod tests {
 
     // Requirements: interception-events-from-shell-text
     #[test]
+    fn cd_dotdot_stays_pinned_at_the_filesystem_root() {
+        let cases: Vec<(&str, &str, &str)> = vec![
+            ("/build/foo", "cd ../bar && gcc x.c", "/build/bar"),
+            ("/build", "cd ../../other && gcc x.c", "/other"),
+            ("/", "cd .. && gcc x.c", "/"),
+            ("/build", "cd /abs/x && gcc x.c", "/abs/x"),
+            ("/build", "cd . && gcc x.c", "/build"),
+        ];
+
+        for (working_dir, input, expected_dir) in cases {
+            let sut = interpret(input, &context(working_dir, &[]));
+            assert_eq!(
+                sut.executions,
+                vec![execution("gcc", &["gcc", "x.c"], expected_dir, &[])],
+                "case: {input:?} from {working_dir:?}"
+            );
+        }
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
     fn make_markers_push_and_pop_the_working_directory() {
         let input = "make[1]: Entering directory '/build/lib'\n\
                      gcc -c a.c\n\
@@ -399,6 +562,23 @@ mod tests {
 
     // Requirements: interception-events-from-shell-text
     #[test]
+    fn a_quoted_value_split_by_a_real_newline_yields_no_fabricated_executions() {
+        // `gcc 'a` / `b' foo.c` -- the interpreter feeds one physical line
+        // at a time, so the quote that spans the newline never gets to
+        // close: each half must be skipped loudly as UnterminatedQuote, and
+        // neither half may fabricate a command.
+        let input = "gcc 'a\nb' foo.c\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert!(sut.executions.is_empty(), "must not fabricate a command from a split quote");
+        assert_eq!(sut.skipped.len(), 2);
+        assert_eq!(sut.skipped[0].reason, SkipReason::UnterminatedQuote);
+        assert_eq!(sut.skipped[1].reason, SkipReason::UnterminatedQuote);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
     fn all_skipped_input_yields_no_executions() {
         let input = "(ranlib libz.a || true) >/dev/null 2>&1\ngcc $CFLAGS foo.c\n";
 
@@ -428,5 +608,46 @@ mod tests {
         let sut = interpret(input, &context("/build", &[]));
 
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build", &[])]);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn heredoc_body_lines_are_swallowed_not_fabricated_into_commands() {
+        let input = "cat <<EOF\nsome random text\nEOF\ngcc -c a.c\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build", &[])]);
+        assert_eq!(sut.skipped.len(), 1, "only the `<<` line itself is a loud skip");
+        assert_eq!(sut.skipped[0].reason, SkipReason::HereDoc);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn heredoc_with_quoted_delimiter_swallows_its_body() {
+        let input = "cat <<'EOF'\n$notexpanded\nEOF\ngcc -c b.c\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "b.c"], "/build", &[])]);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn dash_heredoc_matches_a_tab_indented_terminator() {
+        let input = "cat <<-EOF\n\tbody\n\tEOF\ngcc -c c.c\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "c.c"], "/build", &[])]);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn herestring_is_not_mistaken_for_a_heredoc() {
+        let sut = interpret("cmd <<< input\n", &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("cmd", &["cmd"], "/build", &[])]);
+        assert!(sut.skipped.is_empty());
     }
 }
