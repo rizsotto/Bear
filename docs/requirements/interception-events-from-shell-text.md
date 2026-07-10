@@ -78,8 +78,11 @@ dry-run text contains.
   [`interception-events-format`](interception-events-format.md): empty
   input is success with empty output and a stderr warning; non-empty
   input from which at least one event was emitted is success; non-empty
-  input in which every line was skipped exits non-zero. Every run prints
-  a summary of skipped lines to standard error.
+  input in which every line was skipped exits non-zero. Skipped lines are
+  reported on standard error (line number and reason), and when any line
+  is skipped a summary count is printed there too; this reporting is
+  on by default and does not require a logging opt-in. A run with nothing
+  skipped stays quiet.
 
 ## Non-functional constraints
 

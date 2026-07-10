@@ -78,6 +78,32 @@ fn parse_sh_all_skipped_input_exits_non_zero_with_no_events() -> Result<()> {
 }
 
 // Requirements: interception-events-from-shell-text
+//
+// Skip reports must reach stderr by default, without the caller having to
+// opt in via `RUST_LOG`. Runs with `RUST_LOG` explicitly unset (the harness's
+// other helpers default it to `info`, which would hide a regression in
+// bear-driver's own built-in default log level).
+#[test]
+fn parse_sh_default_log_level_reports_skips_without_rust_log() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_default_log_level")?;
+
+    let script = b"(subshell command) >/dev/null\ngcc -c foo.c\n";
+    let result = env.run_bear_with_stdin_default_log(&["parse-sh"], script)?;
+    result.assert_success()?;
+
+    let stdout = result.stdout();
+    let lines: Vec<&str> = stdout.lines().filter(|line| !line.is_empty()).collect();
+    assert_eq!(lines.len(), 1, "expected exactly one event line, got: {stdout:?}");
+
+    let stderr = result.stderr();
+    assert!(stderr.contains("skipped"), "stderr must report the skip without RUST_LOG set: {stderr}");
+    assert!(stderr.contains("line 1"), "stderr must cite the skipped line number: {stderr}");
+    assert!(stderr.contains("subshell"), "stderr must name the subshell as the skip reason: {stderr}");
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
 #[test]
 fn parse_sh_empty_input_exits_zero_with_warning() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_empty_input")?;

@@ -223,6 +223,33 @@ impl TestEnvironment {
         Ok(bear_output)
     }
 
+    /// Run bear with the given arguments, feeding `stdin_bytes` to its
+    /// standard input, with `RUST_LOG` explicitly removed from the child
+    /// environment (rather than defaulted to `info` like
+    /// `run_bear_with_stdin`). Exercises the binary's *built-in* default log
+    /// level (`env_logger`'s `default_filter_or` in `bear-driver`) instead
+    /// of the harness's own `info` default, which would otherwise mask a
+    /// regression in that built-in default. `RUST_BACKTRACE=1` is still
+    /// forced so panics in bear surface readable backtraces.
+    #[allow(dead_code)]
+    pub fn run_bear_with_stdin_default_log(&self, args: &[&str], stdin_bytes: &[u8]) -> Result<BearOutput> {
+        let mut cmd = Command::new(self.install.path());
+        cmd.current_dir(self.test_dir())
+            .env("RUST_BACKTRACE", "1")
+            .env_remove("RUST_LOG")
+            .args(args)
+            .write_stdin(stdin_bytes.to_vec());
+
+        let output = cmd.output()?;
+
+        let bear_output = BearOutput { output, temp_dir: self.test_dir().to_path_buf() };
+
+        // Store the output for potential later display
+        *self.last_bear_output.borrow_mut() = Some(bear_output.clone());
+
+        Ok(bear_output)
+    }
+
     /// Run bear and expect success
     #[allow(dead_code)]
     pub fn run_bear_success(&self, args: &[&str]) -> Result<BearOutput> {

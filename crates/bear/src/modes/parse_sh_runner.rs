@@ -68,7 +68,11 @@ impl ParseShRunner {
         let executions = interpretation.executions.into_iter().map(intercept::Execution::trim);
         ExecutionEventDatabase::write(writer, executions).map_err(ParseShError::Write)?;
 
-        log::info!("parse-sh: {event_count} event(s) emitted, {skip_count} line(s) skipped");
+        if skip_count > 0 {
+            log::warn!("parse-sh: {event_count} event(s) emitted, {skip_count} line(s) skipped");
+        } else {
+            log::info!("parse-sh: {event_count} event(s) emitted, {skip_count} line(s) skipped");
+        }
 
         if event_count > 0 {
             Ok(ExitCode::SUCCESS)

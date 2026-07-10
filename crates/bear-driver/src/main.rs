@@ -19,8 +19,10 @@ use std::process::ExitCode;
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {
-    // Initialize the logging system.
-    env_logger::init();
+    // Initialize the logging system. `RUST_LOG` is honored when set; when
+    // unset, default to `warn` so recoverable anomalies (e.g. parse-sh skip
+    // reports) reach stderr without opting in.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");
