@@ -36,16 +36,29 @@ impl ClangOutputWriter {
 
 impl IteratorWriter<clang::Entry> for ClangOutputWriter {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        let stats = Arc::clone(&self.stats);
-
-        // Count entries as they are written
-        let counted_entries = entries.inspect(move |_| {
-            stats.entries_written.fetch_add(1, Ordering::Relaxed);
-        });
-
-        JsonCompilationDatabase::write(self.output, counted_entries)
-            .map_err(|err| WriterError::Io(self.path, err))
+        write_entries(self.output, self.path, entries, self.stats)
     }
+}
+
+/// Serializes `entries` as a JSON compilation database to `output`, counting
+/// each entry via `stats` and labeling any I/O or serialization error with
+/// `path`.
+///
+/// Shared by the file-backed [`ClangOutputWriter`] and the stdout-backed
+/// `ClangStdoutOutputWriter` (see `writers/stdout.rs`) so both stream through
+/// the identical serialization instead of duplicating it.
+pub(super) fn write_entries(
+    output: impl io::Write,
+    path: path::PathBuf,
+    entries: impl Iterator<Item = clang::Entry>,
+    stats: Arc<OutputStatistics>,
+) -> Result<(), WriterError> {
+    // Count entries as they are written
+    let counted_entries = entries.inspect(move |_| {
+        stats.entries_written.fetch_add(1, Ordering::Relaxed);
+    });
+
+    JsonCompilationDatabase::write(output, counted_entries).map_err(|err| WriterError::Io(path, err))
 }
 
 #[cfg(test)]

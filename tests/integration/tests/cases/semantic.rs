@@ -1,7 +1,7 @@
 use crate::fixtures::infrastructure::compilation_entry;
 use crate::fixtures::*;
 use anyhow::{Context, Result};
-use serde_json::json;
+use serde_json::{Value, json};
 
 #[test]
 #[cfg(has_executable_compiler_c)]
@@ -1576,6 +1576,121 @@ fn semantic_input_all_malformed_lines_exits_non_zero() -> Result<()> {
         events_content.as_bytes(),
     )?;
     result.assert_failure()?;
+
+    Ok(())
+}
+
+// Requirements: output-json-compilation-database
+//
+// `bear semantic` runs no build, so unlike the combined/intercept modes its
+// stdout is a safe, clean channel: `--output -` must stream the JSON
+// compilation database to standard output, rather than literally creating a
+// file named `-`. The stdout database must be identical to the one produced
+// by the same input written to a file (same dedup/header/source-filter/
+// format decorators, only the sink differs).
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn semantic_output_stdout_matches_file_output() -> Result<()> {
+    let env = TestEnvironment::new("semantic_output_stdout")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event1 = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "test.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let event2 = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "other.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let events_content = format!("{event1}\n{event2}\n");
+
+    env.create_source_files(&[
+        ("events.json", &events_content),
+        ("test.c", "int main() { return 0; }"),
+        ("other.c", "int main() { return 0; }"),
+    ])?;
+
+    // Baseline: the same event input, written to a file.
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "from_file.json"])?;
+    let from_file = env.load_compilation_database("from_file.json")?;
+    from_file.assert_count(2)?;
+
+    // Under test: identical input, output streamed to stdout via `-`.
+    let stdout_result = env.run_bear_success(&["semantic", "--input", "events.json", "--output", "-"])?;
+    let stdout_entries: Vec<Value> = serde_json::from_str(&stdout_result.stdout())
+        .context("stdout must be a valid JSON compilation database")?;
+    assert_eq!(stdout_entries.len(), 2, "stdout database must contain 2 entries: {stdout_entries:?}");
+
+    let mut file_entries: Vec<String> = from_file.entries().iter().map(|entry| entry.to_string()).collect();
+    let mut stdout_strings: Vec<String> = stdout_entries.iter().map(|entry| entry.to_string()).collect();
+    file_entries.sort();
+    stdout_strings.sort();
+
+    assert_eq!(
+        stdout_strings, file_entries,
+        "semantic --output - must produce the same compilation database as semantic --output <file>"
+    );
+
+    assert!(!env.file_exists("-"), "must not create a file literally named `-`");
+
+    Ok(())
+}
+
+// Requirements: output-duplicate-detection
+//
+// Duplicate filtering must still run when the pipeline streams to stdout:
+// two identical compiles collapse to one entry, proving the dedup decorator
+// (and not just the base writer) is present in the stdout pipeline branch.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn semantic_output_stdout_deduplicates_entries() -> Result<()> {
+    let env = TestEnvironment::new("semantic_output_stdout_dedup")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "test.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let events_content = format!("{event}\n{event}\n");
+
+    env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
+
+    let result = env.run_bear_success(&["semantic", "--input", "events.json", "--output", "-"])?;
+    let entries: Vec<Value> =
+        serde_json::from_str(&result.stdout()).context("stdout must be a valid JSON compilation database")?;
+
+    assert_eq!(entries.len(), 1, "duplicate compiles must collapse to one stdout entry: {entries:?}");
+
+    Ok(())
+}
+
+// Requirements: output-append
+//
+// Appending means reading back the existing output before writing, which is
+// impossible for a stream: `--append` combined with `--output -` must be
+// rejected up front with a clear message, rather than attempting (and
+// failing confusingly) to open `-` as a file.
+#[test]
+fn semantic_output_stdout_rejects_append() -> Result<()> {
+    let env = TestEnvironment::new("semantic_output_stdout_append")?;
+
+    env.create_source_files(&[("events.json", "")])?;
+
+    let result = env.run_bear(&["semantic", "--input", "events.json", "--output", "-", "--append"])?;
+    result.assert_failure()?;
+
+    let stderr = result.stderr();
+    assert!(
+        stderr.contains("cannot append to standard output"),
+        "stderr must explain why append + stdout output is rejected: {stderr}"
+    );
+    assert!(!env.file_exists("-"), "must not create a file literally named `-`");
 
     Ok(())
 }

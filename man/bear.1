@@ -108,8 +108,20 @@ for example:
 Since \f[CR]bear semantic\f[R] does not run the build, it has no
 conflicting use for its own stdout; diagnostics still go to stderr,
 keeping stdout machine\-readable.
-This option concerns only the event input; the compilation\-database
-\f[CR]\-\-output\f[R] of \f[CR]bear semantic\f[R] is unaffected.
+.TP
+\f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
+Path of the compilation database to write (default:
+\f[CR]compile_commands.json\f[R]).
+Pass \f[CR]\-\f[R] to write it to standard output instead of a file \(en
+again safe because \f[CR]bear semantic\f[R] runs no build \(en so the
+whole flow can stream, for example
+\f[CR]<producer> | bear semantic \-\-input \- \-\-output \-\f[R].
+Standard\-output writing is not atomic and cannot be appended to, so
+\f[CR]\-\-output \-\f[R] together with \f[CR]\-\-append\f[R] is
+rejected.
+(This differs from \f[CR]bear intercept\f[R]\(cqs and combined mode\(cqs
+\f[CR]\-\-output\f[R], which reject \f[CR]\-\f[R] because their stdout
+is shared with the build.)
 .SS bear parse\-sh
 Parses shell command text \(en typically the output of a build
 system\(cqs dry\-run mode, such as \f[CR]make \-n\f[R] (or

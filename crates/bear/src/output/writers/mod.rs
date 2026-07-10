@@ -15,6 +15,7 @@ mod atomic;
 mod converter;
 mod file;
 mod filtering;
+mod stdout;
 mod synthesis;
 mod validating;
 
@@ -28,6 +29,7 @@ use atomic::AtomicClangOutputWriter;
 use converter::ConverterClangOutputWriter;
 use file::ClangOutputWriter;
 use filtering::{DuplicateEntryFilter, FilteredOutputWriter, SourceEntryFilter};
+use stdout::ClangStdoutOutputWriter;
 use synthesis::HeaderEntrySynthesizer;
 use validating::ValidatingOutputWriter;
 
@@ -43,38 +45,91 @@ pub(crate) trait IteratorWriter<T> {
     fn write(self, items: impl Iterator<Item = T>) -> Result<(), WriterError>;
 }
 
-/// The assembled writer pipeline type for Clang compilation databases.
-type ClangWriterStack = ConverterClangOutputWriter<
-    AppendClangOutputWriter<
-        AtomicClangOutputWriter<
-            FilteredOutputWriter<
-                HeaderEntrySynthesizer<
-                    FilteredOutputWriter<ValidatingOutputWriter<ClangOutputWriter>, DuplicateEntryFilter>,
-                >,
-                SourceEntryFilter,
-            >,
-        >,
-    >,
+/// The shared validating/deduplicating/synthesizing/source-filtering stack
+/// that sits between a base writer and the final format converter. Both the
+/// file pipeline and the stdout pipeline build this identically, so
+/// filtering and formatting behave the same regardless of the sink.
+type FilteredStack<Base> = FilteredOutputWriter<
+    HeaderEntrySynthesizer<FilteredOutputWriter<ValidatingOutputWriter<Base>, DuplicateEntryFilter>>,
+    SourceEntryFilter,
 >;
+
+/// The assembled writer pipeline type for Clang compilation databases
+/// written to a file: atomic temp-file write, then optional append.
+type ClangWriterStack = ConverterClangOutputWriter<
+    AppendClangOutputWriter<AtomicClangOutputWriter<FilteredStack<ClangOutputWriter>>>,
+>;
+
+/// The assembled writer pipeline type for Clang compilation databases
+/// streamed to standard output: no atomic write and no append, since
+/// neither is possible on a stream.
+type ClangWriterStdoutStack = ConverterClangOutputWriter<FilteredStack<ClangStdoutOutputWriter>>;
+
+/// The concrete pipeline behind [`SemanticCommandWriter`].
+///
+/// A plain trait object is not an option here: `IteratorWriter::write` takes
+/// a generic `impl Iterator` parameter, which makes the trait non-object-safe.
+/// An enum over the two concrete pipeline shapes is the direct alternative.
+enum Pipeline {
+    File(ClangWriterStack),
+    Stdout(ClangWriterStdoutStack),
+}
 
 /// An opaque writer that accepts semantic commands and produces a compilation database.
 ///
 /// This struct hides the concrete pipeline type from consumers. Use [`create_pipeline`]
 /// to construct one.
 pub(crate) struct SemanticCommandWriter {
-    inner: ClangWriterStack,
+    inner: Pipeline,
 }
 
 impl SemanticCommandWriter {
     /// Writes semantic commands through the pipeline.
     pub(crate) fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
-        self.inner.write(semantics)
+        match self.inner {
+            Pipeline::File(writer) => writer.write(semantics),
+            Pipeline::Stdout(writer) => writer.write(semantics),
+        }
     }
+}
+
+/// Builds the shared validating/deduplicating/synthesizing/source-filtering
+/// stack on top of `base_writer`. Used by both the file and stdout branches
+/// of [`create_pipeline`] so dedup, header synthesis, and source filtering
+/// behave identically regardless of the sink.
+fn build_filtered_stack<Base: IteratorWriter<crate::output::clang::Entry>>(
+    base_writer: Base,
+    config: &config::Main,
+    stats: Arc<OutputStatistics>,
+) -> Result<FilteredStack<Base>, WriterCreationError> {
+    let validating_writer = ValidatingOutputWriter::new(base_writer, Arc::clone(&stats));
+    let duplicate_filter = DuplicateEntryFilter::try_from(config.duplicates.clone())
+        .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
+    let unique_writer =
+        FilteredOutputWriter::new(validating_writer, duplicate_filter, Arc::clone(&stats), |s| {
+            &s.duplicates_detected
+        });
+    let synthesizer = HeaderEntrySynthesizer::new(unique_writer, config.headers.clone(), Arc::clone(&stats));
+    let source_filter_writer = FilteredOutputWriter::new(
+        synthesizer,
+        SourceEntryFilter::from(config.sources.clone()),
+        Arc::clone(&stats),
+        |s| &s.entries_filtered_by_source,
+    );
+
+    Ok(source_filter_writer)
 }
 
 /// Assembles the full output writer pipeline from configuration.
 ///
-/// The pipeline processes semantic commands through the following stages:
+/// When `args.path` is the `-` sentinel, the pipeline streams the
+/// compilation database to standard output instead of a file: the atomic
+/// temp-file write and the append step are skipped, since neither applies
+/// to a stream (see [`ClangWriterStdoutStack`]). `--append` combined with
+/// `-` is rejected up front, since appending to a stream is impossible.
+///
+/// Otherwise the pipeline processes semantic commands through the following
+/// stages:
 /// 1. Convert semantic commands to compilation database entries
 /// 2. Append entries from an existing database (if configured)
 /// 3. Atomic file write (via temp file + rename)
@@ -90,30 +145,30 @@ pub(crate) fn create_pipeline(
     config: &config::Main,
     stats: Arc<OutputStatistics>,
 ) -> Result<SemanticCommandWriter, WriterCreationError> {
+    if args.path.as_os_str() == "-" {
+        if args.append {
+            return Err(WriterCreationError::Configuration("cannot append to standard output".to_string()));
+        }
+
+        let base_writer = ClangStdoutOutputWriter::new(Arc::clone(&stats));
+        let source_filter_writer = build_filtered_stack(base_writer, config, Arc::clone(&stats))?;
+        let formatted_writer =
+            ConverterClangOutputWriter::new(source_filter_writer, &config.format, Arc::clone(&stats));
+
+        return Ok(SemanticCommandWriter { inner: Pipeline::Stdout(formatted_writer) });
+    }
+
     let final_path = &args.path;
     let temp_path = &args.path.with_extension("tmp");
 
     let base_writer = ClangOutputWriter::create(temp_path, Arc::clone(&stats))?;
-    let validating_writer = ValidatingOutputWriter::new(base_writer, Arc::clone(&stats));
-    let duplicate_filter = DuplicateEntryFilter::try_from(config.duplicates.clone())
-        .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
-    let unique_writer =
-        FilteredOutputWriter::new(validating_writer, duplicate_filter, Arc::clone(&stats), |s| {
-            &s.duplicates_detected
-        });
-    let synthesizer = HeaderEntrySynthesizer::new(unique_writer, config.headers.clone(), Arc::clone(&stats));
-    let source_filter_writer = FilteredOutputWriter::new(
-        synthesizer,
-        SourceEntryFilter::from(config.sources.clone()),
-        Arc::clone(&stats),
-        |s| &s.entries_filtered_by_source,
-    );
+    let source_filter_writer = build_filtered_stack(base_writer, config, Arc::clone(&stats))?;
     let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
     let append_writer =
         AppendClangOutputWriter::new(atomic_writer, final_path, args.append, Arc::clone(&stats));
     let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format, Arc::clone(&stats));
 
-    Ok(SemanticCommandWriter { inner: formatted_writer })
+    Ok(SemanticCommandWriter { inner: Pipeline::File(formatted_writer) })
 }
 
 #[cfg(test)]

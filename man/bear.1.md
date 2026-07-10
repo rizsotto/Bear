@@ -74,7 +74,10 @@ Processes previously captured events to generate a compilation database through 
 
       <producer> | bear semantic --input -
 
-  Since `bear semantic` does not run the build, it has no conflicting use for its own stdout; diagnostics still go to stderr, keeping stdout machine-readable. This option concerns only the event input; the compilation-database `--output` of `bear semantic` is unaffected.
+  Since `bear semantic` does not run the build, it has no conflicting use for its own stdout; diagnostics still go to stderr, keeping stdout machine-readable.
+
+**-o, \-\-output** *FILE*
+: Path of the compilation database to write (default: `compile_commands.json`). Pass `-` to write it to standard output instead of a file -- again safe because `bear semantic` runs no build -- so the whole flow can stream, for example `<producer> | bear semantic --input - --output -`. Standard-output writing is not atomic and cannot be appended to, so `--output -` together with `--append` is rejected. (This differs from `bear intercept`'s and combined mode's `--output`, which reject `-` because their stdout is shared with the build.)
 
 ## bear parse-sh
 

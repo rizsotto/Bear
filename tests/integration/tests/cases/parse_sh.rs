@@ -176,6 +176,42 @@ fn parse_sh_output_piped_into_semantic_yields_compilation_database() -> Result<(
     Ok(())
 }
 
+// Requirements: interception-events-from-shell-text, interception-events-format
+//
+// Same pipeline as `parse_sh_output_piped_into_semantic_yields_compilation_database`,
+// but the consumer end also streams its output: `bear parse-sh | bear semantic
+// --output -` must produce the compilation database on standard output, with
+// no intermediate file anywhere in the chain.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_output_piped_into_semantic_stdout_yields_compilation_database() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_pipe_to_semantic_stdout")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    env.create_source_files(&[("foo.c", "int main() { return 0; }")])?;
+
+    let script = format!("{COMPILER_C_PATH} -c foo.c\n");
+    let parse_result = env.run_bear_with_stdin(&["parse-sh"], script.as_bytes())?;
+    parse_result.assert_success()?;
+
+    let semantic_result = env.run_bear_with_stdin(
+        &["semantic", "--input", "-", "--output", "-"],
+        parse_result.stdout().as_bytes(),
+    )?;
+    semantic_result.assert_success()?;
+
+    let entries: Vec<Value> = serde_json::from_str(&semantic_result.stdout())
+        .context("stdout must be a valid JSON compilation database")?;
+    assert_eq!(entries.len(), 1, "expected exactly one compilation entry: {entries:?}");
+    assert_eq!(entries[0]["file"], "foo.c");
+    assert_eq!(entries[0]["directory"], temp_dir);
+    assert_eq!(entries[0]["arguments"], json!([COMPILER_C_PATH, "-c", "foo.c"]));
+
+    assert!(!env.file_exists("-"), "must not create a file literally named `-`");
+
+    Ok(())
+}
+
 /// The 17 distinct source files the zlib fixture compiles, in the order
 /// `make -n` first mentions them (the default duplicate key collapses each
 /// source's plain and `-fPIC` compile into one entry, keeping the first
