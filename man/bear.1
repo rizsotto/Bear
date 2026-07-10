@@ -141,6 +141,9 @@ Sets the initial working directory for the parsed commands, for input
 captured elsewhere (a CI log, or a dry run from another checkout) whose
 paths would otherwise be interpreted relative to \f[CR]bear\f[R]\(cqs
 own working directory.
+Give an absolute path: a foreign log\(cqs build directory bears no
+relation to \f[CR]bear\f[R]\(cqs own working directory, and a relative
+value would be recorded verbatim.
 Not validated: the directory need not exist on this machine.
 .PP
 This is a best\-effort front end over a documented subset of shell
@@ -151,10 +154,11 @@ make\(cqs \f[CR]Entering directory\f[R]/\f[CR]Leaving directory\f[R]
 markers).
 Anything outside that subset \(en subshells, command substitution,
 parameter expansion, glob in the executable position, here\-documents,
-and shell keywords (\f[CR]if\f[R], \f[CR]for\f[R], \f[CR]while\f[R],
-\f[CR]case\f[R]) \(en causes that one line to be skipped, reported on
-standard error with its line number and reason; the run still succeeds
-as long as at least one line produced an event.
+unterminated quotes, and shell keywords (\f[CR]if\f[R], \f[CR]for\f[R],
+\f[CR]while\f[R], \f[CR]case\f[R]) \(en causes that one line to be
+skipped, reported on standard error with its line number and reason; a
+here\-document\(cqs body lines are consumed along with its opening line.
+The run still succeeds as long as at least one line produced an event.
 .PP
 \f[B]Interception remains the higher\-fidelity, recommended
 default.\f[R] It observes the real \f[CR]exec()\f[R] calls a build

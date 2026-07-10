@@ -69,10 +69,11 @@ dry-run text contains.
     directories correctly. These markers are an explicit, documented
     extension to the shell subset: without recognition they would hit the
     skip path anyway, so recognizing them costs nothing.
-- The environment of each event is the mode's own environment filtered to
-  the build-relevant subset (the same filter interception applies),
-  overlaid with the line's leading `VAR=value` assignments. `PATH`, when
-  present in the mode's environment, survives the filter so that bare
+- The environment of each event is the mode's own environment overlaid
+  with the line's leading `VAR=value` assignments, and the result is then
+  filtered to the build-relevant subset (the same filter interception
+  applies). So an assignment is recorded only if interception would have
+  kept it, and `PATH`, when present, survives the filter so that bare
   executable names remain resolvable by the consumer.
 - Exit-code policy, consistent with the malformed-line rule in
   [`interception-events-format`](interception-events-format.md): empty

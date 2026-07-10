@@ -204,9 +204,12 @@ enum Marker {
 
 /// Recognizes a make recursive-directory marker on an already
 /// continuation-joined logical line. Requires a `: ` immediately before
-/// `Entering directory ` / `Leaving directory ` so an ordinary command that
-/// merely mentions those words is not mis-detected; the optional `[<n>]`
-/// job-number suffix (`make[1]: ...`) is allowed but not required.
+/// `Entering directory ` / `Leaving directory `, with the optional `[<n>]`
+/// job-number suffix (`make[1]: ...`) allowed but not required. Real `make`
+/// prints these markers on their own line and never on a command line, so
+/// dry-run input is not misread; a hand-crafted line that embeds the exact
+/// `<prefix>: Entering directory '<path>'` shape (e.g. an `echo` of it)
+/// would be, but that is outside the supported dry-run contract.
 fn parse_make_marker(line: &str) -> Option<Marker> {
     let trimmed = line.trim();
 
