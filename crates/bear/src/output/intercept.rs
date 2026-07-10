@@ -37,16 +37,27 @@ impl SerializationFormat<intercept::Execution> for ExecutionEventDatabase {
     /// (a non-conforming line must not silently drop every line after it).
     /// Blank/whitespace-only lines are skipped rather than yielded as
     /// errors or empty results.
+    ///
+    /// This is the single production parser for the event stream: it is
+    /// what `RawEventReader::produce` (`crates/bear/src/modes/mod.rs`)
+    /// consumes directly. `enumerate()` runs before the blank-line
+    /// `filter_map`, so a malformed line's `SerializationError::AtLine`
+    /// carries its true 1-based physical line number even when earlier
+    /// blank lines were skipped.
     fn read(
         reader: impl std::io::Read,
     ) -> impl Iterator<Item = Result<intercept::Execution, SerializationError>> {
         let buffered = std::io::BufReader::new(reader);
-        buffered.lines().filter_map(|line| match line {
-            Ok(line) if line.trim().is_empty() => None,
-            Ok(line) => {
-                Some(serde_json::from_str::<intercept::Execution>(&line).map_err(SerializationError::Syntax))
+        buffered.lines().enumerate().filter_map(|(index, line)| {
+            let line_number = index + 1;
+            match line {
+                Ok(line) if line.trim().is_empty() => None,
+                Ok(line) => Some(
+                    serde_json::from_str::<intercept::Execution>(&line)
+                        .map_err(|source| SerializationError::AtLine { line: line_number, source }),
+                ),
+                Err(error) => Some(Err(SerializationError::Io(error))),
             }
-            Err(error) => Some(Err(SerializationError::Io(error))),
         })
     }
 }
@@ -131,6 +142,54 @@ mod tests {
 
         assert_eq!(Vec::<Execution>::new(), read_back);
         assert_eq!(warnings.borrow().len(), 3);
+    }
+
+    #[test]
+    fn read_reports_physical_line_number_of_malformed_line() {
+        let line1 = json!({
+            "executable": "/usr/bin/clang",
+            "arguments": ["clang", "-c", "main.c"],
+            "working_dir": "/home/user",
+            "environment": {}
+        });
+        let line3 = json!({
+            "executable": "/usr/bin/clang",
+            "arguments": ["clang", "-c", "output.c"],
+            "working_dir": "/home/user",
+            "environment": {}
+        });
+        let content = format!("{line1}\nnot json at all\n{line3}\n");
+
+        let mut cursor = Cursor::new(content);
+        let results: Vec<_> = Sut::read(&mut cursor).collect();
+
+        assert_eq!(results.len(), 3);
+        assert!(results[0].is_ok());
+        let error = results[1].as_ref().unwrap_err();
+        assert!(error.to_string().contains("line 2"), "expected 'line 2' in: {error}");
+        assert!(results[2].is_ok());
+    }
+
+    #[test]
+    fn read_reports_true_physical_line_number_past_a_blank_line() {
+        let line1 = json!({
+            "executable": "/usr/bin/clang",
+            "arguments": ["clang", "-c", "main.c"],
+            "working_dir": "/home/user",
+            "environment": {}
+        });
+        // A blank line between the valid and malformed lines must not shift
+        // the reported line number: the malformed line is physical line 3
+        // (valid, blank, malformed), not record 2 counting only data lines.
+        let content = format!("{line1}\n\nnot json at all\n");
+
+        let mut cursor = Cursor::new(content);
+        let results: Vec<_> = Sut::read(&mut cursor).collect();
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].is_ok());
+        let error = results[1].as_ref().unwrap_err();
+        assert!(error.to_string().contains("line 3"), "expected 'line 3' in: {error}");
     }
 
     fn expected_values() -> Vec<Execution> {

@@ -14,6 +14,8 @@ pub enum SerializationError {
     Syntax(#[from] serde_json::Error),
     #[error("Format semantic error: {0}")]
     Semantic(#[from] clang::EntryError),
+    #[error("line {line}: {source}")]
+    AtLine { line: usize, source: serde_json::Error },
 }
 
 /// A trait representing a file format that can be written to and read from.
