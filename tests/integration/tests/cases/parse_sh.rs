@@ -105,6 +105,30 @@ fn parse_sh_rejects_config_option() -> Result<()> {
 
 // Requirements: interception-events-from-shell-text
 //
+// parse-sh consults no configuration, so a malformed config in a default
+// search location (`bear.yml` in the working directory) must not break it --
+// unlike the config-consuming modes, which load and validate it. This is the
+// default-location counterpart to `parse_sh_rejects_config_option`, which
+// covers an explicit `--config`.
+#[test]
+fn parse_sh_ignores_malformed_default_location_config() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_ignores_default_config")?;
+    // An unclosed flow sequence is a hard YAML parse error: loading this
+    // would abort a config-consuming mode.
+    std::fs::write(env.test_dir().join("bear.yml"), "format:\n  paths: [unclosed\n")?;
+
+    let result = env.run_bear_with_stdin(&["parse-sh"], b"gcc -c foo.c\n")?;
+
+    result.assert_success()?;
+    let stdout = result.stdout();
+    let lines: Vec<&str> = stdout.lines().filter(|line| !line.is_empty()).collect();
+    assert_eq!(lines.len(), 1, "expected one event despite the malformed bear.yml, got: {stdout:?}");
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+//
 // Skip reports must reach stderr by default, without the caller having to
 // opt in via `RUST_LOG`. Runs with `RUST_LOG` explicitly unset (the harness's
 // other helpers default it to `info`, which would hide a regression in

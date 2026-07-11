@@ -49,17 +49,30 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// Configure the application mode based on the command line arguments and the configuration.
+    /// Configure the application mode from the command line arguments.
     ///
-    /// Here we are checking if the command line arguments and configuration are valid.
-    /// If the arguments are valid, we create the appropriate mode instance.
-    /// If that is not the case, we try to return a useful error message.
-    pub fn configure(
-        context: context::Context,
-        args: args::Arguments,
-        config: config::Main,
-    ) -> Result<Self, ConfigurationError> {
-        match args.mode {
+    /// For the modes that consume it, this loads the configuration (from
+    /// `--config`, a default-location file, or built-in defaults), checks that
+    /// the argument/configuration combination is valid, and builds the matching
+    /// mode instance -- returning a useful error otherwise. `parse-sh` consults
+    /// no configuration and therefore loads none.
+    pub fn configure(context: context::Context, args: args::Arguments) -> Result<Self, ConfigurationError> {
+        let args::Arguments { config: config_path, mode } = args;
+
+        // parse-sh is the one mode that runs without configuration: it emits a
+        // raw event stream and consults none, so it loads none -- a broken
+        // default-location config must not break it.
+        if let args::Mode::ParseSh { input, output } = mode {
+            log::debug!("Mode: parse shell text into events");
+            let runner = ParseShRunner::new(input, output, &context);
+            return Ok(Self::ParseSh(runner));
+        }
+
+        let config = config::Loader::load(&context, &config_path)
+            .map_err(|error| ConfigurationError::ConfigLoad(Box::new(error)))?;
+        log::info!("{config}");
+
+        match mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept build and write events");
 
@@ -136,13 +149,8 @@ impl Mode {
 
                 Ok(Self::Intercept(intercept, input))
             }
-            args::Mode::ParseSh { input, output } => {
-                log::debug!("Mode: parse shell text into events");
-
-                let runner = ParseShRunner::new(input, output, &context);
-
-                Ok(Self::ParseSh(runner))
-            }
+            // parse-sh is handled before configuration is loaded.
+            args::Mode::ParseSh { .. } => unreachable!("parse-sh handled above"),
         }
     }
 
@@ -177,6 +185,8 @@ pub enum ConfigurationError {
     ConsumerCreation(output::WriterCreationError),
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
+    #[error("Failed to load configuration: {0}")]
+    ConfigLoad(Box<config::ConfigError>),
 }
 
 mod impls {
