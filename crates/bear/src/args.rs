@@ -35,7 +35,7 @@ pub enum Mode {
     Intercept { input: BuildCommand, output: BuildEvents },
     Semantic { input: BuildEvents, output: BuildSemantic },
     Combined { input: BuildCommand, output: BuildSemantic },
-    ParseSh { input: std::path::PathBuf, output: BuildEvents, directory: Option<std::path::PathBuf> },
+    ParseSh { input: ShScript, output: BuildEvents },
 }
 
 /// Represents the execution of a command.
@@ -59,6 +59,16 @@ pub struct BuildSemantic {
 pub struct BuildEvents {
     /// The path to the events file.
     pub path: std::path::PathBuf,
+}
+
+/// Represents the shell text input for the `parse-sh` mode.
+#[derive(Debug, PartialEq)]
+pub struct ShScript {
+    /// The path of the shell text to parse (`-` reads from standard input).
+    pub path: std::path::PathBuf,
+    /// The initial working directory for the parsed commands. When unset, the
+    /// process's current directory is used.
+    pub directory: Option<std::path::PathBuf>,
 }
 
 impl fmt::Display for Arguments {
@@ -90,14 +100,10 @@ impl fmt::Display for Mode {
                 writeln!(f, "  Input: {}", input)?;
                 write!(f, "  Output: {}", output)
             }
-            Mode::ParseSh { input, output, directory } => {
+            Mode::ParseSh { input, output } => {
                 writeln!(f, "Parse Shell Text")?;
-                writeln!(f, "  Input: {}", input.display())?;
-                writeln!(f, "  Output: {}", output)?;
-                match directory {
-                    Some(dir) => write!(f, "  Directory: {}", dir.display()),
-                    None => write!(f, "  Directory: <current>"),
-                }
+                writeln!(f, "  Input: {}", input)?;
+                write!(f, "  Output: {}", output)
             }
         }
     }
@@ -118,6 +124,15 @@ impl fmt::Display for BuildSemantic {
 impl fmt::Display for BuildEvents {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Events Output: {}", self.path.display())
+    }
+}
+
+impl fmt::Display for ShScript {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.directory {
+            Some(dir) => write!(f, "Shell Script: {} (directory: {})", self.path.display(), dir.display()),
+            None => write!(f, "Shell Script: {} (directory: <current>)", self.path.display()),
+        }
     }
 }
 
@@ -166,7 +181,7 @@ impl TryFrom<ArgMatches> for Mode {
                     .expect("output is defaulted");
                 let directory = parse_sh_matches.get_one::<String>("directory").map(std::path::PathBuf::from);
 
-                Ok(Mode::ParseSh { input, output: BuildEvents { path }, directory })
+                Ok(Mode::ParseSh { input: ShScript { path: input, directory }, output: BuildEvents { path } })
             }
             None => {
                 let input = BuildCommand::try_from(&matches)?;
@@ -430,9 +445,8 @@ mod test {
             Arguments {
                 config: None,
                 mode: Mode::ParseSh {
-                    input: "-".into(),
+                    input: ShScript { path: "-".into(), directory: None },
                     output: BuildEvents { path: "-".into() },
-                    directory: None,
                 },
             }
         );
@@ -451,9 +465,8 @@ mod test {
             Arguments {
                 config: None,
                 mode: Mode::ParseSh {
-                    input: "in.sh".into(),
+                    input: ShScript { path: "in.sh".into(), directory: Some("/build".into()) },
                     output: BuildEvents { path: "out.jsonl".into() },
-                    directory: Some("/build".into()),
                 },
             }
         );
