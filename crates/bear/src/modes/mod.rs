@@ -192,17 +192,18 @@ pub enum ConfigurationError {
 mod impls {
     use super::ConfigurationError;
     use super::execution;
+    use super::execution::DynError;
     use crate::args::BuildCommand;
     use crate::environment;
     use crate::output::{ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError};
     use crate::{args, config, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
-    use intercept::reporter::ReporterError;
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
     use std::process::ExitStatus;
     use std::sync::Arc;
     use std::{fs, io};
+    use thiserror::Error;
 
     pub(super) struct TcpEventProducer {
         source: CollectorOnTcp,
@@ -215,7 +216,7 @@ mod impls {
     }
 
     impl execution::Producer for TcpEventProducer {
-        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), ReporterError> {
+        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
             for execution in self.source.executions() {
                 match execution {
                     Ok(execution) => {
@@ -239,12 +240,21 @@ mod impls {
     }
 
     impl execution::Cancellable for TcpEventProducer {
-        fn cancel(&self) -> Result<(), ReporterError> {
-            self.source.shutdown()
+        fn cancel(&self) -> Result<(), DynError> {
+            self.source.shutdown().map_err(Into::into)
         }
     }
 
     impl execution::CancellableProducer for TcpEventProducer {}
+
+    /// Errors raised while reading and replaying a raw event file.
+    #[derive(Debug, Error)]
+    enum ReplayReadError {
+        #[error("failed to open event file {0:?}: {1}")]
+        Open(std::path::PathBuf, io::Error),
+        #[error("every one of {0} event line(s) was rejected; no events to analyze")]
+        AllRejected(usize),
+    }
 
     /// Represents an event file reader to be event source.
     ///
@@ -281,11 +291,14 @@ mod impls {
         /// Tallies non-blank lines seen (`nonempty`) against accepted ones;
         /// if every non-empty line was rejected, the run fails so the caller
         /// does not exit successfully having analyzed nothing.
-        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), ReporterError> {
+        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
             let source: Box<dyn io::Read> = if super::is_stdio(&self.path) {
                 Box::new(io::stdin().lock())
             } else {
-                Box::new(fs::File::open(&self.path).map_err(ReporterError::Network)?)
+                Box::new(
+                    fs::File::open(&self.path)
+                        .map_err(|err| ReplayReadError::Open(self.path.clone(), err))?,
+                )
             };
 
             let mut nonempty = 0usize;
@@ -308,9 +321,7 @@ mod impls {
             }
 
             if nonempty > 0 && accepted == 0 {
-                return Err(ReporterError::Network(std::io::Error::other(format!(
-                    "every one of {nonempty} event line(s) was rejected; no events to analyze"
-                ))));
+                return Err(ReplayReadError::AllRejected(nonempty).into());
             }
 
             Ok(())
@@ -352,9 +363,10 @@ mod impls {
 
     impl execution::Consumer for RawEventWriter {
         /// Using existing file format, write the intercepted executions to the output file.
-        fn consume(self: Box<Self>, executions: Receiver<intercept::Execution>) -> Result<(), WriterError> {
+        fn consume(self: Box<Self>, executions: Receiver<intercept::Execution>) -> Result<(), DynError> {
             ExecutionEventDatabase::write(self.destination, executions.into_iter())
-                .map_err(|err| WriterError::Io(self.path.clone(), err))
+                .map_err(|err| WriterError::Io(self.path.clone(), err))?;
+            Ok(())
         }
     }
 
@@ -390,7 +402,7 @@ mod impls {
     impl execution::Consumer for SemanticEventWriter {
         /// Consume the intercepted executions, transform them into semantic events,
         /// and write them into the target file (with the right format).
-        fn consume(self: Box<Self>, executions: Receiver<intercept::Execution>) -> Result<(), WriterError> {
+        fn consume(self: Box<Self>, executions: Receiver<intercept::Execution>) -> Result<(), DynError> {
             let stats = Arc::clone(self.writer.statistics());
 
             let semantics =

@@ -2,13 +2,18 @@
 
 use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
-use crate::output::WriterError;
 use crossbeam_channel::{Receiver, bounded, unbounded};
-use intercept::reporter::ReporterError;
 use intercept_supervisor::SuperviseError;
 use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
 use thiserror::Error;
+
+/// A type-erased error carried across the pipeline seam.
+///
+/// Each `Producer`/`Consumer`/`Cancellable` implementation keeps its own
+/// precise error type internally and boxes it here at the trait boundary, so
+/// the traits do not force every implementation onto one shared error type.
+pub type DynError = Box<dyn std::error::Error + Send + Sync>;
 
 /// A trait for consuming events from a channel-based stream.
 ///
@@ -27,8 +32,8 @@ pub trait Consumer: Send {
     ///
     /// # Returns
     /// * `Ok(())` - All items were successfully processed
-    /// * `Err(WriterError)` - An error occurred during processing
-    fn consume(self: Box<Self>, receiver: Receiver<intercept::Execution>) -> Result<(), WriterError>;
+    /// * `Err(DynError)` - An error occurred during processing
+    fn consume(self: Box<Self>, receiver: Receiver<intercept::Execution>) -> Result<(), DynError>;
 }
 
 /// A trait for producing events to a channel-based stream.
@@ -48,8 +53,8 @@ pub trait Producer: Send + Sync {
     ///
     /// # Returns
     /// * `Ok(())` - All items were successfully produced
-    /// * `Err(ReporterError)` - An error occurred during production
-    fn produce(&self, sender: crossbeam_channel::Sender<intercept::Execution>) -> Result<(), ReporterError>;
+    /// * `Err(DynError)` - An error occurred during production
+    fn produce(&self, sender: crossbeam_channel::Sender<intercept::Execution>) -> Result<(), DynError>;
 }
 
 /// A trait for cancelling ongoing operations.
@@ -62,8 +67,8 @@ pub trait Cancellable: Send + Sync {
     ///
     /// # Returns
     /// * `Ok(())` - Cancellation was successful
-    /// * `Err(ReporterError)` - An error occurred during cancellation
-    fn cancel(&self) -> Result<(), ReporterError>;
+    /// * `Err(DynError)` - An error occurred during cancellation
+    fn cancel(&self) -> Result<(), DynError>;
 }
 
 /// A trait for producers that support cancellation during operation.
@@ -146,7 +151,7 @@ impl Interceptor {
 
         let exit_status = self.build.run(command)?;
 
-        self.producer.cancel()?;
+        self.producer.cancel().map_err(RuntimeError::Producer)?;
 
         // Handle the producer thread result
         producer_thread
@@ -226,10 +231,10 @@ impl Replayer {
 /// Errors that can occur during event processing or running the build.
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("Report creation error: {0}")]
-    Producer(#[from] ReporterError),
-    #[error("Report creation error: {0}")]
-    Consumer(#[from] WriterError),
+    #[error("Event production failed: {0}")]
+    Producer(DynError),
+    #[error("Event processing failed: {0}")]
+    Consumer(DynError),
     #[error("Build execution failed: {0}")]
     Executor(#[from] SuperviseError),
     #[error("Internal error: {0}")]
@@ -298,34 +303,31 @@ mod tests {
     }
 
     impl Producer for MockCancellableProducer {
-        fn produce(
-            &self,
-            sender: crossbeam_channel::Sender<intercept::Execution>,
-        ) -> Result<(), ReporterError> {
+        fn produce(&self, sender: crossbeam_channel::Sender<intercept::Execution>) -> Result<(), DynError> {
             if self.should_fail_produce {
-                return Err(ReporterError::Network(std::io::Error::new(
+                return Err(Box::new(std::io::Error::new(
                     std::io::ErrorKind::ConnectionRefused,
                     "Test failure",
                 )));
             }
 
             for execution in &self.executions {
-                sender.send(execution.clone()).map_err(|_| {
-                    ReporterError::Network(std::io::Error::new(
-                        std::io::ErrorKind::BrokenPipe,
-                        "Channel disconnected",
-                    ))
-                })?;
+                // Mirror the real producers: a disconnected channel means the
+                // consumer finished or failed, so stop quietly instead of
+                // erroring (which would race the consumer's own error).
+                if sender.send(execution.clone()).is_err() {
+                    break;
+                }
             }
             Ok(())
         }
     }
 
     impl Cancellable for MockCancellableProducer {
-        fn cancel(&self) -> Result<(), ReporterError> {
+        fn cancel(&self) -> Result<(), DynError> {
             *self.cancel_count.lock().expect("Failed to lock cancel_count mutex") += 1;
             if self.should_fail_cancel {
-                return Err(ReporterError::Network(std::io::Error::other("Cancel failure")));
+                return Err(Box::new(std::io::Error::other("Cancel failure")));
             }
             Ok(())
         }
@@ -405,10 +407,7 @@ mod tests {
     fn test_replayer_producer_failure() {
         let mut producer_mock = MockProducer::new();
         producer_mock.expect_produce().times(1).returning(|_| {
-            Err(ReporterError::Network(std::io::Error::new(
-                std::io::ErrorKind::ConnectionRefused,
-                "Test failure",
-            )))
+            Err(Box::new(std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "Test failure")))
         });
 
         let consumer_mock = MockConsumer::new();
@@ -416,7 +415,7 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), RuntimeError::Producer(ReporterError::Network(_)));
+        assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
     }
 
     #[test]
@@ -429,17 +428,17 @@ mod tests {
 
         let mut consumer_mock = MockConsumer::new();
         consumer_mock.expect_consume().times(1).returning(|_| {
-            Err(WriterError::Io(
+            Err(Box::new(WriterError::Io(
                 std::path::PathBuf::new(),
                 SerializationError::Io(std::io::Error::other("Test failure")),
-            ))
+            )))
         });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
         let result = replayer.run();
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), RuntimeError::Consumer(_));
+        assert!(matches!(result.unwrap_err(), RuntimeError::Consumer(_)));
     }
 
     #[test]
@@ -523,7 +522,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), RuntimeError::Executor(_));
+        assert!(matches!(result.unwrap_err(), RuntimeError::Executor(_)));
     }
 
     #[test]
@@ -549,7 +548,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), RuntimeError::Producer(_));
+        assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
         assert_eq!(producer_mock.cancel_call_count(), 1);
     }
 
@@ -560,10 +559,10 @@ mod tests {
 
         let mut consumer_mock = MockConsumer::new();
         consumer_mock.expect_consume().times(1).returning(|_| {
-            Err(WriterError::Io(
+            Err(Box::new(WriterError::Io(
                 std::path::PathBuf::new(),
                 SerializationError::Io(std::io::Error::other("Test failure")),
-            ))
+            )))
         });
 
         let mut executor_mock = MockExecutor::new();
@@ -574,7 +573,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), RuntimeError::Consumer(_));
+        assert!(matches!(result.unwrap_err(), RuntimeError::Consumer(_)));
         assert_eq!(producer_mock.cancel_call_count(), 1);
     }
 
@@ -601,7 +600,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), RuntimeError::Producer(_));
+        assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
         assert_eq!(producer_mock.cancel_call_count(), 1);
     }
 
