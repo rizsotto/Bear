@@ -67,7 +67,7 @@ impl Mode {
             // invocation directory so the producer always has a concrete
             // path to interpret from.
             let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
-            let producer = impls::ShellScriptReader::create(&input.path, directory)?;
+            let producer = impls::ShellScriptReader::create(&input.path, directory, context.environment)?;
             let consumer = impls::RawEventWriter::create_allowing_stdout(&output.path)
                 .map_err(ConfigurationError::ConsumerCreation)?;
 
@@ -353,6 +353,7 @@ mod impls {
     pub(super) struct ShellScriptReader {
         path: std::path::PathBuf,
         working_dir: std::path::PathBuf,
+        environment: HashMap<String, String>,
     }
 
     impl ShellScriptReader {
@@ -361,10 +362,13 @@ mod impls {
         /// This reader will read the shell text from a file, or from standard
         /// input when the path is the `-` sentinel. The `working_dir` is the
         /// already-resolved initial working directory the parsed commands are
-        /// interpreted from.
+        /// interpreted from, and `environment` is the startup environment the
+        /// parsed commands are interpreted against (captured once in `Context`,
+        /// so `produce` performs no ambient environment I/O).
         pub(super) fn create(
             path: &std::path::Path,
             working_dir: std::path::PathBuf,
+            environment: HashMap<String, String>,
         ) -> Result<Self, ConfigurationError> {
             if !super::is_stdio(path) && (!path.exists() || !path.is_file()) {
                 return Err(ConfigurationError::InvalidConfiguration(format!(
@@ -372,7 +376,7 @@ mod impls {
                 )));
             }
 
-            Ok(Self { path: path.to_path_buf(), working_dir })
+            Ok(Self { path: path.to_path_buf(), working_dir, environment })
         }
     }
 
@@ -392,8 +396,10 @@ mod impls {
                     .map_err(|error| ShellScriptReadError::ReadFile(self.path.clone(), error))?
             };
 
-            let environment: HashMap<String, String> = std::env::vars().collect();
-            let context = parse_sh::Context { working_dir: self.working_dir.clone(), environment };
+            let context = parse_sh::Context {
+                working_dir: self.working_dir.clone(),
+                environment: self.environment.clone(),
+            };
             let interpretation = parse_sh::interpret(&text, &context);
 
             for skipped in &interpretation.skipped {
