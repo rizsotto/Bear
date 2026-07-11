@@ -174,13 +174,12 @@ impl Interceptor {
     }
 }
 
-/// Replays previously captured intercept events.
+/// Drives a producer/consumer pair over existing input, without running a build.
 ///
-/// `Replayer` processes stored intercept events without executing a build command.
-/// This is useful for:
-/// - Re-analyzing previous builds with different configurations
-/// - Testing semantic analysis changes
-/// - Generating compilation databases from archived event data
+/// `Replayer` powers the modes that process input that already exists:
+/// - Re-analyzing previously captured intercept events (with different configurations)
+/// - Testing semantic analysis changes against archived event data
+/// - Interpreting shell command text into execution events (parse-sh)
 pub struct Replayer {
     producer: Box<dyn Producer>,
     consumer: Box<dyn Consumer>,
@@ -422,7 +421,10 @@ mod tests {
     fn test_replayer_consumer_failure() {
         let mut producer_mock = MockProducer::new();
         producer_mock.expect_produce().times(1).returning(|sender| {
-            sender.send(create_test_execution("/usr/bin/gcc")).expect("Failed to send test event");
+            // The consumer fails without receiving, so the send may observe
+            // a dropped receiver; the producer must not turn that into its
+            // own failure, or the asserted error variant becomes racy.
+            let _ = sender.send(create_test_execution("/usr/bin/gcc"));
             Ok(())
         });
 

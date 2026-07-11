@@ -7,14 +7,12 @@
 //! used throughout the application.
 
 mod execution;
-mod parse_sh_runner;
 
 use crate::environment;
 use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, output};
 use intercept_supervisor::CollectorOnTcp;
 use intercept_supervisor::context;
-use parse_sh_runner::ParseShRunner;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -31,21 +29,21 @@ fn is_stdio(path: &std::path::Path) -> bool {
 
 /// Represents the application execution modes.
 ///
-/// Bear supports three user-facing modes:
+/// Bear supports four user-facing modes:
 /// - **Intercept only**: Capture build commands and write them to a file for later analysis.
 /// - **Semantic only**: Read previously captured build commands from a file and analyze them.
 /// - **Combined**: Capture build commands and analyze them in real-time.
+/// - **Parse shell text**: Interpret shell command text and emit the event stream.
 ///
 /// Internally, this enum distinguishes between:
 /// - `Intercept`: Modes that execute build commands while capturing events (intercept-only and combined)
-/// - `Replay`: Modes that process previously captured events (semantic-only)
+/// - `Replay`: Modes that process an existing input without running a build (semantic-only and parse-sh)
 ///
-/// The distinction between writing raw events vs. performing semantic analysis
-/// is handled by the consumer configuration, not the mode itself.
+/// The distinction between the input sources and output formats is handled by
+/// the producer and consumer configuration, not the mode itself.
 pub enum Mode {
     Intercept(execution::Interceptor, args::BuildCommand),
     Replay(execution::Replayer),
-    ParseSh(ParseShRunner),
 }
 
 impl Mode {
@@ -64,8 +62,17 @@ impl Mode {
         // default-location config must not break it.
         if let args::Mode::ParseSh { input, output } = mode {
             log::debug!("Mode: parse shell text into events");
-            let runner = ParseShRunner::new(input, output, &context);
-            return Ok(Self::ParseSh(runner));
+
+            // When the caller left `--directory` unset, fall back to Bear's
+            // invocation directory so the producer always has a concrete
+            // path to interpret from.
+            let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
+            let producer = impls::ShellScriptReader::create(&input.path, directory)?;
+            let consumer = impls::RawEventWriter::create_allowing_stdout(&output.path)
+                .map_err(ConfigurationError::ConsumerCreation)?;
+
+            let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
+            return Ok(Self::Replay(replayer));
         }
 
         let config = config::Loader::load(&context, &config_path)
@@ -156,17 +163,14 @@ impl Mode {
 
     /// Runs the application mode.
     ///
-    /// This executes the build command in intercept mode or reads the event file in replay mode.
-    /// All errors returned are runtime errors that occur after valid arguments and configuration
+    /// This executes the build command in intercept mode, or reads the input
+    /// source (event file or shell text) in replay mode. All errors returned
+    /// are runtime errors that occur after valid arguments and configuration
     /// have been provided.
     pub fn run(self) -> ExitCode {
         let status = match self {
             Self::Intercept(interceptor, command) => interceptor.run(command),
-            Self::Replay(semantic) => semantic.run(),
-            // `ParseShRunner::run` already resolves its own exit code (which
-            // depends on emitted/skipped counts, not merely Ok/Err), so it
-            // bypasses the shared `RuntimeError` handling below.
-            Self::ParseSh(runner) => return runner.run(),
+            Self::Replay(replayer) => replayer.run(),
         };
         status.unwrap_or_else(|error| {
             log::error!("{error}");
@@ -196,10 +200,12 @@ mod impls {
     use crate::args::BuildCommand;
     use crate::environment;
     use crate::output::{ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError};
-    use crate::{args, config, output, semantic};
+    use crate::{args, config, output, parse_sh, semantic};
     use crossbeam_channel::{Receiver, Sender};
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
+    use std::collections::HashMap;
+    use std::io::Read;
     use std::process::ExitStatus;
     use std::sync::Arc;
     use std::{fs, io};
@@ -328,13 +334,108 @@ mod impls {
         }
     }
 
+    /// Errors raised while reading and interpreting shell command text.
+    #[derive(Debug, Error)]
+    enum ShellScriptReadError {
+        #[error("failed to read shell text from standard input: {0}")]
+        ReadStdin(io::Error),
+        #[error("failed to read shell text file {0}: {1}")]
+        ReadFile(std::path::PathBuf, io::Error),
+        #[error("every non-empty line was skipped; no events emitted (see warnings above)")]
+        AllSkipped,
+    }
+
+    /// Represents a shell text reader to be an event source.
+    ///
+    /// Runs the pure `parse_sh` lex/interpret pipeline over shell command
+    /// text (e.g. a `make -n` capture) and produces the recognized commands
+    /// as execution events, as if `bear intercept` had observed them.
+    pub(super) struct ShellScriptReader {
+        path: std::path::PathBuf,
+        working_dir: std::path::PathBuf,
+    }
+
+    impl ShellScriptReader {
+        /// Create a new shell text reader.
+        ///
+        /// This reader will read the shell text from a file, or from standard
+        /// input when the path is the `-` sentinel. The `working_dir` is the
+        /// already-resolved initial working directory the parsed commands are
+        /// interpreted from.
+        pub(super) fn create(
+            path: &std::path::Path,
+            working_dir: std::path::PathBuf,
+        ) -> Result<Self, ConfigurationError> {
+            if !super::is_stdio(path) && (!path.exists() || !path.is_file()) {
+                return Err(ConfigurationError::InvalidConfiguration(format!(
+                    "Shell text file not found: {path:?}"
+                )));
+            }
+
+            Ok(Self { path: path.to_path_buf(), working_dir })
+        }
+    }
+
+    impl execution::Producer for ShellScriptReader {
+        /// Reads the whole input (a file, or standard input when the path is
+        /// `-`), interprets it, and sends each recognized command down the
+        /// channel. Skipped lines are logged as warnings; when every
+        /// non-empty line was skipped, the run fails so the caller does not
+        /// exit successfully having emitted nothing.
+        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
+            let text = if super::is_stdio(&self.path) {
+                let mut buffer = String::new();
+                io::stdin().read_to_string(&mut buffer).map_err(ShellScriptReadError::ReadStdin)?;
+                buffer
+            } else {
+                fs::read_to_string(&self.path)
+                    .map_err(|error| ShellScriptReadError::ReadFile(self.path.clone(), error))?
+            };
+
+            let environment: HashMap<String, String> = std::env::vars().collect();
+            let context = parse_sh::Context { working_dir: self.working_dir.clone(), environment };
+            let interpretation = parse_sh::interpret(&text, &context);
+
+            for skipped in &interpretation.skipped {
+                log::warn!("line {}: skipped ({})", skipped.line, skipped.reason);
+            }
+
+            let emitted = interpretation.executions.len();
+            let skipped = interpretation.skipped.len();
+
+            // Trim each execution's environment to the build-relevant subset,
+            // matching the shape `bear intercept` emits (see `intercept::Execution::trim`).
+            for execution in interpretation.executions.into_iter().map(intercept::Execution::trim) {
+                if destination.send(execution).is_err() {
+                    log::debug!("Consumer channel closed; stopping execution forwarding");
+                    break;
+                }
+            }
+
+            if skipped > 0 {
+                log::warn!("parse-sh: {emitted} event(s) emitted, {skipped} line(s) skipped");
+            } else {
+                log::info!("parse-sh: {emitted} event(s) emitted, {skipped} line(s) skipped");
+            }
+
+            if emitted == 0 {
+                if skipped > 0 {
+                    return Err(ShellScriptReadError::AllSkipped.into());
+                }
+                log::warn!("parse-sh: no commands found in input");
+            }
+
+            Ok(())
+        }
+    }
+
     /// Represents a raw event writer to be used as a consumer.
     ///
     /// The raw event writer will write the intercepted events as they are observed
     /// without any transformation. This can be later replayed to analyze the build.
     pub(super) struct RawEventWriter {
         path: std::path::PathBuf,
-        destination: io::BufWriter<fs::File>,
+        destination: Box<dyn io::Write + Send>,
     }
 
     impl RawEventWriter {
@@ -353,11 +454,31 @@ mod impls {
                 ));
             }
 
+            Self::create_file(path)
+        }
+
+        /// Create a raw event writer that maps the `-` sentinel to standard
+        /// output.
+        ///
+        /// parse-sh legitimately writes events to stdout (it runs no build,
+        /// so there is no build output to collide with), unlike `create`,
+        /// which rejects `-` for exactly the opposite reason.
+        pub(super) fn create_allowing_stdout(path: &std::path::Path) -> Result<Self, WriterCreationError> {
+            if super::is_stdio(path) {
+                // The unlocked handle: the consumer crosses a thread
+                // boundary, and `StdoutLock` is not `Send`.
+                return Ok(Self { path: path.to_path_buf(), destination: Box::new(io::stdout()) });
+            }
+
+            Self::create_file(path)
+        }
+
+        fn create_file(path: &std::path::Path) -> Result<Self, WriterCreationError> {
             let destination = fs::File::create(path)
                 .map(io::BufWriter::new)
                 .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
 
-            Ok(Self { path: path.to_path_buf(), destination })
+            Ok(Self { path: path.to_path_buf(), destination: Box::new(destination) })
         }
     }
 
