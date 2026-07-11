@@ -136,10 +136,10 @@ impl Mode {
 
                 Ok(Self::Intercept(intercept, input))
             }
-            args::Mode::ParseSh { input: args::ShScript { path, directory }, output } => {
+            args::Mode::ParseSh { input, output } => {
                 log::debug!("Mode: parse shell text into events");
 
-                let runner = ParseShRunner::new(path, output.path, directory);
+                let runner = ParseShRunner::new(input, output, &context);
 
                 Ok(Self::ParseSh(runner))
             }

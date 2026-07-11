@@ -8,8 +8,10 @@
 //! write; by the time interpretation finishes the whole event list is in
 //! memory, so there is no producer/consumer channel to coordinate.
 
+use crate::args::{BuildEvents, ShScript};
 use crate::output::{ExecutionEventDatabase, SerializationError, SerializationFormat};
 use crate::parse_sh::{self, Context};
+use intercept_supervisor::context;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -17,18 +19,22 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 /// Runs the `parse-sh` mode: reads `input` (a file, or standard input when
-/// `-`), interprets it starting from `directory` (or the process's current
-/// directory when unset), and writes the resulting event stream to `output`
-/// (a file, or standard output when `-`).
+/// `-`), interprets it starting from `directory`, and writes the resulting
+/// event stream to `output` (a file, or standard output when `-`).
 pub struct ParseShRunner {
     input: PathBuf,
     output: PathBuf,
-    directory: Option<PathBuf>,
+    directory: PathBuf,
 }
 
 impl ParseShRunner {
-    pub fn new(input: PathBuf, output: PathBuf, directory: Option<PathBuf>) -> Self {
-        Self { input, output, directory }
+    /// Builds the runner from parsed arguments, resolving the working
+    /// directory eagerly: when the caller left `--directory` unset, this
+    /// falls back to Bear's invocation directory (captured in `context`) so
+    /// `try_run` always has a concrete path to interpret from.
+    pub fn new(input: ShScript, output: BuildEvents, context: &context::Context) -> Self {
+        let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
+        Self { input: input.path, output: output.path, directory }
     }
 
     /// Runs the mode to completion, translating any error into a logged
@@ -46,13 +52,9 @@ impl ParseShRunner {
     fn try_run(self) -> Result<ExitCode, ParseShError> {
         let text = Self::read_input(&self.input)?;
 
-        let working_dir = match self.directory {
-            Some(dir) => dir,
-            None => std::env::current_dir().map_err(ParseShError::WorkingDirectory)?,
-        };
         let environment: HashMap<String, String> = std::env::vars().collect();
 
-        let context = Context { working_dir, environment };
+        let context = Context { working_dir: self.directory, environment };
         let interpretation = parse_sh::interpret(&text, &context);
 
         for skipped in &interpretation.skipped {
@@ -121,8 +123,6 @@ enum ParseShError {
     ReadStdin(std::io::Error),
     #[error("Failed to read shell text file {0}: {1}")]
     ReadFile(PathBuf, std::io::Error),
-    #[error("Failed to determine the current working directory: {0}")]
-    WorkingDirectory(std::io::Error),
     #[error("Failed to create output file {0}: {1}")]
     CreateOutput(PathBuf, std::io::Error),
     #[error("Failed to write events: {0}")]
