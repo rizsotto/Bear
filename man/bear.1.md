@@ -34,7 +34,7 @@ Bear can operate in four modes:
 ## OPTIONS
 
 **-c, \-\-config** *FILE*
-: Specify a configuration file path. The configuration file controls output formatting, compiler recognition, source filtering, and duplicate handling.
+: Specify a configuration file path. The configuration file controls output formatting, compiler recognition, source filtering, and duplicate handling. It applies to every mode except `bear parse-sh`, which only emits an event stream and never consults it; passing `--config` to `bear parse-sh` is an error rather than a silent no-op.
 
 **-o, \-\-output** *FILE*
 : Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database. This option runs the build (combined mode, and `bear intercept`'s own `--output`), so it does not accept `-` for standard output: the build's own stdout shares that stream, and a non-atomic write could corrupt it. Use a file path, or split into `bear intercept` followed by `bear semantic --input -` (see below).
@@ -104,6 +104,8 @@ This is a best-effort front end over a documented subset of shell syntax (word s
 - The build system must both support a dry-run mode and print real commands in it; silent rules, custom launchers, and response files reduce what `bear parse-sh` can see.
 - The environment and `PATH` used to resolve bare executable names are `bear parse-sh`'s own at parse time, which may differ from the real build's -- especially when parsing a log captured on another machine, where `--directory` fixes the working directory but not the environment.
 - Only POSIX `sh` command text is supported; non-POSIX shells and Windows `cmd` are out of scope, and interleaved non-command output (compiler banners, warnings) in a saved log is skipped loudly like any other unsupported line.
+
+`bear parse-sh` itself takes no configuration file -- it rejects `--config` -- because it only emits an event stream. Configuration such as `format.paths` is applied by the `bear semantic` step that consumes the stream, so the settings below are set there, not on `bear parse-sh`.
 
 The source files named in the parsed commands need not exist on the machine running `bear parse-sh`: entries are reconstructed from the text alone, and the default path format (`format.paths: as-is`) never touches the filesystem. The one exception is `format.paths: canonical`, which resolves symlinks and so requires every path to exist on disk; when parsing a log whose sources are absent (a CI log, another checkout) use `format.paths: absolute` for existence-free normalization instead.
 

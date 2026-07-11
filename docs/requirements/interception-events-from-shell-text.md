@@ -75,6 +75,12 @@ dry-run text contains.
   applies). So an assignment is recorded only if interception would have
   kept it, and `PATH`, when present, survives the filter so that bare
   executable names remain resolvable by the consumer.
+- The mode emits the raw event stream and never consults Bear's
+  configuration; configuration shapes only the downstream semantic
+  analysis that turns the stream into a compilation database, not this
+  producer. Supplying a configuration file to this mode is therefore
+  rejected with an error rather than silently accepted and ignored, so
+  the user is not misled into believing it took effect.
 - Exit-code policy, consistent with the malformed-line rule in
   [`interception-events-format`](interception-events-format.md): empty
   input is success with empty output and a stderr warning; non-empty
@@ -142,6 +148,12 @@ subshells, all command substitutions):
 
 > When the mode runs, then it reports each skipped line on stderr, emits
 > no events, and exits non-zero.
+
+Given an invocation of this mode that also supplies a configuration file:
+
+> When the user runs it, then the invocation is rejected with an error
+> stating that configuration does not apply to this mode, and no event
+> stream is produced.
 
 ## Notes
 

@@ -79,6 +79,32 @@ fn parse_sh_all_skipped_input_exits_non_zero_with_no_events() -> Result<()> {
 
 // Requirements: interception-events-from-shell-text
 //
+// `--config` shapes semantic analysis, which parse-sh does not run: the mode
+// emits a raw event stream and never consults config. The invocation is
+// rejected at argument-parse time, before any config is loaded, so a valid
+// config file present here still fails -- proving the rejection is about the
+// mode, not the file's contents.
+#[test]
+fn parse_sh_rejects_config_option() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_rejects_config")?;
+    let config = env.create_config("schema: \"4.1\"\n")?;
+
+    let result =
+        env.run_bear_with_stdin(&["--config", config.to_str().unwrap(), "parse-sh"], b"gcc -c foo.c\n")?;
+
+    result.assert_failure()?;
+    assert!(result.stdout().trim().is_empty(), "no event stream must be produced: {}", result.stdout());
+    assert!(
+        result.stderr().contains("parse-sh"),
+        "stderr must explain that config does not apply to parse-sh: {}",
+        result.stderr()
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+//
 // Skip reports must reach stderr by default, without the caller having to
 // opt in via `RUST_LOG`. Runs with `RUST_LOG` explicitly unset (the harness's
 // other helpers default it to `info`, which would hide a regression in

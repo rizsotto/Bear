@@ -143,6 +143,12 @@ impl TryFrom<ArgMatches> for Arguments {
         let config = matches.get_one::<String>("config").map(String::to_string);
         let mode = Mode::try_from(matches)?;
 
+        // `parse-sh` emits a raw event stream and never consults the config,
+        // so accepting `--config` would silently ignore it. Reject it instead.
+        if config.is_some() && matches!(mode, Mode::ParseSh { .. }) {
+            return Err(ParseError::ConfigNotApplicableToParseSh);
+        }
+
         Ok(Arguments { config, mode })
     }
 }
@@ -222,6 +228,11 @@ pub enum ParseError {
     UnrecognizedSubcommand,
     #[error("Missing build command")]
     MissingBuildCommand,
+    #[error(
+        "The --config option does not apply to parse-sh: it configures semantic analysis, \
+         while parse-sh only emits an event stream"
+    )]
+    ConfigNotApplicableToParseSh,
 }
 
 /// Represents the command line interface of the application.
@@ -470,6 +481,20 @@ mod test {
                 },
             }
         );
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn test_parse_sh_rejects_config() {
+        // arrange
+        let execution = vec!["bear", "-c", "~/bear.yaml", "parse-sh"];
+
+        // act
+        let matches = cli().get_matches_from(execution);
+        let sut = Arguments::try_from(matches);
+
+        // assert
+        assert!(matches!(sut, Err(ParseError::ConfigNotApplicableToParseSh)));
     }
 
     #[test]

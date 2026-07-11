@@ -48,6 +48,10 @@ running a build at all
 Specify a configuration file path.
 The configuration file controls output formatting, compiler recognition,
 source filtering, and duplicate handling.
+It applies to every mode except \f[CR]bear parse\-sh\f[R], which only
+emits an event stream and never consults it; passing
+\f[CR]\-\-config\f[R] to \f[CR]bear parse\-sh\f[R] is an error rather
+than a silent no\-op.
 .TP
 \f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
 Specify the output file path (default:
@@ -198,6 +202,13 @@ Only POSIX \f[CR]sh\f[R] command text is supported; non\-POSIX shells
 and Windows \f[CR]cmd\f[R] are out of scope, and interleaved
 non\-command output (compiler banners, warnings) in a saved log is
 skipped loudly like any other unsupported line.
+.PP
+\f[CR]bear parse\-sh\f[R] itself takes no configuration file \(en it
+rejects \f[CR]\-\-config\f[R] \(en because it only emits an event
+stream.
+Configuration such as \f[CR]format.paths\f[R] is applied by the
+\f[CR]bear semantic\f[R] step that consumes the stream, so the settings
+below are set there, not on \f[CR]bear parse\-sh\f[R].
 .PP
 The source files named in the parsed commands need not exist on the
 machine running \f[CR]bear parse\-sh\f[R]: entries are reconstructed
