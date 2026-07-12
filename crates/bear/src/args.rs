@@ -272,7 +272,7 @@ pub fn cli() -> Command {
             Command::new(MODE_SEMANTIC_SUBCOMMAND)
                 .about("detect semantics of command executions")
                 .args(&[
-                    arg!(-i --input <FILE> "Path of the event file to read (`-` reads from standard input)")
+                    arg!(-i --input <FILE> "Path of the event file to read")
                         .default_value(DEFAULT_STDIO)
                         .hide_default_value(false),
                     arg!(-o --output <FILE> "Path of the result file")
@@ -286,13 +286,13 @@ pub fn cli() -> Command {
             Command::new(MODE_PARSE_SH_SUBCOMMAND)
                 .about("parses shell command text (e.g. `make -n` output) into an event stream")
                 .args(&[
-                    arg!(-i --input <FILE> "Path of the shell text to parse (`-` reads from standard input)")
+                    arg!(-i --input <FILE> "Path of the shell text to parse")
                         .default_value(DEFAULT_STDIO)
                         .hide_default_value(false),
-                    arg!(-o --output <FILE> "Path of the event file to write (`-` writes to standard output)")
+                    arg!(-o --output <FILE> "Path of the event file to write")
                         .default_value(DEFAULT_STDIO)
                         .hide_default_value(false),
-                    arg!(-C --directory <DIR> "Initial working directory for the parsed commands (not validated; the directory need not exist locally)"),
+                    arg!(-C --directory <DIR> "Initial working directory for the parsed commands"),
                 ])
                 .arg_required_else_help(false),
         )
