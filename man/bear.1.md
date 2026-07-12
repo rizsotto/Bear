@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% July 3, 2026
+% July 12, 2026
 <!-- to generate the final `bear.1` file, run `pandoc -s -t man bear.1.md -o bear.1` -->
 
 # NAME
@@ -107,7 +107,14 @@ This is a best-effort front end over a documented subset of shell syntax (word s
 
 `bear parse-sh` itself takes no configuration file -- it rejects `--config` -- because it only emits an event stream. Configuration such as `format.paths` is applied by the `bear semantic` step that consumes the stream, so the settings below are set there, not on `bear parse-sh`.
 
-The source files named in the parsed commands need not exist on the machine running `bear parse-sh`: entries are reconstructed from the text alone, and the default path format (`format.paths: as-is`) never touches the filesystem. The one exception is `format.paths: canonical`, which resolves symlinks and so requires every path to exist on disk; when parsing a log whose sources are absent (a CI log, another checkout) use `format.paths: absolute` for existence-free normalization instead.
+The source files named in the parsed commands need not exist on the machine running `bear parse-sh`: entries are reconstructed from the text alone, and the default path format (as-is) never touches the filesystem. The one exception is the `canonical` path format, which resolves symlinks and so requires every path to exist on disk; when parsing a log whose sources are absent (a CI log, another checkout) use `absolute` for existence-free normalization instead, configured on the `bear semantic` step:
+
+```yaml
+format:
+  paths:
+    directory: absolute
+    file: absolute
+```
 
 Prefer `bear -- <build command>` (or `bear intercept`) whenever the build can actually be run; reach for `bear parse-sh` when it cannot -- for example, reconstructing a compilation database from a CI log after the fact.
 
@@ -121,10 +128,10 @@ Bear generates a JSON compilation database conforming to the [Clang JSON Compila
 Each compilation database entry contains the following fields:
 
 **directory**
-: The working directory of the compilation (absolute path)
+: The working directory of the compilation
 
 **file**
-: The main translation unit source file (absolute path)
+: The main translation unit source file
 
 **arguments**
 : The compilation command as an array of strings (preferred format)
@@ -133,7 +140,7 @@ Each compilation database entry contains the following fields:
 : The compilation command as a single shell-escaped string (alternative to arguments)
 
 **output**
-: The output file produced by compilation (optional, absolute path)
+: The output file produced by compilation (optional)
 
 ## Output Formatting
 
@@ -145,7 +152,7 @@ The output format can be controlled through the configuration file:
 - **Source filtering**: Include/exclude files based on directory rules
 - **Duplicate filtering**: Remove duplicate entries based on configurable field matching
 
-Bear generates entries where all paths are absolute by default, and uses the `arguments` field instead of `command` to avoid shell escaping issues.
+By default Bear does not transform paths: each entry records them as they appeared in the intercepted invocation (`format.paths: as-is`), so the `file` and `output` fields are often relative to the `directory` field. Use the configuration file to normalize them (see `format.paths` below). Bear uses the `arguments` field instead of `command` to avoid shell escaping issues.
 
 
 # CONFIG FILE
@@ -363,6 +370,8 @@ The first file found is loaded; remaining locations are not consulted.
 Bear returns the exit status of the executed build command when running in combined or intercept mode. When the build command succeeds, Bear returns 0. When the build command fails, Bear returns the same non-zero exit code.
 
 In semantic mode, Bear returns 0 on success and a non-zero exit code if semantic analysis fails.
+
+In parse-sh mode, Bear returns 0 when at least one line produced an event, and also on empty input (with a notice on standard error). It returns a non-zero exit code when every non-empty input line was skipped, so a run that emitted nothing cannot pass for a successful one.
 
 If Bear itself encounters an internal error or crashes, it returns a non-zero exit code regardless of the build command's status.
 

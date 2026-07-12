@@ -286,11 +286,16 @@ pub fn cli() -> Command {
                         .hide_default_value(false),
                     arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
                 ])
-                .arg_required_else_help(false),
+                .arg_required_else_help(false)
+                .after_help(
+                    "Reads the event stream that `bear intercept` or `bear parse-sh` produces \
+                     and writes the compilation database, e.g.:\n\n  \
+                     make -n | bear parse-sh | bear semantic",
+                ),
         )
         .subcommand(
             Command::new(MODE_PARSE_SH_SUBCOMMAND)
-                .about("parses shell command text (e.g. `make -n` output) into an event stream")
+                .about("parses build-system dry-run text (e.g. `make -n` output) into events for `bear semantic`")
                 .args(&[
                     arg!(-i --input <FILE> "Path of the shell text to parse")
                         .default_value(DEFAULT_STDIO)
@@ -300,7 +305,11 @@ pub fn cli() -> Command {
                         .hide_default_value(false),
                     arg!(-C --directory <DIR> "Initial working directory for the parsed commands"),
                 ])
-                .arg_required_else_help(false),
+                .arg_required_else_help(false)
+                .after_help(
+                    "Feed the event stream to `bear semantic` to get a compilation database, e.g.:\n\n  \
+                     make -n | bear parse-sh | bear semantic",
+                ),
         )
         .args(&[
             arg!(<BUILD_COMMAND> "Build command")

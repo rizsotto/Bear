@@ -32,6 +32,8 @@ compilation database for you:
 - Unusual toolchains: embedded (ARM, TI, Microchip, QNX), HPC (Cray,
   Intel, NVIDIA, MPI wrappers), CUDA, cross-compilers, and compiler
   launchers such as ccache, distcc, and icecc.
+- A build you cannot run at all - parse `make -n` dry-run output or a
+  saved build log instead (`bear parse-sh`).
 
 Because Bear observes the build instead of parsing build files, it records
 what the compiler was actually invoked with - including flags injected by
@@ -58,6 +60,17 @@ Bear writes `compile_commands.json` to the current working directory.
 
 For more options, see the man page or run `bear --help`. Pass Bear's own
 options before `--`; everything after that is treated as part of the build command.
+
+### From a dry run or build log
+
+When the build cannot be run - all you have is a CI log, or the build
+system's dry-run output - Bear can reconstruct the compilation database
+from the text alone:
+
+    make -n | bear parse-sh | bear semantic
+
+See the man page for the supported shell constructs and the fidelity
+trade-offs compared to intercepting a real build.
 
 For more information, read the man pages or the project [wiki][WIKI], which
 talks about limitations, known issues, and platform-specific usage.
