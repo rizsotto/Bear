@@ -21,6 +21,7 @@ mod validating;
 
 use super::statistics::OutputStatistics;
 use super::{WriterCreationError, WriterError};
+use crate::args::is_stdio;
 use crate::{args, config, semantic};
 use std::sync::Arc;
 
@@ -145,7 +146,7 @@ pub(crate) fn create_pipeline(
     config: &config::Main,
     stats: Arc<OutputStatistics>,
 ) -> Result<SemanticCommandWriter, WriterCreationError> {
-    if args.path.as_os_str() == "-" {
+    if is_stdio(&args.path) {
         if args.append {
             return Err(WriterCreationError::Configuration("cannot append to standard output".to_string()));
         }

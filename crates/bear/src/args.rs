@@ -22,6 +22,12 @@ const DEFAULT_OUTPUT_FILE: &str = "compile_commands.json";
 /// `docs/rationale/event-file-defaults.md`).
 const DEFAULT_STDIO: &str = "-";
 
+/// Returns true when `path` is the [`DEFAULT_STDIO`] sentinel meaning
+/// standard input or standard output, depending on context.
+pub(crate) fn is_stdio(path: &std::path::Path) -> bool {
+    path.as_os_str() == DEFAULT_STDIO
+}
+
 /// Represents the command line arguments of the application.
 #[derive(Debug, PartialEq)]
 pub struct Arguments {
@@ -241,8 +247,8 @@ pub enum ParseError {
 ///
 /// This describes how the user can interact with the application.
 /// The different modes of the application are represented as subcommands.
-/// The application can be run in intercept mode, semantic mode, or the
-/// default mode where both intercept and semantic are executed.
+/// The application can be run in intercept mode, semantic mode, parse-sh
+/// mode, or the default mode where both intercept and semantic are executed.
 pub fn cli() -> Command {
     // The binary is `bear-driver` but users invoke it as `bear` via a
     // shell wrapper, so we hardcode the user-facing name instead of

@@ -8,6 +8,7 @@
 
 mod execution;
 
+use crate::args::is_stdio;
 use crate::environment;
 use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, output};
@@ -15,17 +16,6 @@ use intercept_supervisor::CollectorOnTcp;
 use intercept_supervisor::context;
 use std::process::ExitCode;
 use std::sync::Arc;
-
-/// Returns true when `path` is the `-` sentinel meaning standard input or
-/// standard output, depending on context.
-///
-/// `semantic --input -` reads the event stream from stdin (see
-/// `docs/requirements/interception-events-format.md`). Modes that run the
-/// build never accept `-` for output: the build's own stdout shares the
-/// stream and would corrupt it.
-fn is_stdio(path: &std::path::Path) -> bool {
-    path.as_os_str() == "-"
-}
 
 /// Represents the application execution modes.
 ///
