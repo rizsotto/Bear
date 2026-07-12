@@ -23,10 +23,15 @@ impl SerializationFormat<Entry> for JsonCompilationDatabase {
     /// performs no further semantic validation; it reports only I/O and
     /// JSON-encoding errors.
     fn write(
-        writer: impl std::io::Write,
+        mut writer: impl std::io::Write,
         entries: impl Iterator<Item = Entry>,
     ) -> Result<(), SerializationError> {
-        json::serialize_seq(writer, entries).map_err(SerializationError::Syntax)
+        json::serialize_seq(&mut writer, entries).map_err(SerializationError::Syntax)?;
+        // Without this, a buffering writer (stdout, BufWriter) flushes on
+        // drop and discards the error: a tail write failure (EPIPE,
+        // disk-full) would exit zero with a truncated database.
+        writer.flush().map_err(SerializationError::Io)?;
+        Ok(())
     }
 
     fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<Entry, SerializationError>> {
@@ -227,6 +232,30 @@ mod test {
         assert_eq!(expected_with_array_syntax(), content);
 
         Ok(())
+    }
+
+    /// A writer that accepts every write but fails the final flush, the
+    /// shape of a pipe closed after the last write or a disk that fills
+    /// at flush time.
+    struct FlushFails;
+
+    impl std::io::Write for FlushFails {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::Error::other("flush failed"))
+        }
+    }
+
+    #[test]
+    fn write_surfaces_a_tail_flush_error() {
+        let input = expected_values_with_arguments();
+
+        let sut = Sut::write(FlushFails, input.into_iter());
+
+        assert!(matches!(sut, Err(SerializationError::Io(_))), "flush errors must not be swallowed");
     }
 
     fn expected_quoted_values_with_argument() -> Vec<Entry> {
