@@ -205,7 +205,6 @@ mod impls {
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
     use std::collections::HashMap;
-    use std::io::Read;
     use std::process::ExitStatus;
     use std::sync::Arc;
     use std::{fs, io};
@@ -347,7 +346,7 @@ mod impls {
 
     /// Represents a shell text reader to be an event source.
     ///
-    /// Runs the pure `parse_sh` lex/interpret pipeline over shell command
+    /// Streams the `parse_sh` tokenizer/parser pipeline over shell command
     /// text (e.g. a `make -n` capture) and produces the recognized commands
     /// as execution events, as if `bear intercept` had observed them.
     pub(super) struct ShellScriptReader {
@@ -381,40 +380,51 @@ mod impls {
     }
 
     impl execution::Producer for ShellScriptReader {
-        /// Reads the whole input (a file, or standard input when the path is
-        /// `-`), interprets it, and sends each recognized command down the
-        /// channel. Skipped lines are logged as warnings; when every
-        /// non-empty line was skipped, the run fails so the caller does not
-        /// exit successfully having emitted nothing.
+        /// Streams the input (a file, or standard input when the path is
+        /// `-`) through the parser and sends each recognized command down
+        /// the channel as its line completes; memory stays bounded by the
+        /// longest logical line. Skipped lines are logged as warnings;
+        /// when every non-empty line was skipped, the run fails so the
+        /// caller does not exit successfully having emitted nothing.
         fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
-            let text = if super::is_stdio(&self.path) {
-                let mut buffer = String::new();
-                io::stdin().read_to_string(&mut buffer).map_err(ShellScriptReadError::ReadStdin)?;
-                buffer
+            let input: Box<dyn io::BufRead> = if super::is_stdio(&self.path) {
+                Box::new(io::stdin().lock())
             } else {
-                fs::read_to_string(&self.path)
-                    .map_err(|error| ShellScriptReadError::ReadFile(self.path.clone(), error))?
+                let file = fs::File::open(&self.path)
+                    .map_err(|error| ShellScriptReadError::ReadFile(self.path.clone(), error))?;
+                Box::new(io::BufReader::new(file))
             };
 
             let context = parse_sh::Context {
                 working_dir: self.working_dir.clone(),
                 environment: self.environment.clone(),
             };
-            let interpretation = parse_sh::interpret(&text, &context);
 
-            for skipped in &interpretation.skipped {
-                log::warn!("line {}: skipped ({})", skipped.line, skipped.reason);
-            }
-
-            let emitted = interpretation.executions.len();
-            let skipped = interpretation.skipped.len();
-
-            // Trim each execution's environment to the build-relevant subset,
-            // matching the shape `bear intercept` emits (see `intercept::Execution::trim`).
-            for execution in interpretation.executions.into_iter().map(intercept::Execution::trim) {
-                if destination.send(execution).is_err() {
-                    log::debug!("Consumer channel closed; stopping execution forwarding");
-                    break;
+            let mut emitted = 0usize;
+            let mut skipped = 0usize;
+            for event in parse_sh::parse(input, &context) {
+                match event {
+                    Err(error) => {
+                        return Err(if super::is_stdio(&self.path) {
+                            ShellScriptReadError::ReadStdin(error).into()
+                        } else {
+                            ShellScriptReadError::ReadFile(self.path.clone(), error).into()
+                        });
+                    }
+                    Ok(parse_sh::Event::Skipped(line)) => {
+                        log::warn!("line {}: skipped ({})", line.line, line.reason);
+                        skipped += 1;
+                    }
+                    Ok(parse_sh::Event::Execution(execution)) => {
+                        emitted += 1;
+                        // Trim the environment to the build-relevant subset,
+                        // matching the shape `bear intercept` emits (see
+                        // `intercept::Execution::trim`).
+                        if destination.send(execution.trim()).is_err() {
+                            log::debug!("Consumer channel closed; stopping execution forwarding");
+                            break;
+                        }
+                    }
                 }
             }
 

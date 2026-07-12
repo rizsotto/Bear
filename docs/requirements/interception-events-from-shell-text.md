@@ -49,7 +49,10 @@ dry-run text contains.
     each side of a pipe is a candidate command;
   - comments (`#` to end of line) and blank lines, which produce nothing;
   - redirections (`>`, `>>`, `<`, `2>`, `2>&1`, `>/dev/null`, and the
-    like), which are recognized and removed from the command's words.
+    like), which are recognized and removed from the command's words. A
+    redirect's whole target word is discarded uninspected: an expansion
+    or substitution inside one does not skip the line. An unterminated
+    quote or unterminated substitution in a target skips the line loudly.
 - Any construct outside that subset - subshell groups `( ... )`, command
   substitution (backticks or `$(...)`), parameter expansion (`$VAR`,
   `${...}`), globs in the executable word, here-documents, and the
@@ -63,7 +66,9 @@ dry-run text contains.
   - a `cd <dir>` command updates it for subsequent commands, and is
     consumed only for that effect: `cd` produces no execution event,
     because it is a shell builtin that never reaches `exec()` and so would
-    not appear in an intercepted stream;
+    not appear in an intercepted stream. `cd -` restores the previous
+    working directory when one is known and is a loud skip otherwise;
+    the `-` is never treated as a directory name;
   - `make[N]: Entering directory '...'` and `Leaving directory '...'`
     markers push and pop it, so recursive `make -n -w` output tracks
     directories correctly. These markers are an explicit, documented
@@ -171,3 +176,4 @@ Given an invocation of this mode that also supplies a configuration file:
 ## Rationale
 
 - [parse-sh-producer](../rationale/parse-sh-producer.md)
+- [parse-sh-single-tokenizer](../rationale/parse-sh-single-tokenizer.md)
