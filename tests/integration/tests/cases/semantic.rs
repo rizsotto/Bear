@@ -379,6 +379,48 @@ fn semantic_malformed_events() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-events-format
+//
+// The same set of events in any order must yield a database with the same
+// set of entries. Three distinct compilations consumed forward and reversed
+// must produce identical entry sets; only their order in the file may
+// differ. The bare `gcc` executable with an empty environment keeps the
+// events host-independent: recognition is by name and the default path
+// format never touches the filesystem.
+#[test]
+fn semantic_database_entry_set_is_order_independent() -> Result<()> {
+    let env = TestEnvironment::new("semantic_order_independent")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let events: Vec<String> = ["a.c", "b.c", "c.c"]
+        .iter()
+        .map(|source| {
+            json!({
+                "executable": "gcc",
+                "arguments": ["gcc", "-c", source],
+                "working_dir": temp_dir,
+                "environment": {}
+            })
+            .to_string()
+        })
+        .collect();
+    let forward = events.join("\n") + "\n";
+    let reverse = events.iter().rev().cloned().collect::<Vec<_>>().join("\n") + "\n";
+    env.create_source_files(&[("forward.json", &forward), ("reverse.json", &reverse)])?;
+
+    env.run_bear_success(&["semantic", "--input", "forward.json", "--output", "forward_db.json"])?;
+    env.run_bear_success(&["semantic", "--input", "reverse.json", "--output", "reverse_db.json"])?;
+
+    let mut sut_forward = env.load_compilation_database("forward_db.json")?.entries().to_vec();
+    let mut sut_reverse = env.load_compilation_database("reverse_db.json")?.entries().to_vec();
+    sut_forward.sort_by_key(|entry| entry["file"].as_str().map(String::from));
+    sut_reverse.sort_by_key(|entry| entry["file"].as_str().map(String::from));
+    assert_eq!(sut_forward.len(), 3, "each distinct compilation must yield an entry");
+    assert_eq!(sut_forward, sut_reverse, "entry sets must match regardless of event order");
+
+    Ok(())
+}
+
 // Requirements: output-compilation-entries
 #[test]
 #[cfg(all(has_executable_echo, has_executable_mkdir, has_executable_rm))]

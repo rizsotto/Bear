@@ -65,6 +65,7 @@ impl SerializationFormat<intercept::Execution> for ExecutionEventDatabase {
 #[cfg(test)]
 mod tests {
     use super::ExecutionEventDatabase as Sut;
+    use super::SerializationError;
     use super::SerializationFormat;
     use intercept::Execution;
     use serde_json::json;
@@ -95,6 +96,28 @@ mod tests {
         let read_back: Vec<_> = Sut::read(&mut buffer).collect::<Result<_, _>>().unwrap();
 
         assert_eq!(executions, read_back);
+    }
+
+    #[test]
+    fn write_propagates_flush_errors() {
+        // A sink whose writes succeed but whose flush fails, standing in
+        // for a full pipe or disk discovered only at the tail flush.
+        struct FailingFlushWriter;
+
+        impl std::io::Write for FailingFlushWriter {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Err(std::io::Error::other("flush failure"))
+            }
+        }
+
+        let executions = expected_values();
+
+        let sut = Sut::write(FailingFlushWriter, executions.into_iter());
+
+        assert!(matches!(sut, Err(SerializationError::Io(_))), "the tail flush error must propagate");
     }
 
     #[test]

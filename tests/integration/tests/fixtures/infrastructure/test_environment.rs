@@ -51,6 +51,14 @@ impl TestEnvironment {
         self.test_dir.path()
     }
 
+    /// Path of the installed bear binary, for tests that must drive the
+    /// process manually (for example a partial stdout read to break the
+    /// pipe) instead of through the buffering `run_bear_*` helpers.
+    #[allow(dead_code)]
+    pub fn bear_path(&self) -> &Path {
+        self.install.path()
+    }
+
     /// Create source files in the test directory
     pub fn create_source_files(&self, files: &[(&str, &str)]) -> Result<()> {
         for (path, content) in files {

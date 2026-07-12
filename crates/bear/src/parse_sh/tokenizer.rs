@@ -777,6 +777,41 @@ mod tests {
     }
 
     // Requirements: interception-events-from-shell-text
+    //
+    // A build log saved on Windows (or fetched through a CRLF-translating
+    // channel) carries `\r\n` line endings; the carriage return must not
+    // survive into the last word of the line.
+    #[test]
+    fn crlf_line_endings_leave_no_carriage_return_in_words() {
+        let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
+            ("gcc -c foo.c\r\n", vec![word("gcc", 1), word("-c", 1), word("foo.c", 1), nl()]),
+            (
+                "gcc a\r\ngcc b\r\n",
+                vec![word("gcc", 1), word("a", 1), nl(), word("gcc", 2), word("b", 2), nl()],
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let sut = tokens(input);
+            assert_eq!(sut, expected, "case: {input:?}");
+        }
+    }
+
+    // Requirements: interception-events-from-shell-text
+    //
+    // Documented deviation (see `next_logical_line`): continuations are
+    // stripped textually regardless of quote context, so a backslash-newline
+    // inside single quotes joins instead of staying literal as real `sh`
+    // would keep it. Pin the joined form so a change to the rule is a
+    // conscious one.
+    #[test]
+    fn backslash_newline_inside_single_quotes_joins_the_lines() {
+        let sut = tokens("gcc '-DX=a\\\nb' foo.c");
+
+        assert_eq!(sut, vec![word("gcc", 1), word("-DX=ab", 1), word("foo.c", 1), nl()]);
+    }
+
+    // Requirements: interception-events-from-shell-text
     #[test]
     fn emits_separators_for_the_command_operators() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![

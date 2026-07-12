@@ -681,6 +681,16 @@ mod tests {
     }
 
     // Requirements: interception-events-from-shell-text
+    #[cfg(unix)]
+    #[test]
+    fn bare_cd_leaves_the_working_directory_unchanged() {
+        let sut = interpret("cd\ngcc -c foo.c", &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "foo.c"], "/build", &[])]);
+        assert!(sut.skipped.is_empty(), "a bare cd must not be a skip");
+    }
+
+    // Requirements: interception-events-from-shell-text
     #[test]
     fn make_markers_push_and_pop_the_working_directory() {
         let input = "make[1]: Entering directory '/build/lib'\n\
@@ -718,6 +728,53 @@ mod tests {
         let sut = interpret(input, &context("/build", &[]));
 
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build", &[])]);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn nested_make_markers_pop_to_the_enclosing_directory() {
+        let input = "make[1]: Entering directory '/a/b'\n\
+                     make[2]: Entering directory '/a/b/c'\n\
+                     gcc -c inner.c\n\
+                     make[2]: Leaving directory '/a/b/c'\n\
+                     gcc -c outer.c\n";
+
+        let sut = interpret(input, &context("/a", &[]));
+
+        assert_eq!(
+            sut.executions,
+            vec![
+                execution("gcc", &["gcc", "-c", "inner.c"], "/a/b/c", &[]),
+                execution("gcc", &["gcc", "-c", "outer.c"], "/a/b", &[]),
+            ]
+        );
+        assert!(sut.skipped.is_empty(), "markers must not be reported as skips");
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn leaving_past_the_bottom_of_the_stack_falls_back_to_initial_working_dir() {
+        let input = "make[1]: Entering directory '/a/b'\n\
+                     make[1]: Leaving directory '/a/b'\n\
+                     make[1]: Leaving directory '/a/b'\n\
+                     gcc -c a.c\n";
+
+        let sut = interpret(input, &context("/a", &[]));
+
+        assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/a", &[])]);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    //
+    // A recursive-make log saved on Windows carries `\r\n` line endings;
+    // the marker must still parse and the directory must carry no `\r`.
+    #[test]
+    fn crlf_terminated_make_marker_still_parses() {
+        let input = "make[1]: Entering directory '/build/lib'\r\ngcc -c a.c\r\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build/lib", &[])]);
     }
 
     // Requirements: interception-events-from-shell-text

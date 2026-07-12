@@ -154,6 +154,191 @@ fn parse_sh_default_log_level_reports_skips_without_rust_log() -> Result<()> {
 }
 
 // Requirements: interception-events-from-shell-text
+//
+// When any line is skipped, a stderr summary reports both counts, and the
+// skip count is physical lines, not command segments: the `for` line below
+// holds three segments but is one skipped line. The per-line warnings also
+// say "skipped", so this pins the summary text itself, which no other
+// assertion covers -- the summary could vanish or regress to counting
+// segments without any other test failing.
+#[test]
+fn parse_sh_skip_summary_counts_lines_not_segments() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_skip_summary")?;
+
+    let script = b"gcc -c foo.c\nfor f in *.c; do gcc -c $f; done\n";
+    let result = env.run_bear_with_stdin(&["parse-sh"], script)?;
+
+    result.assert_success()?;
+    let stderr = result.stderr();
+    assert!(
+        stderr.contains("1 event(s) emitted, 1 line(s) skipped"),
+        "the summary must count lines, not segments: {stderr}"
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+//
+// The event's environment is the mode's own environment overlaid with the
+// line's leading `VAR=value` assignments, then trimmed to the build-relevant
+// subset (the same filter interception applies). The kept/dropped pair comes
+// from the line overlay, so the assertions do not depend on what the test
+// runner has set; `PATH` is inherited and must survive so bare executable
+// names stay resolvable by the consumer.
+#[test]
+fn parse_sh_event_environment_is_overlaid_and_filtered() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_environment")?;
+
+    let result = env.run_bear_with_stdin(&["parse-sh"], b"CC=clang SECRET_TOKEN=hunter2 gcc -c foo.c\n")?;
+    result.assert_success()?;
+
+    let stdout = result.stdout();
+    let line = stdout.lines().next().context("expected one event line on stdout")?;
+    let event: Value = serde_json::from_str(line)?;
+    let environment = event["environment"].as_object().context("environment must be an object")?;
+    assert_eq!(
+        environment.get("CC").and_then(Value::as_str),
+        Some("clang"),
+        "a build-relevant line assignment must be recorded: {environment:?}"
+    );
+    assert!(environment.contains_key("PATH"), "PATH must survive the filter: {environment:?}");
+    assert!(
+        !environment.contains_key("SECRET_TOKEN"),
+        "a non-build-relevant line assignment must be dropped: {environment:?}"
+    );
+    assert!(
+        !environment.contains_key("HOME"),
+        "non-build-relevant inherited variables must be dropped: {environment:?}"
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+//
+// An assignment-only line sets shell state but executes nothing, so it is
+// neither an event nor a skip; input made only of such lines is the empty
+// case, not the all-skipped failure.
+#[test]
+fn parse_sh_assignment_only_input_exits_zero_as_no_commands() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_assignment_only")?;
+
+    let result = env.run_bear_with_stdin(&["parse-sh"], b"FOO=bar\n")?;
+
+    result.assert_success()?;
+    assert!(
+        result.stdout().trim().is_empty(),
+        "an assignment-only line must produce no event: {}",
+        result.stdout()
+    );
+    assert!(
+        result.stderr().contains("no commands found"),
+        "stderr must carry the empty-input notice: {}",
+        result.stderr()
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+#[test]
+fn parse_sh_non_utf8_input_fails_with_clear_error() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_non_utf8")?;
+
+    let result = env.run_bear_with_stdin(&["parse-sh"], b"gcc \xff\xfe -c foo.c\n")?;
+
+    result.assert_failure()?;
+    assert!(result.stderr().contains("UTF-8"), "stderr must name the encoding problem: {}", result.stderr());
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+#[test]
+fn parse_sh_missing_input_file_fails() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_missing_input")?;
+
+    let result = env.run_bear(&["parse-sh", "--input", "missing.sh"])?;
+
+    result.assert_failure()?;
+    assert!(
+        result.stderr().contains("Shell text file not found"),
+        "stderr must name the missing input file: {}",
+        result.stderr()
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+#[test]
+fn parse_sh_unwritable_output_file_fails() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_unwritable_output")?;
+
+    let result =
+        env.run_bear_with_stdin(&["parse-sh", "--output", "no_such_dir/out.jsonl"], b"gcc -c foo.c\n")?;
+
+    result.assert_failure()?;
+    assert!(
+        result.stderr().contains("Failed to create"),
+        "stderr must report the unwritable output destination: {}",
+        result.stderr()
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
+//
+// The `run_bear_*` helpers buffer the child's whole stdout, which never
+// breaks the pipe, so this test drives the process manually: feed more
+// events than the pipe buffer holds, read a few bytes, then drop the read
+// end. parse-sh must exit non-zero and say why -- the consumer went away,
+// the stream is incomplete, and dying quietly with 0 would let a broken
+// pipeline pass for a successful run.
+#[cfg(unix)]
+#[test]
+fn parse_sh_broken_stdout_pipe_exits_non_zero() -> Result<()> {
+    use std::io::{Read, Write};
+    use std::process::{Command, Stdio};
+
+    let env = TestEnvironment::new("parse_sh_broken_pipe")?;
+
+    let mut child = Command::new(env.bear_path())
+        .current_dir(env.test_dir())
+        .arg("parse-sh")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    // Write from a thread: once the child blocks on its full stdout pipe it
+    // stops draining stdin, and a single-threaded write_all would deadlock
+    // against the read below. The child dies mid-stream, so an EPIPE from
+    // this write is the expected outcome, not a failure.
+    let mut stdin = child.stdin.take().context("stdin is piped")?;
+    let writer = std::thread::spawn(move || {
+        let script = b"gcc -c foo.c\n".repeat(100_000);
+        let _ = stdin.write_all(&script);
+    });
+
+    let mut stdout = child.stdout.take().context("stdout is piped")?;
+    let mut prefix = [0u8; 64];
+    let _ = stdout.read(&mut prefix)?;
+    drop(stdout);
+
+    let status = child.wait()?;
+    writer.join().expect("the stdin writer thread must not panic");
+    let mut stderr = String::new();
+    child.stderr.take().context("stderr is piped")?.read_to_string(&mut stderr)?;
+    assert!(!status.success(), "a broken stdout pipe must fail the run; stderr: {stderr}");
+    assert!(!stderr.trim().is_empty(), "the failure must be reported on stderr, not silent");
+
+    Ok(())
+}
+
+// Requirements: interception-events-from-shell-text
 #[test]
 fn parse_sh_empty_input_exits_zero_with_warning() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_empty_input")?;
