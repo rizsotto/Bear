@@ -6,7 +6,7 @@ status: implemented
 ## Intent
 
 Bear's `intercept` mode writes a JSON Lines file of captured executions
-(default `events.json`), and Bear's `semantic --input <file>` mode reads
+to a file the user names, and Bear's `semantic --input <file>` mode reads
 the same file to produce a compilation database. The two modes already
 ship and work today. What is missing is a written contract: users and
 third-party tooling cannot tell which fields are stable, what guarantees
@@ -62,14 +62,21 @@ should supply it.
   non-zero. (Any additional producer, such as one parsing shell text,
   applies the same skip-and-continue rule to its own input; see
   [`interception-events-from-shell-text`](interception-events-from-shell-text.md).)
-- `bear semantic --input -` reads the event stream from standard input,
-  and any non-executing producer may write the stream to standard output,
-  so the format is pipeable (`<producer> | bear semantic --input -`).
-  Diagnostics go to stderr, keeping stdout machine-readable. A mode that
-  runs the build does not accept `-` for output: the intercepted build's
-  own stdout shares that stream and would corrupt it (a non-atomic write
-  can split a JSON line), so `bear intercept` writes events only to a
-  file.
+- `bear semantic` reads the event stream from standard input by default
+  (naming an input file is the explicit case), and any non-executing
+  producer may write the stream to standard output, so the format is
+  pipeable with no flags (`<producer> | bear semantic`). Diagnostics go
+  to stderr, keeping stdout machine-readable. When the event stream is
+  about to be read from a terminal, or turned out to contain no events,
+  a stderr notice says so - a filter reading an interactive or empty
+  stdin is almost always a plumbing mistake.
+- A mode that runs the build does not accept `-` for output: the
+  intercepted build's own stdout shares that stream and would corrupt it
+  (a non-atomic write can split a JSON line), so `bear intercept` writes
+  events only to a file - and because no stream fallback exists, it has
+  no default destination either: the event file must be named
+  explicitly, and omitting it is a usage error reported before the
+  build runs.
 
 ## Non-functional constraints
 
@@ -105,6 +112,18 @@ Given an events file with one malformed line in the middle:
 > processes the surrounding valid lines,
 > and writes a compilation database from the valid subset.
 
+Given a producer piped directly into `bear semantic` with no input
+file named:
+
+> When the user runs `<producer> | bear semantic -o cdb.json`,
+> then the event stream is read from standard input and `cdb.json`
+> contains one entry per recognizable compiler invocation.
+
+Given `bear intercept` invoked without naming an event file:
+
+> When the user runs `bear intercept -- <build>`,
+> then Bear exits with a usage error before running the build.
+
 Given an events file produced by Bear vN and consumed by Bear vN+1
 within the same major-version line:
 
@@ -128,7 +147,17 @@ within the same major-version line:
   to free the channel was considered and rejected: it silently changes
   observable build behavior (tools that detect a tty or write results to
   stdout would break) for a pipeline no producer needs.
+- Bear 4.2.0 removed the implicit `events.json` defaults the 4.1.x
+  split workflow relied on: `intercept` now requires the event file to
+  be named and `semantic` reads standard input when none is. See the
+  rationale entry below for the reasoning and rejected alternatives.
 - Out of scope: backward compatibility guarantees across major versions;
   those are explicitly allowed to break. A build-log parser is out of
   scope *for this requirement* - it defines only the interchange
   contract; a producer is a separate contract that depends on this one.
+
+## Rationale
+
+- [`event-file-defaults`](../rationale/event-file-defaults.md) - why
+  `intercept` has no default event-file name and `semantic` reads
+  standard input by default.

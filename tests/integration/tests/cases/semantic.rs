@@ -1459,6 +1459,63 @@ fn semantic_input_stdin_matches_file_input() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-events-format
+//
+// `bear semantic` is a filter: with no input named it reads the event
+// stream from standard input, so a producer pipes into it with no flags
+// (`<producer> | bear semantic`).
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn semantic_input_defaults_to_stdin() -> Result<()> {
+    let env = TestEnvironment::new("semantic_default_stdin")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "test.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let result = env.run_bear_with_stdin(
+        &["semantic", "--output", "compile_commands.json"],
+        format!("{event}\n").as_bytes(),
+    )?;
+    result.assert_success()?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: interception-events-format
+//
+// An empty event stream yields an empty database and success, but it is
+// almost always a plumbing mistake (a producer that emitted nothing, or a
+// forgotten redirect), so a stderr notice must say the stream was empty.
+#[test]
+fn semantic_empty_stdin_succeeds_with_warning() -> Result<()> {
+    let env = TestEnvironment::new("semantic_empty_stdin")?;
+
+    let result = env.run_bear_with_stdin(&["semantic", "--output", "compile_commands.json"], b"")?;
+    result.assert_success()?;
+
+    let stderr = result.stderr();
+    assert!(stderr.contains("no events"), "stderr must warn about the empty event stream: {stderr}");
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    Ok(())
+}
+
 // Requirements: semantic-cpp20-modules
 //
 // GCC's transitional module flag `-fmodules-ts` must not break recognition

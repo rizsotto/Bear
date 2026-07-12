@@ -11,7 +11,7 @@ Bear - a tool to generate compilation database for Clang tooling.
 
 **bear** [*OPTIONS*] [\-\-] [*BUILD_COMMAND*...]
 
-**bear intercept** [*OPTIONS*] [\-\-] *BUILD_COMMAND*...
+**bear intercept** [*OPTIONS*] \-\-output *FILE* [\-\-] *BUILD_COMMAND*...
 
 **bear semantic** [*OPTIONS*]
 
@@ -37,7 +37,7 @@ Bear can operate in four modes:
 : Specify a configuration file path. The configuration file controls output formatting, compiler recognition, source filtering, and duplicate handling. It applies to every mode except `bear parse-sh`, which only emits an event stream and never consults it; passing `--config` to `bear parse-sh` is an error rather than a silent no-op.
 
 **-o, \-\-output** *FILE*
-: Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database. This option runs the build (combined mode, and `bear intercept`'s own `--output`), so it does not accept `-` for standard output: the build's own stdout shares that stream, and a non-atomic write could corrupt it. Use a file path, or split into `bear intercept` followed by `bear semantic --input -` (see below).
+: Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database. This option runs the build (combined mode, and `bear intercept`'s own `--output`), so it does not accept `-` for standard output: the build's own stdout shares that stream, and a non-atomic write could corrupt it. Use a file path, or split into `bear intercept --output <events>` followed by `bear semantic --input <events> --output -` (see below).
 
 **-a, \-\-append**
 : Append results to an existing output file instead of overwriting it. This allows incremental updates to the compilation database. New entries are placed before the existing ones, so when a source file is rebuilt its newest invocation survives duplicate filtering and replaces the stale entry (see the `duplicates` section).
@@ -58,10 +58,10 @@ compiler calls and generate a compilation database as output.
 
 Intercepts command execution events during the build process and saves them to an events file for later processing.
 
-**bear intercept** [*OPTIONS*] [\-\-] *BUILD_COMMAND*...
+**bear intercept** [*OPTIONS*] \-\-output *FILE* [\-\-] *BUILD_COMMAND*...
 
 **-o, \-\-output** *FILE*
-: Path of the event file (default: `events.json`). Rejects `-`: `bear intercept` runs the build, so its stdout is the build's stdout, and writing events there would corrupt the stream.
+: Path of the event file to write. Required: there is no default event-file name, and `-` is rejected -- `bear intercept` runs the build, so its stdout is the build's stdout, and writing events there would corrupt the stream. Since no stream fallback exists, the destination must be named explicitly; omitting it is a usage error reported before the build runs.
 
 ## bear semantic
 
@@ -70,20 +70,20 @@ Processes previously captured events to generate a compilation database through 
 **bear semantic** [*OPTIONS*]
 
 **-i, \-\-input** *FILE*
-: Path of the event file to read (default: `events.json`). Pass `-` to read the event stream from standard input instead of a file, so the events format is pipeable: any non-executing producer of a conforming event stream can feed `bear semantic` directly, for example:
+: Path of the event file to read (default: `-`, reads from standard input). `bear semantic` runs no build, so it is a plain filter: with no input named it reads the event stream from standard input, and any non-executing producer of a conforming stream can pipe into it with no flags, for example:
 
-      <producer> | bear semantic --input -
+      <producer> | bear semantic
 
-  Since `bear semantic` does not run the build, it has no conflicting use for its own stdout; diagnostics still go to stderr, keeping stdout machine-readable.
+  Name a file to read a saved event stream instead (for example one written by `bear intercept --output`). Diagnostics go to stderr, keeping stdout machine-readable; when standard input is a terminal, or the event stream turns out to be empty, a stderr notice says so.
 
 **-o, \-\-output** *FILE*
-: Path of the compilation database to write (default: `compile_commands.json`). Pass `-` to write it to standard output instead of a file -- again safe because `bear semantic` runs no build -- so the whole flow can stream, for example `<producer> | bear semantic --input - --output -`. Standard-output writing is not atomic and cannot be appended to, so `--output -` together with `--append` is rejected. (This differs from `bear intercept`'s and combined mode's `--output`, which reject `-` because their stdout is shared with the build.)
+: Path of the compilation database to write (default: `compile_commands.json`). Pass `-` to write it to standard output instead of a file -- again safe because `bear semantic` runs no build -- so the whole flow can stream, for example `<producer> | bear semantic --output -`. Standard-output writing is not atomic and cannot be appended to, so `--output -` together with `--append` is rejected. (This differs from `bear intercept`'s and combined mode's `--output`, which reject `-` because their stdout is shared with the build.)
 
 ## bear parse-sh
 
 Parses shell command text -- typically the output of a build system's dry-run mode, such as `make -n` (or `make -n -w` for recursive builds), or a saved build log -- into the same event stream `bear intercept` produces, without running anything. Feed that stream to `bear semantic` to get a compilation database:
 
-      make -n | bear parse-sh | bear semantic --input -
+      make -n | bear parse-sh | bear semantic
 
 **bear parse-sh** [*OPTIONS*]
 

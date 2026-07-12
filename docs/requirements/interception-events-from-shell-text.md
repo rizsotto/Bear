@@ -14,7 +14,7 @@ event stream defined by
 existing `semantic` mode then turns into a compilation database:
 
 ```sh
-make -n | bear <this mode> | bear semantic --input -
+make -n | bear <this mode> | bear semantic
 ```
 
 This is a best-effort front-end, not a replacement for interception.

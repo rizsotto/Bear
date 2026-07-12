@@ -205,6 +205,7 @@ mod impls {
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
     use std::collections::HashMap;
+    use std::io::IsTerminal;
     use std::process::ExitStatus;
     use std::sync::Arc;
     use std::{fs, io};
@@ -273,9 +274,20 @@ mod impls {
         /// Create a new raw event reader.
         ///
         /// This reader will read the intercepted events from a file in a raw format,
-        /// or from standard input when the path is the `-` sentinel.
+        /// or from standard input when the path is the `-` sentinel (the default:
+        /// `semantic` is a filter and reads standard input unless a file is named).
         pub(super) fn create(path: &std::path::Path) -> Result<Self, ConfigurationError> {
-            if !super::is_stdio(path) && (!path.exists() || !path.is_file()) {
+            if super::is_stdio(path) {
+                // A filter blocking on an interactive terminal is almost
+                // always a missing producer in front of the pipe; say so
+                // instead of waiting silently.
+                if io::stdin().is_terminal() {
+                    log::warn!(
+                        "reading events from standard input (a terminal); \
+                         pipe a producer in, or name an event file with --input"
+                    );
+                }
+            } else if !path.exists() || !path.is_file() {
                 return Err(ConfigurationError::InvalidConfiguration(format!(
                     "Event file not found: {path:?}"
                 )));
@@ -295,7 +307,10 @@ mod impls {
         ///
         /// Tallies non-blank lines seen (`nonempty`) against accepted ones;
         /// if every non-empty line was rejected, the run fails so the caller
-        /// does not exit successfully having analyzed nothing.
+        /// does not exit successfully having analyzed nothing. An entirely
+        /// empty stream stays a success (an empty database is a valid
+        /// output) but is reported on stderr, since it is almost always a
+        /// plumbing mistake.
         fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
             let source: Box<dyn io::Read> = if super::is_stdio(&self.path) {
                 Box::new(io::stdin().lock())
@@ -325,7 +340,9 @@ mod impls {
                 }
             }
 
-            if nonempty > 0 && accepted == 0 {
+            if nonempty == 0 {
+                log::warn!("event stream: no events found in input");
+            } else if accepted == 0 {
                 return Err(ReplayReadError::AllRejected(nonempty).into());
             }
 

@@ -6,8 +6,8 @@ Bear \- a tool to generate compilation database for Clang tooling.
 .SH SYNOPSIS
 \f[B]bear\f[R] [\f[I]OPTIONS\f[R]] [\-\-] [\f[I]BUILD_COMMAND\f[R]\&...]
 .PP
-\f[B]bear intercept\f[R] [\f[I]OPTIONS\f[R]] [\-\-]
-\f[I]BUILD_COMMAND\f[R]\&...
+\f[B]bear intercept\f[R] [\f[I]OPTIONS\f[R]] \-\-output \f[I]FILE\f[R]
+[\-\-] \f[I]BUILD_COMMAND\f[R]\&...
 .PP
 \f[B]bear semantic\f[R] [\f[I]OPTIONS\f[R]]
 .PP
@@ -61,8 +61,9 @@ This option runs the build (combined mode, and
 \f[CR]bear intercept\f[R]\(cqs own \f[CR]\-\-output\f[R]), so it does
 not accept \f[CR]\-\f[R] for standard output: the build\(cqs own stdout
 shares that stream, and a non\-atomic write could corrupt it.
-Use a file path, or split into \f[CR]bear intercept\f[R] followed by
-\f[CR]bear semantic \-\-input \-\f[R] (see below).
+Use a file path, or split into
+\f[CR]bear intercept \-\-output <events>\f[R] followed by
+\f[CR]bear semantic \-\-input <events> \-\-output \-\f[R] (see below).
 .TP
 \f[B]\-a, \-\-append\f[R]
 Append results to an existing output file instead of overwriting it.
@@ -84,14 +85,17 @@ output.
 Intercepts command execution events during the build process and saves
 them to an events file for later processing.
 .PP
-\f[B]bear intercept\f[R] [\f[I]OPTIONS\f[R]] [\-\-]
-\f[I]BUILD_COMMAND\f[R]\&...
+\f[B]bear intercept\f[R] [\f[I]OPTIONS\f[R]] \-\-output \f[I]FILE\f[R]
+[\-\-] \f[I]BUILD_COMMAND\f[R]\&...
 .TP
 \f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
-Path of the event file (default: \f[CR]events.json\f[R]).
-Rejects \f[CR]\-\f[R]: \f[CR]bear intercept\f[R] runs the build, so its
-stdout is the build\(cqs stdout, and writing events there would corrupt
-the stream.
+Path of the event file to write.
+Required: there is no default event\-file name, and \f[CR]\-\f[R] is
+rejected \(en \f[CR]bear intercept\f[R] runs the build, so its stdout is
+the build\(cqs stdout, and writing events there would corrupt the
+stream.
+Since no stream fallback exists, the destination must be named
+explicitly; omitting it is a usage error reported before the build runs.
 .SS bear semantic
 Processes previously captured events to generate a compilation database
 through semantic analysis.
@@ -99,19 +103,22 @@ through semantic analysis.
 \f[B]bear semantic\f[R] [\f[I]OPTIONS\f[R]]
 .TP
 \f[B]\-i, \-\-input\f[R] \f[I]FILE\f[R]
-Path of the event file to read (default: \f[CR]events.json\f[R]).
-Pass \f[CR]\-\f[R] to read the event stream from standard input instead
-of a file, so the events format is pipeable: any non\-executing producer
-of a conforming event stream can feed \f[CR]bear semantic\f[R] directly,
-for example:
+Path of the event file to read (default: \f[CR]\-\f[R], reads from
+standard input).
+\f[CR]bear semantic\f[R] runs no build, so it is a plain filter: with no
+input named it reads the event stream from standard input, and any
+non\-executing producer of a conforming stream can pipe into it with no
+flags, for example:
 .RS
 .PP
-\ | bear semantic \(eninput \-
+\ | bear semantic
 .RE
 .PP
-Since \f[CR]bear semantic\f[R] does not run the build, it has no
-conflicting use for its own stdout; diagnostics still go to stderr,
-keeping stdout machine\-readable.
+Name a file to read a saved event stream instead (for example one
+written by \f[CR]bear intercept \-\-output\f[R]).
+Diagnostics go to stderr, keeping stdout machine\-readable; when
+standard input is a terminal, or the event stream turns out to be empty,
+a stderr notice says so.
 .TP
 \f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
 Path of the compilation database to write (default:
@@ -119,7 +126,7 @@ Path of the compilation database to write (default:
 Pass \f[CR]\-\f[R] to write it to standard output instead of a file \(en
 again safe because \f[CR]bear semantic\f[R] runs no build \(en so the
 whole flow can stream, for example
-\f[CR]<producer> | bear semantic \-\-input \- \-\-output \-\f[R].
+\f[CR]<producer> | bear semantic \-\-output \-\f[R].
 Standard\-output writing is not atomic and cannot be appended to, so
 \f[CR]\-\-output \-\f[R] together with \f[CR]\-\-append\f[R] is
 rejected.
@@ -136,7 +143,7 @@ Feed that stream to \f[CR]bear semantic\f[R] to get a compilation
 database:
 .IP
 .EX
-  make \-n | bear parse\-sh | bear semantic \-\-input \-
+  make \-n | bear parse\-sh | bear semantic
 .EE
 .PP
 \f[B]bear parse\-sh\f[R] [\f[I]OPTIONS\f[R]]

@@ -14,10 +14,12 @@ const MODE_INTERCEPT_SUBCOMMAND: &str = "intercept";
 const MODE_SEMANTIC_SUBCOMMAND: &str = "semantic";
 const MODE_PARSE_SH_SUBCOMMAND: &str = "parse-sh";
 const DEFAULT_OUTPUT_FILE: &str = "compile_commands.json";
-const DEFAULT_EVENT_FILE: &str = "events.json";
-/// Default for `parse-sh`'s `--input`/`--output`: the `-` sentinel, meaning
-/// standard input or standard output respectively, so the mode is a plain
-/// filter by default.
+/// Default for `parse-sh`'s `--input`/`--output` and `semantic`'s `--input`:
+/// the `-` sentinel, meaning standard input or standard output respectively,
+/// so these non-executing modes are plain filters by default. `intercept` has
+/// no event-file default at all: it cannot fall back to standard output (the
+/// build owns that stream), so its destination must be named explicitly (see
+/// `docs/rationale/event-file-defaults.md`).
 const DEFAULT_STDIO: &str = "-";
 
 /// Represents the command line arguments of the application.
@@ -163,7 +165,7 @@ impl TryFrom<ArgMatches> for Mode {
                 let path = intercept_matches
                     .get_one::<String>("output")
                     .map(std::path::PathBuf::from)
-                    .expect("output is defaulted");
+                    .expect("output is required");
 
                 Ok(Mode::Intercept { input, output: BuildEvents { path } })
             }
@@ -262,9 +264,7 @@ pub fn cli() -> Command {
                         .num_args(1..)
                         .last(true)
                         .required(true),
-                    arg!(-o --output <FILE> "Path of the event file")
-                        .default_value(DEFAULT_EVENT_FILE)
-                        .hide_default_value(false),
+                    arg!(-o --output <FILE> "Path of the event file to write").required(true),
                 ])
                 .arg_required_else_help(true),
         )
@@ -272,8 +272,8 @@ pub fn cli() -> Command {
             Command::new(MODE_SEMANTIC_SUBCOMMAND)
                 .about("detect semantics of command executions")
                 .args(&[
-                    arg!(-i --input <FILE> "Path of the event file (`-` reads from standard input)")
-                        .default_value(DEFAULT_EVENT_FILE)
+                    arg!(-i --input <FILE> "Path of the event file to read (`-` reads from standard input)")
+                        .default_value(DEFAULT_STDIO)
                         .hide_default_value(false),
                     arg!(-o --output <FILE> "Path of the result file")
                         .default_value(DEFAULT_OUTPUT_FILE)
@@ -336,25 +336,19 @@ mod test {
         );
     }
 
+    // Requirements: interception-events-format
+    //
+    // Interception has no default event-file name: it cannot fall back to
+    // standard output (the build owns that stream), so the destination
+    // must be named and omitting it is a usage error.
     #[test]
-    fn test_intercept_defaults() {
+    fn test_intercept_requires_output() {
         let execution = vec!["bear", "intercept", "--", "make", "all"];
 
-        let matches = cli().get_matches_from(execution);
-        let arguments = Arguments::try_from(matches).unwrap();
+        let sut = cli().try_get_matches_from(execution);
 
-        assert_eq!(
-            arguments,
-            Arguments {
-                config: None,
-                mode: Mode::Intercept {
-                    input: BuildCommand {
-                        arguments: vec!["make", "all"].into_iter().map(String::from).collect()
-                    },
-                    output: BuildEvents { path: "events.json".into() },
-                },
-            }
-        );
+        let error = sut.expect_err("intercept without --output must be a usage error");
+        assert_eq!(error.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
 
     #[test]
@@ -377,6 +371,10 @@ mod test {
         );
     }
 
+    // Requirements: interception-events-format
+    //
+    // `bear semantic` is a filter: with no input named it reads the event
+    // stream from standard input, so a producer pipes into it flag-free.
     #[test]
     fn test_semantic_defaults() {
         let execution = vec!["bear", "semantic"];
@@ -389,7 +387,7 @@ mod test {
             Arguments {
                 config: None,
                 mode: Mode::Semantic {
-                    input: BuildEvents { path: "events.json".into() },
+                    input: BuildEvents { path: "-".into() },
                     output: BuildSemantic { path: "compile_commands.json".into(), append: false },
                 },
             }

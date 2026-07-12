@@ -164,6 +164,24 @@ fn intercept_exit_code_for_success() -> Result<()> {
     Ok(())
 }
 
+/// Interception has no default event-file name: omitting the output
+/// destination is a usage error, reported before the build runs.
+// Requirements: interception-events-format
+#[test]
+#[cfg(has_executable_true)]
+fn intercept_exit_code_without_output() -> Result<()> {
+    let env = TestEnvironment::new("intercept_exit_code_without_output")?;
+
+    let result = env.run_bear(&["intercept", "--", TRUE_PATH])?;
+    result.assert_failure()?;
+    assert!(
+        result.stderr().contains("--output"),
+        "the usage error must name the missing option: {}",
+        result.stderr()
+    );
+    Ok(())
+}
+
 /// Test that intercept command propagates command failure exit codes
 // Requirements: interception-signal-forwarding
 #[test]
