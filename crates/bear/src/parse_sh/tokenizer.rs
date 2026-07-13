@@ -79,8 +79,13 @@ pub enum TokenError {
 /// Why a line was skipped instead of parsed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SkipReason {
-    /// `( ... )` subshell, or a `{ ... }` group in command position.
+    /// `( ... )` subshell (a child shell whose state must not leak back
+    /// out, so it stays unsupported; a `{ ...; }` group runs in the
+    /// current shell and is parsed transparently instead).
     Subshell,
+    /// A `}` that closes no open group, or a `{` left open at end of
+    /// input: the brace nesting does not balance.
+    UnbalancedBrace,
     /// Backtick or `$( ... )` command substitution.
     CommandSubstitution,
     /// `$VAR` or `${...}` parameter expansion.
@@ -101,7 +106,8 @@ pub enum SkipReason {
 impl fmt::Display for SkipReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let text = match self {
-            Self::Subshell => "subshell or group",
+            Self::Subshell => "subshell",
+            Self::UnbalancedBrace => "unbalanced brace",
             Self::CommandSubstitution => "command substitution",
             Self::ParameterExpansion => "parameter expansion",
             Self::GlobInExecutable => "glob in executable",

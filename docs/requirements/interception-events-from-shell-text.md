@@ -53,6 +53,16 @@ dry-run text contains.
     redirect's whole target word is discarded uninspected: an expansion
     or substitution inside one does not skip the line. An unterminated
     quote or unterminated substitution in a target skips the line loudly.
+  - brace groups `{ ...; }` in command position, which run in the
+    current shell. The braces are structural and produce no event; the
+    commands between them are parsed with the shared shell state, so a
+    `cd` inside a group persists after the closing brace, matching `sh`.
+    Groups may nest and may span lines. An unmatched `}` (a close with
+    no open group) skips its line loudly, and an input that ends with a
+    `{` still open is reported loudly against the opening line; both are
+    reported as unbalanced braces. This is a subshell contrast, not a
+    generalization: `( ... )` runs in a child shell and stays
+    unsupported, because its state must not leak back out.
 - Any construct outside that subset - subshell groups `( ... )`, command
   substitution (backticks or `$(...)`), parameter expansion (`$VAR`,
   `${...}`), globs in the executable word, here-documents, and the

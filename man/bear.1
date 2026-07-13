@@ -172,15 +172,18 @@ Not validated: the directory need not exist on this machine.
 This is a best\-effort front end over a documented subset of shell
 syntax (word splitting and quoting,
 \f[CR];\f[R]/\f[CR]&&\f[R]/\f[CR]||\f[R]/\f[CR]&\f[R]/\f[CR]|\f[R]
-separators, comments, redirections, \f[CR]cd\f[R], and recursive
-make\(cqs \f[CR]Entering directory\f[R]/\f[CR]Leaving directory\f[R]
-markers).
-Anything outside that subset \(en subshells, command substitution,
+separators, comments, redirections, \f[CR]cd\f[R], brace groups
+(\f[CR]{ ...; }\f[R], which run in the current shell so a \f[CR]cd\f[R]
+inside one persists after the closing brace), and recursive make\(cqs
+\f[CR]Entering directory\f[R]/\f[CR]Leaving directory\f[R] markers).
+Anything outside that subset \(en subshells (\f[CR]( ... )\f[R], which
+unlike a brace group runs in a child shell), command substitution,
 parameter expansion, glob in the executable position, here\-documents,
-unterminated quotes, and shell keywords (\f[CR]if\f[R], \f[CR]for\f[R],
-\f[CR]while\f[R], \f[CR]case\f[R]) \(en causes that one line to be
-skipped, reported on standard error with its line number and reason; a
-here\-document\(cqs body lines are consumed along with its opening line.
+unterminated quotes, unbalanced braces, and shell keywords
+(\f[CR]if\f[R], \f[CR]for\f[R], \f[CR]while\f[R], \f[CR]case\f[R]) \(en
+causes that one line to be skipped, reported on standard error with its
+line number and reason; a here\-document\(cqs body lines are consumed
+along with its opening line.
 The run still succeeds as long as at least one line produced an event.
 .PP
 \f[B]Interception remains the higher\-fidelity, recommended

@@ -61,6 +61,7 @@ pub fn parse<R: io::BufRead>(input: R, context: &Context) -> Parser<'_, R> {
         assignments: Vec::new(),
         words: Vec::new(),
         command_line: 0,
+        open_braces: Vec::new(),
         finished: false,
     }
 }
@@ -100,6 +101,13 @@ pub struct Parser<'a, R> {
     words: Vec<String>,
     /// Line of the current command's first word, for parser-side skips.
     command_line: usize,
+    /// Opening physical lines of `{` groups currently open, innermost
+    /// last. A `{ ...; }` group runs in the current shell, so it needs no
+    /// state snapshot -- the stack only tracks nesting depth so a `}`
+    /// with no matching `{`, and a `{` still open at end of input, are
+    /// caught as unbalanced braces. Persists across lines: groups may
+    /// span newlines.
+    open_braces: Vec<usize>,
     /// Set when the token stream ended or a read error was yielded.
     finished: bool,
 }
@@ -123,6 +131,17 @@ impl<R: io::BufRead> Iterator for Parser<'_, R> {
                     // defensively and let the loop yield anything left.
                     self.finish_command();
                     self.commit_line();
+                    // A group left open at end of input is a syntax error
+                    // `sh` would have rejected; its inner commands were
+                    // already emitted (best-effort), so flag the imbalance
+                    // loudly against the earliest still-open `{` rather
+                    // than retract them.
+                    if let Some(&line) = self.open_braces.first() {
+                        self.ready.push_back(Event::Skipped(SkippedLine {
+                            line,
+                            reason: SkipReason::UnbalancedBrace,
+                        }));
+                    }
                 }
                 Some(Err(TokenError::Io(error))) => {
                     self.finished = true;
@@ -150,10 +169,42 @@ impl<R> Parser<'_, R> {
             }
             Token::Marker(marker) => self.apply_marker(marker),
             Token::Word(word) => {
-                if !self.draining {
+                // Group braces are reserved words only in command position
+                // (no words pending on the current command). They must be
+                // tracked even while draining -- see `accept_brace` -- so
+                // brace handling runs before the drain gate; everything
+                // else on a drained line is discarded.
+                if self.words.is_empty() && (word.text == "{" || word.text == "}") {
+                    self.accept_brace(&word.text, word.line);
+                } else if !self.draining {
                     self.accept_word(word);
                 }
             }
+        }
+    }
+
+    /// Handles a group brace found in command position. A `{ ...; }` group
+    /// runs in the current shell, so the braces are pure structure and
+    /// neither emits a command; the stack only tracks nesting depth.
+    ///
+    /// Tracking must survive draining, or a `{`...`}` pair split by an
+    /// unrelated skip on one line (`{ gcc $X a.c; }`) would desync: the
+    /// `{` is recorded before the skip, and swallowing the `}` after it
+    /// would leak a phantom "still open" entry and fabricate an
+    /// unbalanced-brace report. So a close is always honored -- it may
+    /// balance a real earlier open, and over-popping is a harmless skip
+    /// -- while an open is ignored once draining, because the drained
+    /// text's command position is untrustworthy and a spurious open would
+    /// itself fabricate the imbalance. Any leading assignment before a
+    /// brace is meaningless (`sh` rejects `VAR=x {`) and is discarded.
+    fn accept_brace(&mut self, text: &str, line: usize) {
+        self.assignments.clear();
+        if text == "{" {
+            if !self.draining {
+                self.open_braces.push(line);
+            }
+        } else if self.open_braces.pop().is_none() {
+            self.skip_line(line, SkipReason::UnbalancedBrace);
         }
     }
 
@@ -200,10 +251,9 @@ impl<R> Parser<'_, R> {
                 self.skip_line(word.line, SkipReason::Keyword);
                 return;
             }
-            if word.text == "{" || word.text == "}" {
-                self.skip_line(word.line, SkipReason::Subshell);
-                return;
-            }
+            // Group braces in command position are intercepted before the
+            // drain gate in `accept`, so they never reach here; a `{`/`}`
+            // that does arrive is a plain argument in a later position.
             self.command_line = word.line;
         }
         self.words.push(word.text);
@@ -545,7 +595,6 @@ mod tests {
             ("*.sh arg", SkipReason::GlobInExecutable),
             ("cat <<EOF", SkipReason::HereDoc),
             ("(ranlib libz.a || true) >/dev/null 2>&1", SkipReason::Subshell),
-            ("{ echo a; }", SkipReason::Subshell),
             ("gcc 'unterminated", SkipReason::UnterminatedQuote),
             ("gcc \"also unterminated", SkipReason::UnterminatedQuote),
         ];
@@ -1001,5 +1050,149 @@ mod tests {
 
         assert_eq!(sut.executions, vec![execution("cc", &["cc", "-c", "x.c"], "/build", &[])]);
         assert!(sut.skipped.is_empty());
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn a_brace_group_is_transparent_and_emits_its_inner_commands() {
+        let cases: Vec<(&str, Vec<Vec<String>>)> = vec![
+            ("{ echo a; }", vec![args(&["echo", "a"])]),
+            ("{ echo a;}", vec![args(&["echo", "a"])]),
+            ("{ gcc -c a.c; gcc -c b.c; }", vec![args(&["gcc", "-c", "a.c"]), args(&["gcc", "-c", "b.c"])]),
+            // The braces are structural: a trailing redirect on the group
+            // is stripped like any other, and nothing brace-shaped leaks
+            // into an argument vector.
+            ("{ echo a; } > log", vec![args(&["echo", "a"])]),
+        ];
+
+        for (input, expected) in cases {
+            let sut = arguments_of(input);
+            assert_eq!(sut, expected, "case: {input:?}");
+        }
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn a_brace_group_may_span_lines() {
+        let input = "{\ngcc -c a.c\ngcc -c b.c\n}\ngcc -c c.c\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert_eq!(
+            sut.executions,
+            vec![
+                execution("gcc", &["gcc", "-c", "a.c"], "/build", &[]),
+                execution("gcc", &["gcc", "-c", "b.c"], "/build", &[]),
+                execution("gcc", &["gcc", "-c", "c.c"], "/build", &[]),
+            ]
+        );
+        assert!(sut.skipped.is_empty());
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn nested_brace_groups_balance_by_depth() {
+        let sut = interpret("{ { echo a; }; echo b; }", &context("/build", &[]));
+
+        assert_eq!(
+            sut.executions,
+            vec![
+                execution("echo", &["echo", "a"], "/build", &[]),
+                execution("echo", &["echo", "b"], "/build", &[]),
+            ]
+        );
+        assert!(sut.skipped.is_empty());
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[cfg(unix)]
+    #[test]
+    fn cd_inside_a_group_persists_after_the_closing_brace() {
+        // A brace group runs in the current shell, so unlike a subshell
+        // its `cd` leaks out: the command after the group must be recorded
+        // in the directory the group changed to.
+        let sut = interpret("{ cd sub; gcc -c a.c; }\ngcc -c b.c", &context("/build", &[]));
+
+        assert_eq!(
+            sut.executions,
+            vec![
+                execution("gcc", &["gcc", "-c", "a.c"], "/build/sub", &[]),
+                execution("gcc", &["gcc", "-c", "b.c"], "/build/sub", &[]),
+            ]
+        );
+        assert!(sut.skipped.is_empty());
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn a_closing_brace_keeps_being_an_argument_when_not_in_command_position() {
+        // `}` is a reserved word only in command position; after other
+        // words it is an ordinary argument, and must not be read as a
+        // group close (which would then look unbalanced).
+        let sut = interpret("echo a }", &context("/build", &[]));
+
+        assert_eq!(sut.executions, vec![execution("echo", &["echo", "a", "}"], "/build", &[])]);
+        assert!(sut.skipped.is_empty());
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn an_unmatched_closing_brace_skips_its_line_loudly() {
+        let sut = interpret("echo a; }", &context("/build", &[]));
+
+        assert!(sut.executions.is_empty(), "an unmatched `}}` is a syntax error: the line is skipped");
+        assert_eq!(sut.skipped.len(), 1);
+        assert_eq!(sut.skipped[0].reason, SkipReason::UnbalancedBrace);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn a_skip_between_matching_braces_does_not_leak_a_phantom_open() {
+        // The `{` opens before the `$X` skip poisons the line and the `}`
+        // closes after it: the pair is balanced in the source, so the run
+        // must report only the parameter expansion, never a fabricated
+        // unbalanced brace at end of input from a half-tracked group.
+        let sut = interpret("{ gcc $X foo.c; }", &context("/build", &[]));
+
+        assert!(sut.executions.is_empty(), "the poisoned line emits nothing");
+        assert_eq!(sut.skipped.len(), 1, "one skip only: the braces balance");
+        assert_eq!(sut.skipped[0].reason, SkipReason::ParameterExpansion);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn a_phantom_open_does_not_mask_a_later_unmatched_brace() {
+        // Line 1's braces balance despite its skip; the stray `}` on line
+        // 2 must still be caught, not absorbed by a leaked open from line
+        // 1. Both lines are fully skipped, so nothing is emitted.
+        let sut = interpret("{ gcc $X foo.c; }\necho a; }", &context("/build", &[]));
+
+        assert!(sut.executions.is_empty(), "both lines are skipped");
+        assert_eq!(sut.skipped.len(), 2);
+        assert_eq!(sut.skipped[0].reason, SkipReason::ParameterExpansion);
+        assert_eq!(sut.skipped[0].line, 1);
+        assert_eq!(sut.skipped[1].reason, SkipReason::UnbalancedBrace);
+        assert_eq!(sut.skipped[1].line, 2);
+    }
+
+    // Requirements: interception-events-from-shell-text
+    #[test]
+    fn a_group_left_open_at_end_of_input_is_reported_against_its_opening_line() {
+        // The inner command is best-effort kept (it is very likely real),
+        // but the unclosed group is flagged loudly on the `{` line.
+        let input = "gcc -c a.c\n{ gcc -c b.c\n";
+
+        let sut = interpret(input, &context("/build", &[]));
+
+        assert_eq!(
+            sut.executions,
+            vec![
+                execution("gcc", &["gcc", "-c", "a.c"], "/build", &[]),
+                execution("gcc", &["gcc", "-c", "b.c"], "/build", &[]),
+            ]
+        );
+        assert_eq!(sut.skipped.len(), 1);
+        assert_eq!(sut.skipped[0].reason, SkipReason::UnbalancedBrace);
+        assert_eq!(sut.skipped[0].line, 2, "the skip cites the line the open brace was on");
     }
 }
