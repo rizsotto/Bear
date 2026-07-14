@@ -37,8 +37,6 @@ instead of retaining the stale entry from the previous run.
 
 - Must not corrupt the output file if Bear is interrupted during the read
   phase (the atomic write in `output-atomic-write` handles this)
-- The existing database is read via a streaming iterator; however the
-  underlying JSON parser may buffer the full array in memory
 
 ## Testing
 
@@ -97,9 +95,7 @@ with `-O2`, and a new build that compiles file1.c with identical flags:
 ## Notes
 
 - GitHub issue #532 reported severe performance degradation with `--append`
-  on large projects in the old C++ implementation. The current Rust
-  implementation uses iterators but the underlying JSON parser may still
-  buffer the full file.
+  on large projects in the old C++ implementation.
 - The former `--update` request (GitHub PR #497, asked for in discussion
   #712) is folded into append's default behaviour -- new entries first,
   matched on `directory` and `file` -- rather than shipped as a separate

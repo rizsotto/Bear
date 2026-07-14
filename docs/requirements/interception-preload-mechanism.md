@@ -138,11 +138,9 @@ Given a build on macOS with SIP enabled:
 
 ## Notes
 
-- The preload library path must be correct at runtime. When Bear is
-  installed via a package manager, the default config must point to the
-  installed library location, not the build-time path. Issues #648,
-  #649, #597, #582 were caused by stale build-time paths in the default
-  configuration.
+- The preload library path is resolved at runtime, so a Bear installed
+  via a package manager loads the library from its install location
+  rather than a build-time path (issues #648, #649, #597, #582).
 - Internal compiler invocations (`cc1`, `cc1plus`, `collect2`, etc.)
   are intercepted and reported but filtered out during semantic analysis,
   not in the preload library itself. See `output-json-compilation-database`

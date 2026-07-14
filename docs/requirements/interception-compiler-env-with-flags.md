@@ -42,15 +42,6 @@ Unix-convention build (e.g. `make`) under one of the Unix-like
 shells named above -- the same scenario the rest of Bear's wrapper
 mode is built for on Windows.
 
-## Background
-
-`resolve_program_path` in `crates/bear/src/environment.rs` used to
-pass the entire env var value to `PathBuf::from()` / `which::which_in()`.
-Both treat the whole string as a single filename, so any value with
-trailing flags failed to resolve and the env var was skipped with a
-warning. The build then ran the real compiler directly and the
-compilation database ended up missing entries.
-
 ## Acceptance criteria
 
 - Wrapper mode splits a compiler env var into `(program, flags)` on

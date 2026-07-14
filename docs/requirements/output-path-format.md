@@ -37,15 +37,16 @@ Bear provides configurable path formatting for the `directory`, `file`, and
 - The `file` field is resolved relative to the (already formatted)
   `directory` field
 - On Windows, the `canonical` resolver strips the extended-length path
-  prefix (`\\?\`) that `Path::canonicalize()` produces, because tools
+  prefix (`\\?\`) that Windows canonicalization produces, because tools
   like clangd do not understand it (GitHub issue #683)
 
 ## Non-functional constraints
 
 - The `canonical` resolver requires the file to exist on disk at the time
   Bear writes the output
-- The `absolute` resolver does not require the file to exist (it uses
-  `std::path::absolute()`, which normalizes without stat calls)
+- The `absolute` resolver does not require the file to exist (it joins
+  the path against the working directory without touching the
+  filesystem)
 - Path resolution adds minimal overhead for `as-is` (no-op) and `absolute`
   (string manipulation only); the `canonical` resolver performs syscalls
   (`stat`, `readlink`) and is slower on large databases
@@ -110,9 +111,6 @@ Given path format for directory set to `relative`:
 - GitHub issue #683 reported that on Windows/MSYS2, canonical paths include
   the `\\?\` prefix which clangd rejects. The fix strips this prefix after
   canonicalization.
-- GitHub PR #671 proposed adding an `executable` path resolver for the
-  compiler path (`arguments[0]`). This is not yet implemented but the
-  `PathResolver` infrastructure could support it.
 - The `arguments` array paths (include paths, output paths in flags) are
   intentionally not transformed. Transforming them would require a
   compiler-flag-aware path rewriter, which is complex and error-prone.
