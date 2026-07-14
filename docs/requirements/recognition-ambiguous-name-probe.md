@@ -76,6 +76,14 @@ ability to override Bear's guess when needed.
   classification rather than guess wrong. A misclassification corrupts the
   database; a non-classification falls back to existing behavior.
 
+## Known limitations
+
+The probe classifies only the version banners it already recognizes
+(Clang's and GCC's). A programming environment whose compiler prints a
+banner the probe does not know -- for example `nvc++` under
+PrgEnv-nvidia -- stays unrecognized. Extending the classifier to more
+banners is out of scope.
+
 ## Testing
 
 Given a host where `/usr/bin/cc` is Clang:
@@ -165,8 +173,13 @@ matches no known signature:
 - `gcc.yaml` carries a comment explaining why `cc`/`c++` are absent from
   its recognize list.
 - `CC` joined the ambiguous set for the HPE Cray PrgEnv wrapper (see
-  `recognition-cray-compilers.md`): the same reasoning as `cc`/`c++`
-  applies verbatim, no change to the classifier itself was needed.
+  `recognition-compiler-names.md` for the Cray CCE names and the
+  PrgEnv wrappers in its Acceptance criteria and Recognized names
+  table): the same reasoning as `cc`/`c++` applies verbatim, no change
+  to the classifier itself was needed. `CC` cannot be a static regex
+  entry either: a static mapping would be wrong on every programming
+  environment except the one it hardcoded, and on a case-insensitive
+  filesystem it would shadow `cc`.
 
 ## Rationale
 

@@ -966,7 +966,7 @@ fn vala_multiple_sources_produce_single_entry() -> Result<()> {
     Ok(())
 }
 
-// Requirements: recognition-mpi-wrappers
+// Requirements: recognition-compiler-names
 //
 // An `mpicc -c hello.c` execution yields one entry, with the wrapper itself
 // (not the underlying compiler) as the recorded compiler.
@@ -975,7 +975,7 @@ fn mpi_wrapper_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("mpi_wrapper_execution", &["mpicc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-mpi-wrappers
+// Requirements: recognition-compiler-names
 //
 // Wrapper-info invocations (`-showme`, `-show`, `-compile_info`) print the
 // underlying compiler command and exit; none of them compile anything, so
@@ -1005,7 +1005,7 @@ fn mpi_wrapper_info_flags_yield_no_entry() -> Result<()> {
     Ok(())
 }
 
-// Requirements: recognition-mpi-wrappers
+// Requirements: recognition-compiler-names
 //
 // MPICH's compiler-override flag `-cc=gcc` must survive as a single token
 // (not be split, not be expanded) and must not swallow the source file that
@@ -1015,7 +1015,7 @@ fn mpi_wrapper_compiler_override_flag_is_retained() -> Result<()> {
     assert_driver_yields_single_entry("mpi_wrapper_compiler_override", &["mpicc", "-cc=gcc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-mpi-wrappers
+// Requirements: recognition-compiler-names, output-duplicate-detection
 //
 // In preload mode the wrapper's child compiler exec is intercepted too, so a
 // single compilation can produce both an `mpicc` and a `gcc` event for the
@@ -1031,7 +1031,7 @@ fn mpi_wrapper_and_child_compiler_events_collapse_to_wrapper_entry() -> Result<(
     )
 }
 
-// Requirements: recognition-cray-compilers
+// Requirements: recognition-compiler-names
 //
 // A `craycc -c hello.c` execution yields one entry, using the CCE C/C++
 // compiler name directly (the same shape as the existing Cray Fortran
@@ -1041,7 +1041,7 @@ fn cray_cc_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("cray_cc_execution", &["craycc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-amd-compilers
+// Requirements: recognition-compiler-names
 //
 // A `hipcc -c hello.c` execution yields one entry, using the ROCm HIP
 // compiler driver name directly (parsed with Clang flag semantics).
@@ -1050,7 +1050,7 @@ fn hipcc_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("hipcc_execution", &["hipcc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-embedded-toolchains
+// Requirements: recognition-compiler-names
 //
 // A `qcc -c hello.c` execution yields one entry, using the QNX driver name
 // directly (parsed with GCC flag semantics -- QNX 8 is GCC-backed).
@@ -1059,7 +1059,7 @@ fn qnx_qcc_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("qnx_qcc_execution", &["qcc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-embedded-toolchains
+// Requirements: recognition-compiler-names
 //
 // QNX's attached-value variant selector (`-Vgcc_ntoaarch64le`) must be
 // treated as a driver option, never as an input file, and must be retained
@@ -1072,7 +1072,7 @@ fn qnx_qcc_variant_selector_is_retained_as_driver_option() -> Result<()> {
     )
 }
 
-// Requirements: recognition-embedded-toolchains
+// Requirements: recognition-compiler-names
 //
 // A `tiarmclang -c hello.c` execution yields one entry (TI's clang-based
 // driver, parsed with Clang flag semantics).
@@ -1081,7 +1081,7 @@ fn ti_tiarmclang_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("ti_tiarmclang_execution", &["tiarmclang", "-c", "hello.c"])
 }
 
-// Requirements: recognition-embedded-toolchains
+// Requirements: recognition-compiler-names
 //
 // An `xc8-cc -c hello.c` execution yields one entry (Microchip's gcc-styled
 // XC8 driver, parsed with GCC flag semantics).
@@ -1090,7 +1090,7 @@ fn microchip_xc8_cc_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("microchip_xc8_cc_execution", &["xc8-cc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-embedded-toolchains
+// Requirements: recognition-compiler-names
 //
 // An `emcc -c hello.c` execution yields one entry, using the Emscripten
 // driver name directly (parsed with Clang flag semantics).
@@ -1099,7 +1099,7 @@ fn emscripten_emcc_execution_yields_single_entry() -> Result<()> {
     assert_driver_yields_single_entry("emscripten_emcc_execution", &["emcc", "-c", "hello.c"])
 }
 
-// Requirements: recognition-embedded-toolchains
+// Requirements: recognition-compiler-names, output-duplicate-detection
 //
 // In preload mode emcc's underlying clang child process is intercepted too,
 // so a single compilation can produce both an `emcc` and a `clang` event for
@@ -1130,7 +1130,7 @@ fn icecc_launcher_execution_records_real_compiler() -> Result<()> {
     )
 }
 
-// Requirements: recognition-assemblers
+// Requirements: recognition-compiler-names
 //
 // A `nasm -f elf64 -o hello.o hello.asm` execution yields one entry for
 // `hello.asm`, using the NASM driver name directly, with the invocation's
@@ -1145,7 +1145,7 @@ fn nasm_execution_yields_single_entry() -> Result<()> {
     )
 }
 
-// Requirements: recognition-assemblers
+// Requirements: recognition-compiler-names
 //
 // A `fasm hello.asm` execution yields one entry for `hello.asm`, using the
 // flat assembler driver name directly.
@@ -1159,7 +1159,7 @@ fn fasm_execution_yields_single_entry() -> Result<()> {
     )
 }
 
-// Requirements: recognition-assemblers
+// Requirements: recognition-compiler-names
 //
 // Direct assembly through a driver (`gcc -c foo.s`) is already recorded
 // today via the driver's own entry -- this is the actual fix for the
@@ -1213,7 +1213,7 @@ fn driver_compiled_assembly_yields_driver_entry() -> Result<()> {
     Ok(())
 }
 
-// Requirements: recognition-swift-compiler
+// Requirements: recognition-compiler-names
 //
 // A `swiftc -c hello.swift` execution yields one entry, using the Swift
 // driver name directly, with the invocation's arguments recorded verbatim.
@@ -1227,7 +1227,7 @@ fn swiftc_single_file_execution_yields_single_entry() -> Result<()> {
     )
 }
 
-// Requirements: recognition-swift-compiler
+// Requirements: recognition-compiler-names
 //
 // Swift's whole-module compilation names several sources in one invocation,
 // but SourceKit-LSP looks up a compile command per file. Bear must therefore
@@ -1284,7 +1284,7 @@ fn swiftc_whole_module_invocation_yields_one_entry_per_source_with_full_argument
     Ok(())
 }
 
-// Requirements: recognition-swift-compiler
+// Requirements: recognition-compiler-names
 //
 // swiftc spawns per-file `swift-frontend` jobs the way gcc spawns `cc1`;
 // the internal frontend executable must yield no database entry.
@@ -1314,7 +1314,7 @@ fn swift_frontend_executable_execution_yields_no_entry() -> Result<()> {
     Ok(())
 }
 
-// Requirements: recognition-swift-compiler
+// Requirements: recognition-compiler-names
 //
 // A legacy toolchain that re-invokes itself as `swiftc -frontend` must also
 // yield no entry, via the `ignore_when.flags` filter (mirrors clang's -cc1).
@@ -1344,7 +1344,7 @@ fn swiftc_frontend_flag_execution_yields_no_entry() -> Result<()> {
     Ok(())
 }
 
-// Requirements: recognition-swift-compiler
+// Requirements: recognition-compiler-names
 //
 // `swiftc --version` prints version information and exits; it yields no
 // database entry.

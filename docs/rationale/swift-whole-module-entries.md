@@ -70,7 +70,7 @@ flag that every call site would have to reason about in combination.
 
 ## References
 
-- Requirement: `recognition-swift-compiler`
+- Requirement: `recognition-compiler-names`
 - SourceKit-LSP: https://github.com/swiftlang/sourcekit-lsp
 - CMake/SourceKit-LSP Swift discussion:
   https://forums.swift.org/t/sourcekit-lsp-and-cmake/67956

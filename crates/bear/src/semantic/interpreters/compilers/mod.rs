@@ -1977,7 +1977,7 @@ mod tests {
     mod mpi {
         use super::*;
 
-        // Requirements: recognition-mpi-wrappers
+        // Requirements: recognition-compiler-names
         #[test]
         fn basic_compilation() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -1993,7 +1993,7 @@ mod tests {
 
         /// Watch-out from the requirement: the glued form `-cc=gcc` must stay
         /// a single token, and must not swallow the source file that follows.
-        // Requirements: recognition-mpi-wrappers
+        // Requirements: recognition-compiler-names
         #[test]
         fn compiler_override_glued_form_keeps_single_token_and_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2019,7 +2019,7 @@ mod tests {
 
         /// The separate-token spelling (`-cc gcc`) must consume the value too,
         /// or "gcc" would be misread as a phantom source file.
-        // Requirements: recognition-mpi-wrappers
+        // Requirements: recognition-compiler-names
         #[test]
         fn compiler_override_separate_form_consumes_value() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2041,7 +2041,7 @@ mod tests {
 
         /// Wrapper-info invocations classify as info-and-exit, which the
         /// output converter uses to skip emitting a database entry.
-        // Requirements: recognition-mpi-wrappers
+        // Requirements: recognition-compiler-names
         #[test]
         fn wrapper_info_flags_are_info_and_exit() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2059,7 +2059,7 @@ mod tests {
     mod qnx {
         use super::*;
 
-        // Requirements: recognition-embedded-toolchains
+        // Requirements: recognition-compiler-names
         #[test]
         fn basic_compilation() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2077,7 +2077,7 @@ mod tests {
         /// a bare `-V` (no attached value) lists variants. Both spellings are
         /// modeled as a prefix pattern with 0 extra args, so the token is never
         /// split and never swallows a following source file.
-        // Requirements: recognition-embedded-toolchains
+        // Requirements: recognition-compiler-names
         #[test]
         fn variant_selector_is_retained_and_does_not_swallow_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2104,7 +2104,7 @@ mod tests {
 
         /// A bare `-V` (no attached value) must also be treated as a driver
         /// option, never as a source file.
-        // Requirements: recognition-embedded-toolchains
+        // Requirements: recognition-compiler-names
         #[test]
         fn bare_variant_listing_flag_is_a_driver_option() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2127,7 +2127,7 @@ mod tests {
         /// value so it is never mis-classified as a second source file, and
         /// the `-o` output pair must not swallow the assembly source that
         /// precedes it.
-        // Requirements: recognition-assemblers
+        // Requirements: recognition-compiler-names
         #[test]
         fn separate_format_value_is_consumed_not_classified_as_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2152,7 +2152,7 @@ mod tests {
         /// when that value ends in a source extension (`-d NAME=release.asm`
         /// parameterizes a %include); leaking it into source detection would
         /// fabricate a second compilation entry.
-        // Requirements: recognition-assemblers
+        // Requirements: recognition-compiler-names
         #[test]
         fn lowercase_define_value_with_source_extension_is_not_a_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2175,7 +2175,7 @@ mod tests {
 
         /// The glued form (`-felf64`) must be recognized the same way as the
         /// separate-token form.
-        // Requirements: recognition-assemblers
+        // Requirements: recognition-compiler-names
         #[test]
         fn glued_format_value_is_consumed_not_classified_as_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2193,7 +2193,7 @@ mod tests {
 
         /// `nasm -v` prints version info and exits; there is no source
         /// argument, so no compilation entry can be synthesized from it.
-        // Requirements: recognition-assemblers
+        // Requirements: recognition-compiler-names
         #[test]
         fn version_flag_has_no_source_argument() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2213,7 +2213,7 @@ mod tests {
         /// YASM's long `--version` option is covered by the `--*` catch-all
         /// (no separate-token value ever follows a YASM long option), and
         /// still has no source argument to build an entry from.
-        // Requirements: recognition-assemblers
+        // Requirements: recognition-compiler-names
         #[test]
         fn yasm_long_version_option_has_no_source_argument() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2237,7 +2237,7 @@ mod tests {
         /// consumed so it is never mistaken for a source file, and the
         /// trailing output positional (`hello.o`, not a recognized source
         /// extension) must not turn into a second compilation entry.
-        // Requirements: recognition-assemblers
+        // Requirements: recognition-compiler-names
         #[test]
         fn memory_limit_value_is_consumed_and_output_positional_is_not_a_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2261,7 +2261,7 @@ mod tests {
     mod swift {
         use super::*;
 
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn basic_compilation() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2281,7 +2281,7 @@ mod tests {
         /// treating it (or "App") as a source; the converter (tested
         /// separately) is what fans this into one entry per source, each
         /// keeping every token.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn whole_module_invocation_keeps_all_sources_and_flags() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2304,7 +2304,7 @@ mod tests {
 
         /// swiftc spawns per-file `swift-frontend` jobs the way gcc spawns
         /// `cc1`; the internal executable name is filtered via `ignore_when`.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn swift_frontend_executable_is_ignored() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2318,7 +2318,7 @@ mod tests {
 
         /// A legacy toolchain re-invoking itself as `swiftc -frontend` must
         /// also be filtered, via the `ignore_when.flags` list.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn frontend_flag_execution_is_ignored() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2329,7 +2329,7 @@ mod tests {
 
         /// `swiftc --version`/`-version` print info and exit; there is no
         /// source argument, so no compilation entry can be synthesized.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn version_flags_are_info_and_exit() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2352,7 +2352,7 @@ mod tests {
         /// token to a downstream tool; that token often starts with '-'
         /// (`-Xlinker -rpath`), so `count: 1` must consume it unconditionally
         /// or it would leak in as a phantom source.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn forwarded_flags_consume_dash_prefixed_value_not_a_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2397,7 +2397,7 @@ mod tests {
         /// `-D`/`-I` are JoinedOrSeparate in swiftc (unlike the Separate-only
         /// `-target`/`-module-name`); both the glued and separate spellings
         /// must be recognized so their value never leaks in as a source.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn define_and_import_path_accept_glued_or_separate_value() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -2422,7 +2422,7 @@ mod tests {
         /// translation units elsewhere), so an unmatched (0-arg) rule here
         /// would leak the bridging header in as a phantom compilable
         /// source, corrupting entry count. `count: 1` must consume it.
-        // Requirements: recognition-swift-compiler
+        // Requirements: recognition-compiler-names
         #[test]
         fn bridging_header_value_is_consumed_not_a_phantom_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);

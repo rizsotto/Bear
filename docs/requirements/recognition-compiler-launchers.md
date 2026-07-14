@@ -108,7 +108,7 @@ Given `icecc gcc -c main.c`:
 - icecream's `icerun` is deliberately not a launcher: it runs arbitrary
   commands on the icecream cluster, not compiler invocations, so
   recognizing it would record non-compilations. Same reasoning as the
-  `mpirun`/`mpiexec` exclusion in `recognition-mpi-wrappers`.
+  `mpirun`/`mpiexec` exclusion in `recognition-compiler-names`.
 - Distinct from `interception-wrapper-recursion`, which covers a
   different mechanism: PATH-masquerade loop prevention in Bear's own
   wrapper-mode interception (the `bear-wrapper` binary standing in for

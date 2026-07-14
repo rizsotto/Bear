@@ -550,6 +550,7 @@ mod tests {
         ]);
     }
 
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_cray_fortran_recognition() {
         assert_recognition(&[
@@ -886,7 +887,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-cray-compilers
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_cray_cc_recognition() {
         // Case sensitivity note: on Unix the recognition regex is
@@ -902,7 +903,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-amd-compilers
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_amd_compiler_recognition() {
         assert_recognition(&[
@@ -915,7 +916,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-mpi-wrappers
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_mpi_wrapper_recognition() {
         assert_recognition(&[
@@ -934,7 +935,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-mpi-wrappers
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_intel_mpi_wrapper_recognition() {
         assert_recognition(&[
@@ -947,7 +948,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-embedded-toolchains
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_qnx_recognition() {
         assert_recognition(&[
@@ -959,7 +960,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-assemblers
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_assembler_recognition() {
         assert_recognition(&[
@@ -968,7 +969,8 @@ mod tests {
             ("fasm", Some(CompilerType::Fasm)),
             // The GNU assembler is deliberately not recognized: gcc/clang
             // spawn it internally on temporary .s files during ordinary
-            // compiles (see recognition-assemblers Notes).
+            // compiles (see the recognition-compiler-names Deliberately
+            // not recognized table).
             ("as", None),
             ("gas", None),
             // A name that merely shares the "nasm" prefix is not NASM.
@@ -976,7 +978,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-embedded-toolchains
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_emscripten_and_ti_recognition() {
         assert_recognition(&[
@@ -999,7 +1001,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-swift-compiler
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_swift_recognition() {
         assert_recognition(&[
@@ -1017,7 +1019,7 @@ mod tests {
         ]);
     }
 
-    // Requirements: recognition-embedded-toolchains
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_microchip_xc8_recognition() {
         assert_recognition(&[
@@ -1032,7 +1034,7 @@ mod tests {
     // cross-compilation prefix rules (no YAML change); the test pins that
     // behavior so a recognition-pattern refactor cannot silently lose them.
     //
-    // Requirements: recognition-embedded-toolchains
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_cross_prefixed_embedded_names_already_recognized() {
         let recognizer = CompilerRecognizer::new();
@@ -1160,7 +1162,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("c++")), None);
     }
 
-    // Requirements: recognition-cray-compilers
+    // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn probe_classifies_cray_prgenv_cc_as_clang_via_cray_banner() {
         // Simulates the HPE Cray PrgEnv wrapper "CC" resolving to the CCE
@@ -1174,7 +1176,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::Clang));
     }
 
-    // Requirements: recognition-cray-compilers
+    // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn probe_classifies_cray_prgenv_cc_as_gcc_via_fsf_banner() {
         // Simulates "CC" resolving to g++ under PrgEnv-gnu.
@@ -1184,7 +1186,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::Gcc));
     }
 
-    // Requirements: recognition-cray-compilers
+    // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn config_hint_beats_probe_and_suppresses_it_for_cray_prgenv_cc() {
         let compilers =
@@ -1198,13 +1200,13 @@ mod tests {
         assert_eq!(calls, 0, "hint must short-circuit the probe");
     }
 
-    // Requirements: recognition-cray-compilers
+    // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn probe_inconclusive_for_cray_prgenv_cc_yields_not_recognized() {
         // A programming environment whose compiler prints a banner the
         // probe does not know (e.g. nvc++ under PrgEnv-nvidia) stays
         // unrecognized -- documented limitation in
-        // recognition-cray-compilers.md.
+        // recognition-ambiguous-name-probe.md.
         let probe = Box::new(FakeProbe::new());
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 

@@ -11,7 +11,7 @@
 # JoinedOrSeparate in Options.td and use `{ }*` accordingly.
 #
 # `swift` (the package-manager subcommand driver: `swift build`, `swift run`,
-# ...) is deliberately not recognized -- see recognition-swift-compiler
+# ...) is deliberately not recognized -- see recognition-compiler-names
 # Notes. Only `swiftc` is listed under `recognize:`.
 #
 # swiftc spawns per-file `swift-frontend` jobs the way gcc spawns `cc1`

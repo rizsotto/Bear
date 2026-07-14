@@ -56,6 +56,6 @@ would mis-parse.
 
 ## References
 
-- Requirement: `recognition-mpi-wrappers`
+- Requirement: `recognition-compiler-names`
 - Open MPI wrapper docs: <https://docs.open-mpi.org/en/main/building-apps/customizing-wrappers.html>
 - MPICH wrapper docs: `mpicc(1)`, `-show`/`-compile_info`/`-link_info`

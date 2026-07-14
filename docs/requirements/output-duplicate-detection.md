@@ -122,8 +122,8 @@ both intercepted in preload mode, producing two events for one source:
   preload mode intercepts as well, so one compilation reaches this filter
   as two events for the same source. First-seen matching keeps the
   user-facing driver invocation, which is emitted before its child. The
-  per-driver recognition requirements rely on this behaviour rather than
-  restating it.
+  recognition requirement (`recognition-compiler-names`) relies on this
+  behaviour rather than restating it.
 
 - GitHub issue #667 reported that files with identical basenames in separate
   directories were incorrectly dropped. This was caused by matching on

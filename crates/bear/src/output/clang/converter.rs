@@ -1405,7 +1405,7 @@ mod tests {
         assert_eq!(result.len(), 0);
     }
 
-    // Requirements: output-compilation-entries, recognition-swift-compiler
+    // Requirements: output-compilation-entries, recognition-compiler-names
     #[test]
     fn test_per_source_full_produces_one_entry_per_source_with_full_arguments() {
         let sut = {
@@ -1460,7 +1460,7 @@ mod tests {
         }
     }
 
-    // Requirements: output-compilation-entries, recognition-swift-compiler
+    // Requirements: output-compilation-entries, recognition-compiler-names
     #[test]
     fn test_per_source_full_strips_link_only_flags() {
         let sut = {
@@ -1492,7 +1492,7 @@ mod tests {
         }
     }
 
-    // Requirements: output-compilation-entries, recognition-swift-compiler
+    // Requirements: output-compilation-entries, recognition-compiler-names
     #[test]
     fn test_per_source_full_with_no_compilable_source_produces_no_entries() {
         let sut = {
