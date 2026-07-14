@@ -25,6 +25,14 @@ compiler.
   (version probe and Cray Fortran recognition respectively); this
   requirement does not change their behavior.
 
+## Known limitations
+
+The probe classifies only the version banners it already recognizes
+(Clang's and GCC's). A programming environment whose compiler prints a
+banner the probe does not know -- for example `nvc++` under
+PrgEnv-nvidia -- stays unrecognized. Extending the classifier to more
+banners is out of scope for this requirement.
+
 ## Testing
 
 Given an event file with a CCE C/C++ compiler execution compiling a
@@ -58,11 +66,6 @@ Given an execution of the `cc` or `ftn` PrgEnv wrapper:
   `recognition-ambiguous-name-probe.md`). A static mapping would be
   wrong on every programming environment except the one it hardcodes,
   and on case-insensitive filesystems it would shadow `cc`.
-- Known limitation: the probe classifies only the version banners it
-  already recognizes (Clang's and GCC's). A programming environment
-  whose compiler prints a banner the probe does not know -- for
-  example `nvc++` under PrgEnv-nvidia -- stays unrecognized. Extending
-  the classifier to more banners is out of scope for this requirement.
 
 ## Rationale
 

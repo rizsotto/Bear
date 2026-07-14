@@ -119,8 +119,12 @@ Given a C source file and a build script that runs `$CC -c test.c`:
 ## Notes
 
 - Issue #686 -- bare-name CC resolution.
-- Related requirements: `interception-wrapper-mechanism`,
-  `interception-wrapper-recursion`.
+- Related: `interception-wrapper-mechanism` -- the wrapper mode this
+  feature extends.
+- Related: `interception-wrapper-recursion` -- masquerade handling of
+  the program token.
+- Related: `output-env-derived-flags` -- folding include/option env
+  vars into entries, a separate output-side mechanism.
 
 ## Rationale
 

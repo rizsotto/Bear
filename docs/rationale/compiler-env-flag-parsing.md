@@ -37,5 +37,5 @@ is the decision to revisit.
 
 ## References
 
-- Requirement: `interception-compiler-env-with-flags`
+- Requirement: `interception-cc-env-var-flags`
 - Issue #686 - bare-name CC resolution

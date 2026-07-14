@@ -66,7 +66,7 @@ fn arguments_with_cpath(name: &str, config_yaml: &str) -> Result<Vec<String>> {
     Ok(arguments)
 }
 
-// Requirements: output-arguments-from-environment
+// Requirements: output-env-derived-flags
 #[test]
 fn environment_flags_included_by_default() -> Result<()> {
     let sut = arguments_with_cpath("env_args_default", &config(None))?;
@@ -78,7 +78,7 @@ fn environment_flags_included_by_default() -> Result<()> {
     Ok(())
 }
 
-// Requirements: output-arguments-from-environment
+// Requirements: output-env-derived-flags
 #[test]
 fn environment_flags_excluded_when_disabled() -> Result<()> {
     let sut = arguments_with_cpath("env_args_disabled", &config(Some(false)))?;

@@ -727,7 +727,7 @@ intercept:
 /// flags (e.g. `CC="gcc -std=c11"`). Bear must extract the program token,
 /// register a wrapper for it, and rewrite the env var so the build command
 /// still receives the flags.
-// Requirements: interception-compiler-env-with-flags
+// Requirements: interception-cc-env-var-flags
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn wrapper_mode_handles_cc_with_trailing_flags() -> Result<()> {

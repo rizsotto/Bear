@@ -272,8 +272,8 @@ Given a build that runs `cc -o a.out src1.c src2.c` with the
   first output value is copied into every entry.
 - Related: `output-json-compilation-database` -- per-entry JSON
   shape.
-- Related: `interception-compiler-env-with-flags` -- environment
-  variables that contribute flags to entries.
+- Related: `output-env-derived-flags` -- environment variables the
+  compiler reads (`CPATH`, `CL`, ...) folded into entry arguments.
 - Related: `output-append`, `output-duplicate-detection`,
   `output-source-directory-filter` -- stages that run on the entries
   produced by this step.

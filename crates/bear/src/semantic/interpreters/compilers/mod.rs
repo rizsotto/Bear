@@ -631,7 +631,7 @@ mod tests {
             }
         }
 
-        /// Requirements: output-arguments-from-environment
+        /// Requirements: output-env-derived-flags
         #[test]
         fn environment_disabled_suppresses_injected_flags() {
             let arguments =
@@ -1023,7 +1023,7 @@ mod tests {
             }
         }
 
-        // Requirements: semantic-cpp20-modules
+        // Requirements: recognition-cpp20-modules
         #[test]
         fn modules_ts_flag_recognizes_module_interface_source() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -1637,7 +1637,7 @@ mod tests {
             assert_ignored(sut.recognize(cc1_execution), "internal invocation");
         }
 
-        // Requirements: semantic-cpp20-modules
+        // Requirements: recognition-cpp20-modules
         #[test]
         fn precompile_module_interface_does_not_source_the_output() {
             let sut = CompilerInterpreter::new_with_config(&[]);
@@ -1658,7 +1658,7 @@ mod tests {
             );
         }
 
-        // Requirements: semantic-cpp20-modules
+        // Requirements: recognition-cpp20-modules
         #[test]
         fn module_file_flag_consumes_precompiled_module_without_sourcing_it() {
             let sut = CompilerInterpreter::new_with_config(&[]);

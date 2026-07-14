@@ -82,7 +82,7 @@ fn kind_of(path: &Path) -> Option<FileKind> {
 mod test {
     use super::*;
 
-    // Requirements: semantic-cpp20-modules
+    // Requirements: recognition-cpp20-modules
     #[test]
     fn test_filenames() {
         assert!(looks_like_a_source_file("source.c"));
@@ -113,7 +113,7 @@ mod test {
         assert!(!looks_like_a_source_file("/o"));
     }
 
-    // Requirements: semantic-cpp20-modules
+    // Requirements: recognition-cpp20-modules
     #[test]
     fn test_file_kind() {
         let cases = [
@@ -145,7 +145,7 @@ mod test {
         }
     }
 
-    // Requirements: semantic-cpp20-modules
+    // Requirements: recognition-cpp20-modules
     #[test]
     fn test_is_header_file_and_is_c_family_source() {
         let cases = [

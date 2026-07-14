@@ -1370,7 +1370,7 @@ fn swiftc_version_flag_yields_no_entry() -> Result<()> {
     Ok(())
 }
 
-// Requirements: semantic-cpp20-modules
+// Requirements: recognition-cpp20-modules
 //
 // A C++20 module-interface compile (`clang++ --precompile ... -o foo.pcm`)
 // must produce exactly one entry for the interface source (`foo.cppm`), with
@@ -1411,7 +1411,7 @@ fn clang_precompile_module_interface_yields_single_entry_for_source() -> Result<
     Ok(())
 }
 
-// Requirements: semantic-cpp20-modules
+// Requirements: recognition-cpp20-modules
 //
 // Consuming a precompiled module via `-fmodule-file=<name>=<file>` must not
 // break recognition of the real source (`main.cpp`), and the referenced
@@ -1452,7 +1452,7 @@ fn clang_module_file_flag_yields_single_entry_for_main_source() -> Result<()> {
     Ok(())
 }
 
-// Requirements: semantic-cpp20-modules
+// Requirements: recognition-cpp20-modules
 //
 // A mixed build with one module interface and one consumer, processed in a
 // single semantic run, must yield exactly two entries: no cross-talk between
@@ -1628,7 +1628,7 @@ fn semantic_empty_stdin_succeeds_with_warning() -> Result<()> {
     Ok(())
 }
 
-// Requirements: semantic-cpp20-modules
+// Requirements: recognition-cpp20-modules
 //
 // GCC's transitional module flag `-fmodules-ts` must not break recognition
 // of the module-interface source (`mod.cppm`).

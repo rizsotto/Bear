@@ -54,10 +54,6 @@ intercepted event record already captures the full environment (see
 - The toggle changes only the contents of `compile_commands.json`.
   The interception layer and the recorded event environment are not
   affected.
-- This is a different mechanism from
-  `interception-compiler-env-with-flags`, which handles a compiler
-  named with trailing flags (`CC="gcc -std=c11"`) in wrapper mode.
-  That feature is unaffected by this option.
 
 ## Testing
 
@@ -88,5 +84,5 @@ Given the same build and environment:
   transformation these flags participate in.
 - Related: `output-response-file-inlining` -- the sibling option in
   the same configuration group.
-- Related: `interception-compiler-env-with-flags` -- a separate
-  environment mechanism, not governed here.
+- Related: `interception-cc-env-var-flags` -- wrapper-mode splitting
+  of a `CC="gcc -std=c11"` value, a separate mechanism.

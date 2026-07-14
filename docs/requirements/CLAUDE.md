@@ -51,6 +51,12 @@ What the user expects to happen, written from the user's perspective.
 Performance, platform support, backwards compatibility, etc.
 Only include if relevant.
 
+## Known limitations
+
+Optional. Gaps in the contract that are accepted rather than planned for
+fixing; link the tracking issue when one exists. Omit the section when
+there are none.
+
 ## Testing
 
 Given-When-Then scenarios that describe how the requirement should be verified.

@@ -380,7 +380,7 @@ pub enum ConfigurationError {
 /// Returns `None` for empty or whitespace-only values; the caller logs a
 /// warning and skips. Anything more elaborate than whitespace-separated
 /// tokens (shell quoting, metacharacters, command substitutions) belongs
-/// in `CFLAGS`/`CXXFLAGS` -- see `interception-compiler-env-with-flags`.
+/// in `CFLAGS`/`CXXFLAGS` -- see `interception-cc-env-var-flags`.
 fn parse_program_env_value(value: &str) -> Option<(String, Vec<String>)> {
     let mut tokens = value.split_whitespace().map(str::to_string);
     let program = tokens.next()?;
@@ -1167,7 +1167,7 @@ mod test {
     }
 
     mod env_with_flags {
-        //! Requirements: interception-compiler-env-with-flags
+        //! Requirements: interception-cc-env-var-flags
         use super::super::parse_program_env_value;
         use super::*;
 
@@ -1273,7 +1273,7 @@ mod test {
         /// this requirement: a ccache masquerade dir first on PATH, with a
         /// real compiler past it, must resolve past the masquerade and still
         /// preserve the flags from the env var value.
-        // Requirements: interception-compiler-env-with-flags, interception-wrapper-recursion
+        // Requirements: interception-cc-env-var-flags, interception-wrapper-recursion
         #[cfg(unix)]
         #[test]
         fn masquerade_with_flags_resolves_real_compiler_and_preserves_flags() {
