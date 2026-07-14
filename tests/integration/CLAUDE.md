@@ -1,7 +1,8 @@
 ## Integration test rules
 
-Read `README.md` in this directory for full API documentation (TestEnvironment,
-BearOutput, CompilationDatabase, bear_test! macro, platform-specific patterns).
+The test infrastructure (TestEnvironment, BearOutput, CompilationDatabase, the
+`bear_test!` macro) lives in `tests/fixtures/infrastructure/`; read those
+sources for the full API and platform-specific patterns.
 
 ## Before writing tests
 

@@ -15,8 +15,8 @@ invocation said the two commands were connected.
 Shipping `bear parse-sh` in 4.2.0 changed the balance. The pipe
 `bear parse-sh | bear semantic` becomes a primary way to feed
 `semantic`, and the `events.json` default fought it: forgetting
-`--input -` died with a baffling "Event file not found: events.json"
-(the 4.2.0-rc review's C3 finding). Viewed as a UNIX tool, `semantic`
+`--input -` died with a baffling "Event file not found: events.json".
+Viewed as a UNIX tool, `semantic`
 is a pure filter - no build, stdout free - and filters read standard
 input when no file is named. `intercept` is the opposite case: it can
 never use standard output (the build owns that stream), so no natural
@@ -30,9 +30,9 @@ name Bear invented; no third-party contract depends on it.
 Alternatives considered:
 
 - Keep the paired defaults and only improve the missing-file error with
-  a "reading from a pipe? pass --input -" hint (the review's C3 fix).
-  Rejected: it treats the symptom and keeps both the magic-filename
-  coupling and the stale-file hazard.
+  a "reading from a pipe? pass --input -" hint. Rejected: it treats the
+  symptom and keeps both the magic-filename coupling and the stale-file
+  hazard.
 - Default `semantic --input` to `-` only when stdin is not a TTY.
   Rejected: isatty-dependent semantics make the identical command line
   behave differently in a terminal and in CI, and CI stdin is often an
@@ -63,7 +63,8 @@ stream turned out empty.
 ## Consequences
 
 - The parse-sh pipeline is flagless: `make -n | bear parse-sh | bear
-  semantic`. The review's C3 finding dissolves instead of being fixed.
+  semantic`. The confusing missing-file failure dissolves instead of
+  being papered over with a hint.
 - The stale-`events.json` hazard is gone; an event file is only ever
   read because the user named it.
 - The old two-step habit breaks loudly and early: `bear intercept`
@@ -83,5 +84,6 @@ stream turned out empty.
 - Related rationale:
   [`parse-sh-producer`](parse-sh-producer.md) (the producer that made
   the pipe a first-class feed).
-- The 4.2.0-rc review's C3 finding (forgetting `--input -` fails
-  without a hint) is the pain point this supersedes.
+- The footgun this supersedes: a bare `bear semantic` fed from a pipe
+  failed with "Event file not found: events.json" instead of reading
+  standard input.

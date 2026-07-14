@@ -7,11 +7,11 @@ knowledge across several independent scanners: the lexer's word reader
 owned quotes, escapes, and comments; the interpreter re-scanned the raw
 line with its own quote rules to detect here-documents and again to read
 the here-doc delimiter; and a separate pre-pass joined backslash-newline
-continuations, duplicating the lexer's own continuation stripping. A
-three-pass review of the branch (2026-07-10) traced a whole bug class to
-those scanners drifting apart: the here-doc detector did not understand
-comments, so a `<<` inside a trailing `#` comment silently swallowed all
-subsequent lines; its delimiter reader used a different word-break set
+continuations, duplicating the lexer's own continuation stripping. That
+structure produced a whole bug class from those scanners drifting apart:
+the here-doc detector did not understand comments, so a `<<` inside a
+trailing `#` comment silently swallowed all subsequent lines; its
+delimiter reader used a different word-break set
 than the lexer, so a here-doc inside a subshell swallowed the rest of
 the input; and a redirect-target reader dropped the unterminated-quote
 signal the word reader had already computed, fabricating executions from
@@ -79,9 +79,6 @@ in-band as the stream's last item so the caller cannot lose them.
   to add in one place. The skip path remains the pressure valve; the
   subset must not grow toward a full shell (see
   [parse-sh-producer](parse-sh-producer.md)).
-- The refactor must land behind the tests that pin current behavior,
-  including the review's point fixes, so equivalence is checked rather
-  than assumed.
 
 ## References
 

@@ -122,4 +122,3 @@ probe. The probe keeps `setsid`.
 - Requirement: `cli-signal-forwarding`
 - Prior art in-tree: the version-probe watchdog's `setsid` + `killpg`
   teardown (`semantic/interpreters/compilers/probe.rs`)
-- Plan: `plan.md` (repo root, transient)
