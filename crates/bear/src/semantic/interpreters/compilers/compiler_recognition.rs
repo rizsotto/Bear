@@ -138,28 +138,27 @@ impl CompilerRecognizer {
 
     /// Canonicalize `executable_path` and ask the probe to classify it.
     ///
-    /// Canonicalization happens here (not in the probe) for two reasons:
-    /// the wrapper guard below relies on the canonical basename, and
-    /// canonicalizing before the cache key in
-    /// [`super::probe::CachingProbe`] collapses different argv spellings
-    /// of the same compiler into one cache entry.
+    /// Canonicalization happens here (not in the probe) so the cache key
+    /// in [`super::probe::CachingProbe`] collapses different argv
+    /// spellings of the same compiler into one entry.
     ///
-    /// Wrapper safety: if the canonical path resolves to a wrapper
-    /// (ccache/distcc/sccache, e.g. via a symlink farm where `cc` ->
-    /// `/usr/lib/ccache/ccache`), do not probe -- the wrapper's
-    /// `--version` reports its own banner, not the compiler's, and we
-    /// want the regex layer to classify it as `CompilerType::Wrapper`
-    /// so the wrapper interpreter unwraps it.
+    /// A masquerade link (an ambiguous name canonicalizing to a wrapper,
+    /// e.g. `/usr/lib/ccache/cc` -> `ccache`) is the exception: it
+    /// answers `--version` in the name it was invoked by, passing the
+    /// flag through to the underlying compiler, so it is probed -- and
+    /// cached -- under the invoked path. The canonical key would collapse
+    /// `cc` and `c++` onto the wrapper binary, whose answer depends on
+    /// argv[0]. See docs/rationale/ambiguous-cc-version-probe.md.
     fn probe_canonical(&self, executable_path: &Path) -> Option<CompilerType> {
         let key = executable_path.canonicalize().unwrap_or_else(|_| executable_path.to_path_buf());
 
         if let Some(name) = key.file_name().and_then(|n| n.to_str())
             && WRAPPER_NAMES.contains(&name)
         {
-            return None;
+            self.probe.probe(executable_path)
+        } else {
+            self.probe.probe(&key)
         }
-
-        self.probe.probe(&key)
     }
 
     /// Internal regex-based recognition.
@@ -1255,16 +1254,14 @@ mod tests {
     // Requirements: recognition-ambiguous-name-probe, recognition-compiler-launchers
     #[test]
     fn wrapper_basenames_are_never_probed_even_under_ambiguous_paths() {
-        // ccache, distcc, sccache, icecc must reach the regex (which
-        // returns CompilerType::Wrapper). Probing them would return the
-        // underlying compiler's version and bypass wrapper unwrapping.
+        // ccache, distcc, sccache, icecc invoked by their own names must
+        // reach the regex (which returns CompilerType::Wrapper) so the
+        // launcher interpreter unwraps them; a wrapper's own name is not
+        // ambiguous and must never enter the probe path.
         let probe = Box::new(FakeProbe::new());
         let probe_ptr: *const FakeProbe = &*probe;
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        // The basename guard runs after canonicalization. ccache itself is
-        // not in AMBIGUOUS_NAMES so it would never enter the probe path
-        // anyway; this asserts the documented invariant explicitly.
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("distcc")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("sccache")), Some(CompilerType::Wrapper));
@@ -1331,15 +1328,16 @@ mod tests {
     }
 
     // The masquerade contract: an ambiguous basename (`cc`) that
-    // canonicalizes to a launcher binary must never be probed -- the
-    // launcher's own version banner would misclassify the name. Such an
-    // execution yields no classification of its own; the re-executed
-    // real compiler provides the entry as a separate event.
+    // canonicalizes to a wrapper binary is probed AS INVOKED -- the
+    // masquerade binary answers `--version` in the name it was called
+    // by, passing through to the underlying compiler, so probing the
+    // invoked path (not the canonical wrapper) yields the real
+    // toolchain's banner.
     //
     // Requirements: recognition-ambiguous-name-probe, recognition-compiler-launchers
     #[test]
     #[cfg(unix)]
-    fn ambiguous_name_canonicalizing_to_launcher_is_never_probed() {
+    fn ambiguous_name_canonicalizing_to_masquerade_wrapper_is_probed_as_invoked() {
         use std::os::unix::fs::symlink;
 
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1351,16 +1349,66 @@ mod tests {
         let link = farm.join("cc");
         symlink(&launcher, &link).expect("symlink masquerade/cc -> ccache");
 
-        let probe = Box::new(FakeProbe::new());
+        // The canned answer is keyed by the INVOKED path: a hit proves the
+        // probe received it rather than the canonical wrapper path.
+        let probe = Box::new(FakeProbe::new().answer(link.to_str().unwrap(), CompilerType::Gcc));
         let probe_ptr: *const FakeProbe = &*probe;
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        // The original basename is `cc`, which matches no regex pattern;
-        // with the probe declined by the wrapper guard, recognition
-        // returns None rather than trusting ccache's version banner.
-        assert_eq!(recognizer.recognize(&link), None);
+        let sut = recognizer.recognize(&link);
 
+        assert_eq!(sut, Some(CompilerType::Gcc));
         let calls = unsafe { (*probe_ptr).calls() };
-        assert_eq!(calls, 0, "launcher-canonical ambiguous names must not reach the probe");
+        assert_eq!(calls, 1, "the masquerade link must be probed exactly once, as invoked");
+    }
+
+    // Masquerade links cache under the invoked path, not the canonical
+    // one: `cc` and `c++` links to the same wrapper binary answer for
+    // different underlying compilers, so collapsing them onto the
+    // canonical wrapper key would return the first answer for both.
+    //
+    // Requirements: recognition-ambiguous-name-probe
+    #[test]
+    #[cfg(unix)]
+    fn masquerade_links_to_same_wrapper_are_probed_separately() {
+        use super::super::probe::CachingProbe;
+        use std::os::unix::fs::symlink;
+        use std::sync::Arc;
+
+        struct CountingProbe {
+            calls: Arc<AtomicUsize>,
+        }
+        impl super::super::probe::CompilerProbe for CountingProbe {
+            fn probe(&self, _: &Path) -> Option<CompilerType> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                Some(CompilerType::Gcc)
+            }
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let launcher = dir.path().join("ccache");
+        std::fs::write(&launcher, b"").expect("write ccache");
+
+        let farm = dir.path().join("masquerade");
+        std::fs::create_dir(&farm).expect("mkdir masquerade");
+        let link_cc = farm.join("cc");
+        let link_cxx = farm.join("c++");
+        symlink(&launcher, &link_cc).expect("symlink masquerade/cc -> ccache");
+        symlink(&launcher, &link_cxx).expect("symlink masquerade/c++ -> ccache");
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counting = CountingProbe { calls: Arc::clone(&calls) };
+        let probe: Box<dyn super::super::probe::CompilerProbe> = Box::new(CachingProbe::new(counting));
+        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+
+        assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(&link_cxx), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::Gcc));
+
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "each masquerade name probes once (cached), but cc and c++ must not share an entry"
+        );
     }
 }

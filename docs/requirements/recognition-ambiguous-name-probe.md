@@ -25,9 +25,11 @@ ability to override Bear's guess when needed.
 - For executables whose basename matches a known-ambiguous name (`cc`,
   `c++`, `CC`), Bear runs the executable once with `--version` to
   classify it as GCC or Clang before dispatching to an interpreter.
-- The probe runs at most once per distinct canonical executable path for
-  the lifetime of the process. Subsequent invocations of the same path
-  reuse the cached result.
+- The probe runs at most once per distinct probe key for the lifetime of
+  the process; subsequent invocations of the same path reuse the cached
+  result. The key is the canonical executable path -- except for a
+  masquerade link (below), whose key is the invoked path, because the
+  answer depends on the name the wrapper was called by.
 - The probe is the sole classifier for ambiguous names. The compiler
   recognition regex (`gcc.yaml` and friends) deliberately does not list
   `cc`/`c++`, so when the probe declines (timeout, unrecognizable
@@ -48,9 +50,14 @@ ability to override Bear's guess when needed.
   the supported override mechanism and the only way to recover
   recognition for a quirky `cc` whose `--version` output does not match
   the probe's signature rules.
-- Wrapper basenames (`ccache`, `distcc`, `sccache`) are never probed even
-  if they appear under an ambiguous name. The wrapper interpreter handles
-  them as today.
+- A path invoked by a wrapper's own basename (`ccache`, `distcc`,
+  `sccache`) is never probed: those names are not ambiguous and the
+  wrapper interpreter handles them. An ambiguous-named path whose
+  canonical target is such a wrapper -- a masquerade link like
+  `/usr/lib/ccache/cc` -- IS probed, as invoked: a masquerade binary
+  answers `--version` in the name it was called by, passing the flag
+  through to the underlying compiler, so the probe classifies the real
+  toolchain. Unrecognizable passthrough output declines as usual.
 - Names that are not in the ambiguous set (e.g. `gcc`, `clang`, `gfortran`,
   cross-prefixed or versioned variants) are not probed and continue to
   resolve via regex.
@@ -62,8 +69,8 @@ ability to override Bear's guess when needed.
 
 ## Non-functional constraints
 
-- The probe runs at most once per unique canonical path, not once per
-  invocation.
+- The probe runs at most once per unique probe key (canonical path, or
+  the invoked path for a masquerade link), not once per invocation.
 - Probe timeout: short (single-digit seconds), bounded.
 - The classification rule is conservative: when in doubt, return no
   classification rather than guess wrong. A misclassification corrupts the
@@ -133,8 +140,18 @@ Given an executable named `/usr/lib/ccache/cc`
 that resolves (after canonicalization) to the ccache wrapper:
 
 > When Bear recognizes `/usr/lib/ccache/cc`,
-> then it does not probe the binary
-> and the wrapper interpreter handles the invocation as today.
+> then it probes the path as invoked
+> (`--version` passes through the masquerade to the underlying compiler),
+> the classification follows the passthrough banner,
+> and the recorded compiler stays `/usr/lib/ccache/cc` as observed.
+
+Given the same masquerade link, where the passthrough `--version` output
+matches no known signature:
+
+> When Bear recognizes it,
+> then the probe declines and the execution is reported as
+> `NotRecognized` -- the same conservative failure as any other
+> unclassifiable ambiguous name.
 
 ## Notes
 

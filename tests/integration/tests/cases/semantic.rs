@@ -461,6 +461,54 @@ fn semantic_bare_compiler_name_stays_bare_in_output() -> Result<()> {
     Ok(())
 }
 
+// Requirements: recognition-ambiguous-name-probe
+//
+// A masquerade link under an ambiguous name (a `cc` symlink into a ccache
+// farm) is probed as invoked: ccache passes `--version` through to the
+// underlying compiler, so the event classifies and yields an entry with
+// the compiler recorded as observed. The test builds its own masquerade
+// link from the host's ccache (located via the detected farm), so it does
+// not depend on which names the host farm carries.
+#[test]
+#[cfg(all(unix, host_has_ccache_masquerade))]
+fn masquerade_cc_event_yields_entry_with_observed_path() -> Result<()> {
+    let env = TestEnvironment::new("masquerade_cc_event")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let farm = std::path::Path::new(env!("CCACHE_MASQUERADE_DIR"));
+    let ccache = ["gcc", "cc", "g++", "c++", "clang", "clang++"]
+        .iter()
+        .find_map(|name| std::fs::canonicalize(farm.join(name)).ok())
+        .context("no masquerade entry found in CCACHE_MASQUERADE_DIR")?;
+    let masq_dir = env.test_dir().join("masq");
+    std::fs::create_dir_all(&masq_dir)?;
+    std::os::unix::fs::symlink(&ccache, masq_dir.join("cc"))?;
+    let masq_cc = masq_dir.join("cc").to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": masq_cc,
+        "arguments": [masq_cc, "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("hello.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.clone(),
+        arguments: vec![masq_cc.clone(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: output-compilation-entries
 #[test]
 #[cfg(all(has_executable_echo, has_executable_mkdir, has_executable_rm))]
