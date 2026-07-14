@@ -26,8 +26,8 @@ accurate (e.g. `--precompile` is a compile action, not a link).
 
 - The source-extension table recognizes the standard C++20 module-interface
   extensions: `.cppm`, `.ixx`, `.mxx`, `.ccm`, `.cxxm`, `.c++m`.
-- `clang.yaml` and `gcc.yaml` classify the following flags so they do not
-  break recognition or argument-arity tracking:
+- Bear's per-compiler flag recognition classifies the following flags so
+  they do not break recognition or argument-arity tracking:
   - `--precompile` (Clang module-interface compile)
   - `-fmodule-file=*` (Clang/GCC, including the `<name>=<file>` form)
   - `-fmodule-map-file=*`
@@ -52,8 +52,6 @@ accurate (e.g. `--precompile` is a compile action, not a link).
 
 - The recognition layer must remain extension-driven for the source check.
   Probe-based detection of module-interface units is out of scope.
-- Adding flag entries must not perturb the codegen snapshot tests in
-  `compilers-codegen`. Regeneration via `cargo build` is expected.
 
 ## Testing
 
@@ -91,9 +89,7 @@ Given a GCC build using `-fmodules-ts`:
 - Source-extension list lives at
   `crates/bear/src/semantic/interpreters/matchers/source.rs`.
 - Flag tables live in `crates/bear/compilers/clang.yaml` and
-  `crates/bear/compilers/gcc.yaml`. `clang.yaml` already `extends: gcc`, so
-  module flags common to both should land in `gcc.yaml` and Clang-only
-  flags in `clang.yaml`.
+  `crates/bear/compilers/gcc.yaml`.
 - Out of scope: module dependency-graph awareness, BMI cache discovery,
   and any module-map authoring. This requirement is strictly about
   capturing the invocations.

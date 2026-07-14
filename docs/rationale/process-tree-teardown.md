@@ -1,7 +1,5 @@
 # Process-tree teardown and event-driven supervision
 
-Status: accepted; Stage 1 and Stage 2 implemented.
-
 ## Context
 
 When Bear supervises a build (`bear -- make`) and a termination signal
@@ -53,36 +51,33 @@ Two further forces shaped the design:
 
 ## Decision
 
-- **Two-stage tree teardown.** *Stage 1*: `process_group(0)` + `killpg` in
-  the `cfg`-selected unix `platform` module. *Stage 2*: a Linux-gated
-  `cgroup` module that places the build in a fresh cgroup v2 (the child
-  joins via a `pre_exec` write to `cgroup.procs`) and, on teardown, writes
-  `cgroup.kill` to reap the whole cgroup - including a descendant that
-  `setsid`s out of the process group. Stage 2 is best-effort: when cgroup v2
-  is unavailable or its directory is not writable/delegated it returns
-  nothing and teardown falls back to the Stage 1 process-group `SIGKILL`.
-  Both still go through the leader's single grace-then-force escalation; the
-  graceful real-signal phase stays group-based because `cgroup.kill` can only
-  `SIGKILL`. A Windows Job Object is a possible later third path; non-unix
-  keeps single-process `child.kill()`.
+- **Two-stage tree teardown.** Stage 1 puts each supervised build in its
+  own process group and signals the group -- portable across unix and
+  needing no new dependency. Stage 2, on Linux only, additionally places
+  the build in a fresh cgroup v2 and reaps it with `cgroup.kill`, catching
+  a descendant that `setsid`s out of the process group; it is best-effort
+  and falls back to Stage 1 when cgroup v2 is unavailable or its directory
+  is not delegated. Both go through the leader's single grace-then-force
+  escalation; the graceful phase stays group-based because `cgroup.kill`
+  can only `SIGKILL`. A Windows Job Object is a possible later third path;
+  non-unix keeps single-process kill.
 - **Only the outermost supervisor groups.** The driver creates the group
-  and owns the authoritative `killpg`; nested wrappers inherit the group
-  and merely forward, so a single top-level `killpg` reaches the whole
-  tree. Grouping is therefore a per-caller policy, not baked
-  unconditionally into shared `supervise()`.
+  and owns the authoritative group-kill; nested wrappers inherit the group
+  and merely forward, so a single top-level kill reaches the whole tree.
+  Grouping is a per-caller policy, not baked unconditionally into shared
+  supervision.
 - **Graceful, real-signal forwarding.** Forward the signal Bear actually
   received (not a hardcoded one) to the group, give the tree a grace window
   to wind down and let Bear write the partial database, then escalate to
   `SIGKILL`.
-- **SIGCHLD-driven event loop** replaces the poll; the grace-then-`SIGKILL`
-  escalation runs off a deadline inside that loop. pidfd + signalfd is a
-  deferred Linux-only optimization behind the same `wait` function.
+- **Event-driven wait** replaces the poll: a signal-driven blocking wait
+  reacts at signal speed, and the grace-then-`SIGKILL` escalation runs off
+  a deadline inside that loop.
 
 ## Consequences
 
-- No new dependency for Stage 1; `libc` and `signal-hook` are already in the
-  tree (the latter needs its `iterator` feature enabled), and the group-kill
-  technique is borrowed from the existing watchdog.
+- No new dependency for Stage 1: the primitives it needs are already in the
+  tree, and the group-kill technique is borrowed from the existing watchdog.
 - The poll and its up-to-100ms latency are gone; teardown reacts at signal
   speed, inside the budget.
 - The child leaves Bear's process group, so the tty no longer delivers

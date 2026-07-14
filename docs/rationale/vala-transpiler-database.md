@@ -35,12 +35,7 @@ duplicate producers of the same binding and VLS refused to build. Meson
 emits exactly one entry per `valac` invocation, with `file` set to the
 first source; we match that. The combined entry keeps all sources in its
 arguments (they are not separable siblings to strip) and its `file` is the
-first source in argument order. Mechanically this is a per-invocation
-boolean on the semantic command (set in the valac interpreter factory, not
-in the compiler-flag YAML, because it is consumed at the converter rather
-than at parse time); the per-source compilers are unaffected. Reported on
-discussion #709 after the reporter tested the 4.1.5-rc build against
-GNOME/vala.
+first source in argument order; the per-source C compilers are unaffected.
 
 We record the `valac` invocation itself, rather than its generated-C
 `cc` child, because VLS keys on `command[0]` containing `valac`; the

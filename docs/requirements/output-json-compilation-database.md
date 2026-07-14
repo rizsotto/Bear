@@ -12,71 +12,26 @@ source file, and the compilation command or arguments.
 
 ## Format specification
 
-Bear's output conforms to the Clang JSON Compilation Database specification:
+Bear's output conforms to the Clang JSON Compilation Database
+specification, which defines the array-of-command-objects structure and
+the `directory`, `file`, `arguments`, `command`, and `output` fields:
 <https://clang.llvm.org/docs/JSONCompilationDatabase.html>
 
-A compilation database is a JSON file consisting of an array of "command
-objects", where each command object specifies one way a translation unit is
-compiled in the project.
-
-### Example
-
-```json
-[
-  { "directory": "/home/user/llvm/build",
-    "arguments": ["/usr/bin/clang++", "-Irelative",
-      "-DSOMEDEF=With spaces, quotes and \\-es.",
-      "-c", "-o", "file.o", "file.cc"],
-    "file": "file.cc" },
-
-  { "directory": "/home/user/llvm/build",
-    "command": "/usr/bin/clang++ -Irelative \"-DSOMEDEF=With spaces, quotes and \\-es.\" -c -o file.o file.cc",
-    "file": "file2.cc" }
-]
-```
-
-### Field definitions
-
-**`directory`** -- The working directory of the compilation. All paths
-specified in the `command` or `file` fields must be either absolute or
-relative to this directory.
-
-**`file`** -- The main translation unit source processed by this compilation
-step. This is used by tools as the key into the compilation database. There
-can be multiple command objects for the same file, for example if the same
-source file is compiled with different configurations.
-
-**`arguments`** -- The compile command argv as a list of strings. This should
-run the compilation step for the translation unit `file`. `arguments[0]`
-should be the executable name, such as `clang++`. Arguments should not be
-escaped, but ready to pass to `execvp()`.
-
-**`command`** -- The compile command as a single shell-escaped string.
-Arguments may be shell quoted and escaped following platform conventions,
-with `"` and `\` being the only special characters. Shell expansion is not
-supported.
-
-Either `arguments` or `command` is required. `arguments` is preferred, as
-shell (un)escaping is a possible source of errors.
-
-**`output`** -- The name of the output created by this compilation step. This
-field is optional. It can be used to distinguish different processing modes
-of the same input file.
+Two aspects of that format are specific to how Bear writes it and are
+described below: how Bear escapes the `command` field, and how it spells
+the compiler path in `arguments[0]`.
 
 ### The `command` field in detail
 
-When Bear emits the `command` field (instead of `arguments`), it joins the
-argument list into a single string using `shell_words::join`. The resulting
-string is then embedded in JSON.
+When Bear emits the `command` field instead of `arguments`, it joins the
+argument list into a single string using POSIX shell quoting conventions,
+which may produce either single-quoted or double-quoted output depending
+on the argument content. Both forms are valid per the specification.
 
-The `shell_words` crate follows POSIX shell quoting conventions and may
-produce either single-quoted or double-quoted output depending on the
-argument content. Both forms are valid per the specification.
-
-This means the content has two layers of escaping:
+The content therefore has two layers of escaping:
 
 1. **Shell escaping** -- arguments containing spaces, quotes, or backslashes
-   are quoted. The crate chooses single or double quotes as appropriate.
+   are quoted.
 2. **JSON escaping** -- the shell-escaped string is then JSON-encoded, so
    `"` becomes `\"` and `\` becomes `\\` at the JSON level.
 
@@ -88,8 +43,7 @@ For example, compiling with `-DNAME=\"hello\"`:
 
 Consumers that read the `command` field must first JSON-decode the string,
 then apply shell unquoting to recover the original argv. This double
-encoding has historically been a source of bugs (see GitHub issues #14, #70,
-#77, #81, #88, #96, #508).
+encoding has historically been a source of bugs.
 
 ### The compiler path (`arguments[0]`)
 
@@ -106,7 +60,7 @@ What "observed" means depends on the interception mode:
   `/usr/bin/gcc`.
 - Wrapper mode cannot observe the name the build used -- by construction
   the build executed the wrapper -- so the report names the real
-  compiler by its absolute path (see `interception-wrapper-mechanism`),
+  compiler by its absolute path (see `interception-wrapper-mechanism.md`),
   and the database shows that absolute path.
 - Shell-text parsing observes the command line as the build system wrote
   it, so the database shows exactly that spelling: a bare `gcc` in the
@@ -127,7 +81,7 @@ Related issues: #240, #678, #679, #671.
   rejected during validation
 - Empty `file` or `directory` fields are rejected during validation
 - An entry that fails validation is dropped from the output, logged at
-  `WARN` level with the reason, and counted in the pipeline summary; it
+  `WARN` level with the reason, and counted in the run summary; it
   never aborts processing of subsequent entries
 - When every entry that would otherwise have been written is dropped due to
   validation failures, Bear emits a single `ERROR`-level summary line so
@@ -135,36 +89,31 @@ Related issues: #240, #678, #679, #671.
 - Entries correspond to actual compiler invocations observed during the build
 - Non-compiler commands (linker-only, preprocessor-only, info-only such as
   `--version` or `--help`) are excluded
-- Output path is configurable via `--output` flag
+- The output path is configurable
 - Default output format uses `arguments` (array form)
-- When `command` format is selected, arguments are shell-escaped using
-  `shell_words::join`
-- The `output` field is omitted by default and included when
-  `format.entries.include_output_field` is enabled
+- When `command` format is selected, arguments are shell-escaped
+  following POSIX shell quoting conventions
+- The `output` field is omitted by default and included when a
+  configuration option enables it
 
 ## Validation failure handling
 
-Entry validation runs as a distinct stage in the output pipeline, immediately
-before JSON serialization. When an entry fails validation:
+When an entry fails validation:
 
 - The entry is dropped and does not appear in `compile_commands.json`.
 - A `WARN`-level log line names the `file`, `directory`, and the specific
   validation reason (e.g. empty `directory`, unparsable `command`).
-- The `entries_dropped_invalid` counter in the pipeline summary is
-  incremented.
+- The run summary counts the dropped entry.
 - Processing of subsequent entries continues unaffected.
 
 This contract ensures a single malformed entry cannot destroy the usable
-output produced from the rest of a build. It also replaces the prior
-fail-fast behavior, which aborted the whole pipeline on the first invalid
-entry and produced no database at all -- a failure mode that both lost
-information and yielded unclear error signals (see issue #692).
+output produced from the rest of a build; it replaces a prior fail-fast
+behavior that aborted the whole pipeline on the first invalid entry.
 
-When `entries_dropped_invalid > 0 && entries_written == 0`, Bear emits a
-single `ERROR`-level summary line stating that every entry was dropped.
-The compilation database is still written (as an empty array) so downstream
-tooling sees a valid file, but the log makes the empty result impossible to
-miss.
+When every entry that would otherwise have been written is dropped, Bear
+emits a single `ERROR`-level summary line stating so. The compilation
+database is still written (as an empty array) so downstream tooling sees a
+valid file, but the log makes the empty result impossible to miss.
 
 Validation drops never affect the exit code; the exit-code contract
 across modes is owned by [`cli-exit-codes`](cli-exit-codes.md).
@@ -228,7 +177,7 @@ fails validation (for example, an empty `directory` field):
 > When Bear writes the output,
 > then the valid entries appear in `compile_commands.json` unchanged,
 > a `WARN` log line names the dropped entry and the validation reason,
-> the pipeline summary reports `entries_dropped_invalid = 1`,
+> the run summary reports one dropped entry,
 > and the process exit code is not affected by the drop.
 
 Given a build where every candidate entry fails validation:

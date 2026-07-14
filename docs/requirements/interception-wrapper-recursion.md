@@ -19,48 +19,21 @@ directly. This is intentional: Bear observes, it does not optimise.
 
 ## Background: how masquerade wrappers break Bear
 
-Compiler masquerade wrappers (ccache, distcc, icecream/icecc,
-colorgcc, buildcache) install a directory of symlinks named after real
-compilers (`/usr/lib64/ccache/gcc`, `/usr/lib/icecc/bin/gcc`, ...) where
-each symlink points at the wrapper binary. The distribution prepends
-that directory to PATH, so a bare `gcc` in a Makefile resolves to the
-wrapper, which then looks up the real compiler on PATH (skipping its
-own symlinks) and forwards the call.
+Compiler masquerade wrappers (ccache, distcc, icecream, colorgcc,
+buildcache) install a directory of symlinks named after real compilers
+and prepend it to PATH; a bare `gcc` then resolves to the wrapper, which
+looks up the real compiler further along PATH (skipping its own
+symlinks) and forwards the call. Bear's wrapper mode prepends its own
+directory of compiler-named links to PATH as well. A wrapper that
+recognises itself only by symlink comparison cannot tell Bear's link
+from a real compiler, selects it as the "real" `gcc`, and the two
+forward to each other without end. distcc avoids that specific loop by
+stripping every PATH entry up to and including its own directory, but
+that also drops Bear's directory, silently breaking nested interception.
 
-Bear's wrapper mode puts `.bear/` (full of hard links to `bear-wrapper`)
-at the front of PATH. On a ccache-equipped box the interaction is:
-
-1. Shell finds `.bear/gcc`, runs Bear wrapper.
-2. Wrapper reads its config: real `gcc` is `/usr/lib64/ccache/gcc` --
-   whatever `which gcc` returned at Bear startup.
-3. Wrapper execs `/usr/lib64/ccache/gcc` (which IS ccache).
-4. ccache searches PATH for `gcc`, skipping symlinks to itself. It
-   does NOT skip `.bear/gcc` because that is a hard link, not a
-   symlink, so ccache accepts it as the real compiler.
-5. ccache execs `.bear/gcc`, Bear wrapper runs again. Steps 2-5
-   repeat forever.
-
-The same shape applies to any masquerade wrapper that detects itself
-only by symlink comparison. distcc in masquerade mode happens to avoid
-this specific loop because it strips all PATH entries up to and
-including its own dir -- which drops `.bear/` as collateral damage --
-but that still means distcc silently removes Bear from the child's
-PATH, which breaks nested interception even when no loop occurs.
-
-### Known masquerade wrappers
-
-| Tool                 | Masquerade dir examples                      | Notes                                                                |
-|----------------------|----------------------------------------------|----------------------------------------------------------------------|
-| ccache               | `/usr/lib64/ccache`, `/usr/lib/ccache`       | Default on Fedora, Arch, Gentoo. Loops with Bear.                    |
-| distcc               | `/usr/lib/distcc`, `/usr/lib/distcc/bin`     | Strips PATH prefix including `.bear/`; no loop, but breaks nesting.  |
-| icecream / icecc     | `/usr/lib/icecc/bin`, `/usr/libexec/icecc`   | Symlink pattern same as ccache. Loops with Bear.                     |
-| colorgcc             | `~/bin/colorgcc` setups                      | Rare; typically configured via `~/.colorgccrc`, not PATH masquerade. |
-| buildcache           | `/usr/lib/buildcache/bin` (varies)           | Same shape as ccache.                                                |
-| sccache              | Not a masquerade wrapper                     | Invoked explicitly (`sccache gcc ...`); no recursion with Bear.      |
-
-Detection is by symlink resolution, not by matching directory paths,
-so new or distribution-local masquerade setups are covered as long as
-their installer symlinks compiler names to a wrapper binary.
+Detection is by symlink resolution rather than by matching known
+directory paths, so distribution-local masquerade setups are covered as
+long as their installer symlinks compiler names to a wrapper binary.
 
 ## Acceptance criteria
 
@@ -127,26 +100,6 @@ bare-name compiler in a grandchild process) must still be
 intercepted; that guarantee is not specific to masquerade handling
 and is covered by `interception-wrapper-mechanism`. This
 requirement preserves it by not modifying the child's PATH.
-
-### CI coverage
-
-The existing `rust CI` workflow (`.github/workflows/build_rust.yml`)
-runs integration tests on `ubuntu-latest`. The Ubuntu matrix entry
-runs `apt-get install -y ccache` before `cargo test`, which creates
-`/usr/lib/ccache/*` symlinks. The job does NOT prepend that dir to
-PATH: putting ccache first on the job PATH would inflate event
-counts for every preload-mode test that asserts an exact number of
-compiler invocations.
-
-At build-time, `tests/integration/build.rs` scans well-known
-locations (`/usr/lib/ccache`, `/usr/lib64/ccache`,
-`/usr/libexec/ccache`) for a ccache masquerade directory and, if
-found, exposes it via the `CCACHE_MASQUERADE_DIR` env var and sets
-`cfg(host_has_ccache_masquerade)`. The dedicated recursion test is
-gated on that cfg. At runtime the test prepends
-`CCACHE_MASQUERADE_DIR` to its own child PATH, exercising the
-recursion scenario regardless of the host's default PATH while
-leaving other tests ccache-free.
 
 ## Notes
 

@@ -21,7 +21,7 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
   intercepted
 - Child processes inherit the interception environment even when the
   build system clears or replaces the environment
-- Intercepted commands are reported to the TCP collector
+- Intercepted commands are reported back to Bear for analysis
 - The build process completes normally -- interception does not alter
   build output, exit codes, or observable behavior
 - Co-resident preload libraries (e.g. Gentoo's `libsandbox.so`) are
@@ -33,8 +33,7 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
 ## Non-functional constraints
 
 - Must not alter build output or exit codes
-- Must handle concurrent builds (parallel make) -- each intercepted
-  execution opens its own TCP connection
+- Must handle concurrent builds (parallel make) without losing reports
 - Platform: Linux and BSD systems (`LD_PRELOAD`), macOS
   (`DYLD_INSERT_LIBRARIES`)
 - Not supported on Windows (no equivalent mechanism)
@@ -45,51 +44,35 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
 
 ## Known limitations
 
-**Wrong ELF class during cross-compilation** (issues #236, #510, #517,
-#555): The preload library is compiled for the host architecture. When
-the build invokes cross-compilers targeting a different architecture,
-the dynamic linker rejects the library with "wrong ELF class". This
-produces warning messages but does not prevent the build from
-completing. The cross-compiled commands are not intercepted.
+**Wrong ELF class during cross-compilation** (issue #236): the preload
+library is built for the host architecture, so when the build invokes a
+cross-compiler targeting a different architecture the dynamic linker
+rejects the library with "wrong ELF class". The build still completes,
+but the cross-compiled commands are not intercepted.
 
 **glibc symbol-version mismatch in cross-compilation** (discussion
-#707): The preload library is linked against the host's glibc. The
-dynamic linker loads it into every intercepted process, including
-compilers that run against a cross-compilation SDK sysroot with an
-older glibc. If the library references a glibc symbol version newer
-than the sysroot's libc provides (e.g. `GLIBC_2.33`), the intercepted
-invocation fails with a "version not found" error and that command is
-not recorded. Unlike the wrong-ELF-class case (a different
-architecture), here the architecture matches and only the glibc
-version differs. Workaround: build Bear on a host whose glibc is no
-newer than the SDK's libc, or distribute a Bear built against a
-compatible glibc alongside the SDK.
+#707): the preload library is linked against the host's glibc. If it is
+loaded into a compiler running against an older-glibc sysroot and
+references a newer glibc symbol version, that invocation fails with a
+"version not found" error and the command is not recorded.
 
-**macOS SIP** (issues #108, #152, #232, #360, #558): System Integrity
-Protection strips `DYLD_INSERT_LIBRARIES` for system executables. Bear
-detects SIP at startup via `csrutil status` and falls back to wrapper
-mode. Users who disable SIP can force preload mode via configuration.
+**macOS SIP** (issue #558): System Integrity Protection strips
+`DYLD_INSERT_LIBRARIES` for system executables. Bear detects SIP at
+startup and falls back to wrapper mode; users who disable SIP can force
+preload mode via configuration.
 
-**Preload conflicts with sandboxes** (issues #675, #699): Gentoo's
-sandbox (`libsandbox.so`) is itself an `LD_PRELOAD` library hooking the
-same `exec` family. When a build step clears the environment (`env -i`)
-and re-execs, Bear re-inserts its library first, but a co-resident
-sandbox library downstream in the exec chain can re-assert its own
-`LD_PRELOAD` and drop Bear's entry, so the grandchild is not
-intercepted. Bear cannot prevent this without refusing to delegate to
-the other library, which would disable the sandbox and alter the build.
-This surfaces when Bear's own test suite is run *inside* the sandbox
-(e.g. `FEATURES=test` during `emerge`); the fix is packaging-side -
-keep `RESTRICT="test"` or run the test phase with the sandbox disabled
-(`FEATURES="-sandbox -usersandbox"`). Non-sandboxed interception is
-unaffected. See bugs.gentoo.org/973619.
+**Preload conflicts with sandboxes** (issue #699): a co-resident
+`LD_PRELOAD` sandbox library that hooks the same `exec` family can
+re-assert its own preload variable downstream in the exec chain and drop
+Bear's entry, so a grandchild past that point is not intercepted. Bear
+cannot prevent this without refusing to delegate to the other library,
+which would disable the sandbox and alter the build.
 
-**Affects all child processes** (issues #444, #556): `LD_PRELOAD`
-applies to every process spawned during the build, not just compilers.
-This can cause failures in non-compiler tools that are sensitive to
-preloaded libraries (e.g. tools with incompatible `libstdc++`
-dependencies). The semantic analysis layer filters non-compiler commands
-from the output, but the preload injection itself cannot be selective.
+**Affects all child processes** (issue #444): `LD_PRELOAD` applies to
+every process spawned during the build, not just compilers, which can
+disturb non-compiler tools sensitive to preloaded libraries. The
+semantic analysis layer filters non-compiler commands from the output,
+but the preload injection itself cannot be selective.
 
 ## Testing
 
@@ -119,9 +102,8 @@ Given a parallel build with multiple source files:
 Given a build whose last compiler reports immediately before the build
 process exits:
 
-> When that final report is still queued in the collector's accept
-> backlog at the moment shutdown is requested,
-> then the collector drains the backlog before stopping,
+> When that final report races the shutdown of interception,
+> then it is still delivered before interception stops,
 > and that last compilation still appears in `compile_commands.json`
 > (no entry is lost to the shutdown race -- see issue #704).
 

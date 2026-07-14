@@ -47,48 +47,22 @@ Alternatives on the table for a structural fix:
 ## Decision
 
 parse-sh is split into a single streaming tokenizer and a token-stream
-parser. The tokenizer is the only code that understands characters:
-quotes and escapes (words arrive fully assembled, `foo'bar'baz` is one
-Word token), comments, backslash-newline continuations, redirect
-operators and their targets (consumed whole, never tokens: a target is
-discarded uninspected because the command's argv is fully known without
-it and only the redirect path stays unresolved, so skipping would lose
-real events from automake/cmake logs for nothing the database needs;
-an unterminated quote or substitution in one still skips loudly, since
-that misreads the line boundary itself), here-documents
-(the pending-delimiter queue and body consumption are internal; the
-body is discarded, not stored), and the recursive-make directory
-markers (recognized at line start, emitted as a Marker token). It
-consumes any buffered reader, one logical line at a time, and is exposed
-as an iterator whose items are a Token, a Skip (line number and reason
-for an unsupported construct -- a recoverable item, not stream
-termination), or a fatal read error that ends the stream. The token set
-is small: Word, Separator (`;`, `&&`, `||`, `|`, `&`), Newline, Marker.
-A here-document is a skip reason, not a token.
+parser: the tokenizer is the only code that reads characters (quotes and
+escapes, comments, backslash-newline continuations, redirect operators
+and their targets, here-documents, and the recursive-make directory
+markers) and emits a small token set plus recoverable skip items for
+unsupported constructs, while the parser consumes those tokens and owns
+all interpreter state (working directory, the marker-driven directory
+stack, and the positional `VAR=value` environment overlay).
 
-The parser consumes tokens and owns all interpreter state: working
-directory, the marker-driven directory stack, and the per-command
-environment overlay (leading `VAR=value` classification is positional,
-so it happens here, on plain Word tokens). It is itself an iterator of
-events (an execution, or a skipped line), yielding each as soon as its
-line completes -- one line of buffering, because a skip anywhere on a
-line must still be able to poison the whole line. Both stages are
-incremental state machines: nothing is accumulated across lines, so the
-producer that forwards events into the mode layer's channel runs in
-memory bounded by the longest logical line.
-
-Three rules keep the split sound:
-
-- The tokenizer never stops scanning a line after yielding a skip; the
-  parser discards items up to the next Newline. Skipping in the
-  tokenizer would blind it to a later `<<` on the same line, and the
-  here-doc body would be lexed as commands.
-- Quote state resets at every newline. Real shell lets a double quote
-  span lines, but the contract is line-oriented: an unclosed quote at
-  end of line is an UnterminatedQuote skip, matching pinned behavior.
-- No ambient I/O: the tokenizer reads only the reader the mode layer
-  hands it (never `std::env` or `std::fs`), and read failures surface
-  in-band as the stream's last item, so the caller cannot lose them.
+Both stages are incremental state machines that hold at most one logical
+line, so a skip anywhere on a line can still poison the whole line while
+memory stays bounded by the longest line. Three invariants keep the
+split sound: the tokenizer keeps scanning a line after a skip (so a later
+`<<` on the same line is still seen) and the parser discards to the next
+newline; quote state resets at every newline, matching the line-oriented
+contract; and the tokenizer does no ambient I/O, surfacing read failures
+in-band as the stream's last item so the caller cannot lose them.
 
 ## Consequences
 
