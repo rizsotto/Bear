@@ -101,9 +101,8 @@ impl Mode {
                 log::debug!("Mode: replay events and semantic analysis");
 
                 let source = impls::RawEventReader::create(&input.path)?;
-                let consumer =
-                    impls::SemanticEventWriter::create(output, &config, context.confstr_path.clone())
-                        .map_err(ConfigurationError::ConsumerCreation)?;
+                let consumer = impls::SemanticEventWriter::create(output, &config)
+                    .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(source), Box::new(consumer));
 
@@ -134,9 +133,8 @@ impl Mode {
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
-                let consumer =
-                    impls::SemanticEventWriter::create(output, &config, context.confstr_path.clone())
-                        .map_err(ConfigurationError::ConsumerCreation)?;
+                let consumer = impls::SemanticEventWriter::create(output, &config)
+                    .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
                     Arc::new(impls::TcpEventProducer::create(producer)),
@@ -534,9 +532,8 @@ mod impls {
         pub(super) fn create(
             output: args::BuildSemantic,
             config: &config::Main,
-            confstr_path: String,
         ) -> Result<Self, WriterCreationError> {
-            let interpreter = semantic::interpreters::create(config, confstr_path);
+            let interpreter = semantic::interpreters::create(config);
             let writer = output::OutputWriter::try_from((&output, config))?;
 
             Ok(Self { interpreter: Box::new(interpreter), writer })

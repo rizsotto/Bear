@@ -27,7 +27,6 @@ log.workspace = true
 shell-words.workspace = true
 crossbeam-channel.workspace = true
 regex-lite.workspace = true
-which.workspace = true
 libc.workspace = true
 glob.workspace = true
 

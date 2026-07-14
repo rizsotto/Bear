@@ -33,7 +33,10 @@ const AMBIGUOUS_NAMES: &[&str] = &["cc", "c++", "CC"];
 /// strategy:
 ///
 /// 1. **Hint lookup** — user-supplied [`Compiler`] entries (canonicalized)
-///    are checked first; a hit short-circuits both probe and regex.
+///    are checked first; a hit short-circuits both probe and regex. A bare
+///    executable spelling also matches a configured entry by filename,
+///    because config paths must exist on disk while builds often spell
+///    only the name.
 /// 2. **Probe** — for ambiguous basenames (`cc`, `c++`, `CC`) the binary is
 ///    invoked with `--version` and classified by signature. Memoization
 ///    of probe results lives in the probe itself (see
@@ -113,7 +116,10 @@ impl CompilerRecognizer {
 
     /// Looks up a hint for the given executable path.
     ///
-    /// Tries both the original path and its canonicalized version.
+    /// Tries both the original path and its canonicalized version. The map
+    /// also carries the configured paths' filenames as keys, so a bare
+    /// spelling matches directly; a path spelling cannot collide with a
+    /// filename key because [`Path`] equality is component-wise.
     fn lookup_hint(&self, executable_path: &Path) -> Option<CompilerType> {
         // Try original path first
         if let Some(&compiler_type) = self.hints.get(executable_path) {
@@ -185,8 +191,12 @@ impl CompilerRecognizer {
     ///
     /// # Returns
     ///
-    /// A [`HashMap`] mapping canonicalized [`PathBuf`]s to their corresponding [`CompilerType`]s.
-    /// All compilers that are not marked as `ignore = true` will be included in the mapping.
+    /// A [`HashMap`] mapping [`PathBuf`]s to [`CompilerType`]s over the
+    /// non-ignored compilers. Each entry contributes two keys: its
+    /// canonicalized path, and its bare filename -- builds often invoke a
+    /// configured compiler by name alone, and the filename key lets the
+    /// hint reach those spellings. When two entries share a filename but
+    /// disagree on the type, the first wins and a warning is logged.
     ///
     /// # Compiler Type Resolution
     ///
@@ -247,6 +257,27 @@ impl CompilerRecognizer {
                 guessed_type.unwrap_or(CompilerType::Gcc)
             };
 
+            if let Some(name) = compiler.path.file_name() {
+                match hints.entry(PathBuf::from(name)) {
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(compiler_type);
+                    }
+                    std::collections::hash_map::Entry::Occupied(entry) => {
+                        if *entry.get() != compiler_type {
+                            log::warn!(
+                                "compiler config: '{}' shares the filename '{}' with an earlier \
+                                 entry of a different type; the earlier entry classifies bare \
+                                 invocations of that name",
+                                compiler.path.display(),
+                                name.to_string_lossy()
+                            );
+                        }
+                    }
+                }
+            }
+            // Never collides with a filename key for validated config:
+            // config paths must exist, so canonicalization yields an
+            // absolute, multi-component path.
             hints.insert(canonical_path, compiler_type);
         }
 
@@ -587,6 +618,66 @@ mod tests {
         // Regex detection still works for non-configured compilers
         assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("unknown-compiler")), None);
+    }
+
+    // Requirements: recognition-ambiguous-name-probe
+    #[test]
+    fn test_config_hint_matches_bare_spelling_by_filename() {
+        use crate::config::Compiler;
+        use std::path::PathBuf;
+
+        // The configured path is absolute (validation requires it to exist
+        // on real hosts); the build spells only the name. NoProbe declines
+        // everything and `cc` has no regex, so a hit proves the hint.
+        let compilers = vec![Compiler {
+            path: PathBuf::from("/opt/toolchain/cc"),
+            as_: Some(CompilerType::Clang),
+            ignore: false,
+        }];
+
+        let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
+
+        assert_eq!(sut.recognize(path("cc")), Some(CompilerType::Clang));
+    }
+
+    // Requirements: recognition-ambiguous-name-probe
+    #[test]
+    fn test_config_hint_does_not_filename_match_path_spellings() {
+        use crate::config::Compiler;
+        use std::path::PathBuf;
+
+        // A path spelling names one concrete binary; it must not borrow the
+        // classification of a differently-located configured entry.
+        let compilers = vec![Compiler {
+            path: PathBuf::from("/opt/toolchain/cc"),
+            as_: Some(CompilerType::Clang),
+            ignore: false,
+        }];
+
+        let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
+
+        assert_eq!(sut.recognize(path("/usr/bin/cc")), None);
+        assert_eq!(sut.recognize(path("./cc")), None);
+    }
+
+    // Requirements: recognition-ambiguous-name-probe
+    #[test]
+    fn test_conflicting_filename_hints_first_entry_wins() {
+        use crate::config::Compiler;
+        use std::path::PathBuf;
+
+        let compilers = vec![
+            Compiler { path: PathBuf::from("/opt/a/cc"), as_: Some(CompilerType::Clang), ignore: false },
+            Compiler { path: PathBuf::from("/opt/b/cc"), as_: Some(CompilerType::Gcc), ignore: false },
+        ];
+
+        let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
+
+        // The bare spelling takes the first configured entry (a warning is
+        // logged for the disagreeing second); path spellings keep their own.
+        assert_eq!(sut.recognize(path("cc")), Some(CompilerType::Clang));
+        assert_eq!(sut.recognize(path("/opt/a/cc")), Some(CompilerType::Clang));
+        assert_eq!(sut.recognize(path("/opt/b/cc")), Some(CompilerType::Gcc));
     }
 
     #[test]

@@ -95,13 +95,26 @@ encoding has historically been a source of bugs (see GitHub issues #14, #70,
 
 The specification states that `arguments[0]` should be the executable name
 (e.g. `clang++`), but does not prescribe whether it must be an absolute
-path, a relative path, or a bare command name. Bear preserves the compiler
-path as it was observed during interception -- if the build invoked `gcc`,
-Bear writes `gcc`; if it invoked `/usr/bin/gcc`, Bear writes `/usr/bin/gcc`.
+path, a relative path, or a bare command name. Bear writes the compiler
+exactly as the interception layer observed it; the output stage never
+resolves, absolutizes, or otherwise rewrites the path.
 
-This behavior differs from Bear v3.x, which resolved compiler paths to
-absolute. The current behavior is configurable but the specification is
-intentionally silent on this point.
+What "observed" means depends on the interception mode:
+
+- Preload mode observes the literal `exec` call: if the build invoked
+  `gcc`, Bear writes `gcc`; if it invoked `/usr/bin/gcc`, Bear writes
+  `/usr/bin/gcc`.
+- Wrapper mode cannot observe the name the build used -- by construction
+  the build executed the wrapper -- so the report names the real
+  compiler by its absolute path (see `interception-wrapper-mechanism`),
+  and the database shows that absolute path.
+- Shell-text parsing observes the command line as the build system wrote
+  it, so the database shows exactly that spelling: a bare `gcc` in the
+  text stays `gcc` (see `interception-events-from-shell-text`). No
+  command ran, so no resolved path exists to report.
+
+This differs from Bear v3.x, which always resolved compiler paths to
+absolute. The specification is intentionally silent on this point.
 
 Related issues: #240, #678, #679, #671.
 
@@ -199,7 +212,8 @@ Given a compiler invocation with `-DNAME=\"hello\"`:
 > the JSON encoding adds another layer,
 > and JSON-decoding followed by shell-word splitting recovers the original argv.
 
-Given a compiler invoked as a bare name (e.g. `gcc`):
+Given a compiler invoked as a bare name (e.g. `gcc`), intercepted in
+preload mode:
 
 > When Bear writes the entry,
 > then `arguments[0]` is `gcc` (not resolved to an absolute path).

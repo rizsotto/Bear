@@ -39,11 +39,10 @@
 //!
 //! ## Normalization
 //!
-//! Bare executable filenames from `p`-variant interceptions are resolved to
-//! absolute paths by the `ResolveExecutable` interpreter decorator in the
-//! semantic analysis layer (in the `bear` crate). It uses the execution's own
-//! `PATH` environment variable, falling back to the system default from
-//! `confstr(_CS_PATH)`.
+//! None. The executable travels through semantic analysis and into the
+//! compilation database exactly as reported here; bare filenames stay bare,
+//! and their resolution is left to the consumer (see the
+//! `output-json-compilation-database` requirement).
 
 pub mod environment;
 pub mod reporter;

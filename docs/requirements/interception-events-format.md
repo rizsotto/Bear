@@ -28,7 +28,7 @@ in `crates/intercept/src/lib.rs`.
 
 | JSON key      | Type                     | Meaning                                                                    |
 |---------------|--------------------------|----------------------------------------------------------------------------|
-| `executable`  | string (filesystem path) | Path to the program run. May be absolute or a bare name resolved via PATH. |
+| `executable`  | string (filesystem path) | Path to the program run. May be absolute or a bare name, as the caller spelled it. |
 | `arguments`   | array of strings         | The argument vector; element zero is the program name (`argv[0]`).         |
 | `working_dir` | string (filesystem path) | Absolute working directory the program ran in.                             |
 | `environment` | object (string->string)  | Environment variables in effect for the program.                           |
@@ -38,9 +38,10 @@ any of them requires a major-version bump of the format. Within that
 promise, the *contents* of `environment` are advisory, not stable: Bear
 filters captured variables to a build-relevant subset, so a consumer must
 not assume any particular variable is present, and a producer may include
-or omit variables freely. The `PATH` variable, when present, is what
-resolves a bare `executable`; a producer that wants bare names resolved
-should supply it.
+or omit variables freely. Bear's own semantic analysis never resolves a
+bare `executable` -- the recorded compiler keeps the observed spelling --
+so a consumer that needs the concrete binary resolves the name in its own
+environment.
 
 ## Acceptance criteria
 

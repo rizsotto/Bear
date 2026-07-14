@@ -1523,3 +1523,67 @@ fn default_config_append_replaces_stale_entry_on_flag_change() -> Result<()> {
 
     Ok(())
 }
+
+/// The `compilers:` override must reach invocations that spell only the
+/// compiler's name: the config names a concrete path (validation requires
+/// it to exist), the build writes plain `my-quirky-cc`, and the entry is
+/// produced with the recorded compiler kept as observed. The name is
+/// outside the ambiguous set and matches no recognition regex, so the run
+/// WITHOUT the config proves nothing else classifies it -- the entry in the
+/// second run can only come from the filename-matched hint. (The hint-vs-
+/// probe interplay for the ambiguous `cc` itself is pinned hermetically by
+/// the recognizer's unit tests.)
+// Requirements: recognition-ambiguous-name-probe
+#[test]
+fn config_compiler_hint_matches_bare_spelled_name() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("config_hint_bare_name")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    env.create_source_files(&[("toolchain/my-quirky-cc", ""), ("hello.c", "int main(void) { return 0; }")])?;
+    let event = json!({
+        "executable": "my-quirky-cc",
+        "arguments": ["my-quirky-cc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+    let config = format!(
+        r#"
+schema: "4.1"
+
+compilers:
+  - path: "{dir}/toolchain/my-quirky-cc"
+    as: gcc
+"#,
+        dir = temp_dir
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // Without the config nothing recognizes the name; this is what makes the
+    // second phase conclusive.
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "without_config.json"])?;
+    env.load_compilation_database("without_config.json")?.assert_count(0)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.clone(),
+        arguments: vec!["my-quirky-cc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}

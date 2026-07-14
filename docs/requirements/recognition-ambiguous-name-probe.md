@@ -40,9 +40,14 @@ ability to override Bear's guess when needed.
   time budget even for hung children.
 - Probes do not recursively re-enter Bear's own interception.
 - A user `compilers:` config entry for a path takes priority over the
-  probe and disables it for that path. This is the supported override
-  mechanism and the only way to recover recognition for a quirky `cc`
-  whose `--version` output does not match the probe's signature rules.
+  probe and disables it for that path. The entry matches the executable
+  as the build spelled it, after canonicalization, or -- when the build
+  spelled a bare name -- by the configured path's filename. When two
+  entries share a filename but disagree on the compiler, the first entry
+  classifies bare invocations and a warning names the conflict. This is
+  the supported override mechanism and the only way to recover
+  recognition for a quirky `cc` whose `--version` output does not match
+  the probe's signature rules.
 - Wrapper basenames (`ccache`, `distcc`, `sccache`) are never probed even
   if they appear under an ambiguous name. The wrapper interpreter handles
   them as today.
@@ -88,6 +93,12 @@ Given a user config containing `compilers: [{ path: /usr/bin/cc, as: gcc }]`:
 > When Bear recognizes `/usr/bin/cc`,
 > then the result is GCC and no probe is performed.
 
+Given the same config:
+
+> When Bear recognizes an execution spelled as a bare `cc`,
+> then the result is GCC and no probe is performed,
+> and the recorded compiler stays `cc` as observed.
+
 Given an executable that hangs on `--version`:
 
 > When Bear probes it,
@@ -130,6 +141,10 @@ that resolves (after canonicalization) to the ccache wrapper:
 - Override mechanism: by user request, the only way to disable the probe
   for a given path is to declare it in `compilers:`. There is no
   process-wide off switch; the override is per-path and explicit.
+- A bare ambiguous name is probed by executing it as spelled, letting
+  the operating system resolve it through Bear's own `PATH`. Bear does
+  not resolve the name itself, and it never rewrites the executable it
+  records (see `output-json-compilation-database`).
 - `gcc.yaml` carries a comment explaining why `cc`/`c++` are absent from
   its recognize list.
 - `CC` joined the ambiguous set for the HPE Cray PrgEnv wrapper (see

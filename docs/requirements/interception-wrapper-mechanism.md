@@ -21,8 +21,8 @@ gets a compilation database without modifying the build system.
   build output or exit codes
 - Bare compiler names in environment variables (e.g. `CC=gcc`) are
   resolved via PATH before creating wrappers
-- The wrapper reports the real compiler's absolute path, not the wrapper
-  path
+- The reported execution names the real compiler by its absolute path,
+  never the wrapper path
 - The `.bear/` directory is created in the current working directory
 - The `.bear/` directory is cleaned up when Bear exits
 - On Windows, executable name lookup is case-insensitive and extension-
@@ -138,6 +138,11 @@ Given a successful build:
 
 - Related requirement: `interception-preload-mechanism` (alternative
   interception mode using `LD_PRELOAD`).
+- In this mode the compilation database shows the compiler by absolute
+  path. The output stage writes the compiler exactly as the interception
+  report observed it (see `output-json-compilation-database`), and
+  wrapper mode can only observe the resolved real compiler -- the name
+  the build used denotes the wrapper itself.
 - Related requirement: `interception-wrapper-recursion` (ccache
   recursion prevention in wrapper mode).
 - A wrapper executable stands in for the real compiler on PATH; the

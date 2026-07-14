@@ -421,6 +421,46 @@ fn semantic_database_entry_set_is_order_independent() -> Result<()> {
     Ok(())
 }
 
+// Requirements: output-json-compilation-database
+//
+// The compiler is written into `arguments[0]` exactly as the event observed
+// it: a bare `gcc` stays `gcc`. Semantic analysis never resolves the
+// executable against PATH (an earlier resolver leaked absolute -- even
+// ccache-masquerade -- paths into the database and broke clangd's
+// --query-driver allowlists). The event's PATH names a directory that
+// really contains a resolvable `gcc`, so this test fails if resolution is
+// ever reintroduced and leaks into the output.
+#[test]
+fn semantic_bare_compiler_name_stays_bare_in_output() -> Result<()> {
+    let env = TestEnvironment::new("semantic_bare_name_stays_bare")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    std::fs::create_dir_all(env.test_dir().join("tools"))?;
+    env.create_build_script("tools/gcc", "#!/bin/sh\nexit 0\n")?;
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "test.c"],
+        "working_dir": temp_dir,
+        "environment": { "PATH": env.test_dir().join("tools").to_str().unwrap() }
+    });
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("test.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["gcc".to_string(), "-c".to_string(), "test.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: output-compilation-entries
 #[test]
 #[cfg(all(has_executable_echo, has_executable_mkdir, has_executable_rm))]
@@ -1079,14 +1119,14 @@ fn fasm_execution_yields_single_entry() -> Result<()> {
 // this requirement is not involved). Locking this in guards against a
 // future regression that would make it invisible again.
 //
-// This does not use `assert_driver_yields_single_entry_for_source`: unlike
-// the synthetic embedded-toolchain names used elsewhere in this file,
-// `gcc` is a real, `PATH`-resolvable executable on any host that can build
-// Bear (its own host requirements list a `cc` toolchain), so
-// `ExecutableResolver` rewrites the recorded compiler token to gcc's
-// absolute path. The assertion below only pins the parts this test cares
-// about: one entry, for `foo.s`, invoked with `-c foo.s`, as `gcc`
-// (whichever path it resolved to).
+// Unlike the synthetic embedded-toolchain names used elsewhere in this
+// file, `gcc` is a real, `PATH`-resolvable executable on any host that can
+// build Bear (its own host requirements list a `cc` toolchain), which
+// historically made `ExecutableResolver` rewrite the recorded compiler
+// token to gcc's absolute path. The recorded compiler now keeps the
+// observed spelling (see `semantic_bare_compiler_name_stays_bare_in_output`);
+// this test still asserts only the parts it cares about: one entry, for
+// `foo.s`, invoked with `-c foo.s`, as `gcc`.
 #[test]
 fn driver_compiled_assembly_yields_driver_entry() -> Result<()> {
     let env = TestEnvironment::new("driver_compiled_assembly")?;
@@ -1153,17 +1193,11 @@ fn swiftc_whole_module_invocation_yields_one_entry_per_source_with_full_argument
 
     let temp_dir = env.test_dir().to_str().unwrap();
 
-    // PATH shield: without it, a host that really ships swiftc (macOS
-    // runners) resolves the bare name to its absolute path and the
-    // literal-argv assertions below fail on that platform only.
-    let shield = env.test_dir().join("path-shield");
-    std::fs::create_dir_all(&shield)?;
-
     let event = json!({
         "executable": "swiftc",
         "arguments": ["swiftc", "-module-name", "App", "-emit-object", "a.swift", "b.swift"],
         "working_dir": temp_dir,
-        "environment": { "PATH": shield.to_str().unwrap() }
+        "environment": {}
     });
 
     env.create_source_files(&[
@@ -1299,17 +1333,11 @@ fn clang_precompile_module_interface_yields_single_entry_for_source() -> Result<
     let env = TestEnvironment::new("clang_precompile_module_interface")?;
     let temp_dir = env.test_dir().to_str().unwrap();
 
-    // PATH shield: without it, a host that ships a real clang++ resolves the
-    // bare name to its absolute path and the literal-argv assertion below
-    // fails on that platform only.
-    let shield = env.test_dir().join("path-shield");
-    std::fs::create_dir_all(&shield)?;
-
     let event = json!({
         "executable": "clang++",
         "arguments": ["clang++", "--precompile", "-std=c++20", "foo.cppm", "-o", "foo.pcm"],
         "working_dir": temp_dir,
-        "environment": { "PATH": shield.to_str().unwrap() }
+        "environment": {}
     });
 
     env.create_source_files(&[("events.json", &event.to_string()), ("foo.cppm", "export module foo;\n")])?;
@@ -1344,14 +1372,11 @@ fn clang_module_file_flag_yields_single_entry_for_main_source() -> Result<()> {
     let env = TestEnvironment::new("clang_module_file_flag")?;
     let temp_dir = env.test_dir().to_str().unwrap();
 
-    let shield = env.test_dir().join("path-shield");
-    std::fs::create_dir_all(&shield)?;
-
     let event = json!({
         "executable": "clang++",
         "arguments": ["clang++", "-std=c++20", "-fmodule-file=foo=foo.pcm", "-c", "main.cpp"],
         "working_dir": temp_dir,
-        "environment": { "PATH": shield.to_str().unwrap() }
+        "environment": {}
     });
 
     env.create_source_files(&[
@@ -1388,21 +1413,17 @@ fn clang_module_interface_and_consumer_yield_two_entries() -> Result<()> {
     let env = TestEnvironment::new("clang_module_interface_and_consumer")?;
     let temp_dir = env.test_dir().to_str().unwrap();
 
-    let shield = env.test_dir().join("path-shield");
-    std::fs::create_dir_all(&shield)?;
-    let path = shield.to_str().unwrap();
-
     let event1 = json!({
         "executable": "clang++",
         "arguments": ["clang++", "--precompile", "-std=c++20", "foo.cppm", "-o", "foo.pcm"],
         "working_dir": temp_dir,
-        "environment": { "PATH": path }
+        "environment": {}
     });
     let event2 = json!({
         "executable": "clang++",
         "arguments": ["clang++", "-std=c++20", "-fmodule-file=foo=foo.pcm", "-c", "main.cpp"],
         "working_dir": temp_dir,
-        "environment": { "PATH": path }
+        "environment": {}
     });
 
     let events_content = format!("{}\n{}", event1, event2);
@@ -1567,14 +1588,11 @@ fn gcc_modules_ts_flag_yields_single_entry_for_module_interface() -> Result<()> 
     let env = TestEnvironment::new("gcc_modules_ts_flag")?;
     let temp_dir = env.test_dir().to_str().unwrap();
 
-    let shield = env.test_dir().join("path-shield");
-    std::fs::create_dir_all(&shield)?;
-
     let event = json!({
         "executable": "g++",
         "arguments": ["g++", "-std=c++20", "-fmodules-ts", "-c", "mod.cppm"],
         "working_dir": temp_dir,
-        "environment": { "PATH": shield.to_str().unwrap() }
+        "environment": {}
     });
 
     env.create_source_files(&[("events.json", &event.to_string()), ("mod.cppm", "export module mod;\n")])?;

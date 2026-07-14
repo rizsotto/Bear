@@ -13,7 +13,6 @@ use crate::fixtures::infrastructure::{CompilationEntryMatcher, compilation_entry
 use crate::fixtures::*;
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
-use std::path::Path;
 
 /// A real `make -n` capture of zlib 1.3.1's build (77 lines; 34 compile
 /// commands among the gcc/ar/mv/mkdir/ln/subshell/redirect noise). See
@@ -475,17 +474,14 @@ const ZLIB_EXPECTED_FILES: [&str; 17] = [
     "../zlib-1.3.1/test/minigzip.c",
 ];
 
-/// Asserts that every entry in `db` records a bare `gcc` invocation: its
-/// `arguments[0]` basename is `gcc`, never a literal path. `bear semantic`'s
-/// shared `ResolveExecutable` rewrites the fixture's bare `gcc` token to an
-/// absolute host path (`/usr/bin/gcc`, or a ccache masquerade path), so the
-/// path itself is host-specific and only the basename is portable.
+/// Asserts that every entry in `db` records the fixture's bare `gcc` token
+/// verbatim in `arguments[0]`: semantic analysis never rewrites the
+/// executable, so the spelling from the `make -n` capture survives as-is.
 fn assert_all_entries_use_gcc(db: &CompilationDatabase) -> Result<()> {
     for entry in db.entries() {
         let arg0 =
             entry["arguments"][0].as_str().with_context(|| format!("entry missing arguments[0]: {entry}"))?;
-        let basename = Path::new(arg0).file_name().and_then(|name| name.to_str()).unwrap_or(arg0);
-        assert_eq!(basename, "gcc", "arguments[0] basename must be gcc, got: {arg0} (entry: {entry})");
+        assert_eq!(arg0, "gcc", "arguments[0] must be the observed bare gcc (entry: {entry})");
     }
     Ok(())
 }

@@ -114,7 +114,6 @@ dependencies = [
  "shell-words",
  "tempfile",
  "thiserror",
- "which",
 ]
 
 [[package]]
