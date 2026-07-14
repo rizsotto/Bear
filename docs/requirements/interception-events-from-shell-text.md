@@ -96,15 +96,14 @@ dry-run text contains.
   producer. Supplying a configuration file to this mode is therefore
   rejected with an error rather than silently accepted and ignored, so
   the user is not misled into believing it took effect.
-- Exit-code policy, consistent with the malformed-line rule in
-  [`interception-events-format`](interception-events-format.md): empty
-  input is success with empty output and a stderr warning; non-empty
-  input from which at least one event was emitted is success; non-empty
-  input in which every line was skipped exits non-zero. Skipped lines are
-  reported on standard error (line number and reason), and when any line
-  is skipped a summary count is printed there too; this reporting is
-  on by default and does not require a logging opt-in. A run with nothing
-  skipped stays quiet.
+- Skipped lines are reported on standard error (line number and reason),
+  and when any line is skipped a summary count is printed there too; this
+  reporting is on by default and does not require a logging opt-in. A run
+  with nothing skipped stays quiet, and empty input still emits a stderr
+  notice. Whether such a run succeeds or exits non-zero -- following the
+  same skip-and-continue rule as
+  [`interception-events-format`](interception-events-format.md) -- is the
+  exit-code contract's concern; see [`cli-exit-codes`](cli-exit-codes.md).
 
 ## Non-functional constraints
 

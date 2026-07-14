@@ -759,7 +759,7 @@ fn atomic_write_cleans_up_temp_file_on_success() -> Result<()> {
 /// Given a write failure (the output path exists as a non-empty directory, so
 /// the final rename cannot succeed), Bear's atomic-write step must leave the
 /// pre-existing filesystem object untouched.
-// Requirements: output-atomic-write
+// Requirements: output-atomic-write, cli-exit-codes
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -780,9 +780,12 @@ fn atomic_write_preserves_existing_object_on_failure() -> Result<()> {
     let build = format!("{} -c src.c -o src.o", filename_of(COMPILER_C_PATH));
     let script = env.create_shell_script("build.sh", &build)?;
 
-    // Bear is expected to fail; the key property is what survives.
-    let _ =
-        env.run_bear(&["--output", out_path.to_str().unwrap(), "--", SHELL_PATH, script.to_str().unwrap()]);
+    // The build compiles, but the database cannot be written (the output
+    // path is a directory), so Bear must exit non-zero even though the
+    // build itself succeeded -- and the pre-existing object must survive.
+    let result =
+        env.run_bear(&["--output", out_path.to_str().unwrap(), "--", SHELL_PATH, script.to_str().unwrap()])?;
+    result.assert_failure()?;
 
     assert!(out_path.is_dir(), "output path must still be a directory after failed write");
     assert_eq!(

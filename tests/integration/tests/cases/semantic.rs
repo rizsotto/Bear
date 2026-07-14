@@ -340,6 +340,7 @@ fn semantic_with_filtering() -> Result<()> {
     Ok(())
 }
 
+// Requirements: cli-exit-codes
 #[test]
 fn semantic_empty_events() -> Result<()> {
     let env = TestEnvironment::new("semantic_empty")?;
@@ -355,7 +356,7 @@ fn semantic_empty_events() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-format
+// Requirements: interception-events-format, cli-exit-codes
 //
 // Every one of these three lines is rejected (an unterminated object, a
 // valid-but-incomplete object missing required fields, and another
@@ -1606,7 +1607,7 @@ fn semantic_input_defaults_to_stdin() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-format
+// Requirements: interception-events-format, cli-exit-codes
 //
 // An empty event stream yields an empty database and success, but it is
 // almost always a plumbing mistake (a producer that emitted nothing, or a
@@ -1725,7 +1726,7 @@ fn semantic_input_mixed_valid_and_malformed_lines_keeps_both_valid_entries() -> 
     Ok(())
 }
 
-// Requirements: interception-events-format
+// Requirements: interception-events-format, cli-exit-codes
 //
 // When every line of a non-empty event stream is rejected, the run must
 // not silently succeed with an empty compilation database: it exits

@@ -26,7 +26,7 @@ install paths; `INTERCEPT_LIBDIR` is the one build-time knob.
 Supervision chains nest in wrapper mode, so only the outermost
 supervisor creates a process group (`GroupPolicy::Leader` in
 `supervise.rs`); nested ones `Inherit`. Governed by requirement
-`interception-signal-forwarding`; rationale in
+`cli-signal-forwarding`; rationale in
 `docs/rationale/process-tree-teardown.md`.
 
 ## Wrapper directory

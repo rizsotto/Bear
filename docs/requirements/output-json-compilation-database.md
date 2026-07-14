@@ -166,9 +166,8 @@ The compilation database is still written (as an empty array) so downstream
 tooling sees a valid file, but the log makes the empty result impossible to
 miss.
 
-The pipeline exit code is not affected by validation drops alone. Exit
-codes reflect the build command's own status and genuine I/O failures,
-not data-quality issues with individual entries.
+Validation drops never affect the exit code; the exit-code contract
+across modes is owned by [`cli-exit-codes`](cli-exit-codes.md).
 
 ## Non-functional constraints
 

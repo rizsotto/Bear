@@ -1,5 +1,5 @@
 ---
-title: Signal forwarding and exit-code propagation
+title: Signal forwarding to the build
 status: implemented
 ---
 
@@ -12,11 +12,10 @@ running in the background. The same applies when a CI runner sends
 `SIGTERM` to a running Bear to abort a build: the build being
 supervised must stop too.
 
-The reverse direction matters just as much. Shells, CI runners, and
-parent `make` rules look at Bear's exit code to decide whether the
-build succeeded. Bear must therefore report the same exit code that
-the build command produced, so the caller sees the real result rather
-than a success or failure Bear invented.
+The exit code a signalled build produces -- and Bear's exit-code
+contract in general -- is owned by
+[`cli-exit-codes`](cli-exit-codes.md); this requirement covers only how
+the signal reaches the build and how the process tree is torn down.
 
 Users interact with a single command, `bear`. The interception mode
 Bear selects (see `interception-preload-mechanism` and
@@ -30,14 +29,10 @@ below must hold identically regardless of which mode is active.
   the build
 - Between the signal arriving and both Bear and the build ending,
   less than one second elapses on a system not under heavy load
-- When the build exits normally, Bear's exit code equals the build
-  command's exit code: `0` is preserved for success, non-zero codes
-  are preserved for failure
-- Exit codes in the portable range (0-255 on Unix) are propagated
-  byte-for-byte
 - When the build is terminated by a signal rather than exiting
-  normally, Bear exits with a non-zero code so that scripts and CI
-  systems see a failed build
+  normally, Bear exits non-zero so that scripts and CI systems see a
+  failed build (the exit-code contract is
+  [`cli-exit-codes`](cli-exit-codes.md))
 - The build receives the same signal Bear received: a `SIGINT` arrives
   as `SIGINT` and a `SIGTERM` as `SIGTERM`, so a build that handles the
   two differently sees the real one. Bear relays the signal rather than
@@ -64,13 +59,6 @@ below must hold identically regardless of which mode is active.
   compared with running the same command directly
 
 ## Known limitations
-
-**The signal that terminated the build is not encoded in Bear's exit
-code.** The shell convention of `128 + signal_number` is not
-followed. Scripts that inspect Bear's exit code to identify *why* a
-build stopped cannot distinguish signal termination from a regular
-build failure. (The build itself still receives the real signal; this
-limitation is only about Bear's own exit code.)
 
 **A child that re-detaches into its own session can still survive.**
 Bear stops the whole process tree by signalling the build's process
@@ -102,23 +90,6 @@ Given a long-running build under `bear --`:
 > second,
 > and `bear` reports a non-success exit status.
 
-Given a build that exits successfully:
-
-> When the user runs `bear -- true`,
-> then `bear` exits with code `0`.
-
-Given a build that exits with a non-zero code:
-
-> When the user runs `bear -- false`,
-> then `bear` exits with a non-zero code matching the build's.
-
-Given an interception-only run (`bear intercept`), the exit-code
-contract still holds:
-
-> When the user runs `bear intercept -- true`, the exit code is `0`;
-> when the user runs `bear intercept -- false`, the exit code is
-> non-zero and matches the build's.
-
 Given a build that is interrupted mid-compile:
 
 > When the user presses Ctrl-C while the compiler is running,
@@ -127,7 +98,7 @@ Given a build that is interrupted mid-compile:
 
 ## Notes
 
-- Related: `interception-preload-mechanism`,
+- Related: `cli-exit-codes`, `interception-preload-mechanism`,
   `interception-wrapper-mechanism`.
 
 ## Rationale

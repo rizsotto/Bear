@@ -57,11 +57,13 @@ environment.
   `output-append`).
 - A non-conforming line (invalid JSON, missing required field, wrong
   type) is reported with line number and reason, and processing
-  continues with subsequent lines. Empty input succeeds with an empty
-  database. Non-empty input from which at least one event was accepted
-  succeeds. Non-empty input in which every line was rejected exits
-  non-zero. (Any additional producer, such as one parsing shell text,
-  applies the same skip-and-continue rule to its own input; see
+  continues with subsequent lines. Empty input yields an empty database.
+  Whether a run succeeds or exits non-zero -- in particular, that
+  non-empty input in which every line was rejected exits non-zero -- is
+  the exit-code contract's concern; see
+  [`cli-exit-codes`](cli-exit-codes.md). (Any additional producer, such
+  as one parsing shell text, applies the same skip-and-continue rule to
+  its own input; see
   [`interception-events-from-shell-text`](interception-events-from-shell-text.md).)
 - `bear semantic` reads the event stream from standard input by default
   (naming an input file is the explicit case), and any non-executing

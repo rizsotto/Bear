@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Requirements: interception-signal-forwarding
+//! Requirements: cli-signal-forwarding
 
 use intercept::Execution;
 use std::path::PathBuf;
@@ -551,7 +551,7 @@ pub enum SuperviseError {
 
 #[cfg(all(test, unix))]
 mod tests {
-    // Requirements: interception-signal-forwarding
+    // Requirements: cli-signal-forwarding
     //
     // Only the normal-exit path is unit-tested here. The signal-forwarding
     // paths (real-signal forward, grace window, SIGKILL escalation, whole-tree

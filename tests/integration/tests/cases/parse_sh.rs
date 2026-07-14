@@ -61,7 +61,7 @@ fn parse_sh_directory_flag_sets_event_working_dir() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 #[test]
 fn parse_sh_all_skipped_input_exits_non_zero_with_no_events() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_all_skipped")?;
@@ -214,7 +214,7 @@ fn parse_sh_event_environment_is_overlaid_and_filtered() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 //
 // An assignment-only line sets shell state but executes nothing, so it is
 // neither an event nor a skip; input made only of such lines is the empty
@@ -240,7 +240,7 @@ fn parse_sh_assignment_only_input_exits_zero_as_no_commands() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 #[test]
 fn parse_sh_non_utf8_input_fails_with_clear_error() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_non_utf8")?;
@@ -253,7 +253,7 @@ fn parse_sh_non_utf8_input_fails_with_clear_error() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 #[test]
 fn parse_sh_missing_input_file_fails() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_missing_input")?;
@@ -270,7 +270,7 @@ fn parse_sh_missing_input_file_fails() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 #[test]
 fn parse_sh_unwritable_output_file_fails() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_unwritable_output")?;
@@ -288,7 +288,7 @@ fn parse_sh_unwritable_output_file_fails() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 //
 // The `run_bear_*` helpers buffer the child's whole stdout, which never
 // breaks the pipe, so this test drives the process manually: feed more
@@ -337,7 +337,7 @@ fn parse_sh_broken_stdout_pipe_exits_non_zero() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, cli-exit-codes
 #[test]
 fn parse_sh_empty_input_exits_zero_with_warning() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_empty_input")?;

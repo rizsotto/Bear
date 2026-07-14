@@ -12,6 +12,7 @@ use std::process::Stdio;
 #[cfg(has_executable_sleep)]
 use std::time::Instant;
 
+// Requirements: cli-exit-codes
 #[test]
 fn exit_code_for_empty_arguments() -> Result<()> {
     // Executing Bear with no arguments should return a non-zero exit code,
@@ -24,6 +25,7 @@ fn exit_code_for_empty_arguments() -> Result<()> {
     Ok(())
 }
 
+// Requirements: cli-exit-codes
 #[test]
 fn exit_code_for_help() -> Result<()> {
     // Executing help and subcommand help should always has zero exit code,
@@ -48,6 +50,7 @@ fn exit_code_for_help() -> Result<()> {
     Ok(())
 }
 
+// Requirements: cli-exit-codes
 #[test]
 fn exit_code_for_invalid_argument() -> Result<()> {
     // Executing Bear with an invalid argument should always has non-zero exit code,
@@ -60,6 +63,7 @@ fn exit_code_for_invalid_argument() -> Result<()> {
     Ok(())
 }
 
+// Requirements: cli-exit-codes
 #[test]
 fn exit_code_for_non_existing_command() -> Result<()> {
     // Executing a non-existing command should always has non-zero exit code,
@@ -72,7 +76,7 @@ fn exit_code_for_non_existing_command() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-signal-forwarding
+// Requirements: cli-exit-codes
 #[test]
 #[cfg(has_executable_true)]
 fn exit_code_for_true() -> Result<()> {
@@ -84,7 +88,7 @@ fn exit_code_for_true() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-signal-forwarding
+// Requirements: cli-exit-codes
 #[test]
 #[cfg(has_executable_false)]
 fn exit_code_for_false() -> Result<()> {
@@ -96,7 +100,7 @@ fn exit_code_for_false() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding, cli-exit-codes
 #[test]
 #[cfg(has_executable_sleep)]
 fn exit_code_when_signaled() -> Result<()> {
@@ -153,7 +157,7 @@ fn combined_output_dash_is_rejected() -> Result<()> {
 // Intercept mode exit code tests
 
 /// Test that intercept command returns 0 for successful interception
-// Requirements: interception-signal-forwarding
+// Requirements: cli-exit-codes
 #[test]
 #[cfg(has_executable_true)]
 fn intercept_exit_code_for_success() -> Result<()> {
@@ -183,7 +187,7 @@ fn intercept_exit_code_without_output() -> Result<()> {
 }
 
 /// Test that intercept command propagates command failure exit codes
-// Requirements: interception-signal-forwarding
+// Requirements: cli-exit-codes
 #[test]
 #[cfg(has_executable_false)]
 fn intercept_exit_code_for_failure() -> Result<()> {
@@ -197,7 +201,7 @@ fn intercept_exit_code_for_failure() -> Result<()> {
 /// A compiler that is blocked reading from a FIFO with no writer is in the
 /// mid-compile state. Signaling Bear with SIGTERM must stop both Bear and
 /// the compiler quickly, with Bear reporting non-success.
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -259,7 +263,7 @@ fn exit_code_when_compiler_is_interrupted_mid_compile() -> Result<()> {
 /// down whole: signaling Bear stops not just the direct child but the
 /// grandchild the build spawned. This proves process-group teardown end to
 /// end through the real driver, not just the killpg mechanism in isolation.
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_shell, has_executable_sleep))]
@@ -331,7 +335,7 @@ fn signal_tears_down_build_process_tree() -> Result<()> {
 /// grandchild dies too. Where no writable cgroup is available the documented
 /// process-group fallback applies and this test skips (the
 /// `signal_tears_down_build_process_tree` test covers that path).
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding
 #[test]
 #[cfg(target_os = "linux")]
 #[cfg(all(has_executable_shell, has_executable_sleep, has_executable_setsid))]
@@ -433,7 +437,7 @@ fn cgroup_v2_writable() -> bool {
 /// its own: a build that traps `SIGINT` and `SIGTERM` differently sees the
 /// real one. Each case sends a distinct signal and asserts the matching trap
 /// ran (via its marker) and that Bear propagated that trap's exit code.
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_shell, has_executable_sleep))]
@@ -493,7 +497,7 @@ fn forwards_the_exact_signal_received() -> Result<()> {
 /// driver must still tear the whole nested tree down within the budget -- not
 /// leave Bear hanging on the blocked compiler -- so the contract holds in
 /// wrapper mode just as in preload mode.
-// Requirements: interception-signal-forwarding, interception-wrapper-mechanism
+// Requirements: cli-signal-forwarding, interception-wrapper-mechanism
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -562,7 +566,7 @@ fn wait_for_file(path: &std::path::Path) {
 /// Bear forwards the real signal (not SIGKILL) and grants a grace window, so
 /// a build that traps the signal runs its trap and Bear's exit code reflects
 /// whatever the build ultimately exited with.
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_shell, has_executable_sleep))]
@@ -629,7 +633,7 @@ fn signal_lets_a_trapping_build_run_its_trap() -> Result<()> {
 /// A build that ignores the termination signal is still stopped: after the
 /// grace window Bear escalates to SIGKILL, so Bear and the build both end
 /// within the time budget and Bear reports non-success.
-// Requirements: interception-signal-forwarding
+// Requirements: cli-signal-forwarding
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_shell, has_executable_sleep))]
@@ -673,6 +677,7 @@ fn signal_escalates_when_build_ignores_it() -> Result<()> {
 // Semantic mode exit code tests (note: this is now called 'semantic' not 'citnames')
 
 /// Test that semantic command returns 0 for valid input
+// Requirements: cli-exit-codes
 #[test]
 fn semantic_exit_code_for_success() -> Result<()> {
     let env = TestEnvironment::new("semantic_exit_code_for_success")?;
@@ -689,6 +694,7 @@ fn semantic_exit_code_for_success() -> Result<()> {
 }
 
 /// Test that semantic command with missing input file returns non-zero
+// Requirements: cli-exit-codes
 #[test]
 fn semantic_exit_code_for_missing_input() -> Result<()> {
     let env = TestEnvironment::new("semantic_exit_code_for_missing_input")?;
