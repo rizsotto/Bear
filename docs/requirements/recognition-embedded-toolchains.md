@@ -26,10 +26,9 @@ executed.
   a database entry, parsed with Clang flag semantics.
 - Executions of Microchip's XC8 drivers `xc8-cc` and `xc8` with a source
   file yield database entries, parsed with GCC flag semantics.
-- In preload interception mode, Emscripten's `emcc`/`em++` may also
-  intercept the underlying `clang` child process they spawn; the default
-  duplicate filter collapses the pair to a single entry, with the
-  user-facing driver's invocation surviving.
+- In preload mode `emcc`/`em++` may also intercept the underlying `clang`
+  child they spawn; the default duplicate filter keeps the driver entry
+  (see `output-duplicate-detection`).
 
 ## Testing
 
@@ -66,8 +65,8 @@ processes intercepted):
 
 > When `bear semantic` runs with default duplicate detection,
 > then exactly one entry survives for `hello.c`,
-> and it records the `emcc` invocation (the driver event comes first in
-> the event stream, so it wins under first-seen duplicate detection).
+> and it records the `emcc` invocation (see `output-duplicate-detection`
+> for the driver-wins rule).
 
 ## Notes
 

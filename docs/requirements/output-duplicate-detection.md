@@ -32,6 +32,10 @@ the set of fields that distinguish entries.
   (`output-append`): a newly generated entry is emitted before the matching
   entry from the existing database, so the new entry wins and its flags
   replace the old ones
+- When preload interception records both a compiler driver or wrapper and
+  the child compiler it spawns for the same source, they collapse to a
+  single entry under the default match; the driver or wrapper invocation
+  survives because it is emitted first in the event stream
 - Accepted entries appear in the output in the same order they were received
 - The set of fields used for matching is configurable via the `duplicates`
   section in the configuration file
@@ -102,7 +106,24 @@ new build compiles file.c with different flags:
 > (the new entry wins, because new entries come first and default matching
 > ignores arguments).
 
+Given a compiler driver or wrapper and the child compiler it spawns are
+both intercepted in preload mode, producing two events for one source:
+
+> When Bear generates the compilation database with default duplicate
+> detection,
+> then exactly one entry survives for that source,
+> and it records the driver/wrapper invocation (the driver event is
+> emitted first, so it wins under first-seen matching).
+
 ## Notes
+
+- Compiler drivers and wrappers (MPI wrappers, Emscripten's `emcc`/`em++`,
+  AMD's `hipcc`/`amdclang`/`amdflang`, ...) exec a child compiler that
+  preload mode intercepts as well, so one compilation reaches this filter
+  as two events for the same source. First-seen matching keeps the
+  user-facing driver invocation, which is emitted before its child. The
+  per-driver recognition requirements rely on this behaviour rather than
+  restating it.
 
 - GitHub issue #667 reported that files with identical basenames in separate
   directories were incorrectly dropped. This was caused by matching on
@@ -113,13 +134,10 @@ new build compiles file.c with different flags:
   frontend invocations. These are filtered by the semantic analyzer before
   reaching the duplicate filter, but the duplicate filter provides a safety
   net.
-- GitHub PR #497 introduced an `--update` concept where existing entries are
-  replaced when a file is recompiled with new flags. Bear now delivers this
-  as the default rather than a separate flag: dropping arguments from the
-  default match set collapses a file to one entry, and append ordering
-  (`output-append`) makes the newest entry win. GitHub discussion #712
-  requested this for partial builds where changed flags previously left
-  stale duplicates.
+- The former `--update` request (GitHub PR #497 / discussion #712) is
+  delivered by the defaults above -- the `directory`/`file` match set plus
+  append ordering (`output-append`) -- rather than a separate flag. The
+  rationale linked below records why.
 
 ## Rationale
 

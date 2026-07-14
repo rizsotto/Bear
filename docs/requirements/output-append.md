@@ -100,12 +100,10 @@ with `-O2`, and a new build that compiles file1.c with identical flags:
   on large projects in the old C++ implementation. The current Rust
   implementation uses iterators but the underlying JSON parser may still
   buffer the full file.
-- GitHub PR #497 introduced an `--update` concept where existing entries
-  with matching filenames are replaced rather than appended. Bear now folds
-  this into append itself: new entries come first and the default duplicate
-  match is `directory` and `file`, so a rebuilt file's newest entry replaces
-  the old one without a separate flag. GitHub discussion #712 requested this
-  for partial builds where changed flags previously left stale duplicates.
+- The former `--update` request (GitHub PR #497, asked for in discussion
+  #712) is folded into append's default behaviour -- new entries first,
+  matched on `directory` and `file` -- rather than shipped as a separate
+  flag. The rationale linked below records why.
 
 ## Rationale
 

@@ -16,12 +16,10 @@ without a dedicated build-system integration.
 - An execution of `swiftc` naming one or more `.swift` sources yields a
   database entry per source file.
 - A whole-module invocation that names several `.swift` sources in a
-  single command yields one entry per source file, and every one of
-  those entries carries the complete invocation's arguments (every
-  source, not just the entry's own file). Swift's whole-module
-  compilation gives each file's semantics a dependency on the whole
-  module, unlike a separable-sources compiler, so no entry can be
-  reduced to "its own file only" the way GCC/Clang entries are.
+  single command yields one entry per source file, each carrying the
+  complete invocation's arguments (every source, not just the entry's own
+  file), following the whole-module shape defined by
+  `output-compilation-entries`.
 - Internal per-file frontend jobs that `swiftc` spawns (`swift-frontend`,
   or a legacy toolchain re-invoking itself as `swiftc -frontend`) yield
   no database entries.

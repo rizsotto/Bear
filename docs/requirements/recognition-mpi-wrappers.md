@@ -51,8 +51,8 @@ intercepted in preload mode):
 
 > When `bear semantic` runs with default duplicate detection,
 > then exactly one entry survives for `hello.c`,
-> and it records the wrapper invocation (the wrapper event comes first
-> in the event stream, so it wins under first-seen duplicate detection).
+> and it records the wrapper invocation (see `output-duplicate-detection`
+> for the driver-wins rule).
 
 ## Notes
 
@@ -61,6 +61,9 @@ intercepted in preload mode):
   wrapper (e.g. clangd's `--query-driver`).
 - The launcher names `mpirun` and `mpiexec` stay unrecognized on
   purpose; there is no acceptance path for them.
+- In preload mode the wrapper's child compiler is intercepted too; the
+  default duplicate filter keeps the wrapper invocation (see
+  `output-duplicate-detection`).
 
 ## Rationale
 

@@ -57,13 +57,11 @@ Given the executable name `amdgpu-arch`:
   records the user-facing driver invocation, the same way it does for
   `nvcc`; `hipcc` accepts clang-style options, so it dispatches with
   Clang flag semantics.
-- In preload interception mode the child compiler process that `hipcc`
-  (or `amdclang`/`amdflang`) execs into is intercepted too, so a single
-  compilation can produce more than one event for the same source file.
-  The default duplicate filter (directory+file, first-seen wins)
-  collapses these to one entry, with the user-facing driver's invocation
-  surviving because it is first in the event stream. This is the same
-  behavior already exercised for MPI wrappers and needs no new code.
+- In preload mode the child compiler that `hipcc`, `amdclang`, or
+  `amdflang` execs into is intercepted too, so the default duplicate
+  filter collapses the driver and child events for one source into a
+  single entry, keeping the driver invocation (see
+  `output-duplicate-detection`).
 - AOCC (AMD's Clang-based CPU compiler) installs plain `clang`/`clang++`/
   `flang` binaries, not AMD-prefixed names; those were already covered by
   the existing `clang`/`flang` recognition before this requirement.
