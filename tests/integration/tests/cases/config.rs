@@ -1549,12 +1549,14 @@ fn config_compiler_hint_matches_bare_spelled_name() -> Result<()> {
         "environment": {}
     });
     env.create_source_files(&[("events.json", &event.to_string())])?;
+    // YAML single quotes: a double-quoted scalar treats the backslashes of a
+    // Windows temp path as escape sequences and fails to parse.
     let config = format!(
         r#"
 schema: "4.1"
 
 compilers:
-  - path: "{dir}/toolchain/my-quirky-cc"
+  - path: '{dir}/toolchain/my-quirky-cc'
     as: gcc
 "#,
         dir = temp_dir
