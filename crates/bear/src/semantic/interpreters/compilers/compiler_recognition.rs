@@ -417,6 +417,7 @@ mod tests {
         CompilerRecognizer::with_probe(&[], Box::new(NoProbe))
     }
 
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_gcc_recognition() {
         // Pure regex behavior. The bare names `cc` and `c++` are
@@ -446,6 +447,7 @@ mod tests {
         );
     }
 
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_clang_recognition() {
         assert_recognition(&[
@@ -521,6 +523,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("/usr/bin/clang.exe")), Some(CompilerType::Clang));
     }
 
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_fortran_recognition() {
         assert_recognition(&[

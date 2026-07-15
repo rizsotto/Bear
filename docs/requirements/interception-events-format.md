@@ -35,9 +35,15 @@ in `crates/intercept/src/lib.rs`.
 
 The stable subset is the four key names and their JSON types: changing
 any of them requires a major-version bump of the format. Within that
-promise, the *contents* of `environment` are advisory, not stable: Bear
-filters captured variables to a build-relevant subset, so a consumer must
-not assume any particular variable is present, and a producer may include
+promise, the *contents* of `environment` are advisory, not stable. Every
+Bear producer applies one shared filter before writing an event: the
+captured variables are reduced to the build-relevant subset - those that
+can influence which build tool runs or how it compiles. Which variables
+qualify is an implementation detail that may change between releases,
+with one fixed guarantee: `PATH`, when present in the captured
+environment, survives the filter, so bare executable names remain
+resolvable by the consumer. Beyond that, a consumer must not assume any
+particular variable is present, and a third-party producer may include
 or omit variables freely. Bear's own semantic analysis never resolves a
 bare `executable` -- the recorded compiler keeps the observed spelling --
 so a consumer that needs the concrete binary resolves the name in its own

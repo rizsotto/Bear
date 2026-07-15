@@ -177,14 +177,14 @@ fn parse_sh_skip_summary_counts_lines_not_segments() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-events-from-shell-text, interception-events-format
 //
 // The event's environment is the mode's own environment overlaid with the
-// line's leading `VAR=value` assignments, then trimmed to the build-relevant
-// subset (the same filter interception applies). The kept/dropped pair comes
-// from the line overlay, so the assertions do not depend on what the test
-// runner has set; `PATH` is inherited and must survive so bare executable
-// names stay resolvable by the consumer.
+// line's leading `VAR=value` assignments, then reduced by the shared
+// build-relevant filter owned by interception-events-format. The
+// kept/dropped pair comes from the line overlay, so the assertions do not
+// depend on what the test runner has set; `PATH` is inherited and must
+// survive so bare executable names stay resolvable by the consumer.
 #[test]
 fn parse_sh_event_environment_is_overlaid_and_filtered() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_environment")?;

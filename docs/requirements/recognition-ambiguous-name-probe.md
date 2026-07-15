@@ -58,9 +58,8 @@ ability to override Bear's guess when needed.
   answers `--version` in the name it was called by, passing the flag
   through to the underlying compiler, so the probe classifies the real
   toolchain. Unrecognizable passthrough output declines as usual.
-- Names that are not in the ambiguous set (e.g. `gcc`, `clang`, `gfortran`,
-  cross-prefixed or versioned variants) are not probed and continue to
-  resolve via regex.
+- Names that are not in the ambiguous set are never probed; they
+  resolve by the static name rules owned by `recognition-compiler-names`.
 - On non-Unix targets (Windows) the probe is not available and the
   recognizer wires up a no-op probe. Windows toolchains use unambiguous
   basenames (`cl.exe`, `clang-cl`, `gcc.exe`) that the regex layer

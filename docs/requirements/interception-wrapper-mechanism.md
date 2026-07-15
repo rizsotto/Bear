@@ -5,8 +5,8 @@ status: implemented
 
 ## Intent
 
-When the user runs `bear -- make` on a system where `LD_PRELOAD` is not
-available (macOS with SIP, Windows) or not desired, Bear intercepts
+When the user runs `bear -- make` in wrapper mode (which mode runs and
+when is owned by `interception-mode-selection`), Bear intercepts
 compiler invocations by placing wrapper executables on PATH ahead of the
 real compilers. The build system invokes the wrapper instead of the real
 compiler; the wrapper reports the execution to Bear and then forwards
@@ -148,10 +148,8 @@ Given a successful build:
 - A wrapper executable stands in for the real compiler on PATH; the
   build system invokes it in place of the compiler it expects.
 - GitHub issues #686, #681 cover Windows/MSYS2 wrapper mode improvements.
-- GitHub issue #609 describes user confusion about when to use wrapper
-  vs. preload mode. The default selection (wrapper on macOS/Windows,
-  preload on Linux) handles the common case; the configuration file
-  covers the rest.
+- The default mode per platform and the configuration override are
+  owned by `interception-mode-selection`.
 
 ## Rationale
 

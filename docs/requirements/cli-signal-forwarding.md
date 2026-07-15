@@ -17,10 +17,10 @@ contract in general -- is owned by
 [`cli-exit-codes`](cli-exit-codes.md); this requirement covers only how
 the signal reaches the build and how the process tree is torn down.
 
-Users interact with a single command, `bear`. The interception mode
-Bear selects (see `interception-preload-mechanism` and
-`interception-wrapper-mechanism`) is an internal detail: the contract
-below must hold identically regardless of which mode is active.
+Users interact with a single command, `bear`. Which interception mode
+runs is owned by
+[`interception-mode-selection`](interception-mode-selection.md); the
+contract below must hold identically in every mode.
 
 ## Acceptance criteria
 

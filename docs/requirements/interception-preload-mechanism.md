@@ -57,9 +57,9 @@ references a newer glibc symbol version, that invocation fails with a
 "version not found" error and the command is not recorded.
 
 **macOS SIP** (issue #558): System Integrity Protection strips
-`DYLD_INSERT_LIBRARIES` for system executables. Bear detects SIP at
-startup and falls back to wrapper mode; users who disable SIP can force
-preload mode via configuration.
+`DYLD_INSERT_LIBRARIES` for protected executables, so preload cannot
+intercept them. Which mode Bear selects as a result is owned by
+`interception-mode-selection`.
 
 **Preload conflicts with sandboxes** (issue #699): a co-resident
 `LD_PRELOAD` sandbox library that hooks the same `exec` family can
@@ -130,12 +130,6 @@ Given a build on macOS with SIP disabled:
 > set,
 > and compiler invocations are intercepted the same way as on Linux.
 
-Given a build on macOS with SIP enabled:
-
-> When Bear detects SIP is active,
-> then preload mode is not available,
-> and Bear uses wrapper mode instead (see `interception-wrapper-mechanism`).
-
 ## Notes
 
 - The preload library path is resolved at runtime, so a Bear installed
@@ -146,7 +140,8 @@ Given a build on macOS with SIP enabled:
   not in the preload library itself. See `output-json-compilation-database`
   for details on which commands appear in the output.
 - Related requirement: `interception-wrapper-mechanism` (alternative
-  interception mode).
+  interception mode); which mode runs and when is owned by
+  `interception-mode-selection`.
 
 ## Rationale
 

@@ -61,6 +61,9 @@ Standalone filter modes (`bear semantic`, `bear parse-sh`):
   inspecting only Bear's exit code cannot distinguish signal termination
   from an ordinary build failure. The build itself still receives the real
   signal; see [`cli-signal-forwarding`](cli-signal-forwarding.md).
+- Nested invocations (`bear` running under another `bear`) are
+  unsupported and their exit-code behaviour is undefined; the exclusion
+  is owned by [`cli-signal-forwarding`](cli-signal-forwarding.md).
 
 ## Testing
 

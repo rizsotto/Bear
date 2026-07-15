@@ -85,11 +85,9 @@ dry-run text contains.
     extension to the shell subset: without recognition they would hit the
     skip path anyway, so recognizing them costs nothing.
 - The environment of each event is the mode's own environment overlaid
-  with the line's leading `VAR=value` assignments, and the result is then
-  filtered to the build-relevant subset (the same filter interception
-  applies). So an assignment is recorded only if interception would have
-  kept it, and `PATH`, when present, survives the filter so that bare
-  executable names remain resolvable by the consumer.
+  with the line's leading `VAR=value` assignments, then reduced by the
+  shared build-relevant filter (including its `PATH` guarantee) owned by
+  [`interception-events-format`](interception-events-format.md).
 - The mode emits the raw event stream and never consults Bear's
   configuration; configuration shapes only the downstream semantic
   analysis that turns the stream into a compilation database, not this

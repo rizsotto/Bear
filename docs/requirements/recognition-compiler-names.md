@@ -5,11 +5,12 @@ status: implemented
 
 ## Intent
 
-Builds using AMD ROCm, standalone assemblers, the Cray Compiling
-Environment, Emscripten, QNX, Texas Instruments, Microchip, MPI wrapper
-commands, or the Swift compiler record their compilations in the
-compilation database without any configuration. The recorded compiler is
-the name the build invoked, exactly as executed.
+Builds using the classic GNU and LLVM compiler drivers, AMD ROCm,
+standalone assemblers, the Cray Compiling Environment, Emscripten, QNX,
+Texas Instruments, Microchip, MPI wrapper commands, or the Swift
+compiler record their compilations in the compilation database without
+any configuration. The recorded compiler is the name the build invoked,
+exactly as executed.
 
 ## Acceptance criteria
 
@@ -27,6 +28,12 @@ The shared contract for every recognized name below:
   `--help`, and the like) whose contract is owned by
   `output-compilation-entries`; that requirement is the single source
   for the full list.
+- The classic GNU and LLVM driver names (the first two table rows) are
+  also recognized when spelled with a cross-compilation target prefix
+  (`arm-linux-gnueabihf-gcc`, `aarch64-linux-gnu-clang`), a version
+  suffix (`gcc-12`, `gcc12`, `gcc-11.2`, `clang-15`), or both at once
+  (`arm-linux-gnueabi-gcc-12`); every such spelling carries the base
+  name's flag semantics. Other rows note where these shapes also apply.
 - A value-carrying wrapper or driver option never swallows a following
   source file, and the option token is retained verbatim in the
   recorded arguments. MPICH's compiler-override options (for example
@@ -49,6 +56,8 @@ The shared contract for every recognized name below:
 
 | Names | Flag semantics | Notes |
 |---|---|---|
+| `gcc`, `g++`, `gfortran`, `f95`, `egfortran` | GCC | classic GNU driver names; the cross-prefix and version-suffix shapes apply |
+| `clang`, `clang++` | Clang | classic LLVM driver names; the cross-prefix and version-suffix shapes apply |
 | `amdclang`, `amdclang++`, `hipcc` | Clang | AMD ROCm; `hipcc` is a driver, recorded like `nvcc` |
 | `amdflang` | Flang | AMD ROCm |
 | `nasm`, `yasm`, `fasm` | own assembler, recorded as executed | standalone assemblers |
@@ -75,6 +84,15 @@ The shared contract for every recognized name below:
 | `swift-frontend`, `swiftc -frontend` | The Swift driver's internal per-file frontend jobs, not user-facing invocations. |
 
 ## Testing
+
+Given an event file with a `<name> -c hello.c` execution for a classic
+GNU or LLVM driver name in any recognized spelling (`gcc`, `clang++`,
+`arm-linux-gnueabihf-gcc`, `gcc-12`, `clang-15`):
+
+> When `bear semantic` runs,
+> then the database contains one entry for `hello.c`
+> whose arguments start with the name as invoked,
+> parsed with the base name's flag semantics.
 
 Given an event file with a `<name> -c hello.c` execution for any of
 the C-family driver names in the table (the AMD ROCm C/C++ drivers,
@@ -164,9 +182,9 @@ Given an event file with a `fasm hello.asm output.bin` execution:
   AMD-prefixed name is added for it.
 - QNX 8 ships a GCC 12.2-based toolchain, so `qcc`/`q++` parse with GCC
   semantics, not Clang.
-- `xc16-gcc`/`xc32-gcc` already match the existing GCC
-  cross-compilation prefix rule; they are covered only by a regression
-  test, not by this requirement's name list.
+- `xc16-gcc`/`xc32-gcc` already match the GCC cross-compilation prefix
+  rule in the Acceptance criteria; they are covered only by a
+  regression test, not by this requirement's name list.
 - The wrapper or driver invocation is recorded verbatim. Clang tooling
   users who need a wrapper's baked-in include paths can point their
   tool at the wrapper (for example clangd's `--query-driver`).
