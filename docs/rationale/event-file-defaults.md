@@ -38,6 +38,11 @@ Alternatives considered:
   behave differently in a terminal and in CI, and CI stdin is often an
   empty pipe even when the user meant a file - a silent
   empty-database path.
+- Give `intercept` a stream default by redirecting the build's own
+  stdout to stderr, freeing standard output for the event stream.
+  Rejected: it silently changes observable build behavior - tools that
+  detect a tty or write results to stdout would break - for a pipeline
+  no producer needs.
 - Mandate `--input` on `semantic` too, symmetric with `intercept`.
   Rejected: a pure filter refusing to read stdin by default fights the
   convention this redesign invokes, permanently bakes `--input -` into

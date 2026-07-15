@@ -77,6 +77,7 @@ Given files `src/util.c` and `lib/util.c` (same basename, different directories)
 
 > When Bear generates the compilation database,
 > then both entries are preserved (different directory means not a duplicate).
+> Regression guard for issue #667.
 
 Given duplicate detection configured with `match_on: [file]`:
 
@@ -114,6 +115,7 @@ both intercepted in preload mode, producing two events for one source:
 > then exactly one entry survives for that source,
 > and it records the driver/wrapper invocation (the driver event is
 > emitted first, so it wins under first-seen matching).
+> Regression guard for issue #638.
 
 ## Notes
 
@@ -124,16 +126,6 @@ both intercepted in preload mode, producing two events for one source:
   user-facing driver invocation, which is emitted before its child. The
   recognition requirement (`recognition-compiler-names`) relies on this
   behaviour rather than restating it.
-
-- GitHub issue #667 reported that files with identical basenames in separate
-  directories were incorrectly dropped. This was caused by matching on
-  filename alone without considering the directory. The default config still
-  includes `directory` alongside `file`, so same-basename files in different
-  directories remain distinct.
-- GitHub issue #638 reported duplicate entries from clang's internal `-cc1`
-  frontend invocations. These are filtered by the semantic analyzer before
-  reaching the duplicate filter, but the duplicate filter provides a safety
-  net.
 
 ## Rationale
 

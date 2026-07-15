@@ -14,14 +14,6 @@ translation units. Clang tooling (clangd, clang-tidy) needs the module
 inputs and module-path flags to follow imports and produce accurate
 diagnostics.
 
-Today these entries are dropped: the module-interface extensions are not
-in the source-extension table, so the heuristic finds no source and
-filters the invocation out. The module-related driver flags do not by
-themselves break recognition -- an unrecognized single-token flag is
-consumed individually and never fabricates or destroys arity -- but the
-per-compiler flag tables must still classify them so pass detection stays
-accurate (e.g. `--precompile` is a compile action, not a link).
-
 ## Acceptance criteria
 
 - The source-extension table recognizes the standard C++20 module-interface
@@ -83,9 +75,7 @@ Given a GCC build using `-fmodules-ts`:
 
 ## Notes
 
-- GitHub issue #637 reported that `.cppm` compilations are silently
-  dropped from the database. The issue was bulk-closed in 2026 presuming
-  the rewrite addressed it; it did not.
+- Demand: issue #637.
 - Source-extension list lives at
   `crates/bear/src/semantic/interpreters/matchers/source.rs`.
 - Flag tables live in `crates/bear/compilers/clang.yaml` and

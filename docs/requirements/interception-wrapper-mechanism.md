@@ -64,12 +64,6 @@ workaround is to combine both steps under a single Bear invocation:
 `bear -- sh -c './configure && make'`. Using separate Bear invocations
 will always fail because the directory is removed when the first exits.
 
-**Wrapper path must be discoverable** (issue #668): The `bear-wrapper`
-binary path was previously baked in at build time via a compile-time
-constant. This broke prebuilt packages (conda-forge, scoop, system
-packages) where the install path differs from the build path. The
-wrapper path must be resolved relative to the `bear` binary at runtime.
-
 **Cross-compilers may not be discovered** (issue #561): Bear discovers
 compilers from environment variables and common names. Cross-compilers
 with unusual names (e.g. `arm-none-eabi-gcc`) are only intercepted if
@@ -140,7 +134,6 @@ Given a successful build:
   recursion prevention in wrapper mode).
 - A wrapper executable stands in for the real compiler on PATH; the
   build system invokes it in place of the compiler it expects.
-- GitHub issues #686, #681 cover Windows/MSYS2 wrapper mode improvements.
 - The default mode per platform and the configuration override are
   owned by `interception-mode-selection`.
 

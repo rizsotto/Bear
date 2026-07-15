@@ -53,16 +53,16 @@ mode is built for on Windows.
 - The rewritten env var value is the wrapper path followed by the
   original flag tokens, joined with single spaces and without shell
   quoting. When there are no flags, the override is the wrapper path
-  as a bare string, byte-identical to today's no-flags behavior.
-- Empty or whitespace-only values are skipped gracefully (same
-  warn-and-skip behavior as before this feature; log message text
-  differs).
+  as a bare string, with no quoting added.
+- An empty or whitespace-only value is skipped with a warning.
 
 ## Non-functional constraints
 
 - No shell parser or subprocess is involved.
-- Behavior for today's common inputs (`CC=gcc`, `CC=/usr/bin/gcc`,
-  unset) does not change.
+- A flagless value (a bare name such as `CC=gcc` or an absolute path
+  such as `CC=/usr/bin/gcc`) and an unset variable follow the ordinary
+  wrapper-mode resolution owned by `interception-wrapper-mechanism`;
+  the whitespace split is observable only when flag tokens are present.
 
 ## Testing
 

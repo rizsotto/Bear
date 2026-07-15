@@ -108,9 +108,6 @@ Given path format for directory set to `relative`:
   output.
 - GitHub issue #612 requested canonical/realpath support to work around
   clangd issues with symlinked source trees.
-- GitHub issue #683 reported that on Windows/MSYS2, canonical paths include
-  the `\\?\` prefix which clangd rejects. The fix strips this prefix after
-  canonicalization.
 - The `arguments` array paths (include paths, output paths in flags) are
   intentionally not transformed. Transforming them would require a
   compiler-flag-aware path rewriter, which is complex and error-prone.

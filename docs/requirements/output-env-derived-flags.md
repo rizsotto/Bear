@@ -30,8 +30,7 @@ intercepted event record already captures the full environment (see
 
 - A single configuration option enables or disables folding compiler
   environment variables into the generated entries.
-- The default is enabled, preserving the behaviour Bear has always
-  had.
+- The default is enabled.
 - When disabled, recognized environment variables contribute nothing:
   each entry's `arguments` contain only the flags that came from argv
   (after any response-file inlining; see
@@ -75,11 +74,6 @@ Given the same build and environment:
 
 ## Notes
 
-- The translation itself predates this requirement; it was previously
-  unconditional and undocumented. This requirement adds the
-  configuration switch and documents the behaviour. Surfaced while
-  implementing `output-response-file-inlining` (feature request #701),
-  which introduced the sibling configuration group.
 - Related: `output-compilation-entries` -- the per-source
   transformation these flags participate in.
 - Related: `output-response-file-inlining` -- the sibling option in

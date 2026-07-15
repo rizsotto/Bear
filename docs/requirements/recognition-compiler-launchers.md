@@ -94,12 +94,6 @@ Given `icecc gcc -c main.c`:
 
 ## Notes
 
-- This requirement documents a contract that predates it: ccache,
-  distcc, and sccache launcher-unwrap behavior has existed in Bear for
-  several releases (`crates/bear/src/semantic/interpreters/compilers/wrapper.rs`).
-  It was written down when the icecc addition needed an existing
-  contract to extend; icecc support landed with this requirement's
-  implementation.
 - icecream's `icerun` is deliberately not a launcher: it runs arbitrary
   commands on the icecream cluster, not compiler invocations, so
   recognizing it would record non-compilations. Same reasoning as the

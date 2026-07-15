@@ -142,24 +142,9 @@ within the same major-version line:
 
 ## Notes
 
-- GitHub issue #644 requested a post-processing mode that turns an
-  existing build log into a compilation database. The maintainer
-  declined to ship a build-log parser (build-system-specific, out of
-  scope), but `bear semantic --input` already provides the consumer
-  half. This requirement documents the contract so users can build
-  their own log-to-events converters. Bear now also ships one such
-  producer on this seam; see
+- Issue #644 -- the demand signal for a documented interchange
+  contract. Bear ships one producer on this seam; see
   [`interception-events-from-shell-text`](interception-events-from-shell-text.md).
-- Only the consumer side (`semantic --input -`) and non-executing
-  producers use `-`. Modes that run the build cannot, because the build's
-  own stdout is the same stream. Redirecting the build's stdout to stderr
-  to free the channel was considered and rejected: it silently changes
-  observable build behavior (tools that detect a tty or write results to
-  stdout would break) for a pipeline no producer needs.
-- Bear 4.2.0 removed the implicit `events.json` defaults the 4.1.x
-  split workflow relied on: `intercept` now requires the event file to
-  be named and `semantic` reads standard input when none is. See the
-  rationale entry below for the reasoning and rejected alternatives.
 - Out of scope: backward compatibility guarantees across major versions;
   those are explicitly allowed to break. A build-log parser is out of
   scope *for this requirement* - it defines only the interchange

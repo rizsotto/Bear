@@ -72,11 +72,6 @@ compiler invocations:
 > When the user runs `bear --append -- true`,
 > then the existing entries are preserved unchanged.
 
-## Notes
-
-- GitHub issue #532 reported severe performance degradation with `--append`
-  on large projects in the old C++ implementation.
-
 ## Rationale
 
 - [Latest compilation wins for a rebuilt file](../rationale/duplicate-latest-flags-win.md)

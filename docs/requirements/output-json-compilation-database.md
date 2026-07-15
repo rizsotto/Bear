@@ -43,10 +43,6 @@ For example, compiling with `-DNAME=\"hello\"`:
 - `command` form: `"... '-DNAME=\"hello\"' ..."` or
   `"... \"-DNAME=\\\"hello\\\"\" ..."` (shell-quoted, then JSON-encoded)
 
-Consumers that read the `command` field must first JSON-decode the string,
-then apply shell unquoting to recover the original argv. This double
-encoding has historically been a source of bugs.
-
 ### The compiler path (`arguments[0]`)
 
 The specification states that `arguments[0]` should be the executable name
@@ -68,11 +64,6 @@ What "observed" means depends on the interception mode:
   it, so the database shows exactly that spelling: a bare `gcc` in the
   text stays `gcc` (see `interception-events-from-shell-text`). No
   command ran, so no resolved path exists to report.
-
-This differs from Bear v3.x, which always resolved compiler paths to
-absolute. The specification is intentionally silent on this point.
-
-Related issues: #240, #678, #679, #671.
 
 ## Acceptance criteria
 
@@ -107,8 +98,7 @@ When an entry fails validation:
 - Processing of subsequent entries continues unaffected.
 
 This contract ensures a single malformed entry cannot destroy the usable
-output produced from the rest of a build; it replaces a prior fail-fast
-behavior that aborted the whole pipeline on the first invalid entry.
+output produced from the rest of a build.
 
 When every entry that would otherwise have been written is dropped, Bear
 emits a single `ERROR`-level summary line stating so. The compilation
@@ -195,9 +185,6 @@ Given a build where every candidate entry fails validation:
   unless the duplicate filter removes them (see `output-duplicate-detection`).
 - Path formatting for the `file` and `directory` fields is configurable;
   see `output-path-format` for details.
-- The validation-drop contract was introduced in response to issue #692,
-  where a path-format edge case produced empty `directory` fields. Under
-  the old fail-fast behavior, the first such entry aborted the pipeline
-  and no database was written for the rest of the build. The new contract
-  keeps the rest of the output usable while making the failure visible in
-  the logs.
+- The `arguments[0]` spelling contract responds to issues #240, #678,
+  and #671.
+- The validation-drop contract responds to issue #692.
