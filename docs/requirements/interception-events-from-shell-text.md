@@ -21,8 +21,8 @@ This is a best-effort front-end, not a replacement for interception.
 Interception observes real `exec()` calls and remains the high-fidelity,
 recommended path; this mode reconstructs approximate events from text a
 build system chose to print. The user must be told, in the man page and
-in this contract's non-guarantees, that fidelity is bounded by what the
-dry-run text contains.
+in this contract's known limitations, that fidelity is bounded by what
+the dry-run text contains.
 
 ## Acceptance criteria
 
@@ -62,7 +62,7 @@ dry-run text contains.
     `{` still open is reported loudly against the opening line; both are
     reported as unbalanced braces. This is a subshell contrast, not a
     generalization: `( ... )` runs in a child shell and stays
-    unsupported, because its state must not leak back out.
+    unsupported.
 - Any construct outside that subset - subshell groups `( ... )`, command
   substitution (backticks or `$(...)`), parameter expansion (`$VAR`,
   `${...}`), globs in the executable word, here-documents, and the
@@ -82,8 +82,7 @@ dry-run text contains.
   - `make[N]: Entering directory '...'` and `Leaving directory '...'`
     markers push and pop it, so recursive `make -n -w` output tracks
     directories correctly. These markers are an explicit, documented
-    extension to the shell subset: without recognition they would hit the
-    skip path anyway, so recognizing them costs nothing.
+    extension to the shell subset.
 - The environment of each event is the mode's own environment overlaid
   with the line's leading `VAR=value` assignments, then reduced by the
   shared build-relevant filter (including its `PATH` guarantee) owned by
@@ -103,7 +102,7 @@ dry-run text contains.
   [`interception-events-format`](interception-events-format.md) -- is the
   exit-code contract's concern; see [`cli-exit-codes`](cli-exit-codes.md).
 
-## Non-functional constraints
+## Known limitations
 
 Non-guarantees, which hold regardless of parser quality because they are
 inherent to dry-run text. These must also appear in the man page:

@@ -146,7 +146,7 @@ Given a build that partially fails (some files compile, some do not):
 Given a compiler invocation with `-DNAME=\"hello\"`:
 
 > When Bear writes the `command` field,
-> the value is shell-escaped (the crate may use single or double quotes),
+> the value is shell-escaped (either single- or double-quoted form is valid),
 > the JSON encoding adds another layer,
 > and JSON-decoding followed by shell-word splitting recovers the original argv.
 

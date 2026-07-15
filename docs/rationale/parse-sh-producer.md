@@ -61,6 +61,17 @@ a line number and reason, never guessed at, and the dry-run non-guarantees
 are written into both the requirement and the man page. Interception
 stays the recommended high-fidelity default.
 
+Two boundary calls inside the subset follow the same stance. The
+recursive-make `Entering directory` / `Leaving directory` markers are
+recognized as an explicit extension because they are free: without
+recognition they would hit the skip path anyway, so admitting them
+costs nothing and buys correct directory tracking. Brace groups
+`{ ...; }` are supported because they run in the current shell, so a
+`cd` inside one legitimately persists; subshell groups `( ... )` stay
+unsupported because a child shell's state must not leak back out, and
+modeling a child shell is exactly the growth the skip path exists to
+avoid.
+
 This narrowly revises the #644 rejection. What was rejected was a
 build-log parser wired into the core; what ships is a parser isolated to
 one producer whose only output is the public event format, leaving the

@@ -45,8 +45,8 @@ intercepted event record already captures the full environment (see
   them); the MSVC implicit-option variables are spliced before and
   after the command-line options respectively.
 - The set of variables recognized for each family, and the flag each
-  maps to, is defined by Bear's per-compiler interpreters. This
-  requirement governs only the on/off switch, not the mapping.
+  maps to, is defined per compiler family. This requirement governs
+  only the on/off switch, not the mapping.
 
 ## Non-functional constraints
 
@@ -76,7 +76,6 @@ Given the same build and environment:
 
 - Related: `output-compilation-entries` -- the per-source
   transformation these flags participate in.
-- Related: `output-response-file-inlining` -- the sibling option in
-  the same configuration group.
+- Related: `output-response-file-inlining` -- the sibling option.
 - Related: `interception-cc-env-var-flags` -- wrapper-mode splitting
   of a `CC="gcc -std=c11"` value, a separate mechanism.

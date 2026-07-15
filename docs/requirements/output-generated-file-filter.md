@@ -20,18 +20,14 @@ off by default: with no such configuration the output is unchanged.
   pattern containing a separator matches the full source path as it appears in
   the entry.
 - Rules are evaluated in order and the last matching rule wins, the same
-  precedence the directory rules use. A file matched by no pattern rule is
-  included.
+  precedence the directory rules use (see `output-source-directory-filter`).
+  A file matched by no pattern rule is included.
 - File-pattern rules and directory rules compose: an entry is emitted only when
   both the directory rules and the file-pattern rules accept it.
 - An invalid pattern is rejected during configuration validation with an error
   that identifies the offending rule.
 - With no file-pattern rules configured, every entry the directory rules accept
   is emitted; behaviour is unchanged.
-
-## Non-functional constraints
-
-Patterns are compiled once, when the output pipeline is built, not per entry.
 
 ## Testing
 

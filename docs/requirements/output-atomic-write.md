@@ -17,13 +17,12 @@ a truncated or half-written file.
   or mid-write file
 - If writing fails, the previous output file (if any) remains unchanged
 - The temporary file is created in the same directory as the final output
-  (to guarantee same-filesystem rename)
 - If the final rename fails (e.g. permission denied), the error is reported
   and the temporary file is left in place for debugging
-- If the inner writer fails, the temporary file may also be left behind
-  (empty or partial)
+- If writing the new content fails, the temporary file may also be left
+  behind (empty or partial)
 
-## Non-functional constraints
+## Known limitations
 
 - The temp file name is deterministic, so concurrent Bear runs targeting
   the same output file will conflict
@@ -47,7 +46,7 @@ Given a successful build with an existing `compile_commands.json`:
 
 Given a write that fails (e.g. disk full during serialization):
 
-> When the inner writer returns an error,
+> When writing the new content fails,
 > then the original `compile_commands.json` (if any) is unchanged
 > and the temp file may be left behind (empty or partial).
 
@@ -59,6 +58,8 @@ Given a directory where the user lacks write permission:
 
 ## Notes
 
+- The temporary file shares the final output's directory so the rename
+  never crosses a filesystem boundary.
 - GitHub issue #513 originally reported the need for atomic writes after
   users observed corrupted output when Bear/citnames was killed during
   serialization.

@@ -7,17 +7,17 @@ status: implemented
 
 When the user performs incremental builds or builds separate components at
 different times, they need to accumulate compilation entries across multiple
-Bear runs into a single compilation database. The `--append` flag merges new
+Bear runs into a single compilation database. An append option merges new
 entries with an existing `compile_commands.json` instead of overwriting it.
 
 ## Acceptance criteria
 
-- When `--append` is specified and the output file exists, new entries are
-  emitted first and the existing entries follow
-- When `--append` is specified and the output file does not exist, Bear logs
-  a warning and writes only the new entries (no error)
-- When `--append` is not specified, the output file is overwritten with only
-  the new entries (default behavior)
+- In append mode, when the output file exists, new entries are emitted
+  first and the existing entries follow
+- In append mode, when the output file does not exist, Bear logs a warning
+  and writes only the new entries (no error)
+- Without append mode, the output file is overwritten with only the new
+  entries (the default behavior)
 - When the existing file cannot be opened (e.g. permission denied), Bear
   returns an error and does not write output
 - When the existing file opens but contains invalid JSON or invalid entries,

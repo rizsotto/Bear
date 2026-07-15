@@ -21,8 +21,10 @@ The rules below describe the user-visible transformation. The JSON
 shape of an individual entry is covered separately by
 `output-json-compilation-database`. Per-compiler details (which flags
 each compiler recognizes, which extensions identify its sources, how
-MSVC-style flags differ from GCC/Clang-style) are defined by Bear's
-per-compiler interpreters.
+MSVC-style flags differ from GCC/Clang-style) are defined per
+compiler family; which executables belong to which family is owned by
+the recognition requirements (`recognition-compiler-names` and its
+siblings).
 
 ## Acceptance criteria
 
@@ -35,7 +37,7 @@ source compiles on its own and contributes an independent object
 - An invocation that names N source files produces exactly N entries
 - Recognized source extensions include `.c`, `.cc`, `.cpp`, `.cxx`,
   `.m`, `.mm`, `.S`, `.s`, `.f`, `.f90`, `.cu`, and other language-
-  specific extensions defined by the per-compiler interpreters
+  specific extensions defined per compiler family
 - Each entry's `file` field is one of those sources
 - In each entry, the other sources from the same invocation are
   removed from the argument list -- each entry looks like a command
@@ -156,16 +158,14 @@ records the value of the invocation's output flag (`-o`, MSVC `/Fo`,
 - For a multi-source invocation with a single output flag
   (`cc -o a.out src1.c src2.c src3.c`), Bear copies the output value
   verbatim into **every** entry. All three entries report
-  `output` = `a.out`, even though a real build would produce
-  `src1.o`, `src2.o`, and `src3.o`. Per-source inference of object
-  names is a known gap; see Notes.
+  `output` = `a.out` (see Known limitations).
 - When the invocation has no output flag, the `output` field is
   absent.
 
 ## Non-functional constraints
 
-- The same rules apply to every compiler family recognized by Bear's
-  interpreters (GCC/Clang, MSVC, Fortran, CUDA, and others); the
+- The same rules apply to every compiler family Bear recognizes
+  (GCC/Clang, MSVC, Fortran, CUDA, and others); the
   flag names and source extensions listed above are indicative, not
   exhaustive
 - Source-extension recognition follows the file system's rules: on
@@ -176,6 +176,12 @@ records the value of the invocation's output flag (`-o`, MSVC `/Fo`,
 - Response-file (`@file`) tokens pass through untouched by default;
   the default and the opt-in inlining are owned by
   `output-response-file-inlining`
+
+## Known limitations
+
+- For a multi-source invocation that shares a single output flag,
+  the output value is copied verbatim into every entry; per-source
+  object names (`src1.o`, `src2.o`) are not inferred.
 
 ## Testing
 
@@ -259,15 +265,10 @@ Given a build that runs `cc -o a.out src1.c src2.c` with the
 `output` field enabled via configuration:
 
 > When the user runs Bear wrapping that build,
-> then every entry's `output` is `a.out` (reflecting the known
-> limitation documented above, not an ideal behaviour).
+> then every entry's `output` is `a.out` (see Known limitations).
 
 ## Notes
 
-- Per-source inference of object names (`src1.o`, `src2.o`) for
-  multi-source invocations that share a single `-o` output is a
-  plausible future improvement. It is not implemented today; the
-  first output value is copied into every entry.
 - Related: `output-json-compilation-database` -- per-entry JSON
   shape.
 - Related: `output-env-derived-flags` -- environment variables the

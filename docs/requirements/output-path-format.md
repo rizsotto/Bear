@@ -23,35 +23,32 @@ Bear provides configurable path formatting for the `directory`, `file`, and
 - The `file` field path format is configurable
 - The `output` field is formatted using the same strategy as `file`; on
   formatting failure, Bear falls back to the original unformatted path
-- Supported path resolution strategies:
-  - `as-is` (default) -- preserve the path exactly as observed during
-    interception, no transformation applied
-  - `absolute` -- convert to an absolute path; does not require the path
-    to exist on disk
-  - `relative` -- convert to a path relative to the base directory
-  - `canonical` -- resolve to the canonical path (resolves symlinks, `.`
-    and `..` components); requires the path to exist on disk
+- Four formatting behaviors are supported:
+  - preserve the path exactly as observed during interception, with no
+    transformation applied (the default)
+  - make the path absolute; the path need not exist on disk
+  - make the path relative to the entry's directory
+  - resolve symlinks and normalize `.` and `..` components; the path
+    must exist on disk at the time the output is written
 - The `directory` field value is the process working directory of the
   intercepted command, formatted according to the chosen strategy using
   itself as the base
 - The `file` field is resolved relative to the (already formatted)
   `directory` field
-- On Windows, the `canonical` resolver strips the extended-length path
-  prefix (`\\?\`) that Windows canonicalization produces, because tools
-  like clangd do not understand it (GitHub issue #683)
+- On Windows, the symlink-resolving format strips the extended-length
+  path prefix (`\\?\`) that Windows canonicalization produces
+  (GitHub issue #683)
 
 ## Non-functional constraints
 
-- The `canonical` resolver requires the file to exist on disk at the time
-  Bear writes the output
-- The `absolute` resolver does not require the file to exist (it joins
-  the path against the working directory without touching the
-  filesystem)
-- Path resolution adds minimal overhead for `as-is` (no-op) and `absolute`
-  (string manipulation only); the `canonical` resolver performs syscalls
-  (`stat`, `readlink`) and is slower on large databases
 - Relative path computation handles cross-directory references correctly
   (e.g. `../../other/dir/file.c`)
+
+## Known limitations
+
+- Paths inside the `arguments` array (include paths, output paths in
+  flags) are deliberately not transformed. Rewriting them would require
+  a compiler-flag-aware path rewriter, which is complex and error-prone.
 
 ## Testing
 
@@ -108,6 +105,3 @@ Given path format for directory set to `relative`:
   output.
 - GitHub issue #612 requested canonical/realpath support to work around
   clangd issues with symlinked source trees.
-- The `arguments` array paths (include paths, output paths in flags) are
-  intentionally not transformed. Transforming them would require a
-  compiler-flag-aware path rewriter, which is complex and error-prone.

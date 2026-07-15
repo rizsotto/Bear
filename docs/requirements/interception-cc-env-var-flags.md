@@ -23,25 +23,6 @@ quoting, metacharacters, command substitutions -- belongs in `CFLAGS` /
 and goes no further. The man page points users at `CFLAGS` for
 anything that does not fit that shape.
 
-## Scope
-
-This feature targets Unix and Unix-like environments: Linux, macOS,
-BSD, and the Unix-like shells hosted on Windows (MSYS2, Git Bash,
-WSL). The `CC`/`CXX` convention is a Unix / GNU Make inheritance.
-
-Native Windows build tooling picks compilers through different
-channels. MSBuild resolves the compiler from project files and the
-installed Visual Studio / Build Tools toolchain; `nmake` does not
-inherit `CC`/`CXX` from the environment by default (its predefined
-macros are read from makefiles or passed with `/E`, not from the
-process environment); `cmd` and PowerShell have no `CC` convention
-of their own. None of these pathways read `CC`/`CXX` environment
-variables, so on a native Windows build the feature has no
-observable effect. The Windows use case Bear targets is running a
-Unix-convention build (e.g. `make`) under one of the Unix-like
-shells named above -- the same scenario the rest of Bear's wrapper
-mode is built for on Windows.
-
 ## Acceptance criteria
 
 - Wrapper mode splits a compiler env var into `(program, flags)` on
@@ -58,11 +39,19 @@ mode is built for on Windows.
 
 ## Non-functional constraints
 
-- No shell parser or subprocess is involved.
+- Platform support: Unix and Unix-like environments -- Linux, macOS,
+  BSD, and the Unix-like shells hosted on Windows (MSYS2, Git Bash,
+  WSL). The `CC`/`CXX` convention is a Unix / GNU Make inheritance.
 - A flagless value (a bare name such as `CC=gcc` or an absolute path
   such as `CC=/usr/bin/gcc`) and an unset variable follow the ordinary
   wrapper-mode resolution owned by `interception-wrapper-mechanism`;
   the whitespace split is observable only when flag tokens are present.
+
+## Known limitations
+
+- No observable effect on a native Windows build: native Windows build
+  tooling (MSBuild, `nmake`, `cmd`, PowerShell) does not read
+  `CC`/`CXX` from the environment.
 
 ## Testing
 
@@ -99,8 +88,7 @@ Given a ccache masquerade directory on PATH and a real compiler past it:
 > masquerade directory,
 > and the override for `CC` still contains `-std=c11`.
 
-Given a Unix-like shell on Windows producing forward-slash paths (see
-Scope):
+Given a Unix-like shell on Windows producing forward-slash paths:
 
 > When `CC="C:/tools/fake-cc.exe -DBEAR_TEST=1"`,
 > then the wrapper is registered for `fake-cc.exe`,

@@ -8,6 +8,19 @@ compiler. If Bear records that path, the build loops the wrapper into
 itself. Several fixes were considered before settling on "resolve past
 the masquerade dir and record the real compiler".
 
+How the loop arises: masquerade wrappers (ccache, distcc, icecream,
+colorgcc, buildcache) install a directory of symlinks named after real
+compilers and prepend it to PATH; a bare `gcc` then resolves to the
+wrapper, which looks up the real compiler further along PATH (skipping
+its own symlinks) and forwards the call. Bear's wrapper mode prepends
+its own directory of compiler-named links to PATH as well. A wrapper
+that recognises itself only by symlink comparison cannot tell Bear's
+link from a real compiler, selects it as the "real" `gcc`, and the two
+forward to each other without end. distcc avoids that specific loop by
+stripping every PATH entry up to and including its own directory, but
+that also drops Bear's directory, silently breaking nested
+interception.
+
 ## Decision
 
 Filter Bear's own lookup PATH so resolution lands on the real compiler
@@ -15,6 +28,14 @@ past any masquerade directory, and record that path. Do not touch the
 child's PATH or set ccache-specific variables.
 
 ## Consequences
+
+Detecting a masquerade wrapper by resolving the symlink of the
+discovered path, rather than matching a list of known directory
+locations, covers distribution-local masquerade setups automatically:
+any installer that symlinks compiler names to a wrapper binary is
+caught, with no per-distro path table to maintain. The cost is missing
+a masquerade installed as a shell script or hard copy, which no major
+distro ships.
 
 The rejected alternatives were each narrower or more fragile:
 

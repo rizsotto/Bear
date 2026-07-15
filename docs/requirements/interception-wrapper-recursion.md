@@ -17,24 +17,6 @@ discovery time. The price is that while Bear is observing the build,
 tools like ccache are not exercised -- the build sees the real compiler
 directly. This is intentional: Bear observes, it does not optimise.
 
-## Background: how masquerade wrappers break Bear
-
-Compiler masquerade wrappers (ccache, distcc, icecream, colorgcc,
-buildcache) install a directory of symlinks named after real compilers
-and prepend it to PATH; a bare `gcc` then resolves to the wrapper, which
-looks up the real compiler further along PATH (skipping its own
-symlinks) and forwards the call. Bear's wrapper mode prepends its own
-directory of compiler-named links to PATH as well. A wrapper that
-recognises itself only by symlink comparison cannot tell Bear's link
-from a real compiler, selects it as the "real" `gcc`, and the two
-forward to each other without end. distcc avoids that specific loop by
-stripping every PATH entry up to and including its own directory, but
-that also drops Bear's directory, silently breaking nested interception.
-
-Detection is by symlink resolution rather than by matching known
-directory paths, so distribution-local masquerade setups are covered as
-long as their installer symlinks compiler names to a wrapper binary.
-
 ## Acceptance criteria
 
 - Wrapper mode completes without hanging when any supported masquerade
@@ -53,19 +35,25 @@ long as their installer symlinks compiler names to a wrapper binary.
 
 - Detection must be pure filesystem inspection. No subprocess may be
   spawned to identify a wrapper (cost, trust).
+- Detection is based on resolving the invoked path's symlink, not on
+  matching known directory locations, so distribution-local masquerade
+  setups are covered as long as the installer symlinks compiler names
+  to a wrapper binary.
 - Resolution failure for one compiler must not fail Bear overall;
   other compilers are still registered.
-- The set of recognised wrapper names is fixed in source. Uncommon
-  or locally built wrappers that do not match are not detected; the
-  user can either unset them from PATH or use preload mode.
-- Detection is symlink-based. A masquerade wrapper installed as a
-  shell script or hard copy (rather than a symlink) is out of scope
-  and will not be detected. All major distros (Debian/Ubuntu,
-  Fedora, Arch, Gentoo, macOS Homebrew) ship masquerade dirs as
-  directories of symlinks, so this is a theoretical gap. If a
-  non-symlink masquerade does surface in the wild, extend detection
-  rather than widening the classification helper to read file
-  contents.
+
+## Known limitations
+
+**Fixed set of recognised wrapper names**: uncommon or locally built
+masquerade wrappers whose names are not in the recognised set are not
+detected -- kept fixed so detection stays a cheap, trusted filesystem
+check. The user can unset such wrappers from PATH or use preload mode.
+
+**Symlink-only detection**: a masquerade wrapper installed as a shell
+script or hard copy (rather than a symlink) is not detected -- accepted
+because all major distros (Debian/Ubuntu, Fedora, Arch, Gentoo, macOS
+Homebrew) ship masquerade dirs as directories of symlinks, so this is
+a theoretical gap.
 
 ## Testing
 

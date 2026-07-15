@@ -39,10 +39,21 @@ in the output based on the source file path.
 
 ## Non-functional constraints
 
-- Filtering is a streaming operation with O(r) cost per entry, where r is
-  the number of rules
 - No filesystem access is performed during matching (no stat calls, no
   symlink resolution)
+
+## Known limitations
+
+- Symlinks are not resolved during matching. A rule for `/real/path` will
+  not match a file accessed via `/symlink/path` even if they point to the
+  same location. Users who need symlink-aware filtering should use the
+  `canonical` path format (`output-path-format`) so that file paths are
+  resolved before matching.
+- For a single-translation-unit invocation whose sources straddle an
+  included and an excluded directory, only the representative source's
+  path is consulted: a rule that matches one of the unit's other sources
+  has no effect on whether the unit is kept. Such an input does not occur
+  in real builds; the gap is accepted without a dedicated test.
 
 ## Testing
 
@@ -105,17 +116,6 @@ Given a rule with an empty path:
 
 - GitHub issue #261 was the original feature request for include/exclude
   filters on the output.
-- Symlinks are not resolved during matching. A rule for `/real/path` will
-  not match a file accessed via `/symlink/path` even if they point to the
-  same location. Users who need symlink-aware filtering should use the
-  `canonical` path format (`output-path-format`) so that file paths are resolved
-  before matching.
-- A single-translation-unit invocation whose sources straddle an included
-  and an excluded directory is filtered solely by its representative
-  source's path. The whole unit is kept or dropped together. The input
-  that would expose this (one target whose sources span both sides of a
-  rule boundary) does not occur in real builds, so there is no dedicated
-  test and no behaviour change for the common case.
 
 ## Rationale
 

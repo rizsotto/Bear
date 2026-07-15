@@ -27,8 +27,6 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
 - Co-resident preload libraries (e.g. Gentoo's `libsandbox.so`) are
   preserved in the preload variable
 - Reporting failures do not affect the build process
-- The preload library path and collector address are communicated via
-  environment variables, not hard-coded
 
 ## Non-functional constraints
 
@@ -37,12 +35,19 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
 - Platform: Linux and BSD systems (`LD_PRELOAD`), macOS
   (`DYLD_INSERT_LIBRARIES`)
 - Not supported on Windows (no equivalent mechanism)
-- Not supported on macOS when SIP is enabled (the dynamic linker
-  strips `DYLD_INSERT_LIBRARIES` for protected executables)
-- Statically linked executables are not affected by the preload
-  mechanism -- this is a fundamental limitation of the approach
+- Not supported on macOS when SIP is enabled (see Known limitations)
 
 ## Known limitations
+
+**Statically linked executables**: a statically linked executable does
+not load the dynamic linker, so the preload mechanism cannot intercept
+it -- a fundamental limitation of the approach.
+
+**Environment stripped before `execvp`** (and other `exec` variants
+without an explicit environment argument): the preload library restores
+the preload variable only when the call passes an explicit `envp`. If
+the build removes `LD_PRELOAD` from its environment and then spawns
+children via `execvp`, grandchild processes may not be intercepted.
 
 **Wrong ELF class during cross-compilation** (issue #236): the preload
 library is built for the host architecture, so when the build invokes a
@@ -88,16 +93,13 @@ Given a build system that clears the environment:
 > launched via `execve` (or another function with an explicit `envp`),
 > then the preload library restores `LD_PRELOAD` in the child,
 > and the compilation is still intercepted and appears in the output.
-> Note: `execvp` does not receive explicit environment doctoring; if
-> the build uses `execvp` after stripping `LD_PRELOAD`, grandchild
-> processes may not be intercepted.
 
 Given a parallel build with multiple source files:
 
 > When the user runs `bear -- make -j4` on a project with four source
 > files,
 > then all four compilations appear in `compile_commands.json`,
-> and no reports are lost due to concurrent TCP connections.
+> and no reports are lost.
 
 Given a build whose last compiler reports immediately before the build
 process exits:

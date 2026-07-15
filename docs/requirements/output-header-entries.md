@@ -9,8 +9,8 @@ Editors and linters that consume `compile_commands.json` frequently look up
 compile flags for header files, not only for translation units, so that
 features like "jump to definition" or "find references" work when a header is
 open. A user can opt in to having header files receive a synthesized entry
-derived from a compiled translation unit. This is off by default: without
-configuration the output is byte-identical to today.
+derived from a compiled translation unit. This is off by default: with no
+such configuration the output is unchanged.
 
 ## Acceptance criteria
 
@@ -35,13 +35,6 @@ configuration the output is byte-identical to today.
   duplicated.
 - When the option is disabled (the default), no synthesized entries appear in
   the output.
-
-## Non-functional constraints
-
-Streaming is preserved: memory use is proportional to the number of
-directories considered, not to the number of entries in the database.
-Directory scanning reads each directory at most once regardless of how many
-translation units or headers it contains.
 
 ## Testing
 

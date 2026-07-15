@@ -6,8 +6,8 @@ status: implemented
 ## Intent
 
 Build systems may invoke the compiler for the same source file more than
-once - parallel make retries, ccache wrappers, or repeated builds with
-`--append` after a file's flags change. The compilation database
+once - parallel make retries, ccache wrappers, or repeated builds that
+append to an existing database after a file's flags change. The compilation database
 specification (<https://clang.llvm.org/docs/JSONCompilationDatabase.html>)
 allows multiple entries for the same file, noting this is for "different
 configurations", but stale duplicates confuse downstream tools and let old
@@ -37,8 +37,6 @@ the set of fields that distinguish entries.
   single entry under the default match; the driver or wrapper invocation
   survives because it is emitted first in the event stream
 - Accepted entries appear in the output in the same order they were received
-- The set of fields used for matching is configurable via the `duplicates`
-  section in the configuration file
 - Configuration validation rejects:
   - Empty field lists
   - Duplicate fields in the list
@@ -47,12 +45,8 @@ the set of fields that distinguish entries.
 
 ## Non-functional constraints
 
-- The first occurrence of each identical entry is kept and later
-  duplicates are dropped
-- Entries are processed as a stream, one at a time, without buffering
-  the whole input; every unique entry seen so far is remembered for the
-  rest of the run, so a duplicate is detected no matter how far apart the
-  two occurrences are
+- A duplicate is detected no matter how far apart the two occurrences
+  are in the input
 
 ## Testing
 

@@ -6,8 +6,8 @@ status: implemented
 ## Intent
 
 Bear's `intercept` mode writes a JSON Lines file of captured executions
-to a file the user names, and Bear's `semantic --input <file>` mode reads
-the same file to produce a compilation database. The two modes already
+to a file the user names, and Bear's `semantic` mode reads the same
+file to produce a compilation database. The two modes already
 ship and work today. What is missing is a written contract: users and
 third-party tooling cannot tell which fields are stable, what guarantees
 the format makes, or how to produce a synthetic events file (for example,
@@ -34,7 +34,8 @@ in `crates/intercept/src/lib.rs`.
 | `environment` | object (string->string)  | Environment variables in effect for the program.                           |
 
 The stable subset is the four key names and their JSON types: changing
-any of them requires a major-version bump of the format. Within that
+any of them requires a major-version bump of the format, and across
+major versions compatibility is explicitly allowed to break. Within that
 promise, the *contents* of `environment` are advisory, not stable. Every
 Bear producer applies one shared filter before writing an event: the
 captured variables are reduced to the build-relevant subset - those that
@@ -55,9 +56,10 @@ environment.
   execution event, conforming to the schema above. Lines are
   newline-terminated (`\n`); no comments; no trailing comma; UTF-8
   encoded.
-- `bear semantic --input <file>` accepts any file conforming to the
-  documented schema. The producer of the file does not need to be Bear.
-- `bear semantic --input <file>` is order-independent across lines: the
+- `bear semantic`, reading a named events file, accepts any file
+  conforming to the documented schema. The producer of the file does not
+  need to be Bear.
+- `bear semantic` is order-independent across event lines: the
   same set of events in any order yields a `compile_commands.json` with
   the same set of entries (modulo append-order semantics defined by
   `output-append`).
@@ -74,15 +76,16 @@ environment.
 - `bear semantic` reads the event stream from standard input by default
   (naming an input file is the explicit case), and any non-executing
   producer may write the stream to standard output, so the format is
-  pipeable with no flags (`<producer> | bear semantic`). Diagnostics go
+  pipeable with no flags. Diagnostics go
   to stderr, keeping stdout machine-readable. When the event stream is
   about to be read from a terminal, or turned out to contain no events,
   a stderr notice says so - a filter reading an interactive or empty
   stdin is almost always a plumbing mistake.
-- A mode that runs the build does not accept `-` for output: the
-  intercepted build's own stdout shares that stream and would corrupt it
-  (a non-atomic write can split a JSON line), so `bear intercept` writes
-  events only to a file - and because no stream fallback exists, it has
+- A mode that runs the build does not accept the standard stream as the
+  event-file destination: the intercepted build's own output shares that
+  stream and would corrupt it (a non-atomic write can split a JSON
+  line), so `bear intercept` writes events only to a file - and because
+  no stream fallback exists, it has
   no default destination either: the event file must be named
   explicitly, and omitting it is a usage error reported before the
   build runs.
@@ -90,7 +93,7 @@ environment.
 ## Non-functional constraints
 
 - The format must round-trip: events produced by `bear intercept` must
-  always be accepted by `bear semantic --input`. A regression in either
+  always be accepted by `bear semantic`. A regression in either
   direction is a bug.
 - The format must remain JSON Lines, not a single JSON array. This
   matters for streaming producers and for fault-tolerant readers
@@ -145,10 +148,9 @@ within the same major-version line:
 - Issue #644 -- the demand signal for a documented interchange
   contract. Bear ships one producer on this seam; see
   [`interception-events-from-shell-text`](interception-events-from-shell-text.md).
-- Out of scope: backward compatibility guarantees across major versions;
-  those are explicitly allowed to break. A build-log parser is out of
-  scope *for this requirement* - it defines only the interchange
-  contract; a producer is a separate contract that depends on this one.
+- A build-log parser is out of scope *for this requirement* - it defines
+  only the interchange contract; a producer is a separate contract that
+  depends on this one.
 
 ## Rationale
 

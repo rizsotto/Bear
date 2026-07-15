@@ -47,10 +47,7 @@ contract below must hold identically in every mode.
 ## Non-functional constraints
 
 - Platform support: Linux, macOS, BSD, and Windows
-- Bear must not interfere with the build tool's own signal handling.
-  Build drivers such as `make -j`, `ninja`, and `cmake --build`
-  install their own handlers to stop their workers on termination;
-  Bear relies on that behaviour rather than re-implementing it
+- Bear must not interfere with the build tool's own signal handling
 - Running a build under `bear --` must add no perceptible delay
   compared with running the same command directly
 

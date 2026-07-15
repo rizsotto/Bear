@@ -32,8 +32,7 @@ gets a compilation database without modifying the build system.
 ## Non-functional constraints
 
 - Must not alter build output or exit codes
-- Must handle concurrent builds (parallel make) -- each wrapper opens
-  its own TCP connection for reporting
+- Must handle concurrent builds (parallel make) without losing reports
 - Platform: works on all supported platforms (Linux, macOS, FreeBSD,
   Windows)
 - The wrapper binary path must be discoverable at runtime, not baked in
@@ -132,8 +131,6 @@ Given a successful build:
   interception mode using `LD_PRELOAD`).
 - Related requirement: `interception-wrapper-recursion` (ccache
   recursion prevention in wrapper mode).
-- A wrapper executable stands in for the real compiler on PATH; the
-  build system invokes it in place of the compiler it expects.
 - The default mode per platform and the configuration override are
   owned by `interception-mode-selection`.
 

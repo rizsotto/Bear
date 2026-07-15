@@ -80,6 +80,12 @@ Two further forces shaped the design:
   tree, and the group-kill technique is borrowed from the existing watchdog.
 - The poll and its up-to-100ms latency are gone; teardown reacts at signal
   speed, inside the budget.
+- Build drivers such as `make -j`, `ninja`, and `cmake --build` install
+  their own handlers to stop their workers on termination; forwarding the
+  real signal leaves that behaviour intact, so Bear relies on it rather
+  than re-implementing per-tool worker teardown. This is why the
+  requirement constrains Bear not to interfere with the build tool's own
+  signal handling.
 - The child leaves Bear's process group, so the tty no longer delivers
   Ctrl-C to the build directly - Bear becomes the sole conduit. This is what
   makes reliable tree-kill and real-signal forwarding possible and fixes

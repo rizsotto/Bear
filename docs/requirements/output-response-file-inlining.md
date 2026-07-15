@@ -109,6 +109,12 @@ relative to the original invocation's working directory.
 - Reading the response file happens on the host where Bear runs.
   The path the build recorded must be reachable from that host.
 
+## Known limitations
+
+- Compiler-specific response-file flags that use a different syntax
+  than `@file` are not inlined: nvcc's `--options-file` / `-optf`
+  and IBM XL's `-qoptfile` arguments pass through literally.
+
 ## Testing
 
 Given a build that runs
@@ -180,8 +186,3 @@ through a cycle:
   of an entry. This requirement does not change it.
 - Related: `interception-events-format` records argv as observed by
   interception. This requirement does not affect it.
-- Out of scope for the first iteration: compiler-specific
-  response-file flags that use a different syntax than `@file`,
-  such as nvcc's `--options-file` / `-optf` and IBM XL's
-  `-qoptfile`. They can be added later as additional acceptance
-  criteria if a user need arises.

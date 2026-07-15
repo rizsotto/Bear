@@ -30,15 +30,17 @@ ability to override Bear's guess when needed.
   result. The key is the canonical executable path -- except for a
   masquerade link (below), whose key is the invoked path, because the
   answer depends on the name the wrapper was called by.
-- The probe is the sole classifier for ambiguous names. The compiler
-  recognition regex (`gcc.yaml` and friends) deliberately does not list
-  `cc`/`c++`, so when the probe declines (timeout, unrecognizable
-  output, failed spawn, non-zero exit) recognition returns
-  `NotRecognized` rather than guessing.
+- The probe is the sole classifier for ambiguous names. Static name
+  recognition (owned by `recognition-compiler-names`) deliberately
+  excludes the ambiguous names, so when the probe declines (timeout,
+  unrecognizable output, failed spawn, non-zero exit) the execution is
+  not classified and no database entry is produced for it -- Bear never
+  guesses.
 - Probes never deadlock. Stdin is closed; the call returns within a bounded
   time budget even for hung children.
 - Probes do not recursively re-enter Bear's own interception.
-- A user `compilers:` config entry for a path takes priority over the
+- A user compiler-override configuration entry mapping a path to a
+  compiler family (the man page names the key) takes priority over the
   probe and disables it for that path. The entry matches the executable
   as the build spelled it, after canonicalization, or -- when the build
   spelled a bare name -- by the configured path's filename. When two
@@ -57,11 +59,12 @@ ability to override Bear's guess when needed.
   toolchain. Unrecognizable passthrough output declines as usual.
 - Names that are not in the ambiguous set are never probed; they
   resolve by the static name rules owned by `recognition-compiler-names`.
-- On non-Unix targets (Windows) the probe is not available and the
-  recognizer wires up a no-op probe. Windows toolchains use unambiguous
-  basenames (`cl.exe`, `clang-cl`, `gcc.exe`) that the regex layer
-  classifies directly. Bare `cc`/`c++` on Windows falls through to
-  `NotRecognized`; in practice no Windows toolchain installs them.
+- On non-Unix targets (Windows) the probe is not available and probing
+  is a no-op. Windows toolchains use unambiguous basenames (`cl.exe`,
+  `clang-cl`, `gcc.exe`) that name-based recognition (owned by
+  `recognition-compiler-names`) classifies directly. Bare `cc`/`c++` on
+  Windows is not classified and produces no database entry; in practice
+  no Windows toolchain installs them.
 
 ## Non-functional constraints
 
@@ -96,7 +99,7 @@ Given a host where `/usr/bin/cc` is GCC:
 Given any host:
 
 > When Bear recognizes the same `cc` path 1000 times in one run,
-> then the executable is fork-exec'd at most once for probing.
+> then the executable is spawned at most once for probing.
 
 Given a user config containing `compilers: [{ path: /usr/bin/cc, as: gcc }]`:
 
@@ -113,18 +116,18 @@ Given an executable that hangs on `--version`:
 
 > When Bear probes it,
 > then the call returns within the configured timeout
-> and the execution is reported as `NotRecognized`
-> (no entry is written; there is no regex fallback for ambiguous names).
+> and no database entry is produced for the execution
+> (there is no name-based fallback for ambiguous names).
 
 Given an executable named `cc` whose `--version` output contains no
 recognizable signature (e.g. a custom wrapper that prints a vendor
 banner):
 
 > When Bear recognizes it,
-> then the probe declines, recognition returns `None`,
-> and the execution is reported as `NotRecognized`.
-> The user can recover the entry by adding the path to
-> `compilers:` with an explicit `as:` field.
+> then the probe declines, the execution is not classified,
+> and no database entry is produced for it.
+> The user can recover the entry with a compiler-override
+> configuration entry that maps the path to a compiler family.
 
 Given an executable that reads from stdin on `--version`
 (e.g. a misplaced `bash` in PATH named `cc`):
@@ -152,32 +155,31 @@ Given the same masquerade link, where the passthrough `--version` output
 matches no known signature:
 
 > When Bear recognizes it,
-> then the probe declines and the execution is reported as
-> `NotRecognized` -- the same conservative failure as any other
+> then the probe declines and no database entry is produced for
+> the execution -- the same conservative failure as any other
 > unclassifiable ambiguous name.
 
 ## Notes
 
 - Override mechanism: by user request, the only way to disable the probe
-  for a given path is to declare it in `compilers:`. There is no
-  process-wide off switch; the override is per-path and explicit.
+  for a given path is a compiler-override configuration entry for that
+  path. There is no process-wide off switch; the override is per-path
+  and explicit.
 - A bare ambiguous name is probed by executing it as spelled, letting
   the operating system resolve it through Bear's own `PATH`. Bear does
   not resolve the name itself, and it never rewrites the executable it
   records (see `output-json-compilation-database`).
-- `gcc.yaml` carries a comment explaining why `cc`/`c++` are absent from
-  its recognize list.
 - `CC` joined the ambiguous set for the HPE Cray PrgEnv wrapper (see
-  `recognition-compiler-names.md` for the Cray CCE names and the
+  `recognition-compiler-names` for the Cray CCE names and the
   PrgEnv wrappers in its Acceptance criteria and Recognized names
   table): the same reasoning as `cc`/`c++` applies verbatim, no change
-  to the classifier itself was needed. `CC` cannot be a static regex
-  entry either: a static mapping would be wrong on every programming
-  environment except the one it hardcoded, and on a case-insensitive
-  filesystem it would shadow `cc`.
+  to the classifier itself was needed. `CC` cannot be a statically
+  recognized name either: a static mapping would be wrong on every
+  programming environment except the one it hardcoded, and on a
+  case-insensitive filesystem it would shadow `cc`.
 
 ## Rationale
 
 - [Cached version probe as sole classifier](../rationale/ambiguous-cc-version-probe.md) -
-  why the probe replaces per-OS defaults, a regex fallback, and the
-  per-invocation probe (PR #695).
+  why the probe replaces per-OS defaults, a name-recognition fallback,
+  and the per-invocation probe (PR #695).

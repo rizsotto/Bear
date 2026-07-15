@@ -16,10 +16,11 @@ diagnostics.
 
 ## Acceptance criteria
 
-- The source-extension table recognizes the standard C++20 module-interface
-  extensions: `.cppm`, `.ixx`, `.mxx`, `.ccm`, `.cxxm`, `.c++m`.
-- Bear's per-compiler flag recognition classifies the following flags so
-  they do not break recognition or argument-arity tracking:
+- A compilation whose source file has one of the standard C++20
+  module-interface extensions -- `.cppm`, `.ixx`, `.mxx`, `.ccm`,
+  `.cxxm`, `.c++m` -- produces a database entry.
+- The following flags never swallow a following source file and never
+  suppress or corrupt the entry:
   - `--precompile` (Clang module-interface compile)
   - `-fmodule-file=*` (Clang/GCC, including the `<name>=<file>` form)
   - `-fmodule-map-file=*`
@@ -44,6 +45,12 @@ diagnostics.
 
 - The recognition layer must remain extension-driven for the source check.
   Probe-based detection of module-interface units is out of scope.
+
+## Known limitations
+
+Module dependency-graph awareness, BMI cache discovery, and module-map
+authoring are accepted exclusions: this contract covers capturing the
+module compilation invocations and nothing more.
 
 ## Testing
 
@@ -76,10 +83,3 @@ Given a GCC build using `-fmodules-ts`:
 ## Notes
 
 - Demand: issue #637.
-- Source-extension list lives at
-  `crates/bear/src/semantic/interpreters/matchers/source.rs`.
-- Flag tables live in `crates/bear/compilers/clang.yaml` and
-  `crates/bear/compilers/gcc.yaml`.
-- Out of scope: module dependency-graph awareness, BMI cache discovery,
-  and any module-map authoring. This requirement is strictly about
-  capturing the invocations.
