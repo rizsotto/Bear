@@ -112,9 +112,6 @@ Given `icecc gcc -c main.c`:
   commands on the icecream cluster, not compiler invocations, so
   recognizing it would record non-compilations. Same reasoning as the
   `mpirun`/`mpiexec` exclusion in `recognition-compiler-names`.
-- Distinct from `interception-wrapper-recursion`, which covers a
-  different mechanism: PATH-masquerade loop prevention in Bear's own
-  wrapper-mode interception (the `bear-wrapper` binary standing in for
-  the real compiler on macOS/Windows). This requirement covers
-  recognition-time classification of an explicit launcher invocation
-  appearing in the build's own argv, in any interception mode.
+- Distinct from `interception-wrapper-recursion`, which owns loop
+  prevention for Bear's own wrapper-mode interception; this file owns
+  recognition of launcher invocations appearing in the build's own argv.

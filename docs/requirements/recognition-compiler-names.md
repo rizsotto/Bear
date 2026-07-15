@@ -22,12 +22,11 @@ The shared contract for every recognized name below:
 - The recorded arguments are the invocation as executed. A wrapper or
   driver is never expanded to the underlying compiler command; the name
   the build invoked is what the entry records.
-- An info-only invocation yields no entry. This includes the MPI
-  wrapper-info options (`mpicc -showme`, `-show`, `-compile_info`,
-  `-link_info`) and the general information-only cases (`--version`,
-  `--help`, and the like) whose contract is owned by
-  `output-compilation-entries`; that requirement is the single source
-  for the full list.
+- An info-only invocation yields no entry. The general
+  information-only contract (`--version`, `--help`, and the like) is
+  owned by `output-compilation-entries`; the MPI wrapper-info options
+  (`mpicc -showme`, `-show`, `-compile_info`, `-link_info`) are this
+  requirement's own addition to that contract.
 - The classic GNU and LLVM driver names (the first two table rows) are
   also recognized when spelled with a cross-compilation target prefix
   (`arm-linux-gnueabihf-gcc`, `aarch64-linux-gnu-clang`), a version

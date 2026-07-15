@@ -198,8 +198,11 @@ Given a build where every candidate entry fails validation:
 ## Notes
 
 - The specification allows multiple entries for the same file (different
-  configurations). Bear does not merge or deduplicate across configurations
-  unless the duplicate filter removes them (see `output-duplicate-detection`).
+  configurations). By default one entry per `directory` and `file` pair
+  survives -- arguments are ignored by the match, so differing
+  configurations of the same file collapse; keeping several requires
+  widening the fields entries are matched on (owned by
+  `output-duplicate-detection`).
 - Path formatting for the `file` and `directory` fields is configurable;
   see `output-path-format` for details.
 - The `arguments[0]` spelling contract responds to issues #240, #678,

@@ -91,8 +91,7 @@ reading it:
 > `source.c` the pipe, waits for the compiler to block, then sends a
 > termination signal to the `bear` process (standing in for the
 > interactive Ctrl-C),
-> then both `bear` and the compiler terminate within the time budget,
-> and `bear` exits with a non-zero status.
+> then both `bear` and the compiler terminate within the time budget.
 
 Given a build script that installs distinct traps for `SIGINT` and
 `SIGTERM` -- each trap writes its own marker file and exits with its own
