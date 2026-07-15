@@ -39,6 +39,13 @@ Given a Linux host and no interception configuration:
 > evidence that the preload mechanism is active, since wrapper mode
 > never observes the shell.
 
+Given a macOS or Windows host and no interception configuration:
+
+> When the user runs `bear -- make`,
+> then the wrapper directory is present in the working directory while
+> the build runs -- evidence that the wrapper mechanism is the platform
+> default there.
+
 Given a Linux host and a configuration forcing wrapper mode:
 
 > When the user runs `bear --config config.yaml -- sh build.sh`,

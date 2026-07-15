@@ -36,8 +36,21 @@ off by default: with no such configuration the output is unchanged.
   database contains `main.cpp` only.
 - Given the same events and no file-pattern configuration, when bear runs, then
   the database contains both files.
-- Given a rule whose pattern contains a path separator, when bear runs, then the
-  pattern is matched against the full source path rather than the basename.
+- Given events compiling `src/main.cpp` and `generated/main.cpp`, and a
+  configuration excluding the pattern `generated/*.cpp`, when bear runs, then
+  the database contains `src/main.cpp` and omits `generated/main.cpp`: the
+  pattern contains a path separator, so it is matched against the full source
+  path rather than the basename.
+- Given events compiling `main.cpp` and `util.cpp`, and a configuration with
+  an exclude rule for `*.cpp` followed by an include rule for `main.cpp`, when
+  bear runs, then the database contains `main.cpp` only: the later include
+  rule re-includes it (last matching rule wins), while `util.cpp` stays
+  excluded.
+- Given events compiling `src/main.cpp` and `src/moc_window.cpp`, a directory
+  rule including `src`, and a file-pattern rule excluding `moc_*.cpp`, when
+  bear runs, then the database contains `src/main.cpp` and omits
+  `src/moc_window.cpp`: an entry is emitted only when both the directory rules
+  and the file-pattern rules accept it.
 - Given a configuration containing a malformed pattern, when the configuration
   is validated, then validation fails with an error identifying the rule.
 

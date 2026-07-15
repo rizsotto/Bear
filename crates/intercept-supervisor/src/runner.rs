@@ -766,6 +766,28 @@ mod test {
         assert!(sut._wrapper_directory.is_none());
     }
 
+    // Requirements: interception-mode-selection
+    #[test]
+    fn test_create_preload_rejected_when_preload_unsupported() {
+        // The fixture defaults to preload_supported=false, modelling a host
+        // where library injection is unavailable (Windows, macOS with SIP).
+        let fx = fixture::Fixture::new();
+
+        let sut = BuildEnvironment::create_as_preload(&fx.context(), fixture::test_address());
+
+        let Err(error) = sut else {
+            panic!("forced preload must be rejected when unsupported");
+        };
+        assert!(
+            matches!(error, ConfigurationError::UnsupportedInterceptMode(_)),
+            "expected UnsupportedInterceptMode, got: {error:?}",
+        );
+        assert!(
+            error.to_string().contains("wrapper mode"),
+            "error must name wrapper mode as the alternative: {error}",
+        );
+    }
+
     #[test]
     fn test_wrapper_environment_path_setting_when_it_was_empty_before() {
         let fx = fixture::Fixture::new();

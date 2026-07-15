@@ -59,9 +59,6 @@ of the compiler that produced the entry:
   group tokens; backslash escaping is positional and only meaningful
   next to quote characters.
 
-The compiler family used for tokenization is the one Bear already
-identified for the entry; no new detection is introduced.
-
 ### Nested `@file` references are expanded recursively
 
 If a response file itself contains `@file` tokens, those are
@@ -96,9 +93,6 @@ relative to the original invocation's working directory.
 - Inlined tokens participate in flag classification, link-only
   stripping, and the one-entry-per-source rule (see
   `output-compilation-entries`) exactly like any other argument.
-- Within a given entry, the inlined tokens appear at the position of
-  the original `@file` token, and the relative order of all other
-  arguments is unchanged.
 
 ## Non-functional constraints
 
@@ -158,6 +152,25 @@ Given a build whose response file references another response file
 > then the entry's `arguments` contain the tokens from `inner.resp`
 > spliced through `outer.resp`,
 > and no element of `arguments` starts with `@`.
+
+Given an intercepted invocation `cc @rel.resp -c src.c` whose working
+directory is `/proj`, where `/proj/rel.resp` contains `-DFROM_RESP=1`:
+
+> When the user runs Bear with response-file inlining enabled,
+> then `rel.resp` is read from `/proj` -- resolved relative to the
+> invocation's working directory, even when Bear itself runs from a
+> different directory --
+> and the entry's `arguments` contain `-DFROM_RESP=1`;
+> an absolute reference such as `@/opt/flags.resp` is read from that
+> absolute path as-is.
+
+Given a build that runs `cc -c src.c @flags.resp`, where `flags.resp`
+contains `extra.c`:
+
+> When the user runs Bear with response-file inlining enabled,
+> then the database contains an entry for `extra.c` in addition to the
+> entry for `src.c`: inlined tokens participate in per-source entry
+> shaping like any other argument.
 
 Given a build whose response file has been removed between the
 build and Bear's analysis step:

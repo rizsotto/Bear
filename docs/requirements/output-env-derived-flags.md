@@ -38,15 +38,10 @@ intercepted event record already captures the full environment (see
 
 ### Enabled translation follows the compiler family
 
-- When enabled, the environment variables Bear recognizes for the
-  entry's compiler family are translated into the equivalent flags and
-  added to the entry. The header-search variables above become include
-  flags (an include flag per path, in the order the variable lists
-  them); the MSVC implicit-option variables are spliced before and
-  after the command-line options respectively.
-- The set of variables recognized for each family, and the flag each
-  maps to, is defined per compiler family. This requirement governs
-  only the on/off switch, not the mapping.
+- When enabled, each environment variable Bear recognizes for the
+  entry's compiler family is translated into that family's equivalent
+  flags, preserving the order the variable lists its values, and the
+  resulting flags are folded into the entry's `arguments`.
 
 ## Non-functional constraints
 
@@ -56,24 +51,28 @@ intercepted event record already captures the full environment (see
 
 ## Testing
 
-Given a build that runs `cc -c src.c -o src.o` with `CPATH` set to a
-directory in the environment:
+Given a build that runs `cc -c src.c -o src.o` with `CPATH` set to
+`/opt/first:/opt/second` in the environment:
 
 > When the user runs Bear with environment flags enabled (the
 > default),
-> then the entry for `src.c` has `arguments` that include the
-> directory from `CPATH` as an explicit include flag.
+> then the entry for `src.c` has `arguments` that include an explicit
+> include flag for `/opt/first` followed by an explicit include flag
+> for `/opt/second`, in the order `CPATH` lists them.
 
 Given the same build and environment:
 
 > When the user runs Bear with environment flags disabled,
-> then the entry for `src.c` has `arguments` that do not contain the
-> directory from `CPATH`,
+> then the entry for `src.c` has `arguments` that contain neither
+> `/opt/first` nor `/opt/second`,
 > and the arguments are exactly those that appeared on the command
 > line.
 
 ## Notes
 
+- The set of variables recognized for each family, and the flag each
+  maps to, is defined per compiler family; this requirement governs
+  only the on/off switch, not the mapping.
 - Related: `output-compilation-entries` -- the per-source
   transformation these flags participate in.
 - Related: `output-response-file-inlining` -- the sibling option.

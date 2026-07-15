@@ -27,10 +27,10 @@ anything that does not fit that shape.
 
 - Wrapper mode splits a compiler env var into `(program, flags)` on
   whitespace before resolution.
-- `CC="gcc -std=c11"` resolves `gcc` via PATH and registers a wrapper
-  (existing masquerade handling still applies to the program token,
-  see `interception-wrapper-recursion`).
-- `CC="/usr/bin/gcc -m32"` extracts `/usr/bin/gcc` as the program.
+- The program token, whether a bare name or an absolute path, follows
+  the ordinary wrapper-mode resolution (masquerade handling of the
+  token included, see `interception-wrapper-recursion`), and the flag
+  tokens are preserved.
 - The rewritten env var value is the wrapper path followed by the
   original flag tokens, joined with single spaces and without shell
   quoting. When there are no flags, the override is the wrapper path
@@ -55,7 +55,7 @@ anything that does not fit that shape.
 
 ## Testing
 
-### Unit tests (in `crates/bear/src/environment.rs`)
+### Unit tests
 
 Given a wrapper-mode setup with a fake compiler on PATH:
 
@@ -77,9 +77,11 @@ Given a wrapper-mode setup with no flags (regression guard):
 > then the override value equals the wrapper path verbatim (no shell
 > quoting introduced).
 
-Given a whitespace-only value:
+Given an empty or whitespace-only value:
 
-> Then `CC` is skipped.
+> When `CC=""` or `CC="   "`,
+> then no `CC` override appears in the build environment,
+> and a warning is emitted.
 
 Given a ccache masquerade directory on PATH and a real compiler past it:
 
@@ -94,7 +96,7 @@ Given a Unix-like shell on Windows producing forward-slash paths:
 > then the wrapper is registered for `fake-cc.exe`,
 > and the override for `CC` still contains `-DBEAR_TEST=1`.
 
-### Integration test (`tests/integration/tests/cases/intercept.rs`)
+### Integration test
 
 Given a C source file and a build script that runs `$CC -c test.c`:
 

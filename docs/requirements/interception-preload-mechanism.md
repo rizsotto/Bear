@@ -94,6 +94,21 @@ Given a build system that clears the environment:
 > then the preload library restores `LD_PRELOAD` in the child,
 > and the compilation is still intercepted and appears in the output.
 
+Given a build whose steps spawn the compiler through functions other
+than plain `exec`:
+
+> When one step launches `cc -c a.c` via `posix_spawn`, another
+> `cc -c b.c` via `popen`, and a third `cc -c c.c` via `system`,
+> then all three compilations are intercepted and appear in
+> `compile_commands.json`.
+
+Given a build during which the collector is unreachable:
+
+> When the preload library cannot deliver its report for `cc -c test.c`,
+> then the compiler still runs, the build's output and exit code are
+> unchanged, and the only effect is that the entry for `test.c` is
+> missing from the compilation database.
+
 Given a parallel build with multiple source files:
 
 > When the user runs `bear -- make -j4` on a project with four source
@@ -125,11 +140,12 @@ Given an existing `LD_PRELOAD` value in the environment:
 > followed by `/usr/lib/libsandbox.so`,
 > and both libraries are preserved in child processes.
 
-Given a build on macOS with SIP disabled:
+Given preload mode active on a macOS host with SIP disabled (which
+invocations select preload is owned by `interception-mode-selection`):
 
-> When the user forces preload mode via configuration,
-> then `DYLD_INSERT_LIBRARIES` and `DYLD_FORCE_FLAT_NAMESPACE=1` are
-> set,
+> When the build spawns a compiler,
+> then `DYLD_INSERT_LIBRARIES` is set in the environment of the build's
+> child processes,
 > and compiler invocations are intercepted the same way as on Linux.
 
 ## Notes

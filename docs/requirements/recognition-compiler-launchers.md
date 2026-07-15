@@ -13,14 +13,16 @@ launcher's.
 
 ## Acceptance criteria
 
-- An execution of ccache, distcc, or sccache with a real compiler named
-  in its arguments (`ccache gcc -c main.c`, `distcc -j4 clang -c
-  main.c`, `sccache clang++ -c main.c`) yields a database entry for the
-  real compiler, parsed with that compiler's flag semantics.
-- distcc's own flags (`-j`, `--jobs`, `-v`, `--verbose`, `-i`,
-  `--show-hosts`, `--scan-avail`, `--show-principal`) are skipped when
-  locating the real compiler in argv; they are never mistaken for the
-  compiler name.
+- An execution of ccache, distcc, sccache, or icecc with a real
+  compiler named in its arguments (`ccache gcc -c main.c`, `distcc -j4
+  clang -c main.c`, `sccache clang++ -c main.c`, `icecc gcc -c
+  main.c`) yields a database entry for the real compiler, parsed with
+  that compiler's flag semantics.
+- distcc's launcher-only options before the compiler are skipped when
+  locating the real compiler in argv; they are never taken as the
+  compiler name (the recognized set: `-j`, `--jobs`, `-v`,
+  `--verbose`, `-i`, `--show-hosts`, `--scan-avail`,
+  `--show-principal`).
 - A launcher invocation whose argument does not name a recognized
   compiler (for example `ccache make all`), or that has no inner
   argument at all (bare `ccache`), yields no entry.
@@ -37,10 +39,6 @@ launcher's.
   compiler's name with the invocation's own arguments; collapsing it
   with the re-executed real compiler in preload mode is owned by
   `output-duplicate-detection`.
-- icecc follows the identical contract: the real compiler in its
-  arguments is recorded as the compilation. In its launcher usage icecc
-  takes the compiler as its first argument with no launcher-specific
-  flags before it, so nothing needs skipping (unlike distcc).
 
 ## Non-functional constraints
 
@@ -55,14 +53,20 @@ Given `ccache gcc -c main.c`:
 > When Bear recognizes it,
 > then the recorded compiler is `gcc`,
 > and the recorded arguments are `gcc -c main.c` (the `ccache` token is
-> dropped; the real compiler's argv survives).
+> dropped; the real compiler's argv survives),
+> and no version probe process is spawned for the `ccache` name --
+> a launcher's own basename is not ambiguous. This no-probe observable
+> holds for every launcher basename (`ccache`, `distcc`, `sccache`,
+> `icecc`).
 
 Given `distcc -j 4 gcc -c main.c`:
 
 > When Bear recognizes it,
 > then the recorded compiler is `gcc`,
-> and the `-j 4` distcc-only flags do not appear in the recorded
+> and the `-j 4` distcc-only tokens do not appear in the recorded
 > arguments.
+> This scenario is representative of every launcher-only option in
+> the recognized set above.
 
 Given `sccache clang -c main.c`:
 
@@ -80,11 +84,21 @@ launcher):
 > When Bear recognizes it,
 > then no database entry is produced.
 
-Given `ccache`, `distcc`, `sccache`, or `icecc` invoked by its own
-basename:
+Given a bare `ccache` execution with no arguments at all:
 
 > When Bear recognizes it,
-> then no version probe runs and the launcher contract above applies.
+> then no database entry is produced.
+
+Given a ccache masquerade symlink shadowing `gcc` on PATH
+(`/usr/lib/ccache/gcc` resolving to the ccache binary), invoked as
+`gcc -c main.c`:
+
+> When Bear recognizes it,
+> then the recorded compiler is `gcc` as observed,
+> and the recorded arguments are the invocation's own
+> (`gcc -c main.c`).
+> Collapsing this entry with the re-executed real compiler in preload
+> mode is owned by `output-duplicate-detection`.
 
 Given `icecc gcc -c main.c`:
 

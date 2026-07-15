@@ -26,13 +26,11 @@ such configuration the output is unchanged.
 - A synthesized entry clones a compiled translation unit's arguments with the
   source path replaced by the header path and the output-file flag removed;
   the synthesized entry has no output field.
-- Which files count as headers is fixed (a built-in header-extension set); it
-  is not user-configurable.
 - Only translation units for C, C++, and Objective-C sources are eligible to
   donate their arguments to a synthesized header entry.
-- Synthesized entries pass through duplicate detection and validation like any
-  other entry; a header that already has a real entry in the database is not
-  duplicated.
+- Synthesized entries are subject to duplicate detection and validation like
+  any other entry (owned by `output-duplicate-detection`); a header that
+  already has a real entry in the database is not duplicated.
 - When the option is disabled (the default), no synthesized entries appear in
   the output.
 
@@ -78,6 +76,27 @@ headers) outside it:
 > When Bear generates the database with the dependency-files strategy,
 > then the database contains a synthesized entry for exactly the in-scope
 > headers that dependency file lists, and no others.
+
+Given a build that compiles `thing.swift` with `swiftc -c thing.swift`, which
+sits next to an uncompiled `util.h`:
+
+> When Bear generates the database with header entries enabled using the
+> default (same-directory) strategy,
+> then the database contains no entry for `util.h`:
+> only C, C++, and Objective-C translation units donate their arguments.
+
+Given a build that compiles both `src/util.h` directly (`cc -c src/util.h`)
+and `src/main.c` beside it:
+
+> When Bear generates the database with header entries enabled using the
+> default (same-directory) strategy,
+> then the database contains exactly one entry for `src/util.h`
+> (the real entry from the build; no synthesized duplicate is added).
+
+## Notes
+
+- The set of file extensions that count as headers is built-in and
+  deliberately not user-configurable.
 
 ## Rationale
 

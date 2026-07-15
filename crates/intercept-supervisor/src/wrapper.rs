@@ -377,6 +377,7 @@ mod tests {
     }
 
     // U5: normalize_key lowercases and strips .exe on Windows
+    // Requirements: interception-wrapper-mechanism
     #[cfg(windows)]
     #[test]
     fn test_wrapper_config_get_executable_windows_case_insensitive() {

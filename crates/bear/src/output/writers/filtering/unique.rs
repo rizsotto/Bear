@@ -119,6 +119,7 @@ mod tests {
         assert!(matches!(result, Err(ConfigurationError::EmptyFieldList)));
     }
 
+    // Requirements: output-duplicate-detection
     #[test]
     fn test_try_from_failure_duplicate_fields() {
         let config = config::DuplicateFilter {

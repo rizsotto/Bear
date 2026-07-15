@@ -16,8 +16,6 @@ in the output based on the source file path.
 
 - When no directory rules are configured, all entries are included (no
   filtering)
-- When rules are configured, each source file path is evaluated against
-  the rule list
 - An entry that represents a whole invocation as a single translation
   unit (see `output-compilation-entries`) carries one representative
   source in its `file` field; it is filtered as a unit by that single
@@ -35,7 +33,6 @@ in the output based on the source file path.
   paths are compared as literal values
 - Two actions are supported: `include` and `exclude`
 - Empty rule paths are rejected during configuration validation
-- Filtered entries are counted in the pipeline statistics
 
 ## Non-functional constraints
 
@@ -94,10 +91,11 @@ Given a file path that matches no rule:
 > then `lib/external.c` is included (default is include when no rule
 > matches).
 
-Given rules with mixed absolute and relative paths:
+Given an exclude rule for the absolute path `/usr/include`:
 
-> When a rule uses `/usr/include` (absolute) and source files use
-> relative paths, then the rule does not match those relative paths.
+> When a build compiles `src/main.c`, recorded with that relative path,
+> then `src/main.c` is kept in the output: the absolute rule does not
+> match the relative path, and no normalization bridges the two.
 > The user must ensure rule paths match the configured path format
 > (`output-path-format`).
 

@@ -78,19 +78,23 @@ Given a project with a single C source file:
 > compiler (not `.bear/cc`),
 > and the build exit code is preserved.
 
-Given `CC=gcc` (a bare name) in the environment:
+Given `CC=gcc` (a bare name) or `CC=/usr/bin/gcc` (an absolute path) in
+the environment:
 
 > When the user runs `bear -- make`,
-> then Bear resolves `gcc` via PATH to an absolute path
-> (e.g. `/usr/bin/gcc`),
-> creates `.bear/gcc` as a wrapper,
-> and the compilation database contains `/usr/bin/gcc` as the compiler.
+> then Bear resolves the bare name via PATH to `/usr/bin/gcc` (the
+> absolute path needs no resolution),
+> creates `.bear/gcc` as the wrapper in both cases,
+> and the compilation database entry names `/usr/bin/gcc` as the
+> compiler.
 
-Given a build that uses an absolute compiler path (`CC=/usr/bin/gcc`):
+Given a wrapper that cannot reach the collector:
 
-> When the user runs `bear -- make`,
-> then Bear creates `.bear/gcc` pointing to `/usr/bin/gcc`,
-> and the wrapper intercepts the invocation correctly.
+> When the build invokes the wrapper for `cc -c test.c`,
+> then the wrapper still launches the real compiler,
+> the compiler's output is produced,
+> and the build's exit code is the real compiler's exit code -- the
+> failed report costs one database entry, never the build.
 
 Given a parallel build with multiple source files:
 
@@ -107,10 +111,11 @@ Given a build that fails partway through:
 
 Given a Windows build with `CC=cl` (no `.exe` extension):
 
-> When Bear looks up `cl` in the wrapper configuration,
-> then it matches case-insensitively and without requiring the `.exe`
-> extension,
-> and the wrapper is created correctly.
+> When Bear sets up wrapper mode and the build compiles `test.c`,
+> then the wrapper directory contains exactly one wrapper for `cl` --
+> `cl`, `cl.exe`, and `CL.EXE` all match it, case- and extension-
+> insensitively --
+> and the database entry names the real `cl.exe` by absolute path.
 
 Given a build where the compiler is not in any environment variable:
 

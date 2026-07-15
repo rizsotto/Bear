@@ -556,6 +556,88 @@ format:
     Ok(())
 }
 
+/// A header that is BOTH compiled directly by the build and discoverable by
+/// the siblings strategy gets exactly one entry: the real compile streams
+/// first, and the synthesized clone is collapsed by the default duplicate
+/// filter (directory + file).
+// Requirements: output-header-entries
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn header_entries_direct_header_compile_yields_one_entry() -> Result<()> {
+    let env = TestEnvironment::new("header_entries_direct_compile")?;
+
+    env.create_source_files(&[("main.c", "int main() { return 0; }"), ("util.h", "int util(void);")])?;
+
+    // util.h is compiled directly (a precompiled-header build step), then
+    // main.c beside it -- the siblings strategy would synthesize a second
+    // util.h entry from main.c's arguments. The -DDIRECT_COMPILE marker
+    // distinguishes the real compile from the synthesized clone (whose
+    // arguments derive from main.c's and lack the marker), so the assertion
+    // below proves the real entry existed and won first-seen dedup.
+    let build_commands =
+        format!("{cc} -DDIRECT_COMPILE -c util.h\n{cc} -c main.c -o main.o", cc = COMPILER_C_PATH);
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+headers:
+  enabled: true
+  strategy: siblings
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.c"))?;
+
+    let header_entries: Vec<_> = db
+        .entries()
+        .iter()
+        .filter(|entry| entry.get("file").and_then(|v| v.as_str()) == Some("util.h"))
+        .collect();
+    assert_eq!(
+        header_entries.len(),
+        1,
+        "exactly one util.h entry expected (real compile + synthesized clone must dedup): {header_entries:?}"
+    );
+    let survivor_args: Vec<&str> = header_entries[0]
+        .get("arguments")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    assert!(
+        survivor_args.contains(&"-DDIRECT_COMPILE"),
+        "the surviving util.h entry must be the real compile (first seen), not the synthesized clone: {survivor_args:?}"
+    );
+
+    Ok(())
+}
+
 /// Test that with no `headers` configuration, no synthesized header entries
 /// appear in the output: behaviour is unchanged from before header-entry
 /// synthesis existed.
@@ -804,6 +886,75 @@ format:
 
     assert_eq!(file, "src/main.c", "file must be relative to directory, got {file:?}");
     assert!(std::path::Path::new(directory).is_absolute(), "directory must be absolute, got {directory:?}");
+
+    Ok(())
+}
+
+/// With the output field enabled and `file: relative`, the `output` field is
+/// formatted with the same resolver as `file`: an absolute `-o` path observed
+/// at interception is rewritten relative to the directory. Exercised via the
+/// `semantic` subcommand with a hand-crafted event so the observed paths are
+/// exactly known.
+// Requirements: output-path-format
+#[test]
+#[cfg(target_family = "unix")]
+fn output_field_follows_file_path_format() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("output_field_path_format")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let abs_source = format!("{temp_dir}/src/main.c");
+    let abs_output = format!("{temp_dir}/build/main.o");
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", abs_source, "-o", abs_output],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("src/main.c", "int main() { return 0; }"),
+    ])?;
+
+    let config = r#"
+schema: "4.1"
+
+format:
+  paths:
+    directory: absolute
+    file: relative
+  entries:
+    use_array_format: true
+    include_output_field: true
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    let entry = db.entries().first().expect("expected one entry");
+    assert_eq!(
+        entry.get("file").and_then(|v| v.as_str()),
+        Some("src/main.c"),
+        "file must be rewritten relative to the directory"
+    );
+    assert_eq!(
+        entry.get("output").and_then(|v| v.as_str()),
+        Some("build/main.o"),
+        "output must be formatted like file (relative to the directory)"
+    );
 
     Ok(())
 }
@@ -1187,6 +1338,48 @@ sources:
     // Verify duplicate filtering worked
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
+
+    Ok(())
+}
+
+/// Accepted entries appear in the output in the order they were received:
+/// three sources compiled as a.c, b.c, c.c (with a duplicate of a.c in
+/// between, dropped by the default filter) come out in exactly that order.
+/// The bare `gcc` executable with an empty environment keeps the events
+/// host-independent.
+// Requirements: output-duplicate-detection
+#[test]
+fn duplicate_filter_preserves_input_order() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("dup_output_order")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let mut events: Vec<String> = ["a.c", "b.c", "c.c"]
+        .iter()
+        .map(|source| {
+            json!({
+                "executable": "gcc",
+                "arguments": ["gcc", "-c", source],
+                "working_dir": temp_dir,
+                "environment": {}
+            })
+            .to_string()
+        })
+        .collect();
+    // A duplicate of a.c between b.c and c.c: it must be dropped without
+    // disturbing the order of the survivors.
+    events.insert(2, events[0].clone());
+    let events_content = events.join("\n") + "\n";
+    env.create_source_files(&[("events.json", &events_content)])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(3)?;
+    let files: Vec<&str> =
+        db.entries().iter().filter_map(|entry| entry.get("file").and_then(|v| v.as_str())).collect();
+    assert_eq!(files, ["a.c", "b.c", "c.c"], "entries must appear in the order they were received");
 
     Ok(())
 }

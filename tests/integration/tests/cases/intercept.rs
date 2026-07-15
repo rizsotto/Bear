@@ -727,6 +727,77 @@ intercept:
     Ok(())
 }
 
+/// Reporting failures must not affect the build. In wrapper mode the
+/// collector address reaches the agents through the wrapper configuration
+/// file (`.bear/wrappers.cfg`), which every wrapper invocation re-reads --
+/// so the build script can repoint it at a closed port (port 1 refuses
+/// connections) before invoking the compiler. The wrapper's report then
+/// fails, yet the real compiler still runs and produces its object file,
+/// and Bear's exit code reflects the build alone.
+///
+/// (The preload mechanism carries the same "reporting failures do not
+/// affect the build" contract, but its endpoint cannot be made unreachable
+/// end-to-end here: the collector lives inside the Bear process, and the
+/// preload library actively restores the session state in child
+/// environments -- see the restoration policy in
+/// `crates/intercept-preload/src/session.rs`.)
+// Requirements: interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_reporting_failure_does_not_affect_build() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_reporting_failure")?;
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    // Rewrite the collector address to a port nothing listens on, then
+    // compile via $CC so the wrapper is exercised with the dead endpoint.
+    // The rewrite handles both loopback forms the collector may bind.
+    let build = r#"sed -e 's/127\.0\.0\.1:[0-9]*/127.0.0.1:1/' -e 's/::1\]:[0-9]*/::1]:1/' .bear/wrappers.cfg > .bear/wrappers.cfg.tmp
+mv .bear/wrappers.cfg.tmp .bear/wrappers.cfg
+$CC -c test.c -o test.o
+"#;
+    let script = env.create_shell_script("build.sh", build)?;
+
+    let config = r#"
+schema: "4.1"
+
+intercept:
+  mode: wrapper
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).args([
+        "--config",
+        config_path.to_str().unwrap(),
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ]);
+    let output = cmd.output()?;
+
+    // The build must succeed end-to-end despite the reporting failure.
+    assert!(
+        output.status.success(),
+        "bear must exit with the build's success despite the unreachable endpoint:\nstdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(env.file_exists("test.o"), "the real compiler must have run and produced its object file");
+
+    // The dead endpoint was really in effect: the compile was never
+    // reported, so the database holds no entry for it.
+    let db = env.load_compilation_database("compile_commands.json")?;
+    let has_entry =
+        db.entries().iter().any(|entry| entry.get("file").and_then(|v| v.as_str()) == Some("test.c"));
+    assert!(!has_entry, "the compile must not have reached the collector through the dead endpoint");
+
+    Ok(())
+}
+
 /// Test that wrapper mode handles a compiler env var that carries trailing
 /// flags (e.g. `CC="gcc -std=c11"`). Bear must extract the program token,
 /// register a wrapper for it, and rewrite the env var so the build command

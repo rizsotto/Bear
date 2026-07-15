@@ -16,11 +16,9 @@ a truncated or half-written file.
 - The output file is written atomically: consumers never see a truncated
   or mid-write file
 - If writing fails, the previous output file (if any) remains unchanged
-- The temporary file is created in the same directory as the final output
 - If the final rename fails (e.g. permission denied), the error is reported
-  and the temporary file is left in place for debugging
-- If writing the new content fails, the temporary file may also be left
-  behind (empty or partial)
+  and the temporary file, created next to the final output, is left in
+  place for debugging
 
 ## Known limitations
 
@@ -28,27 +26,25 @@ a truncated or half-written file.
   the same output file will conflict
 - The output directory must already exist; Bear does not create missing
   parent directories
+- There is no cleanup guarantee for the temporary file on failure; it may
+  be left behind (empty or partial)
 
 ## Testing
 
-Given a successful build:
+Given a successful build, with or without an existing
+`compile_commands.json`:
 
 > When Bear writes `compile_commands.json`,
 > then a temp file is created during writing
 > and renamed to `compile_commands.json` on success,
+> atomically replacing any existing file (consumers never see a
+> truncated file),
 > and the temp file does not exist after completion.
-
-Given a successful build with an existing `compile_commands.json`:
-
-> When Bear writes the new output,
-> then the old file is atomically replaced
-> and consumers never see a truncated file.
 
 Given a write that fails (e.g. disk full during serialization):
 
 > When writing the new content fails,
-> then the original `compile_commands.json` (if any) is unchanged
-> and the temp file may be left behind (empty or partial).
+> then the original `compile_commands.json` (if any) is unchanged.
 
 Given a directory where the user lacks write permission:
 

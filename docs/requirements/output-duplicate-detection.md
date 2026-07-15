@@ -22,10 +22,6 @@ the set of fields that distinguish entries.
 - Duplicate entries are detected and only the first occurrence is kept
 - Duplicate detection is based on configurable fields (default: `directory`
   and `file`)
-- By default two entries for the same source file in the same directory are
-  duplicates regardless of their compiler arguments, so only one survives;
-  distinguishing entries by their flags requires adding the arguments field
-  to the configured set
 - Two entries are considered duplicates when all configured fields match
 - Entries that differ in any configured field are preserved as distinct
 - The first-occurrence guarantee combines with append ordering
@@ -54,6 +50,12 @@ Given a build that compiles file.c twice with identical flags:
 
 > When Bear generates the compilation database,
 > then only one entry for file.c appears in the output.
+
+Given a build that compiles `a.c`, `b.c`, and `c.c` sequentially, in
+that order:
+
+> When Bear generates the compilation database,
+> then the entries appear in the same order: `a.c`, `b.c`, `c.c`.
 
 Given a build that compiles file.c with `-O2` and then with `-O3`:
 
@@ -92,6 +94,11 @@ Given duplicate detection configured with `match_on: []`:
 
 > Then configuration validation rejects it
 > with an error explaining the empty field list.
+
+Given duplicate detection configured with `match_on: [file, file]`:
+
+> Then configuration validation rejects it
+> with an error naming the repeated field.
 
 Given an `--append` run where file.c exists in the old database, and the
 new build compiles file.c with different flags:

@@ -904,6 +904,7 @@ mod environment_mapping_tests {
         assert_eq!(args, vec!["/I", r"C:\a", "/I", r"C:\b"]);
     }
 
+    // Requirements: output-env-derived-flags
     #[test]
     fn expand_prepend() {
         let rules = &[EnvRule::new(
@@ -920,6 +921,7 @@ mod environment_mapping_tests {
         assert_eq!(args, vec!["/O2", "/W4"]);
     }
 
+    // Requirements: output-env-derived-flags
     #[test]
     fn expand_append() {
         let rules = &[EnvRule::new(

@@ -33,7 +33,8 @@ ability to override Bear's guess when needed.
 - The probe is the sole classifier for ambiguous names. Static name
   recognition (owned by `recognition-compiler-names`) deliberately
   excludes the ambiguous names, so when the probe declines (timeout,
-  unrecognizable output, failed spawn, non-zero exit) the execution is
+  unrecognizable output, failed spawn, non-zero exit) or cannot run at
+  all (a platform where the probe is unavailable), the execution is
   not classified and no database entry is produced for it -- Bear never
   guesses.
 - Probes never deadlock. Stdin is closed; the call returns within a bounded
@@ -59,12 +60,6 @@ ability to override Bear's guess when needed.
   toolchain. Unrecognizable passthrough output declines as usual.
 - Names that are not in the ambiguous set are never probed; they
   resolve by the static name rules owned by `recognition-compiler-names`.
-- On non-Unix targets (Windows) the probe is not available and probing
-  is a no-op. Windows toolchains use unambiguous basenames (`cl.exe`,
-  `clang-cl`, `gcc.exe`) that name-based recognition (owned by
-  `recognition-compiler-names`) classifies directly. Bare `cc`/`c++` on
-  Windows is not classified and produces no database entry; in practice
-  no Windows toolchain installs them.
 
 ## Non-functional constraints
 
@@ -84,17 +79,41 @@ banners is out of scope.
 
 ## Testing
 
-Given a host where `/usr/bin/cc` is Clang:
+Given a host where `/usr/bin/cc` is Clang (or, symmetrically, GCC):
 
 > When Bear recognizes an execution of `cc -c hello.c`,
-> then it dispatches to the Clang interpreter,
-> and a Clang-only flag with a follow-on argument
+> then it dispatches to the interpreter the probe identified
+> (Clang or GCC respectively),
+> and on the Clang host a Clang-only flag with a follow-on argument
 > (e.g. `-Xclang -ast-dump`) is parsed with correct arity.
 
-Given a host where `/usr/bin/cc` is GCC:
+The `cc` scenarios in this section are representative of `c++`; both
+names follow the same probe path.
 
-> When Bear recognizes an execution of `cc -c hello.c`,
-> then it dispatches to the GCC interpreter.
+Given an HPE Cray host where the PrgEnv wrapper `CC` answers
+`--version` with the loaded programming environment's banner (the CCE
+Clang banner under PrgEnv-cray, the FSF GCC banner under PrgEnv-gnu):
+
+> When Bear recognizes an execution of `CC -c hello.cpp`,
+> then it dispatches to the interpreter the banner names
+> (Clang under PrgEnv-cray, GCC under PrgEnv-gnu).
+
+Given an execution of `gcc -c hello.c` (a name outside the ambiguous
+set):
+
+> When Bear recognizes it,
+> then static name recognition classifies it as GCC
+> and no probe process is spawned.
+
+Given a user config with two compiler-override entries whose paths
+share the filename `cc` but map it to different compiler families
+(the first to Clang, the second to GCC):
+
+> When Bear recognizes an execution spelled as a bare `cc`,
+> then the first entry classifies it (Clang),
+> and a warning names the conflicting entries.
+> An execution spelled with either full path keeps that entry's own
+> classification.
 
 Given any host:
 
@@ -170,9 +189,9 @@ matches no known signature:
   not resolve the name itself, and it never rewrites the executable it
   records (see `output-json-compilation-database`).
 - `CC` joined the ambiguous set for the HPE Cray PrgEnv wrapper (see
-  `recognition-compiler-names` for the Cray CCE names and the
-  PrgEnv wrappers in its Acceptance criteria and Recognized names
-  table): the same reasoning as `cc`/`c++` applies verbatim, no change
+  the Recognized names table in `recognition-compiler-names` for the
+  Cray CCE names and the statically recognized PrgEnv `ftn`
+  wrapper): the same reasoning as `cc`/`c++` applies verbatim, no change
   to the classifier itself was needed. `CC` cannot be a statically
   recognized name either: a static mapping would be wrong on every
   programming environment except the one it hardcoded, and on a

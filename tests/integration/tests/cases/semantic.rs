@@ -510,6 +510,55 @@ fn masquerade_cc_event_yields_entry_with_observed_path() -> Result<()> {
     Ok(())
 }
 
+// Requirements: recognition-compiler-launchers
+//
+// A ccache masquerade link under a full compiler name (a `gcc` symlink
+// into a ccache farm), invoked as `gcc -c main.c`, is treated as that
+// compiler's compilation: the entry records the compiler as observed (the
+// symlink path) with the invocation's own arguments. The underlying binary
+// being ccache must not leak into the entry. Modeled on the ambiguous-name
+// variant above (`masquerade_cc_event_yields_entry_with_observed_path`);
+// here the name `gcc` is unambiguous, so recognition is by name alone.
+#[test]
+#[cfg(all(unix, host_has_ccache_masquerade))]
+fn masquerade_gcc_event_yields_entry_with_observed_path() -> Result<()> {
+    let env = TestEnvironment::new("masquerade_gcc_event")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let farm = std::path::Path::new(env!("CCACHE_MASQUERADE_DIR"));
+    let ccache = ["gcc", "cc", "g++", "c++", "clang", "clang++"]
+        .iter()
+        .find_map(|name| std::fs::canonicalize(farm.join(name)).ok())
+        .context("no masquerade entry found in CCACHE_MASQUERADE_DIR")?;
+    let masq_dir = env.test_dir().join("masq");
+    std::fs::create_dir_all(&masq_dir)?;
+    std::os::unix::fs::symlink(&ccache, masq_dir.join("gcc"))?;
+    let masq_gcc = masq_dir.join("gcc").to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": masq_gcc,
+        "arguments": [masq_gcc, "-c", "main.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("main.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "main.c".to_string(),
+        directory: temp_dir.clone(),
+        arguments: vec![masq_gcc.clone(), "-c".to_string(), "main.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: output-compilation-entries
 #[test]
 #[cfg(all(has_executable_echo, has_executable_mkdir, has_executable_rm))]
@@ -1127,6 +1176,22 @@ fn icecc_launcher_execution_records_real_compiler() -> Result<()> {
         &["icecc", "gcc"],
         &["icecc", "gcc", "-c", "hello.c"],
         &["gcc", "-c", "hello.c"],
+    )
+}
+
+// Requirements: recognition-compiler-names
+//
+// A `gfortran -c hello.f90` execution yields one entry for the Fortran
+// source, with the invocation's arguments recorded verbatim -- one
+// representative row proving the Fortran compiler names follow the same
+// recognition pattern as the C family, at entry level.
+#[test]
+fn gfortran_execution_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry_for_source(
+        "gfortran_execution",
+        &["gfortran", "-c", "hello.f90"],
+        "hello.f90",
+        "program hello\nend program hello\n",
     )
 }
 

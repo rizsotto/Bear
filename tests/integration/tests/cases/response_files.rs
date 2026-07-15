@@ -154,6 +154,35 @@ fn inlining_expands_nested_references() -> Result<()> {
 }
 
 // Requirements: output-response-file-inlining
+//
+// Inlined tokens participate in entry shaping: a response file that names an
+// additional source makes the database gain an entry for that source, exactly
+// as if it had been written on the command line.
+#[test]
+fn inlining_adds_entry_for_source_named_in_response_file() -> Result<()> {
+    let env = TestEnvironment::new("rsp_extra_source")?;
+    env.create_source_files(&[("src.c", SRC), ("extra.c", SRC), ("srcs.resp", "extra.c")])?;
+    let build = format!("{} -c src.c @srcs.resp", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    run(&env, &config(true), &script)?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("src.c").arguments(vec![
+        COMPILER_C_PATH.to_string(),
+        "-c".to_string(),
+        "src.c".to_string(),
+    ]))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("extra.c").arguments(vec![
+        COMPILER_C_PATH.to_string(),
+        "-c".to_string(),
+        "extra.c".to_string(),
+    ]))?;
+    Ok(())
+}
+
+// Requirements: output-response-file-inlining
 #[test]
 fn missing_response_file_at_analysis_kept_literal_with_warning() -> Result<()> {
     // Two-phase flow: intercept while the response file is present (the build

@@ -5,6 +5,8 @@
 //! The idea is that we write C programs which are calling the specific function
 //! and verify if the interception get these calls recorded. This only works with
 //! the preload mode, since it does not involve any compiler.
+//!
+//! Requirements: interception-preload-mechanism
 
 use crate::fixtures::constants::*;
 use crate::fixtures::infrastructure::*;

@@ -77,10 +77,9 @@ environment.
   (naming an input file is the explicit case), and any non-executing
   producer may write the stream to standard output, so the format is
   pipeable with no flags. Diagnostics go
-  to stderr, keeping stdout machine-readable. When the event stream is
-  about to be read from a terminal, or turned out to contain no events,
-  a stderr notice says so - a filter reading an interactive or empty
-  stdin is almost always a plumbing mistake.
+  to stderr, keeping stdout machine-readable. An interactive or empty
+  event stream produces a stderr notice - either one is almost always a
+  plumbing mistake.
 - A mode that runs the build does not accept the standard stream as the
   event-file destination: the intercepted build's own output shares that
   stream and would corrupt it (a non-atomic write can split a JSON
@@ -111,11 +110,20 @@ conforms to the schema:
 > compiler invocation in the synthetic file.
 
 Given a Bear-produced events file from a successful `bear intercept`
-run:
+run -- produced by the same Bear, or by any earlier Bear release within
+the same major-version line of the format (the schema section above owns
+that stability promise):
 
 > When the user runs `bear semantic --input events.json` against it,
-> then the resulting compilation database is identical to the one
-> produced by an equivalent `bear -- <build>` run.
+> then the run succeeds and the resulting compilation database is
+> identical to the one produced by an equivalent `bear -- <build>` run.
+
+Given the same three compilation events written to one file in order and
+to a second file reversed:
+
+> When the user runs `bear semantic` over each file,
+> then the two compilation databases contain the same set of three
+> entries; only their order may differ.
 
 Given an events file with one malformed line in the middle:
 
@@ -131,17 +139,24 @@ file named:
 > then the event stream is read from standard input and `cdb.json`
 > contains one entry per recognizable compiler invocation.
 
+Given `bear semantic` reading standard input with nothing piped in:
+
+> When the user runs `bear semantic -o cdb.json` on the empty stream,
+> then `bear` exits `0`,
+> `cdb.json` is written as an empty database,
+> and a stderr notice reports that the stream contained no events.
+
 Given `bear intercept` invoked without naming an event file:
 
 > When the user runs `bear intercept -- <build>`,
 > then Bear exits with a usage error before running the build.
 
-Given an events file produced by Bear vN and consumed by Bear vN+1
-within the same major-version line:
+Given `bear intercept` asked to write events to the standard stream:
 
-> When the user runs `bear semantic --input old-events.json` with the
-> newer Bear,
-> then the run succeeds and produces an equivalent compilation database.
+> When the user runs `bear intercept --output - -- <build>`,
+> then Bear exits with a usage error before running the build,
+> the error explains that events cannot go to standard output,
+> and no file literally named `-` is created.
 
 ## Notes
 

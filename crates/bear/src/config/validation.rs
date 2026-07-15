@@ -192,6 +192,7 @@ mod tests {
         }
     }
 
+    // Requirements: output-source-directory-filter
     #[test]
     fn test_validate_source_filter_empty_paths() {
         let config = SourceFilter {
@@ -320,6 +321,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    // Requirements: output-duplicate-detection
     #[test]
     fn test_validate_duplicate_filter_with_duplicates() {
         let config = DuplicateFilter {

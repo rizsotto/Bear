@@ -100,6 +100,61 @@ fn exit_code_for_false() -> Result<()> {
     Ok(())
 }
 
+/// The build's exit code is propagated byte-for-byte, not collapsed to a
+/// generic failure: a build that exits 42 makes Bear exit exactly 42, in
+/// both the combined and the intercept build-running modes.
+// Requirements: cli-exit-codes
+#[test]
+#[cfg(has_executable_shell)]
+fn exit_code_propagates_exact_build_code() -> Result<()> {
+    let env = TestEnvironment::new("exit_code_exact_42")?;
+
+    let result = env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, "-c", "exit 42"])?;
+    assert_eq!(result.exit_code(), Some(42), "combined mode must propagate the build's exact exit code");
+
+    let result =
+        env.run_bear(&["intercept", "--output", "events.json", "--", SHELL_PATH, "-c", "exit 42"])?;
+    assert_eq!(result.exit_code(), Some(42), "intercept mode must propagate the build's exact exit code");
+
+    Ok(())
+}
+
+/// A build-running mode whose every candidate entry is dropped at output
+/// validation still exits with the build's exit code: an `--append` run
+/// feeds the existing database's entries back through output validation, so
+/// a pre-seeded entry with an empty directory (modeled on the all-dropped
+/// semantic test in config.rs) is the sole candidate and is rejected -- yet
+/// the build succeeded, so Bear exits 0 and the database is written empty.
+/// Data-quality outcomes must never change the exit code.
+// Requirements: cli-exit-codes
+#[test]
+#[cfg(has_executable_true)]
+fn build_exit_code_is_preserved_when_every_entry_is_dropped_at_output() -> Result<()> {
+    let env = TestEnvironment::new("exit_code_all_entries_dropped")?;
+
+    // A well-formed database whose only entry fails validation (empty
+    // directory field), so it is rejected when --append reads it back.
+    let invalid_entry = r#"[{"directory": "", "file": "main.c", "arguments": ["gcc", "-c", "main.c"]}]"#;
+    env.create_source_files(&[("compile_commands.json", invalid_entry)])?;
+
+    let output = env.run_bear(&["--append", "--output", "compile_commands.json", "--", TRUE_PATH])?;
+
+    // The build exited 0, so Bear must exit 0 despite the empty database.
+    output.assert_success()?;
+
+    // The candidate entry existed and was rejected at output validation.
+    assert!(
+        output.stderr().contains("Entry has an empty directory field"),
+        "expected the validation rejection to be visible in stderr: {}",
+        output.stderr()
+    );
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    Ok(())
+}
+
 // Requirements: cli-signal-forwarding, cli-exit-codes
 #[test]
 #[cfg(has_executable_sleep)]
@@ -690,6 +745,32 @@ fn semantic_exit_code_for_success() -> Result<()> {
     let result =
         env.run_bear(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
     result.assert_success()?;
+    Ok(())
+}
+
+/// `bear semantic` on input whose events are all understood but name only
+/// non-compiler commands exits 0 and writes an empty database: the filter
+/// did its job, and an empty result is not a failure.
+// Requirements: cli-exit-codes
+#[test]
+fn semantic_exit_code_for_understood_non_compiler_events() -> Result<()> {
+    let env = TestEnvironment::new("semantic_exit_code_non_compiler")?;
+
+    // Both events conform to the format; neither names a compiler.
+    let events_content = [
+        r#"{"executable":"ls","arguments":["ls","-la"],"working_dir":"/tmp","environment":{}}"#,
+        r#"{"executable":"echo","arguments":["echo","done"],"working_dir":"/tmp","environment":{}}"#,
+    ]
+    .join("\n");
+    env.create_source_files(&[("events.json", &events_content)])?;
+
+    let result =
+        env.run_bear(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+    result.assert_success()?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
     Ok(())
 }
 

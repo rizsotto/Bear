@@ -14,8 +14,8 @@ entries with an existing `compile_commands.json` instead of overwriting it.
 
 - In append mode, when the output file exists, new entries are emitted
   first and the existing entries follow
-- In append mode, when the output file does not exist, Bear logs a warning
-  and writes only the new entries (no error)
+- In append mode, when the output file does not exist, Bear writes only
+  the new entries (no error)
 - Without append mode, the output file is overwritten with only the new
   entries (the default behavior)
 - When the existing file cannot be opened (e.g. permission denied), Bear
@@ -23,9 +23,6 @@ entries with an existing `compile_commands.json` instead of overwriting it.
 - When the existing file opens but contains invalid JSON or invalid entries,
   Bear skips invalid entries individually with a logged warning per entry
   and preserves valid entries
-- The combined output (new + existing) passes through the rest of the output
-  pipeline (duplicate filtering, source filtering, atomic write); which entry
-  survives when a file appears in both is owned by `output-duplicate-detection`
 
 ## Non-functional constraints
 
@@ -42,7 +39,8 @@ Given no existing `compile_commands.json`:
 Given an existing `compile_commands.json` with an entry for file1.c:
 
 > When the user runs `bear --append -- <compiler> -c file2.c`,
-> then `compile_commands.json` contains entries for both file1.c and file2.c.
+> then `compile_commands.json` contains entries for both file1.c and file2.c,
+> and the file2.c entry precedes the file1.c entry (new entries first).
 
 Given an existing `compile_commands.json` with an entry for file1.c:
 
@@ -71,6 +69,11 @@ compiler invocations:
 
 > When the user runs `bear --append -- true`,
 > then the existing entries are preserved unchanged.
+
+## Notes
+
+- Which entry survives when a file appears in both the new and the
+  existing entries is owned by `output-duplicate-detection`.
 
 ## Rationale
 

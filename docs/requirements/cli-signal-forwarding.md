@@ -83,11 +83,65 @@ Given a long-running build under `bear --`:
 > second,
 > and `bear` reports a non-success exit status.
 
-Given a build that is interrupted mid-compile:
+Given a build interrupted mid-compile -- the compiler's input source is
+a named pipe created by `mkfifo` with no writer, so the compiler blocks
+reading it:
 
-> When the user presses Ctrl-C while the compiler is running,
-> then the compiler terminates,
+> When the test runs `bear -- cc -x c -c source.c -o out.o` with
+> `source.c` the pipe, waits for the compiler to block, then sends a
+> termination signal to the `bear` process (standing in for the
+> interactive Ctrl-C),
+> then both `bear` and the compiler terminate within the time budget,
 > and `bear` exits with a non-zero status.
+
+Given a build script that installs distinct traps for `SIGINT` and
+`SIGTERM` -- each trap writes its own marker file and exits with its own
+code (`10` for `INT`, `20` for `TERM`) -- then blocks in a long sleep:
+
+> When the test runs the script under `bear --`, waits until the script
+> reports it is ready, and sends `SIGINT` to the `bear` process,
+> then the `INT` marker appears (the `TERM` trap did not fire)
+> and `bear` exits `10`;
+> and when the test repeats the run sending `SIGTERM` instead,
+> then the `TERM` marker appears and `bear` exits `20` -- the build saw
+> the real signal, not a substitute.
+
+Given a build script that spawns a background grandchild (`sleep 60 &`),
+records the grandchild's pid, then blocks in its own `sleep 60`:
+
+> When the test sends `SIGTERM` to the `bear` process,
+> then `bear` exits with a non-success status,
+> and the recorded grandchild pid is no longer alive -- teardown reached
+> the whole tree, not just the direct child.
+> (On Linux with a usable cgroup the same holds even when the grandchild
+> starts its own session with `setsid`; without one, the process-group
+> fallback in Known limitations applies.)
+
+Given a build script that traps `SIGTERM`, writes a marker file from the
+trap, and exits `42` from it:
+
+> When the test sends `SIGTERM` to the `bear` process while the script
+> blocks in a long sleep,
+> then the marker appears -- the script received the signal and its trap
+> ran, rather than being killed outright --
+> and `bear` exits `42`, the script's own exit code.
+
+Given a build script that ignores `SIGTERM` (an empty trap) and loops
+forever:
+
+> When the test sends `SIGTERM` to the `bear` process,
+> then both `bear` and the build still end within the time budget -- the
+> grace period expires and the build is forced --
+> and `bear` exits with a non-success status.
+
+Given wrapper mode selected by configuration, and a build that invokes
+the compiler through `$CC -c` on a named pipe with no writer, so the
+compiler blocks mid-compile under the wrapper's supervision:
+
+> When the test sends `SIGTERM` to the `bear` process,
+> then both `bear` and the blocked compiler end within the time budget,
+> and `bear` exits with a non-success status -- the teardown contract
+> holds in wrapper mode just as in preload mode.
 
 ## Rationale
 

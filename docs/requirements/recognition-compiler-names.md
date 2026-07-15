@@ -40,13 +40,8 @@ The shared contract for every recognized name below:
   `-cc=gcc`) and QNX's variant selector (for example
   `-Vgcc_ntoaarch64le`) are options, never inputs.
 - The names in the Deliberately not recognized table yield no entry.
-- Ambiguous names (`cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC`)
-  are not in either table here; they are classified by the version
-  probe (see `recognition-ambiguous-name-probe`), not this
-  requirement. Only these ambiguous names defer to the probe; the
-  Cray PrgEnv Fortran wrapper `ftn` is not ambiguous and is
-  statically recognized as Cray Fortran (see the Recognized names
-  table).
+- Ambiguous names (`cc`, `c++`, `CC`) are in neither table here; their
+  classification is owned by `recognition-ambiguous-name-probe`.
 - When preload interception records both a driver or wrapper and the
   child compiler it execs for one source, the pair collapses to a
   single entry and the driver invocation survives; this behavior is
@@ -105,8 +100,18 @@ Microchip XC8 drivers, and the C/C++ MPI wrappers):
 
 The assembler, Fortran, and Swift names in the table follow the same
 pattern with a source file and flags from their own toolchain rather
-than a C source and `-c`; the concrete `fasm` and `swiftc` scenarios
-below exercise those shapes.
+than a C source and `-c`; the concrete `fasm`, `gfortran`, and
+`swiftc` scenarios below exercise those shapes.
+
+Given an event file with a `gfortran -c hello.f90` execution:
+
+> When `bear semantic` runs,
+> then the database contains one entry for `hello.f90`,
+> whose arguments start with `gfortran`,
+> parsed with GCC flag semantics.
+> This scenario is representative of the Fortran rows in the table;
+> each row's names follow the same shape with that row's own flag
+> semantics.
 
 Given an event file with a `qcc -Vgcc_ntoaarch64le -c hello.c`
 execution:
@@ -150,6 +155,10 @@ Given an event file with an `as -o foo.o foo.s` execution:
 
 > When `bear semantic` runs,
 > then the database contains no entry for that execution.
+
+The `as` and `swift-frontend` scenarios are representative of the
+whole Deliberately not recognized table: every name in it yields no
+entry.
 
 Given an event file with a `gcc -c foo.s` execution:
 

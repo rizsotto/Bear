@@ -603,6 +603,36 @@ mod tests {
         assert_eq!(result, expected);
     }
 
+    // Requirements: output-compilation-entries
+    #[test]
+    fn test_output_field_absent_when_invocation_has_no_output_flag() {
+        // Output field enabled, but the invocation carries no -o flag: the
+        // entry must omit the field rather than invent a value.
+        let command = Command::from_strings(
+            "/home/user",
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+            ],
+        );
+
+        let sut = {
+            let format = Format {
+                paths: PathFormat::default(),
+                entries: EntryFormat { use_array_format: true, include_output_field: true },
+                arguments: ArgumentsFormat::default(),
+            };
+            CommandConverter::new(format)
+        };
+
+        let result = sut.convert(&command);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].output, None, "entry must have no output field");
+    }
+
     #[test]
     fn test_command_converter_public_api() {
         // Test that CommandConverter can be used as a public API

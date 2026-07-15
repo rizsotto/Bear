@@ -141,12 +141,86 @@ Given real `make -n` output from a configured project (the zlib fixture):
 > `mkdir`, `ln`) produce no compilation entries, and the skipped subshell
 > and redirect lines are reported on stderr but are not fatal.
 
-Given a line with a leading assignment and a redirection, such as
-`CC=gcc gcc -c foo.c -o foo.o >/dev/null 2>&1`:
+Given the line `gcc -c foo.c` saved in a file named `build.sh`:
+
+> When the user runs the mode with `build.sh` as the named input and
+> `out.jsonl` as the named output, then `out.jsonl` contains exactly one
+> event, with `executable` `gcc` and `arguments` `["gcc", "-c", "foo.c"]`,
+> and standard output carries no events.
+
+Given the non-compiler line `mv objs/a.o a.lo`:
+
+> When the mode parses it, then it emits one event with `executable` `mv`
+> and `arguments` `["mv", "objs/a.o", "a.lo"]` -- the raw stream carries
+> non-compiler commands; filtering them is the consumer's job.
+
+Given input exercising the supported subset together -- quotes, an
+escape, a continuation, separators including a pipe, a comment, and a
+blank line:
+
+```sh
+gcc -DNAME='a b' -c \
+  foo\ bar.c && ar rc libz.a foo.o | tee log  # archive it
+
+mkdir objs 2>/dev/null || test -d objs
+```
+
+> When the mode parses it, then it emits five events -- `gcc` (with the
+> quoted define resolved to the single argument `-DNAME=a b`, the escaped
+> name resolved to `foo bar.c`, and the continuation joined into one
+> command), `ar`, `tee` (each side of the pipe is its own candidate
+> command), `mkdir` (the redirection removed), and `test` -- while the
+> comment and the blank line produce nothing and no line is skipped.
+
+Given the redirect-target pair `gcc -c foo.c > $(logdir)/x.log` and
+`cmd > 'oops`:
+
+> When the mode parses them, then the first line emits a clean `gcc`
+> event and no skip -- the substitution lies entirely inside the
+> discarded target -- while the second line emits nothing and is skipped
+> loudly as an unterminated quote.
+
+Given a brace group followed by another command, starting in `/build`:
+
+```sh
+{ cd sub; gcc -c a.c; }
+gcc -c b.c
+```
+
+> When the mode parses it, then the braces produce no event and both
+> compilations are recorded in `/build/sub` -- the group's `cd` persists
+> past the closing brace. A `}` with no open group (`echo a; }`) skips
+> its line loudly, and an input that ends with a `{` still open reports
+> unbalanced braces against the line that `{` opened on.
+
+Given the line `gcc -c foo.c` from a log captured elsewhere, and a
+caller-set initial working directory of `/custom/build`:
+
+> When the mode parses it, then the event's `working_dir` is
+> `/custom/build`, not the mode's own working directory.
+
+Given `cd`-driven directory changes, starting in `/build`:
+
+```sh
+cd sub
+gcc -c a.c
+cd -
+gcc -c b.c
+```
+
+> When the mode parses it, then neither `cd` line produces an event,
+> `a.c` is recorded in `/build/sub`, and `b.c` back in `/build`. An
+> input whose first command is `cd -` (no previous directory is known)
+> has that line skipped loudly and the working directory left unchanged.
+
+Given a line with leading assignments and a redirection, such as
+`CC=gcc SECRET_TOKEN=hunter2 gcc -c foo.c -o foo.o >/dev/null 2>&1`:
 
 > When the mode parses it, then the event has `executable` `gcc`,
 > `arguments` beginning with `gcc`, the redirection removed from the
-> arguments, and `CC=gcc` overlaid on the environment.
+> arguments, and an environment reduced to the build-relevant subset:
+> `CC=gcc` is present, `PATH` survives the filter, and `SECRET_TOKEN` --
+> like any non-build-relevant inherited variable -- is absent.
 
 Given a recursive-make log carrying `Entering directory` and
 `Leaving directory` markers around `cd`-free compiler lines:
@@ -159,6 +233,15 @@ subshells, all command substitutions):
 
 > When the mode runs, then it reports each skipped line on stderr, emits
 > no events, and exits non-zero.
+
+Given input mixing one supported compile line with one unsupported line
+(`gcc -c foo.c`, then `for f in *.c; do gcc -c $f; done`):
+
+> When the mode runs, then stderr carries the per-line skip report and a
+> summary counting one event emitted and one line skipped -- the `for`
+> line counts once, not once per command segment inside it. Empty input
+> produces a stderr notice that no commands were found; input with
+> nothing skipped keeps stderr quiet.
 
 Given an invocation of this mode that also supplies a configuration file:
 

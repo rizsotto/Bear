@@ -22,10 +22,11 @@ its own job. Everything below follows from that.
 Common to all modes:
 
 - Requesting help exits `0`.
-- A malformed invocation -- no build command given, an unknown argument, a
-  build-running mode asked to write the database to a stream, or
-  interception with no event file named -- exits non-zero and is reported
-  before any work runs.
+- Any malformed invocation exits non-zero and is reported before any work
+  runs. Which invocations are malformed is owned by the individual mode
+  requirements (for example,
+  [`interception-events-format`](interception-events-format.md) owns the
+  event-file usage errors).
 - A run terminated by a signal never exits `0`. In build-running modes the
   signal is first relayed to the build; delivery and process-tree teardown
   are governed by [`cli-signal-forwarding`](cli-signal-forwarding.md).
@@ -74,8 +75,9 @@ Given a build that exits successfully:
 
 Given a build that exits with a non-zero code:
 
-> When the user runs `bear -- false`, then `bear` exits non-zero, matching
-> the build; likewise `bear intercept -- false`.
+> When the user runs `bear -- sh -c "exit 42"`, then `bear` exits `42`,
+> the build's code byte-for-byte; likewise
+> `bear intercept -- sh -c "exit 42"` exits `42`.
 
 Given a build stopped by a signal:
 
@@ -88,10 +90,25 @@ written (the output path exists as a directory):
 > When the user runs the build under `bear`, then `bear` exits non-zero
 > even though the build itself succeeded.
 
+Given a build that exits `0` but where every candidate entry fails output
+validation (the validation rules are owned by
+[`output-json-compilation-database`](output-json-compilation-database.md)):
+
+> When the user runs the build under `bear`, then the database is written
+> as an empty array and `bear` exits `0` -- the build's code, unchanged by
+> the drops.
+
 Given a `semantic` run over a conforming events file:
 
 > When the user runs `bear semantic --input events.json`, then `bear`
 > exits `0`.
+
+Given a `semantic` run over a conforming events file whose every event is
+understood but yields an entry that fails output validation (for example,
+a compiler event whose recorded working directory is the empty string):
+
+> When the user runs `bear semantic --input events.json`, then the
+> database is written as an empty array and `bear` exits `0`.
 
 Given a `semantic` run over non-empty input in which every line is
 non-conforming:

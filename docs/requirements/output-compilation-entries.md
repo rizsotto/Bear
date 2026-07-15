@@ -35,17 +35,12 @@ source compiles on its own and contributes an independent object
 (GCC, Clang, the Fortran and CUDA families, MSVC, and the like):
 
 - An invocation that names N source files produces exactly N entries
-- Recognized source extensions include `.c`, `.cc`, `.cpp`, `.cxx`,
-  `.m`, `.mm`, `.S`, `.s`, `.f`, `.f90`, `.cu`, and other language-
-  specific extensions defined per compiler family
+- Sources are identified by per-family extension lists: each compiler
+  family defines which file extensions name its sources
 - Each entry's `file` field is one of those sources
 - In each entry, the other sources from the same invocation are
   removed from the argument list -- each entry looks like a command
   that compiles only that one source
-- If the same source appears more than once in the same invocation
-  (`cc -c foo.c foo.c`), one entry is produced per positional
-  occurrence; deduplication is then the responsibility of
-  `output-duplicate-detection`
 
 ### One entry per invocation (single-translation-unit compilers)
 
@@ -61,9 +56,6 @@ compiler:
 - That entry's `file` field is the first source in argument order
 - All N sources are retained in the entry's argument list (they are
   not stripped as siblings, because they are not separate units)
-- Link-only flag stripping (below) still applies
-- If the invocation compiles no source at all, it produces no entry,
-  exactly as for the separable case
 
 Because the entire invocation collapses to one entry keyed on its
 first source, duplicate detection (`output-duplicate-detection`) sees
@@ -88,9 +80,6 @@ compiler:
 - Every entry's argument list is the complete invocation -- every
   source is retained in every entry, not stripped to that entry's own
   file
-- Link-only flag stripping (below) still applies
-- If the invocation compiles no source at all, it produces no entry,
-  exactly as for the other two shapes
 
 This is a third, distinct shape: unlike the separable case, no source
 is stripped from any entry's arguments; unlike the single-invocation
@@ -99,7 +88,10 @@ invocation).
 
 ### Zero entries for invocations that do not compile a source
 
-An invocation produces no entries when any of the following holds:
+Regardless of entry shape, an invocation produces an entry only when a
+recognized source is compiled -- never a best-effort guess. In
+particular, an invocation produces no entries when any of the
+following holds:
 
 - Every positional file argument is an object file, archive, or
   shared library (`.o`, `.obj`, `.a`, `.so`, `.lib`, `.dylib`, ...)
@@ -108,9 +100,7 @@ An invocation produces no entries when any of the following holds:
   `-###`, `-dumpversion`, ...)
 - The invocation requests preprocessing only (`-E`) or dependency
   generation only (`-M` or `-MM` without a compile step)
-- The executable is not a recognized compiler, or argument parsing
-  does not find a source; Bear emits no entry rather than a
-  best-effort guess
+- Argument parsing finds no recognized source
 
 `-fsyntax-only`, `-MD`, and `-MMD` do compile the source (the last
 two emit dependency files as a side effect) and therefore produce an
@@ -121,53 +111,37 @@ entry.
 When a single invocation both compiles and links
 (`cc -o a.out -lsomething src.c`), the resulting entry describes only
 the compile step. Flags whose effect is limited to the link stage are
-removed.
+removed; each compiler family defines its link-stage flag set, with
+GCC-style `-l<name>` as the representative example. Stripping applies
+to all three entry shapes.
 
-GCC/Clang-style examples: `-l<name>`, `-L<dir>`, `-Wl,...`,
-`-Xlinker ...`, `-shared`, `-static`, `-rdynamic`. MSVC counterpart:
-`/link` and every argument following it.
-
-Preprocessing, compiling, and assembling flags (`-D`, `-I`,
-`-isystem`, `-iquote`, `-std=...`, `-O2`, `-Wall`, `-c`, `-S`,
-`-x <lang>`, and their MSVC equivalents) are kept, together with
-driver-level options that affect compilation.
+Flags affecting preprocessing, compiling, or assembling are kept
+(`-O2` as the representative example), together with driver-level
+options that affect compilation.
 
 ### Argument order is preserved
 
 Within a given entry, the remaining arguments appear in the same
 relative order as in the original command. Downstream consumers are
-order-sensitive:
-
-- Include search paths (`-I`, `-isystem`, `-iquote`) are searched in
-  the order they appear
-- Later `-D` definitions override earlier ones
-- `-W` options can enable and then disable the same warning
-- `-x <lang>` language overrides apply to subsequent source files
-  and must keep their position relative to them
-- The compiler executable stays at index 0 of `arguments`
+order-sensitive (search paths, macro definitions, and warning options
+all depend on their relative order), and `-x <lang>` overrides must
+keep their position relative to the source files they apply to. The
+compiler executable stays at index 0 of `arguments`.
 
 ### The `output` field
 
 The per-entry `output` field (see `output-json-compilation-database`)
-is optional and off by default. When enabled via configuration, Bear
-records the value of the invocation's output flag (`-o`, MSVC `/Fo`,
-`/Fe`) and emits it in each entry produced from that invocation.
-
-- For a single-source invocation (`cc -c src.c -o src.o`), the entry's
-  `output` is `src.o`.
-- For a multi-source invocation with a single output flag
-  (`cc -o a.out src1.c src2.c src3.c`), Bear copies the output value
-  verbatim into **every** entry. All three entries report
-  `output` = `a.out` (see Known limitations).
-- When the invocation has no output flag, the `output` field is
-  absent.
+is optional and off by default. When enabled via configuration, each
+entry's `output` is the value of the invocation's output flag, copied
+verbatim into every entry produced from that invocation (see Known
+limitations); when the invocation has no output flag, the field is
+absent.
 
 ## Non-functional constraints
 
 - The same rules apply to every compiler family Bear recognizes
-  (GCC/Clang, MSVC, Fortran, CUDA, and others); the
-  flag names and source extensions listed above are indicative, not
-  exhaustive
+  (GCC/Clang, MSVC, Fortran, CUDA, and others); the flag names and
+  source extensions named in this file are indicative, not exhaustive
 - Source-extension recognition follows the file system's rules: on
   Linux and BSD a file named `foo.C` is treated as a C++ source
   because the extension is `.C`, while on Windows and typical macOS
@@ -195,13 +169,6 @@ invocation:
 > file,
 > and the other two source files do not appear in that entry's
 > `arguments`.
-
-Given a build that compiles multiple files via separate compiler
-invocations (the typical `make -j` case):
-
-> When the user runs Bear wrapping that build,
-> then `compile_commands.json` contains one entry per source file,
-> and each entry names the compiler used for that source.
 
 Given a build that compiles a single source file:
 
@@ -261,11 +228,31 @@ Given a build that runs `cc --version` or `cc -###`:
 > then `compile_commands.json` contains no entries for this
 > invocation.
 
+Given a build that runs `cc -E src.c` and `cc -M src.c`:
+
+> When the user runs Bear wrapping that build,
+> then `compile_commands.json` contains no entries for either
+> invocation (preprocess-only and dependency-generation-only steps
+> compile nothing).
+
+Given a build that runs `cc -MD -c src.c`:
+
+> When the user runs Bear wrapping that build,
+> then `compile_commands.json` contains exactly one entry, with `file`
+> set to `src.c` (the dependency file is a side effect of a real
+> compile step).
+
 Given a build that runs `cc -o a.out src1.c src2.c` with the
 `output` field enabled via configuration:
 
 > When the user runs Bear wrapping that build,
 > then every entry's `output` is `a.out` (see Known limitations).
+
+Given a build that runs `cc -c src.c` (no output flag) with the
+`output` field enabled via configuration:
+
+> When the user runs Bear wrapping that build,
+> then the resulting entry has no `output` key.
 
 ## Notes
 

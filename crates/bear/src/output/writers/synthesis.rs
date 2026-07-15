@@ -738,6 +738,7 @@ mod tests {
         assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 0);
     }
 
+    // Requirements: output-header-entries
     #[test]
     fn test_non_c_family_donor_is_not_eligible() {
         let fixture = fixture::Fixture::new();

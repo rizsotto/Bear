@@ -148,7 +148,9 @@ Given a compiler invocation with `-DNAME=\"hello\"`:
 > When Bear writes the `command` field,
 > the value is shell-escaped (either single- or double-quoted form is valid),
 > the JSON encoding adds another layer,
-> and JSON-decoding followed by shell-word splitting recovers the original argv.
+> JSON-decoding followed by shell-word splitting recovers the original argv,
+> and the entry has no `arguments` field (the two forms are mutually
+> exclusive).
 
 Given a compiler invoked as a bare name (e.g. `gcc`), intercepted in
 preload mode:
@@ -169,6 +171,21 @@ fails validation (for example, an empty `directory` field):
 > a `WARN` log line names the dropped entry and the validation reason,
 > the run summary reports one dropped entry,
 > and the process exit code is not affected by the drop.
+
+Given an entry presented for output whose `command` field contains an
+unterminated quote (e.g. `cc -c "src.c`):
+
+> When Bear validates entries while writing the output,
+> then the entry is dropped from `compile_commands.json`,
+> and a `WARN` log line names the entry and the unparsable `command` as
+> the validation reason.
+
+Given a project with a single C source file:
+
+> When the user runs Bear configured to write the database to
+> `build/commands.json` instead of the default path,
+> then `build/commands.json` is created and contains the entry,
+> and no `compile_commands.json` is written in the working directory.
 
 Given a build where every candidate entry fails validation:
 

@@ -35,6 +35,11 @@ Bear provides configurable path formatting for the `directory`, `file`, and
   itself as the base
 - The `file` field is resolved relative to the (already formatted)
   `directory` field
+- When the symlink-resolving format fails for a `file` or `output` path
+  (for example, the path no longer exists on disk), Bear logs a warning
+  and falls back to the original unformatted path for that field
+- When the `directory` field cannot be canonicalized under the
+  symlink-resolving format, the entire entry is dropped with a warning
 - On Windows, the symlink-resolving format strips the extended-length
   path prefix (`\\?\`) that Windows canonicalization produces
   (GitHub issue #683)
@@ -58,10 +63,11 @@ Given a build invoked from `/home/user/project` that compiles `src/main.c`:
 > then `directory` is written as-is from the interception,
 > and `file` is written as-is (e.g. `src/main.c`).
 
-Given a build where the compiler is invoked with a relative working directory:
+Given a build whose intercepted event records the working directory as
+the relative path `build` while Bear runs from `/home/user/project`:
 
 > When path format for directory is `absolute`,
-> then `directory` is written as an absolute path.
+> then `directory` is written as `/home/user/project/build`.
 
 Given a build where the source file is specified as
 `/home/user/project/src/main.c`:
@@ -87,12 +93,27 @@ Given a build where the source file does not exist at output time:
 > `file` field. If the `directory` cannot be canonicalized, the entire
 > entry is dropped with a warning.
 
-Given two directories `/a/b` and `/a/c` with files compiled from each:
+Given `/a/b/one.c` compiled from `/a/b` and `/a/c/two.c` compiled from
+`/a/c`:
 
 > When path format for file is `relative` and directory is `absolute`,
-> then files in `/a/b` are relative to `/a/b`,
-> files in `/a/c` are relative to `/a/c`,
-> and both directory fields are absolute.
+> then the first entry has `directory` `/a/b` and `file` `one.c`,
+> and the second entry has `directory` `/a/c` and `file` `two.c`.
+
+Given a build invoked from `/home/user/project` that compiles `src/main.c`
+to `obj/main.o`, with output-field emission enabled:
+
+> When path format for file is `relative`,
+> then `output` is written as `obj/main.o`, formatted with the same
+> strategy as `file`.
+
+Given the same build, where `obj/main.o` has been deleted before the
+output is written:
+
+> When path format for file is `canonical`,
+> then `file` is written as the resolved real path,
+> and `output` falls back to the original unformatted path
+> `obj/main.o`, with a warning.
 
 Given path format for directory set to `relative`:
 

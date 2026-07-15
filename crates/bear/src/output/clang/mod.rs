@@ -174,6 +174,7 @@ mod tests {
         assert!(entry.validate().is_ok());
     }
 
+    // Requirements: output-json-compilation-database
     #[test]
     fn test_entry_validate_errors() {
         let cases = vec![
