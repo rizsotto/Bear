@@ -870,9 +870,13 @@ mod tests {
             );
             let result = sut.recognize(execution);
             if let RecognizeResult::Recognized(cmd) = result {
-                assert_eq!(cmd.arguments[1].kind(), stops_at(CompilerPass::Preprocessing));
-                for i in 2..13 {
-                    assert_eq!(cmd.arguments[i].kind(), configures(CompilerPass::Preprocessing));
+                // -E, -M and -MM stop the compiler after preprocessing (the
+                // latter two imply -E); the rest only configure it.
+                for i in [1, 9, 10] {
+                    assert_eq!(cmd.arguments[i].kind(), stops_at(CompilerPass::Preprocessing), "index {i}");
+                }
+                for i in (2..9).chain(11..13) {
+                    assert_eq!(cmd.arguments[i].kind(), configures(CompilerPass::Preprocessing), "index {i}");
                 }
             }
         }

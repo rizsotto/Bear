@@ -643,6 +643,54 @@ fn pure_link_invocation_produces_no_entries() -> Result<()> {
     Ok(())
 }
 
+/// Given cc -E src.c, cc -M src.c, and cc -MM src.c (preprocess-only or
+/// dependency-generation-only invocations that stop before compiling), no
+/// entries are produced. Guards the -M/-MM stops_at_preprocessing
+/// classification in gcc.yaml.
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn preprocess_and_dependency_only_invocations_produce_no_entries() -> Result<()> {
+    let env = TestEnvironment::new("preprocess_dependency_only_no_entries")?;
+
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    let cc = filename_of(COMPILER_C_PATH);
+    let build = format!("{cc} -E src.c > /dev/null\n{cc} -M src.c > /dev/null\n{cc} -MM src.c > /dev/null");
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    let content = env.read_file("compile_commands.json")?;
+    assert_eq!(content.trim(), "[]", "preprocess- and dependency-only invocations must produce zero entries");
+
+    Ok(())
+}
+
+/// Given cc -MD -c src.c (a dependency file emitted as a side effect of a
+/// real compile), exactly one entry is produced for src.c.
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn dependency_side_effect_compile_produces_entry() -> Result<()> {
+    let env = TestEnvironment::new("dependency_side_effect_compile")?;
+
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    let build = format!("{} -MD -c src.c", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("src.c"))?;
+
+    Ok(())
+}
+
 /// Given cc -o a.out -lm -O2 src.c, the resulting compile entry preserves -O2
 /// but drops the link-only -lm flag.
 // Requirements: output-compilation-entries

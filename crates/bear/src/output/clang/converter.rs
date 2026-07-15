@@ -687,6 +687,7 @@ mod tests {
         assert_eq!(entries[0].output, Some(PathBuf::from("main.o")));
     }
 
+    // Requirements: output-compilation-entries
     #[test]
     fn test_preprocessing_only_command_no_entries() {
         let sut = {
@@ -705,6 +706,50 @@ mod tests {
 
         let result = sut.convert(&command);
         assert_eq!(result.len(), 0);
+    }
+
+    /// Runs the production compiler recognition over a `gcc` invocation and
+    /// converts the result with the default format. The dependency-generation
+    /// tests below must exercise the real flag classification (not a
+    /// hand-written one), because entry suppression is decided from it.
+    fn recognize_and_convert(args: Vec<&str>) -> Vec<Entry> {
+        use crate::semantic::interpreters::compilers::CompilerInterpreter;
+        use crate::semantic::{Interpreter, RecognizeResult};
+
+        let execution = intercept::Execution::from_strings(
+            "/usr/bin/gcc",
+            args,
+            "/home/user",
+            std::collections::HashMap::new(),
+        );
+        let interpreter = CompilerInterpreter::new_with_config(&[]);
+        let RecognizeResult::Recognized(command) = interpreter.recognize(execution) else {
+            panic!("gcc invocation must be recognized as a compiler command");
+        };
+        CommandConverter::new(Format::default()).convert(&command)
+    }
+
+    // Requirements: output-compilation-entries
+    #[test]
+    fn test_dependency_generation_only_command_no_entries() {
+        // -M and -MM imply -E: the compiler only emits a dependency rule,
+        // nothing is compiled, so no entry may be produced.
+        for flag in ["-M", "-MM"] {
+            let sut = recognize_and_convert(vec!["gcc", flag, "main.c"]);
+
+            assert!(sut.is_empty(), "gcc {flag} main.c must produce no entries, got: {sut:?}");
+        }
+    }
+
+    // Requirements: output-compilation-entries
+    #[test]
+    fn test_dependency_side_effect_compile_produces_entry() {
+        // -MD emits the dependency file as a side effect of a real compile
+        // step, so the invocation still produces its entry.
+        let sut = recognize_and_convert(vec!["gcc", "-MD", "-c", "main.c"]);
+
+        assert_eq!(sut.len(), 1, "gcc -MD -c main.c must produce one entry, got: {sut:?}");
+        assert_eq!(sut[0].file, PathBuf::from("main.c"));
     }
 
     #[test]

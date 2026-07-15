@@ -78,10 +78,14 @@ flags:
     result: configures_preprocessing
   - match: {pattern: "-pthread"}
     result: configures_preprocessing
+  # -M and -MM imply -E: the compiler emits a dependency rule and stops
+  # before compiling, so they suppress entry generation like -E does
+  # (requirement output-compilation-entries). The other -M* flags only
+  # modify dependency output and do not stop compilation.
   - match: {pattern: "-M"}
-    result: configures_preprocessing
+    result: stops_at_preprocessing
   - match: {pattern: "-MM"}
-    result: configures_preprocessing
+    result: stops_at_preprocessing
   - match: {pattern: "-MG"}
     result: configures_preprocessing
   - match: {pattern: "-MP"}
