@@ -1336,7 +1336,7 @@ mod tests {
     // invoked path (not the canonical wrapper) yields the real
     // toolchain's banner.
     //
-    // Requirements: recognition-ambiguous-name-probe, recognition-compiler-launchers
+    // Requirements: recognition-ambiguous-name-probe
     #[test]
     #[cfg(unix)]
     fn ambiguous_name_canonicalizing_to_masquerade_wrapper_is_probed_as_invoked() {

@@ -9,9 +9,7 @@ When a build compiles through a compiler-launcher command (ccache,
 distcc, sccache, icecc) that carries the real compiler in
 its own arguments, Bear records the compilation as the real compiler's
 invocation, parsed with that compiler's flag semantics -- not the
-launcher's. A launcher reached through its masquerade symlink farm is
-never version-probed, so the launcher's own version banner can never
-misclassify an ambiguous compiler name.
+launcher's.
 
 ## Acceptance criteria
 
@@ -29,12 +27,11 @@ misclassify an ambiguous compiler name.
 - A launcher wrapping another launcher (`ccache distcc gcc -c main.c`)
   is not unwrapped; it yields no entry. Bear does not chase a chain of
   launchers.
-- An ambiguous compiler basename (one whose classification relies on
-  the version probe) that resolves after canonicalization to a launcher
-  binary is never probed: the launcher's version banner must not stand
-  in for a compiler's. Such an execution yields no entry of its own; in
-  preload mode the real compiler that the launcher re-executes is
-  intercepted as a separate event and provides the entry.
+- A launcher invoked by its own basename (`ccache`, `distcc`,
+  `sccache`, `icecc`) is never version-probed; the launcher contract
+  above applies directly. An ambiguous compiler name that
+  canonicalizes to a launcher binary (a masquerade link) is probed as
+  invoked; that contract is owned by `recognition-ambiguous-name-probe`.
 - A masquerade entry under a specific compiler's name (the launcher's
   symlink farm shadowing `gcc` on PATH) is recorded under that
   compiler's name with the invocation's own arguments; the launcher
@@ -83,13 +80,11 @@ launcher):
 > When Bear recognizes it,
 > then no database entry is produced.
 
-Given an ambiguous compiler name (`cc`) that canonicalizes to a
-launcher binary (a masquerade symlink farm first on PATH):
+Given `ccache`, `distcc`, `sccache`, or `icecc` invoked by its own
+basename:
 
 > When Bear recognizes it,
-> then the version probe is not run,
-> and the launcher's version banner does not classify the name as any
-> compiler.
+> then no version probe runs and the launcher contract above applies.
 
 Given `icecc gcc -c main.c`:
 
