@@ -39,8 +39,14 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 /// Responsible for recognizing the semantic meaning of an executed command.
+///
+/// `Send` because the interpreter is moved into the consumer thread that
+/// drains the interception channel (see `modes::execution::Interceptor`).
+/// Recognition runs on that one thread only, so `Sync` is deliberately
+/// not required: implementations may use single-threaded interior
+/// mutability (e.g. `RefCell`) for caches.
 #[cfg_attr(test, mockall::automock)]
-pub trait Interpreter: Send + Sync {
+pub trait Interpreter: Send {
     fn recognize(&self, execution: Execution) -> RecognizeResult;
 }
 

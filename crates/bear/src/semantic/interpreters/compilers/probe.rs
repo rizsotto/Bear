@@ -31,13 +31,16 @@ use crate::config::CompilerType;
 use std::path::Path;
 
 #[cfg(unix)]
+use std::cell::RefCell;
+#[cfg(unix)]
 use std::collections::HashMap;
 #[cfg(unix)]
 use std::path::PathBuf;
-#[cfg(unix)]
-use std::sync::Mutex;
 
-pub trait CompilerProbe: Send + Sync {
+/// `Send` (and not `Sync`) for the same reason as [`crate::semantic::Interpreter`]:
+/// the probe lives inside the interpreter that is moved into the single
+/// consumer thread, and is never shared across threads.
+pub trait CompilerProbe: Send {
     /// Classify `executable_path` by running `--version` on it.
     /// Returns `None` if the binary does not produce a recognizable signature
     /// (timeout, spawn failure, non-zero exit, garbage output, etc.).
@@ -54,13 +57,12 @@ pub trait CompilerProbe: Send + Sync {
 /// `None` (an inconclusive probe), so a binary that doesn't understand
 /// `--version` is probed once, not on every recognize() call.
 ///
-/// Concurrency note: the lock is released between the cache miss and the
-/// inner-probe call, so two concurrent callers can both miss and both
-/// run the inner probe for the same path. This is deliberate -- holding
-/// the mutex across a fork+exec would serialize every probe across the
-/// whole process. The duplicate work is harmless because the inner probe
-/// is deterministic for a given path, and bounded because each unique
-/// path can only race once before the cache fills.
+/// The cache is a `RefCell` because `probe()` takes `&self` (it is called
+/// through shared references all the way down from `Box<dyn Interpreter>`)
+/// but a miss must write. Recognition runs on the single consumer thread
+/// (see [`CompilerProbe`]'s `Send`-only bound), so no locking is needed;
+/// the borrow is released before the inner-probe call, which forks and
+/// can block for the probe timeout.
 ///
 /// Gated to Unix because the only probe worth caching is `VersionProbe`,
 /// which is itself Unix-only. On Windows `default_probe` returns
@@ -69,24 +71,24 @@ pub trait CompilerProbe: Send + Sync {
 #[cfg(unix)]
 pub(crate) struct CachingProbe<P: CompilerProbe> {
     inner: P,
-    cache: Mutex<HashMap<PathBuf, Option<CompilerType>>>,
+    cache: RefCell<HashMap<PathBuf, Option<CompilerType>>>,
 }
 
 #[cfg(unix)]
 impl<P: CompilerProbe> CachingProbe<P> {
     pub(crate) fn new(inner: P) -> Self {
-        Self { inner, cache: Mutex::new(HashMap::new()) }
+        Self { inner, cache: RefCell::new(HashMap::new()) }
     }
 }
 
 #[cfg(unix)]
 impl<P: CompilerProbe> CompilerProbe for CachingProbe<P> {
     fn probe(&self, executable_path: &Path) -> Option<CompilerType> {
-        if let Some(&hit) = self.cache.lock().unwrap().get(executable_path) {
+        if let Some(&hit) = self.cache.borrow().get(executable_path) {
             return hit;
         }
         let result = self.inner.probe(executable_path);
-        self.cache.lock().unwrap().insert(executable_path.to_path_buf(), result);
+        self.cache.borrow_mut().insert(executable_path.to_path_buf(), result);
         result
     }
 }
@@ -134,35 +136,35 @@ mod caching_tests {
     //! Requirements: recognition-ambiguous-name-probe
 
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::cell::Cell;
 
     /// Probe that returns canned answers and counts how many times it ran.
     /// Used to verify that [`CachingProbe`] collapses repeated lookups for
     /// the same path into a single inner call.
     struct CountingProbe {
         answers: HashMap<PathBuf, CompilerType>,
-        calls: AtomicUsize,
+        calls: Cell<usize>,
     }
 
     impl CountingProbe {
         fn empty() -> Self {
-            Self { answers: HashMap::new(), calls: AtomicUsize::new(0) }
+            Self { answers: HashMap::new(), calls: Cell::new(0) }
         }
 
         fn with_answer(p: &str, t: CompilerType) -> Self {
             let mut answers = HashMap::new();
             answers.insert(PathBuf::from(p), t);
-            Self { answers, calls: AtomicUsize::new(0) }
+            Self { answers, calls: Cell::new(0) }
         }
 
         fn calls(&self) -> usize {
-            self.calls.load(Ordering::SeqCst)
+            self.calls.get()
         }
     }
 
     impl CompilerProbe for CountingProbe {
         fn probe(&self, p: &Path) -> Option<CompilerType> {
-            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.calls.set(self.calls.get() + 1);
             self.answers.get(p).copied()
         }
     }
@@ -200,7 +202,7 @@ mod caching_tests {
         let mut answers = HashMap::new();
         answers.insert(PathBuf::from("/usr/bin/cc"), CompilerType::Gcc);
         answers.insert(PathBuf::from("/usr/local/bin/cc"), CompilerType::Clang);
-        let inner = CountingProbe { answers, calls: AtomicUsize::new(0) };
+        let inner = CountingProbe { answers, calls: Cell::new(0) };
         let cached = CachingProbe::new(inner);
 
         assert_eq!(cached.probe(Path::new("/usr/bin/cc")), Some(CompilerType::Gcc));
