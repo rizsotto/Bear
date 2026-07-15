@@ -23,6 +23,9 @@
 //!   environment so the probe is not itself intercepted by Bear.
 //! - A watchdog thread `SIGKILL`s the child's process group if
 //!   `--version` does not return within the configured timeout.
+//! - A spawn that fails with `ETXTBSY` (the probed file transiently held
+//!   open for writing across another fork+exec) is retried briefly
+//!   before the probe declines.
 
 use crate::config::CompilerType;
 use std::path::Path;
@@ -268,11 +271,25 @@ mod unix {
                 });
             }
 
-            let child = match cmd.spawn() {
-                Ok(c) => c,
-                Err(err) => {
-                    log::debug!("probe: spawn failed for {}: {err}", executable_path.display());
-                    return None;
+            // exec fails with ETXTBSY while any process holds a write fd to
+            // the probed file. The pre_exec closure above forces the
+            // fork+exec spawn path, and a child forked elsewhere (by another
+            // thread here, or by a build tool that just wrote a compiler
+            // wrapper script) holds every inherited fd until its own exec.
+            // That window is transient, so retry briefly; a persistently
+            // busy file still declines as inconclusive.
+            let mut attempts = 0;
+            let child = loop {
+                match cmd.spawn() {
+                    Ok(c) => break c,
+                    Err(err) if err.raw_os_error() == Some(libc::ETXTBSY) && attempts < 10 => {
+                        attempts += 1;
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(err) => {
+                        log::debug!("probe: spawn failed for {}: {err}", executable_path.display());
+                        return None;
+                    }
                 }
             };
             let pid = child.id();
@@ -519,6 +536,30 @@ mod unix {
                     elapsed < std::time::Duration::from_secs(2),
                     "probe took {elapsed:?}, expected <2s; watchdog did not fire"
                 );
+            }
+
+            #[test]
+            fn retries_exec_while_script_is_transiently_open_for_write() {
+                // exec of a script fails with ETXTBSY while any process holds
+                // a write fd to it. That happens transiently under parallel
+                // fork+exec: a child forked by another thread inherits the
+                // write fd of a script still being created and holds it until
+                // its own exec. Hold the write handle open past the probe's
+                // first spawn attempt and assert the retry absorbs it.
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("busy-clang");
+                let mut writer = std::fs::File::create(&path).unwrap();
+                writer.write_all(b"#!/bin/sh\necho 'clang version 1.0'\n").unwrap();
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+                let release = std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(30));
+                    drop(writer);
+                });
+
+                let sut = VersionProbe::new().probe(&path);
+                release.join().unwrap();
+
+                assert_eq!(sut, Some(CompilerType::Clang));
             }
 
             #[test]
