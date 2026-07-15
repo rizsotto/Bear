@@ -84,8 +84,13 @@ mod platform {
 
     /// How long the build's process tree is allowed to wind down on its own
     /// after the real termination signal before the `Leader` escalates to
-    /// `SIGKILL`. Kept well under the requirement's sub-one-second budget.
-    const GRACE: Duration = Duration::from_millis(400);
+    /// `SIGKILL`. A cooperating tree ends the window early by exiting, so
+    /// only a build that ignores the signal pays the full wait; sized to
+    /// the largest value that keeps that case inside the requirement's
+    /// sub-one-second teardown budget, because the headroom is what keeps
+    /// a trap on a starved CI runner from being SIGKILLed mid-flight
+    /// (issue #713).
+    const GRACE: Duration = Duration::from_millis(800);
 
     pub(super) fn supervise(
         command: &mut std::process::Command,
@@ -189,6 +194,13 @@ mod platform {
                 break;
             }
             std::thread::sleep(Duration::from_millis(10));
+        }
+
+        if exited.is_none() {
+            // One stable line across both escalation paths (cgroup and
+            // process-group): tests and triage key on it to distinguish a
+            // starved grace window from a build that exited in time.
+            log::debug!("Build did not exit within the grace window ({GRACE:?})");
         }
 
         // Force anything still alive. A cgroup kill reaps the whole cgroup,

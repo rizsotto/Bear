@@ -499,48 +499,37 @@ fn cgroup_v2_writable() -> bool {
 fn forwards_the_exact_signal_received() -> Result<()> {
     // (signal for `kill`, marker its trap writes, exit code its trap uses)
     let cases = [("INT", "INT", 10), ("TERM", "TERM", 20)];
+    // Distinct INT and TERM traps: whichever marker appears reveals which
+    // signal Bear actually forwarded. If Bear substituted a signal, the
+    // wrong trap would fire. Starvation of the grace window can only leave
+    // the marker empty (or the exit code forced), never write the wrong
+    // marker, so retrying on the supervisor's starvation evidence cannot
+    // mask a signal-substitution regression (issue #713).
+    let traps = [("INT", "INT", 10), ("TERM", "TERM", 20)];
 
     for (signal, expected_marker, expected_code) in cases {
-        let env = TestEnvironment::new(&format!("signal_fidelity_{signal}"))?;
+        for attempt in 1..=STARVATION_ATTEMPTS {
+            let (caught, code, bear_stderr) =
+                run_trapping_build(&format!("signal_fidelity_{signal}_{attempt}"), &traps, signal)?;
 
-        let marker = env.test_dir().join("caught.marker");
-        let ready = env.test_dir().join("ready");
-        // Distinct INT and TERM traps: whichever marker appears reveals which
-        // signal Bear actually forwarded. If Bear substituted a signal, the
-        // wrong trap would fire.
-        let script = format!(
-            "trap 'echo INT > {m} ; exit 10' INT ; trap 'echo TERM > {m} ; exit 20' TERM ; echo ready > {r} ; {sleep} 60",
-            m = marker.display(),
-            r = ready.display(),
-            sleep = SLEEP_PATH,
-        );
+            if caught == expected_marker && code == Some(expected_code) {
+                break;
+            }
+            if attempt < STARVATION_ATTEMPTS && bear_stderr.contains(GRACE_STARVED_LINE) {
+                eprintln!("runner starved the teardown grace window (attempt {attempt}); retrying");
+                continue;
+            }
 
-        let mut cmd = env.command_bear();
-        cmd.current_dir(env.test_dir())
-            .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        let mut child = cmd.spawn().expect("failed to spawn bear");
-
-        wait_for_file(&ready);
-
-        let pid = child.id().to_string();
-        let kill_status = std::process::Command::new("kill")
-            .arg(format!("-{signal}"))
-            .arg(&pid)
-            .status()
-            .expect("kill failed to run");
-        assert!(kill_status.success(), "kill -{signal} reported failure");
-
-        let status = child.wait().expect("failed to wait for bear");
-
-        let caught = std::fs::read_to_string(&marker).unwrap_or_default();
-        assert_eq!(caught.trim(), expected_marker, "{signal}: build trapped the wrong signal");
-        assert_eq!(
-            status.code(),
-            Some(expected_code),
-            "{signal}: bear did not propagate the trap's exit code"
-        );
+            assert_eq!(
+                caught, expected_marker,
+                "{signal}: build trapped the wrong signal; bear stderr:\n{bear_stderr}"
+            );
+            assert_eq!(
+                code,
+                Some(expected_code),
+                "{signal}: bear did not propagate the trap's exit code; bear stderr:\n{bear_stderr}"
+            );
+        }
     }
 
     Ok(())
@@ -618,43 +607,54 @@ fn wait_for_file(path: &std::path::Path) {
     }
 }
 
-/// Bear forwards the real signal (not SIGKILL) and grants a grace window, so
-/// a build that traps the signal runs its trap and Bear's exit code reflects
-/// whatever the build ultimately exited with.
-// Requirements: cli-signal-forwarding
-#[test]
-#[cfg(target_family = "unix")]
-#[cfg(all(has_executable_shell, has_executable_sleep))]
-fn signal_lets_a_trapping_build_run_its_trap() -> Result<()> {
-    let env = TestEnvironment::new("signal_trapping_build")?;
+/// The supervisor's trace line proving the direct child did not exit within
+/// the teardown grace window: the runner starved the build, and its trap was
+/// SIGKILLed through no fault of the signal-forwarding contract. Emitted by
+/// `leader_teardown` in `intercept-supervisor`; the trap tests retry only on
+/// this evidence (issue #713).
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
+const GRACE_STARVED_LINE: &str = "did not exit within the grace window";
+
+/// Upper bound on scenario attempts when the runner starves the grace
+/// window. A regression (no grace, wrong signal) fails every attempt, so
+/// retrying does not mask it.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
+const STARVATION_ATTEMPTS: usize = 3;
+
+/// One attempt of a trapping-build signal scenario: run a shell script that
+/// installs `traps` (signal name, marker text, exit code) and blocks in a
+/// long sleep, wait until the script reports ready, send `signal` to bear,
+/// and return the trap marker's content, bear's exit code, and bear's
+/// captured stderr (debug level, so the supervisor's teardown trace is in
+/// it: which signal it forwarded and whether the grace window was starved).
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
+fn run_trapping_build(
+    env_name: &str,
+    traps: &[(&str, &str, i32)],
+    signal: &str,
+) -> Result<(String, Option<i32>, String)> {
+    let env = TestEnvironment::new(env_name)?;
 
     let marker = env.test_dir().join("trap.marker");
     let ready = env.test_dir().join("ready");
-    // The build traps TERM, records that the trap ran, and exits 42.
-    let script = format!(
-        "trap 'echo caught > {marker} ; exit 42' TERM ; echo ready > {ready} ; {sleep} 60",
-        marker = marker.display(),
-        ready = ready.display(),
-        sleep = SLEEP_PATH,
-    );
+    let mut script = String::new();
+    for (sig, text, code) in traps {
+        script.push_str(&format!("trap 'echo {text} > {m} ; exit {code}' {sig} ; ", m = marker.display()));
+    }
+    script.push_str(&format!("echo ready > {r} ; {sleep} 60", r = ready.display(), sleep = SLEEP_PATH));
 
-    // Capture bear's stderr (RUST_LOG=debug on CI) so a teardown-timing
-    // failure carries the supervisor's own trace - which signal it forwarded
-    // and whether it escalated to SIGKILL - instead of a bare assertion.
     let mut cmd = env.command_bear();
     cmd.current_dir(env.test_dir())
         .env("RUST_BACKTRACE", "1")
+        .env("RUST_LOG", "debug")
         .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
-    if std::env::var_os("RUST_LOG").is_none() {
-        cmd.env("RUST_LOG", "info");
-    }
     let mut child = cmd.spawn().expect("failed to spawn bear");
 
-    // Drain stderr on a thread: with debug logging a full pipe would otherwise
-    // block the very build we are trying to tear down. The write ends close
-    // when bear and its build tree exit, so the read returns EOF.
+    // Drain stderr on a thread: with debug logging a full pipe would
+    // otherwise block the very build we are trying to tear down. The write
+    // ends close when bear and its build tree exit, so the read returns EOF.
     let stderr = child.stderr.take().expect("bear stderr was piped");
     let drain = std::thread::spawn(move || {
         let mut captured = String::new();
@@ -666,22 +666,57 @@ fn signal_lets_a_trapping_build_run_its_trap() -> Result<()> {
     wait_for_file(&ready);
 
     let pid = child.id().to_string();
-    let kill_status =
-        std::process::Command::new("kill").arg("-TERM").arg(&pid).status().expect("kill -TERM failed to run");
-    assert!(kill_status.success(), "kill -TERM reported failure");
+    let kill_status = std::process::Command::new("kill")
+        .arg(format!("-{signal}"))
+        .arg(&pid)
+        .status()
+        .expect("kill failed to run");
+    assert!(kill_status.success(), "kill -{signal} reported failure");
 
     let status = child.wait().expect("failed to wait for bear");
     let bear_stderr = drain.join().unwrap_or_default();
 
-    // The trap ran (real signal forwarded with grace, not an immediate
-    // SIGKILL) and Bear reflected the build's own exit code.
     let caught = std::fs::read_to_string(&marker).unwrap_or_default();
-    assert_eq!(caught.trim(), "caught", "build's TERM trap did not run; bear stderr:\n{bear_stderr}");
-    assert_eq!(
-        status.code(),
-        Some(42),
-        "bear did not propagate the build's trap exit code; bear stderr:\n{bear_stderr}"
-    );
+    Ok((caught.trim().to_string(), status.code(), bear_stderr))
+}
+
+/// Bear forwards the real signal (not SIGKILL) and grants a grace window, so
+/// a build that traps the signal runs its trap and Bear's exit code reflects
+/// whatever the build ultimately exited with.
+// Requirements: cli-signal-forwarding
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep))]
+fn signal_lets_a_trapping_build_run_its_trap() -> Result<()> {
+    // The build traps TERM, records that the trap ran, and exits 42. A
+    // starved runner can blow the whole grace window before the trapping
+    // shell is even scheduled; the supervisor then SIGKILLs the trap
+    // mid-flight and the attempt proves nothing about the contract (issue
+    // #713). Retry only on the supervisor's own starvation evidence.
+    for attempt in 1..=STARVATION_ATTEMPTS {
+        let (caught, code, bear_stderr) = run_trapping_build(
+            &format!("signal_trapping_build_{attempt}"),
+            &[("TERM", "caught", 42)],
+            "TERM",
+        )?;
+
+        if caught == "caught" && code == Some(42) {
+            return Ok(());
+        }
+        if attempt < STARVATION_ATTEMPTS && bear_stderr.contains(GRACE_STARVED_LINE) {
+            eprintln!("runner starved the teardown grace window (attempt {attempt}); retrying");
+            continue;
+        }
+
+        // The trap ran (real signal forwarded with grace, not an immediate
+        // SIGKILL) and Bear reflected the build's own exit code.
+        assert_eq!(caught, "caught", "build's TERM trap did not run; bear stderr:\n{bear_stderr}");
+        assert_eq!(
+            code,
+            Some(42),
+            "bear did not propagate the build's trap exit code; bear stderr:\n{bear_stderr}"
+        );
+    }
     Ok(())
 }
 
