@@ -51,10 +51,15 @@ flags:
     result: configures_preprocessing
   - match: {pattern: "-MQ{ }*"}
     result: configures_preprocessing
+  # -M and -MG emit Makefile dependencies and stop: nothing is assembled,
+  # so they suppress entry generation like -E does (requirement
+  # output-compilation-entries). -MD assembles and generates the dependency
+  # file as a side effect; the remaining -M* flags only shape the
+  # dependency output.
   - match: {pattern: "-M"}
-    result: configures_preprocessing
+    result: stops_at_preprocessing
   - match: {pattern: "-MG"}
-    result: configures_preprocessing
+    result: stops_at_preprocessing
   - match: {pattern: "-MP"}
     result: configures_preprocessing
   - match: {pattern: "-MW"}

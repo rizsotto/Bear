@@ -1224,6 +1224,54 @@ fn fasm_execution_yields_single_entry() -> Result<()> {
     )
 }
 
+// Requirements: output-compilation-entries
+//
+// NASM's `-M` and `-MG` emit Makefile dependencies and stop: nothing is
+// assembled, so a `nasm -M hello.asm` execution must yield no entry. Guards
+// the stops_at_preprocessing classification in nasm.yaml.
+#[test]
+fn nasm_dependency_only_invocation_yields_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("nasm_dependency_only")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    for flag in ["-M", "-MG"] {
+        let event = json!({
+            "executable": "nasm",
+            "arguments": ["nasm", flag, "hello.asm"],
+            "working_dir": temp_dir,
+            "environment": {}
+        });
+
+        env.create_source_files(&[
+            ("events.json", &event.to_string()),
+            ("nasm", ""),
+            ("hello.asm", "section .text\nglobal _start\n_start:\n    ret\n"),
+        ])?;
+
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+        let db = env.load_compilation_database("compile_commands.json")?;
+        db.assert_count(0).with_context(|| format!("flag {flag} must yield no entry"))?;
+    }
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
+// NASM's `-MD` generates the dependency file as a side effect of a real
+// assembly step, so the invocation still yields its entry for `hello.asm`.
+#[test]
+fn nasm_dependency_side_effect_assembly_yields_entry() -> Result<()> {
+    assert_driver_yields_single_entry_for_source(
+        "nasm_dependency_side_effect",
+        &["nasm", "-MD", "hello.d", "-f", "elf64", "-o", "hello.o", "hello.asm"],
+        "hello.asm",
+        "section .text\nglobal _start\n_start:\n    ret\n",
+    )
+}
+
 // Requirements: recognition-compiler-names
 //
 // Direct assembly through a driver (`gcc -c foo.s`) is already recorded
