@@ -9,18 +9,11 @@ When the user performs incremental builds or builds separate components at
 different times, they need to accumulate compilation entries across multiple
 Bear runs into a single compilation database. The `--append` flag merges new
 entries with an existing `compile_commands.json` instead of overwriting it.
-New entries are emitted before the existing ones so that, after duplicate
-filtering, a file rebuilt with different flags keeps its newest invocation
-instead of retaining the stale entry from the previous run.
 
 ## Acceptance criteria
 
 - When `--append` is specified and the output file exists, new entries are
   emitted first and the existing entries follow
-- New entries appear before existing entries in the combined output
-- When a source file is present in both the new build and the existing
-  database, duplicate filtering (`output-duplicate-detection`) keeps the new
-  entry and drops the old one, so the recorded flags reflect the latest build
 - When `--append` is specified and the output file does not exist, Bear logs
   a warning and writes only the new entries (no error)
 - When `--append` is not specified, the output file is overwritten with only
@@ -31,7 +24,8 @@ instead of retaining the stale entry from the previous run.
   Bear skips invalid entries individually with a logged warning per entry
   and preserves valid entries
 - The combined output (new + existing) passes through the rest of the output
-  pipeline (duplicate filtering, source filtering, atomic write)
+  pipeline (duplicate filtering, source filtering, atomic write); which entry
+  survives when a file appears in both is owned by `output-duplicate-detection`
 
 ## Non-functional constraints
 
@@ -78,28 +72,10 @@ compiler invocations:
 > When the user runs `bear --append -- true`,
 > then the existing entries are preserved unchanged.
 
-Given an existing `compile_commands.json` with an entry for file1.c compiled
-with `-O2`, and a new build that compiles file1.c with `-O3`:
-
-> When the user runs `bear --append -- <compiler> -c -O3 file1.c`,
-> then only one entry for file1.c appears, recording the `-O3` flags
-> (the new entry replaces the old, because default duplicate matching ignores
-> arguments and new entries come first).
-
-Given an existing `compile_commands.json` with an entry for file1.c compiled
-with `-O2`, and a new build that compiles file1.c with identical flags:
-
-> When the user runs `bear --append -- <compiler> -c -O2 file1.c`,
-> then only one entry for file1.c appears (the duplicate is collapsed).
-
 ## Notes
 
 - GitHub issue #532 reported severe performance degradation with `--append`
   on large projects in the old C++ implementation.
-- The former `--update` request (GitHub PR #497, asked for in discussion
-  #712) is folded into append's default behaviour -- new entries first,
-  matched on `directory` and `file` -- rather than shipped as a separate
-  flag. The rationale linked below records why.
 
 ## Rationale
 

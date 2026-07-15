@@ -29,10 +29,6 @@ contract below must hold identically in every mode.
   the build
 - Between the signal arriving and both Bear and the build ending,
   less than one second elapses on a system not under heavy load
-- When the build is terminated by a signal rather than exiting
-  normally, Bear exits non-zero so that scripts and CI systems see a
-  failed build (the exit-code contract is
-  [`cli-exit-codes`](cli-exit-codes.md))
 - The build receives the same signal Bear received: a `SIGINT` arrives
   as `SIGINT` and a `SIGTERM` as `SIGTERM`, so a build that handles the
   two differently sees the real one. Bear relays the signal rather than
@@ -95,11 +91,6 @@ Given a build that is interrupted mid-compile:
 > When the user presses Ctrl-C while the compiler is running,
 > then the compiler terminates,
 > and `bear` exits with a non-zero status.
-
-## Notes
-
-- Related: `cli-exit-codes`, `interception-preload-mechanism`,
-  `interception-wrapper-mechanism`.
 
 ## Rationale
 

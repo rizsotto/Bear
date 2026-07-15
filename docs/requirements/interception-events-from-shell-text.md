@@ -171,10 +171,7 @@ Given an invocation of this mode that also supplies a configuration file:
 
 - GitHub issue #284 ("Dry run flag") is the recurring request; #287,
   #219, #644, #456, and #404 ask for the same capability from build-log
-  and dry-run angles. Issue #644's build-log parser was previously
-  declined as out of scope; this contract revises that narrowly - the
-  parser is quarantined in one producer whose output is the documented
-  event stream, and the consumer half stays parser-agnostic.
+  and dry-run angles.
 - The name "dry run" describes the build system's mode, not this mode:
   the build system dry-runs, this mode only parses the text. The man page
   should carry the "dry run" vocabulary so users searching for it arrive

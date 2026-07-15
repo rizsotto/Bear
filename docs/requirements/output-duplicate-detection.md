@@ -134,10 +134,6 @@ both intercepted in preload mode, producing two events for one source:
   frontend invocations. These are filtered by the semantic analyzer before
   reaching the duplicate filter, but the duplicate filter provides a safety
   net.
-- The former `--update` request (GitHub PR #497 / discussion #712) is
-  delivered by the defaults above -- the `directory`/`file` match set plus
-  append ordering (`output-append`) -- rather than a separate flag. The
-  rationale linked below records why.
 
 ## Rationale
 

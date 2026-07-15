@@ -34,9 +34,9 @@ launcher's.
   invoked; that contract is owned by `recognition-ambiguous-name-probe`.
 - A masquerade entry under a specific compiler's name (the launcher's
   symlink farm shadowing `gcc` on PATH) is recorded under that
-  compiler's name with the invocation's own arguments; the launcher
-  re-executes the real compiler, and default duplicate detection
-  collapses the pair in preload mode.
+  compiler's name with the invocation's own arguments; collapsing it
+  with the re-executed real compiler in preload mode is owned by
+  `output-duplicate-detection`.
 - icecc follows the identical contract: the real compiler in its
   arguments is recorded as the compilation. In its launcher usage icecc
   takes the compiler as its first argument with no launcher-specific

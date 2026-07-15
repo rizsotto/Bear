@@ -21,8 +21,7 @@ stands on its own and downstream tools see the full set of flags the
 compiler was given.
 
 This behaviour is opt-in. With the default configuration Bear
-continues to record argv exactly as the build wrote it, in line with
-`output-compilation-entries`.
+continues to record argv exactly as the build wrote it.
 
 ## Acceptance criteria
 
@@ -175,9 +174,8 @@ through a cycle:
 - Source: feature request #701 -- Xcode's response files cause
   important flags to be lost when downstream tools read
   `compile_commands.json`.
-- Related: `output-compilation-entries` documents the default
-  behaviour (response files are kept literal) and points to this
-  requirement for the opt-in expansion.
+- Related: `output-compilation-entries` -- the entry-shaping rules
+  the inlined tokens participate in.
 - Related: `output-json-compilation-database` defines the JSON shape
   of an entry. This requirement does not change it.
 - Related: `interception-events-format` records argv as observed by

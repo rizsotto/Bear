@@ -1374,7 +1374,7 @@ duplicates:
 /// fields wins over the entry from the existing compilation database: the new
 /// arguments survive, the stale ones are dropped. New entries are emitted
 /// before existing ones, so first-occurrence filtering keeps the new entry.
-// Requirements: output-duplicate-detection, output-append
+// Requirements: output-duplicate-detection
 #[test]
 #[cfg(target_family = "unix")]
 fn duplicate_append_mode_newest_entry_wins() -> Result<()> {
@@ -1462,7 +1462,7 @@ duplicates:
 /// `[directory, file]` (arguments excluded) together with append emitting new
 /// entries first, so it would fail under the old `[directory, file, arguments]`
 /// default (which kept both entries).
-// Requirements: output-duplicate-detection, output-append
+// Requirements: output-duplicate-detection
 #[test]
 #[cfg(target_family = "unix")]
 fn default_config_append_replaces_stale_entry_on_flag_change() -> Result<()> {

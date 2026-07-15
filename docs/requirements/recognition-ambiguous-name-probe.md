@@ -34,10 +34,7 @@ ability to override Bear's guess when needed.
   recognition regex (`gcc.yaml` and friends) deliberately does not list
   `cc`/`c++`, so when the probe declines (timeout, unrecognizable
   output, failed spawn, non-zero exit) recognition returns
-  `NotRecognized` rather than guessing. A missing entry is visible and
-  debuggable; a wrongly-classified entry corrupts the compilation
-  database silently via mismatched flag-arity tables, which is the bug
-  this requirement exists to prevent.
+  `NotRecognized` rather than guessing.
 - Probes never deadlock. Stdin is closed; the call returns within a bounded
   time budget even for hung children.
 - Probes do not recursively re-enter Bear's own interception.
@@ -72,8 +69,7 @@ ability to override Bear's guess when needed.
   the invoked path for a masquerade link), not once per invocation.
 - Probe timeout: short (single-digit seconds), bounded.
 - The classification rule is conservative: when in doubt, return no
-  classification rather than guess wrong. A misclassification corrupts the
-  database; a non-classification falls back to existing behavior.
+  classification rather than guess wrong.
 
 ## Known limitations
 

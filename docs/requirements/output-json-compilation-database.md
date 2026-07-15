@@ -19,7 +19,9 @@ the `directory`, `file`, `arguments`, `command`, and `output` fields:
 
 Two aspects of that format are specific to how Bear writes it and are
 described below: how Bear escapes the `command` field, and how it spells
-the compiler path in `arguments[0]`.
+the compiler path in `arguments[0]`. Whether an entry carries the
+optional `output` field, and its value, is owned by
+`output-compilation-entries`.
 
 ### The `command` field in detail
 
@@ -86,15 +88,13 @@ Related issues: #240, #678, #679, #671.
 - When every entry that would otherwise have been written is dropped due to
   validation failures, Bear emits a single `ERROR`-level summary line so
   the empty compilation database is never silent
-- Entries correspond to actual compiler invocations observed during the build
-- Non-compiler commands (linker-only, preprocessor-only, info-only such as
-  `--version` or `--help`) are excluded
+- Entries correspond to actual compiler invocations observed during the
+  build; which invocations produce entries is owned by
+  `output-compilation-entries`
 - The output path is configurable
 - Default output format uses `arguments` (array form)
 - When `command` format is selected, arguments are shell-escaped
   following POSIX shell quoting conventions
-- The `output` field is omitted by default and included when a
-  configuration option enables it
 
 ## Validation failure handling
 
