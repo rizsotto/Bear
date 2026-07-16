@@ -1,17 +1,17 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% July 12, 2026
+% July 16, 2026
 <!-- to generate the final `bear.1` file, run `pandoc -s -t man bear.1.md -o bear.1` -->
 
 # NAME
 
-Bear - a tool to generate compilation database for Clang tooling.
+bear - generate a compilation database for Clang tooling
 
 # SYNOPSIS
 
-**bear** [*OPTIONS*] [\-\-] [*BUILD_COMMAND*...]
+**bear** [*OPTIONS*] \-\- *BUILD_COMMAND*...
 
-**bear intercept** [*OPTIONS*] \-\-output *FILE* [\-\-] *BUILD_COMMAND*...
+**bear intercept** [*OPTIONS*] \-\-output *FILE* \-\- *BUILD_COMMAND*...
 
 **bear semantic** [*OPTIONS*]
 
@@ -20,146 +20,229 @@ Bear - a tool to generate compilation database for Clang tooling.
 
 # DESCRIPTION
 
-Bear is a tool that generates a JSON compilation database for Clang tooling by intercepting command executions during the build process. The JSON compilation database is used in the Clang project to provide information about how individual compilation units were processed, enabling tools like clang-tidy, clangd, and other Clang-based analysis tools to understand your project's build configuration.
+Bear produces a JSON compilation database (`compile_commands.json`).
+Clang-based tools such as clangd and clang-tidy read this file to learn
+how each source file of a project is compiled: with which compiler,
+which flags, from which directory. Build systems know this, but most do
+not export it; Bear recovers it from the build itself.
 
-Bear operates by intercepting system calls during the build process to capture compilation commands. It supports two main interception methods: dynamic library preloading (on Unix-like systems) and wrapper executables (cross-platform). The captured commands are then filtered through semantic analysis to identify actual compiler invocations and generate the final compilation database.
+Bear works in two stages. First it captures the commands a build
+executes, and writes them as a stream of execution events. The capture
+either observes a real build run, or parses the text of a dry run. Then
+semantic analysis recognizes the compiler invocations among those
+events, parses their command lines, and writes the compilation
+database.
 
-Bear can operate in four modes:
+## Modes
 
-- **Combined mode** (default): Runs both interception and semantic analysis in sequence
-- **Intercept mode**: Only captures build events to an intermediate file
-- **Semantic mode**: Processes previously captured events to generate the compilation database
-- **Parse-sh mode**: Reconstructs the event stream from shell command text (for example, `make -n` dry-run output), without running a build at all
+**Combined mode** (default)
+: `bear -- <build command>` runs the build, captures and analyzes in one
+step, and writes the database. This is the recommended way to use Bear:
+it observes the commands the build actually executes, so the result is
+exact. Use it whenever you can run the build.
+
+**Intercept mode**
+: `bear intercept` runs the build but only captures, writing the raw
+event stream to a file. Useful when the build is expensive and you want
+to run it once and process the events several times, for example to
+try different output configurations.
+
+**Semantic mode**
+: `bear semantic` runs no build: it is a filter that reads an event
+stream (from `bear intercept` or `bear parse-sh`) and writes the
+compilation database. Combine it with intercept mode to re-generate the
+database without rebuilding.
+
+**Parse-sh mode**
+: `bear parse-sh` reconstructs the event stream from shell command
+text, without executing anything. Typical input is a build system's dry
+run (`make -n`) or a saved build log. It is a text parser and inherently
+lower fidelity than interception; reach for it when the build cannot be
+run, for example to recover a database from a CI log. See its
+limitations under COMMANDS.
+
+## Interception methods
+
+Interception itself has two methods, selectable in the configuration
+file. **Preload** (the default on Linux and macOS) injects a small
+library into every process the build starts and observes its `exec()`
+calls. **Wrapper** substitutes the known compilers with a reporting
+wrapper executable. Preload is transparent to the build but cannot
+observe statically linked executables, and macOS System Integrity
+Protection blocks it for Apple-signed binaries (such as Xcode's
+compilers); Bear falls back to the wrapper for those. Wrapper mode
+works on every platform, but the build has to pick the wrapper up: a
+"configure" step that discovers compilers must itself run under Bear
+(see TROUBLESHOOTING).
 
 ## OPTIONS
 
 **-c, \-\-config** *FILE*
-: Specify a configuration file path. The configuration file controls output formatting, compiler recognition, source filtering, and duplicate handling. It applies to every mode except `bear parse-sh`, which only emits an event stream and never consults it; passing `--config` to `bear parse-sh` is an error rather than a silent no-op.
+: Path of the configuration file. It controls the interception method,
+compiler recognition, source filtering, duplicate handling, and output
+formatting (see CONFIGURATION). Given before a subcommand it applies to
+that subcommand too, except `bear parse-sh`, which rejects it: parse-sh
+only emits an event stream, so no configuration applies to it.
 
 **-o, \-\-output** *FILE*
-: Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database. This option runs the build (combined mode, and `bear intercept`'s own `--output`), so it does not accept `-` for standard output: the build's own stdout shares that stream, and a non-atomic write could corrupt it. Use a file path, or split into `bear intercept --output <events>` followed by `bear semantic --input <events> --output -` (see below).
+: Path of the compilation database to write (default:
+`compile_commands.json`). `-` is not accepted here, because in combined
+mode standard output belongs to the build. To stream the database, use
+`bear semantic --output -` (see COMMANDS).
 
 **-a, \-\-append**
-: Append results to an existing output file instead of overwriting it. This allows incremental updates to the compilation database. New entries are placed before the existing ones, so when a source file is rebuilt its newest invocation survives duplicate filtering and replaces the stale entry (see the `duplicates` section).
+: Append to an existing output file instead of overwriting it. New
+entries are placed before the existing ones, so a rebuilt file's newest
+invocation survives duplicate filtering and replaces the stale entry
+(see `duplicates` under CONFIGURATION).
 
 **-h, \-\-help**
-: Print help information.
+: Print help.
 
 **-V, \-\-version**
-: Print version information.
+: Print version.
 
 
 # COMMANDS
 
-Calling bear without commands will execute the combined mode, and will intercept the
-compiler calls and generate a compilation database as output.
-
 ## bear intercept
 
-Intercepts command execution events during the build process and saves them to an events file for later processing.
+Runs the build and captures execution events to a file, without
+analyzing them.
 
-**bear intercept** [*OPTIONS*] \-\-output *FILE* [\-\-] *BUILD_COMMAND*...
+**bear intercept** [*OPTIONS*] \-\-output *FILE* \-\- *BUILD_COMMAND*...
 
 **-o, \-\-output** *FILE*
-: Path of the event file to write. Required: there is no default event-file name, and `-` is rejected -- `bear intercept` runs the build, so its stdout is the build's stdout, and writing events there would corrupt the stream. Since no stream fallback exists, the destination must be named explicitly; omitting it is a usage error reported before the build runs.
+: Path of the event file to write. Required, and `-` is not accepted:
+the build owns standard output, and there is no default event-file name.
 
 ## bear semantic
 
-Processes previously captured events to generate a compilation database through semantic analysis.
+Reads an event stream and writes the compilation database. It runs no
+build, so it behaves as a plain filter: diagnostics go to standard
+error, and both ends can be standard streams.
 
 **bear semantic** [*OPTIONS*]
 
 **-i, \-\-input** *FILE*
-: Path of the event file to read (default: `-`, reads from standard input). `bear semantic` runs no build, so it is a plain filter: with no input named it reads the event stream from standard input, and any non-executing producer of a conforming stream can pipe into it with no flags, for example:
-
-      <producer> | bear semantic
-
-  Name a file to read a saved event stream instead (for example one written by `bear intercept --output`). Diagnostics go to stderr, keeping stdout machine-readable; when standard input is a terminal, or the event stream turns out to be empty, a stderr notice says so.
+: Path of the event file to read (default: `-`, standard input). Any
+producer of a conforming event stream can pipe into it. When standard
+input is a terminal, or the stream turns out to be empty, a notice is
+printed on standard error.
 
 **-o, \-\-output** *FILE*
-: Path of the compilation database to write (default: `compile_commands.json`). Pass `-` to write it to standard output instead of a file -- again safe because `bear semantic` runs no build -- so the whole flow can stream, for example `<producer> | bear semantic --output -`. Standard-output writing is not atomic and cannot be appended to, so `--output -` together with `--append` is rejected. (This differs from `bear intercept`'s and combined mode's `--output`, which reject `-` because their stdout is shared with the build.)
+: Path of the compilation database to write (default:
+`compile_commands.json`). Pass `-` to write to standard output; that
+write is neither atomic nor appendable, so `--output -` together with
+`--append` is rejected.
+
+**-a, \-\-append**
+: Same as in combined mode: place new entries before the existing ones
+in the output file.
 
 ## bear parse-sh
 
-Parses shell command text -- typically the output of a build system's dry-run mode, such as `make -n` (or `make -n -w` for recursive builds), or a saved build log -- into the same event stream `bear intercept` produces, without running anything. Feed that stream to `bear semantic` to get a compilation database:
+Parses shell command text into the same event stream `bear intercept`
+produces, without running anything. Typical input is a build system's
+dry-run output, such as `make -n`, or a saved build log:
 
-      make -n | bear parse-sh | bear semantic
+    make -n | bear parse-sh | bear semantic
 
 **bear parse-sh** [*OPTIONS*]
 
 **-i, \-\-input** *FILE*
-: Path of the shell text to parse (default: `-`, reads from standard input).
+: Path of the shell text to parse (default: `-`, standard input).
 
 **-o, \-\-output** *FILE*
-: Path of the event file to write (default: `-`, writes to standard output). Because `bear parse-sh` runs no build, it has no conflicting use for its own stdout, so `-` is the default here (unlike `bear intercept`'s `--output`, which rejects it).
+: Path of the event file to write (default: `-`, standard output).
 
 **-C, \-\-directory** *DIR*
-: Sets the initial working directory for the parsed commands, for input captured elsewhere (a CI log, or a dry run from another checkout) whose paths would otherwise be interpreted relative to `bear`'s own working directory. Give an absolute path: a foreign log's build directory bears no relation to `bear`'s own working directory, and a relative value would be recorded verbatim. Not validated: the directory need not exist on this machine.
+: Initial working directory for the parsed commands. Use it for input
+captured elsewhere (a CI log, a dry run from another checkout). Give an
+absolute path; the directory need not exist on this machine.
 
-This is a best-effort front end over a documented subset of shell syntax (word splitting and quoting, `;`/`&&`/`||`/`&`/`|` separators, comments, redirections, `cd`, brace groups (`{ ...; }`, which run in the current shell so a `cd` inside one persists after the closing brace), and recursive make's `Entering directory`/`Leaving directory` markers). Anything outside that subset -- subshells (`( ... )`, which unlike a brace group runs in a child shell), command substitution, parameter expansion, glob in the executable position, here-documents, unterminated quotes, unbalanced braces, and shell keywords (`if`, `for`, `while`, `case`) -- causes that one line to be skipped, reported on standard error with its line number and reason; a here-document's body lines are consumed along with its opening line. The run still succeeds as long as at least one line produced an event.
+It understands a documented subset of POSIX shell syntax: word splitting
+and quoting; the `;`, `&&`, `||`, `&`, and `|` separators; comments;
+redirections; `cd`; brace groups (`{ ...; }`, whose `cd` persists past
+the closing brace); and make's `Entering directory` / `Leaving
+directory` markers, which track the working directory across a
+recursive build. Sub-makes print these markers by default; run
+`make -nw` to have the top-level make print them too, so the log itself
+names the build root. A line using anything outside that subset
+is skipped and reported on standard error with its line number and
+reason. This covers subshells, command substitution, parameter
+expansion, globs in the executable position, here-documents,
+unterminated quotes, and shell keywords such as `if` or `for`. The run
+succeeds as long as at least one line produced an event.
 
-**Interception remains the higher-fidelity, recommended default.** It observes the real `exec()` calls a build makes; `bear parse-sh` only reconstructs approximate events from text the build system chose to print during a dry run. In particular:
+Interception remains the higher-fidelity default: it observes the
+`exec()` calls a build really makes, while `bear parse-sh` reconstructs
+approximate events from text the build system chose to print. A dry run
+can omit commands (recursive make does not always propagate `-n`, and
+commands behind not-yet-generated sources never print); the environment
+and `PATH` used to resolve bare executable names are the parse-time
+ones, not the real build's; and only POSIX `sh` text is supported.
+Prefer `bear -- <build command>` whenever the build can actually be run.
 
-- A dry run can omit commands entirely: recursive `make` does not always propagate `-n` to sub-makes, commands behind not-yet-generated sources never print because the generator never ran, and `$(shell ...)` output captured at parse time can differ from a real build's.
-- The build system must both support a dry-run mode and print real commands in it; silent rules, custom launchers, and response files reduce what `bear parse-sh` can see.
-- The environment and `PATH` used to resolve bare executable names are `bear parse-sh`'s own at parse time, which may differ from the real build's -- especially when parsing a log captured on another machine, where `--directory` fixes the working directory but not the environment.
-- Only POSIX `sh` command text is supported; non-POSIX shells and Windows `cmd` are out of scope, and interleaved non-command output (compiler banners, warnings) in a saved log is skipped loudly like any other unsupported line.
-
-`bear parse-sh` itself takes no configuration file -- it rejects `--config` -- because it only emits an event stream. Configuration such as `format.paths` is applied by the `bear semantic` step that consumes the stream, so the settings below are set there, not on `bear parse-sh`.
-
-The source files named in the parsed commands need not exist on the machine running `bear parse-sh`: entries are reconstructed from the text alone, and the default path format (as-is) never touches the filesystem. The one exception is the `canonical` path format, which resolves symlinks and so requires every path to exist on disk; when parsing a log whose sources are absent (a CI log, another checkout) use `absolute` for existence-free normalization instead, configured on the `bear semantic` step:
-
-```yaml
-format:
-  paths:
-    directory: absolute
-    file: absolute
-```
-
-Prefer `bear -- <build command>` (or `bear intercept`) whenever the build can actually be run; reach for `bear parse-sh` when it cannot -- for example, reconstructing a compilation database from a CI log after the fact.
+The source files named in the parsed commands need not exist: entries
+are reconstructed from the text alone. The one exception is the
+`canonical` path format, which resolves symlinks on disk; when the
+sources are absent, configure `absolute` on the `bear semantic` step
+instead (see `format.paths` under CONFIGURATION).
 
 
 # OUTPUT
 
-Bear generates a JSON compilation database conforming to the [Clang JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html) specification. The output is a JSON array of compilation entry objects.
-
-## Entry Format
-
-Each compilation database entry contains the following fields:
+Bear writes a JSON compilation database conforming to the Clang JSON
+Compilation Database specification (see SEE ALSO): a JSON array of entry
+objects with the following fields.
 
 **directory**
-: The working directory of the compilation
+: The working directory of the compilation.
 
 **file**
-: The main translation unit source file
+: The main translation unit source file.
 
 **arguments**
-: The compilation command as an array of strings (preferred format)
+: The compilation command as an array of strings. This is the default;
+Bear prefers it over `command` because it avoids shell-escaping issues.
 
 **command**
-: The compilation command as a single shell-escaped string (alternative to arguments)
+: The compilation command as a single shell-escaped string (written
+instead of `arguments` when `format.entries.use_array_format` is
+`false`).
 
 **output**
-: The output file produced by compilation (optional)
+: The file produced by the compilation (optional).
 
-## Output Formatting
+By default Bear does not transform paths: each entry records them as
+they appeared in the intercepted invocation, so `file` and `output` are
+often relative to `directory`. Use `format.paths` in the configuration
+to normalize them.
 
-The output format can be controlled through the configuration file:
+Two compilers produce an entry shape worth knowing about:
 
-- **Path resolution**: Paths can be formatted as absolute, relative, canonical, or as-is
-- **Entry format**: Choose between arguments array (preferred) or command string
-- **Field inclusion**: Control whether the output field is included
-- **Source filtering**: Include/exclude files based on directory rules
-- **Duplicate filtering**: Remove duplicate entries based on configurable field matching
+- **swiftc**: a whole-module invocation naming several `.swift` sources
+produces one entry per source, each carrying the complete invocation's
+arguments (every source of the module, not just its own). This matches
+the shape CMake emits and SourceKit-LSP consumes: in whole-module
+compilation each file's semantics depend on every other source. The
+repeated argument data is expected, not a bug. The internal
+`swift-frontend` jobs that `swiftc` spawns are filtered out
+automatically.
+- **valac**: one entry per `valac` invocation (valac compiles all of a
+target's `.vala`/`.gs` sources together as one unit); the entry's `file`
+is the first source and every source is kept in the command. Since valac
+transpiles to C and compiles the result, the database also contains
+entries for the generated C files (see TROUBLESHOOTING for the clangd
+consequences).
 
-By default Bear does not transform paths: each entry records them as they appeared in the intercepted invocation (`format.paths: as-is`), so the `file` and `output` fields are often relative to the `directory` field. Use the configuration file to normalize them (see `format.paths` below). Bear uses the `arguments` field instead of `command` to avoid shell escaping issues.
 
+# CONFIGURATION
 
-# CONFIG FILE
-
-Bear uses a YAML configuration file to control its behavior. The configuration file follows a structured schema with several main sections.
-
-## Configuration Schema
+Bear reads a YAML configuration file, found by search (see FILES) or
+named with `--config`. Without one, built-in defaults apply. All
+sections are optional; the example below shows every one of them:
 
 ```yaml
 schema: "4.1"
@@ -198,154 +281,167 @@ headers:
   strategy: siblings
 ```
 
-This example configuration file:
- sets the interception mode to `wrapper`,
- hints the `/usr/bin/cc` to be the main compiler in this project, which is the GNU compiler,
- hints to ignore the `/usr/local/bin/gcc` compilers from the project,
- instructs to ignore files from `/project/tests`,
- instructs to drop generated Qt moc output (`moc_*.cpp`) and protobuf stubs (`*.pb.cc`) by filename,
- instructs to detect duplicates based on the `file` and `arguments` fields of the output file,
- instructs to format the output to use canonical path for the `file` and `directory` fields of the output file,
- instructs to use the `arguments` over the `command` field in the output file,
- instructs to include the `output` field in the output file,
- instructs to synthesize compilation entries for header files using the same-directory sibling strategy.
+## intercept
 
-## Configuration Sections
+Controls the interception method (see DESCRIPTION for the trade-offs):
 
-The configuration file uses schema version `4.1` and has the following structure:
+- **mode**: `preload` (default; Linux and macOS) or `wrapper`
+(cross-platform).
 
-### intercept
+## compilers
 
-Controls the command interception method:
+Hints for compiler recognition. Bear recognizes GCC- and Clang-compatible
+drivers (including cross-compiler prefixed names), the common vendor
+compiler drivers and standalone assemblers, `swiftc` and `valac`,
+compiler launchers, and MPI compiler wrappers. Run
+`bear semantic --help` for the full list of recognized compiler names.
 
-- **mode**: `preload` (Unix) or `wrapper` (cross-platform)
+A few recognition behaviors are worth knowing. Compiler launchers
+(`ccache`, `distcc`, `sccache`, `icecc`) are dropped from the recorded
+command: `ccache gcc -c main.c` produces an entry for `gcc -c main.c`.
+MPI compiler wrappers are recorded as invoked, not expanded to the
+compiler they wrap; Clang tooling that needs the wrapper's baked-in
+include paths can point at it directly, for example with clangd's
+`--query-driver`. C++20 module-interface units (`.cppm`, `.ixx`, and
+similar) are recognized as sources, while precompiled `.pcm` artifacts
+never appear as an entry's `file`.
 
-### compilers
+Use this section when a compiler at a given path is not recognized, or
+is recognized wrongly:
 
-Contains hints about what compiler needs to be recognized and what that compiler is.
+- **path**: Path of the compiler executable.
+- **as**: Compiler type hint for semantic analysis. The accepted names
+are listed in the `bear semantic --help` output.
+- **ignore**: Exclude this executable's invocations from the database.
 
-- **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`, `qnx`, `nasm`, `fasm`, `swift`.
-- **ignore**: Whether to ignore this compiler.
-
-The generic compiler names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` default to GCC/Clang semantics chosen by probing the executable's `--version` output (since the same basename can be a different compiler depending on the platform or, for `CC`, the loaded Cray programming environment). On platforms where the probe cannot classify the executable, use the `as` field to override:
+The generic names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` are
+classified by probing the executable's `--version` output, since the
+same basename can be a different compiler depending on the platform or
+the loaded environment module. When the probe cannot classify the
+executable, override it:
 
 ```yaml
 compilers:
   - path: /usr/bin/cc
     as: clang
-  - path: /usr/bin/c++
-    as: clang
 ```
 
-MPI compiler wrappers (Open MPI/MPICH's `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `mpifort`, `mpif77`, `mpif90`) are recognized automatically, without any configuration. The wrapper is recorded as the compiler exactly as invoked -- Bear does not expand it to the underlying compiler command it wraps. Clang tooling that needs the wrapper's baked-in include paths can point at the wrapper directly (e.g. clangd's `--query-driver`). Intel MPI's wrappers (`mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx`, `mpiifort`, `mpiifx`) are recognized as the Intel compilers they front, using Intel's flag semantics. The launchers `mpirun` and `mpiexec` are not recognized: they execute programs, they do not compile.
+## sources
 
-The Cray Compiling Environment (CCE) C/C++ compiler names `craycc`, `crayCC`, and `craycxx` are recognized automatically, using Clang flag semantics (CCE C/C++ is Clang-based). The HPE Cray PrgEnv wrapper `CC` is classified by the same version probe as `cc`/`c++`: it resolves to CCE Clang under PrgEnv-cray, GCC under PrgEnv-gnu, and so on, matching whatever compiler module is currently loaded. A programming environment whose compiler prints a version banner the probe does not recognize (for example `nvc++` under PrgEnv-nvidia) is not classified; use the `as` field on that path to override.
+Filters entries by source file location and filename.
 
-AMD's ROCm compiler names `amdclang`, `amdclang++`, and `hipcc` are recognized automatically, using Clang flag semantics; `amdflang` is recognized automatically, using Flang flag semantics. `hipcc` is a compiler driver (it calls clang or nvcc depending on target), the same way `nvcc` is; Bear records the driver invocation as executed. AOCC's plain `clang`/`clang++`/`flang` names were already covered by the existing Clang/Flang recognition.
+- **directories**: List of directory-based rules, each with a **path**
+and an **action** (`include` or `exclude`).
+- **files**: List of filename-glob rules, each with a **pattern** and an
+**action** (`include` or `exclude`).
 
-QNX's compiler driver names `qcc` and `q++` are recognized automatically, using GCC flag semantics (QNX's toolchain is GCC-backed). QNX's variant selector, `-V` (e.g. `-Vgcc_ntoaarch64le`, or bare `-V` to list available variants), is always treated as a driver option and is never mistaken for a source file.
+Rules of each list are evaluated in order, the last matching rule wins,
+and an entry matched by no rule is included; an empty list includes
+everything. The two lists compose: an entry is emitted only when both
+accept it. A file pattern without a path separator matches the source
+file's basename; a pattern containing a separator matches the full
+source path as it appears in the entry, so use the same path format as
+configured in `format.paths.file`. An invalid pattern is rejected during
+configuration validation with an error naming the offending rule.
+Typical use for file patterns is dropping machine-generated sources (Qt
+`moc` output, protobuf stubs) so that linters and editors act only on
+hand-written code; see EXAMPLES.
 
-Emscripten's driver names `emcc` and `em++` (including the `emcc.py`/`em++.py` spellings) and Texas Instruments' `tiarmclang` are recognized automatically, using Clang flag semantics. In preload mode the underlying `clang` child process that `emcc`/`em++` spawn may be intercepted too; the default duplicate detection collapses the pair to a single entry recording the driver invocation. Microchip's XC8 driver names `xc8-cc` and `xc8` are recognized automatically, using GCC flag semantics; the `xc16-gcc` and `xc32-gcc` names were already covered by the existing cross-compiler prefix recognition.
+## duplicates
 
-C++20 module-interface units (`.cppm`, `.ixx`, `.mxx`, `.ccm`, `.cxxm`, `.c++m`) are recognized as sources, so their compilations are captured the same way ordinary `.cpp` translation units are -- for example `clang++ --precompile foo.cppm -o foo.pcm`, or a consumer built with GCC's `-fmodules-ts` or with `-fmodule-file=`. Precompiled module artifacts (`.pcm`) are never recorded as sources: they appear on the command line but never as an entry's `file`.
+Controls duplicate detection.
 
-Compiler launchers (`ccache`, `distcc`, `sccache`, `icecc`) that carry the real compiler in their arguments are recorded as the real compiler's compilation: `ccache gcc -c main.c` produces an entry for `gcc -c main.c`, with the launcher token dropped. A launcher invocation that does not name a recognized compiler, or a launcher wrapping another launcher, produces no entry. icecream's `icerun` is not a compiler launcher (it runs arbitrary commands on the cluster) and is not recognized.
+- **match_on**: List of entry fields to compare (`file`, `arguments`,
+`directory`, `command`, `output`). Two entries are duplicates when all
+of the configured fields match; the first occurrence is kept. The
+default is `directory` and `file`, so one entry is kept per source file
+per directory, regardless of arguments; when a build compiles the same
+file with different flags, add `arguments` to keep an entry per
+configuration. Combined with `--append` (new entries first), the default
+means a rebuilt file's newest invocation replaces its stale entry.
 
-The standalone assemblers `nasm`, `yasm`, and `fasm` are recognized automatically, so assembly language servers (for example asm-lsp) can read per-file assembler flags from `compile_commands.json`. Assembly compiled through a C/C++ compiler driver (for example `gcc -c foo.s`) was already recorded via that driver's own entry before this support existed; both paths now produce entries. The GNU assembler `as` is deliberately not recognized: gcc and clang spawn it internally on a temporary `.s` file for every ordinary C compile, and recognizing it would pollute the database with one throwaway entry per compilation, using a temporary filename that duplicate detection cannot collapse. MASM (`ml`, `ml64`) is out of scope (Windows-only, no recorded demand).
+## format
 
-The Swift compiler `swiftc` is recognized automatically; see "Swift Projects" below for its whole-module entry shape. The `swift` subcommand driver (`swift build`, `swift run`, `swift package`) is not recognized -- it is a subcommand dispatcher, not a compiler invocation.
+Controls output formatting.
 
-### sources
+- **paths.directory**, **paths.file**: How to format these fields'
+paths: `as-is` (default, no transformation), `canonical` (resolve
+symlinks; requires the path to exist), `relative` (to the `directory`
+field), or `absolute`.
+- **entries.use_array_format**: Use the `arguments` array (default)
+instead of the `command` string. Set to `false` for consumers that read
+only the `command` field.
+- **entries.include_output_field**: Include the `output` field in
+entries.
+- **arguments.from_response_files**: Replace `@file` response-file
+references with the file's tokenized contents (resolved relative to the
+compilation's working directory, expanded recursively, using the
+compiler's quoting convention). Disabled by default, in which case an
+`@file` argument is recorded verbatim; a missing or unreadable file is
+left literal with a warning.
+- **arguments.from_environment**: Fold compiler environment variables
+that act as implicit flags into the arguments. GCC/Clang header-search
+paths (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
+`OBJC_INCLUDE_PATH`) become include flags, and MSVC's `CL` / `_CL_`
+become leading / trailing options. Enabled by default; set to `false` to
+record only the command-line flags. (Unrelated to the `CC="gcc -std=c11"`
+convention handled during interception; see TROUBLESHOOTING.)
 
-Filtering functionality based on the source file location and filename.
+## headers
 
-- **directories**: List of directory-based inclusion/exclusion rules
-
-Directory rules are evaluated in order, with the last matching rule determining inclusion/exclusion. Empty directories list means include everything.
-
-- **files**: List of filename-glob inclusion/exclusion rules, each with a **pattern** and an **action** (`include` or `exclude`)
-
-Filename-pattern rules exist to drop machine-generated sources -- Qt `moc` output, protobuf stubs, and the output of other code generators -- from the compilation database, so that linters and editors act only on hand-written code. This is off by default: with no `files` rules configured, the output is unchanged. A pattern with no path separator (`/`, or `\` on Windows) matches the source file's basename; a pattern containing a separator matches the full source path as it appears in the entry, so patterns should use the same path format as configured in `format.paths.file`. File-pattern rules are evaluated in order, with the last matching rule determining inclusion/exclusion, the same precedence the directory rules use; a file matched by no pattern rule is included. Directory rules and file-pattern rules compose: an entry is emitted only when both accept it. An invalid pattern is rejected during configuration validation with an error identifying the offending rule.
-
-A common recipe for a Qt/protobuf project:
-
-```yaml
-sources:
-  files:
-    - pattern: "moc_*.cpp"
-      action: exclude
-    - pattern: "*.pb.cc"
-      action: exclude
-    - pattern: "*.pb.h"
-      action: exclude
-```
-
-### duplicates
-
-Filtering functionality based on duplicate detection. Here you can define which fields of the output file should be used in the duplicate detection. Two entries are duplicates when all of the configured fields match; the first occurrence is kept and later duplicates are dropped.
-
-- **match_on**: List of fields to use for duplicate detection (file, arguments, directory, command, output). The default is `directory` and `file`, so by default one entry is kept per source file per directory, regardless of the compiler arguments. A consequence is that when a single build compiles the same file from the same directory with different flags, only one entry is kept (the first seen); add `arguments` to `match_on` to keep a separate entry per configuration. Combined with `--append` (new entries first), the default means a rebuilt file's newest invocation replaces its stale entry.
-
-### format
-
-Output formatting configuration:
-
-- **paths.directory** and **paths.file**: How to format paths of these fields. The allowed values are:
-  - **as-is**: No transformation,
-  - **canonical**: Resolve to canonical path,
-  - **relative**: Make relative to directory field,
-  - **absolute**: Convert to absolute path,
-- **entries.use_array_format**: Use the arguments array (default) instead of the command string. Set to `false` for consumers that read only the `command` field.
-- **entries.include_output_field**: Include output field in entries
-- **arguments.from_response_files**: Replace `@file` response-file references in each entry's arguments with the file's tokenized contents (resolved relative to the compiler's working directory, expanded recursively, MSVC/clang-cl using Windows quoting and other compilers using GCC/Clang quoting). Disabled by default, in which case an `@file` argument is recorded verbatim. Missing or unreadable files are left literal with a warning.
-- **arguments.from_environment**: Fold compiler environment variables that act as implicit flags into each entry's arguments -- GCC/Clang header-search paths (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`, `OBJC_INCLUDE_PATH`) become include flags, and MSVC's `CL` / `_CL_` become leading / trailing options. Enabled by default. Set to `false` to record only the flags that appeared on the command line. (This is unrelated to the `CC="gcc -std=c11"` convention handled during interception.)
-
-### headers
-
-Editors and linters often need compile flags for header files, not only for the translation units that were compiled. When enabled, Bear synthesizes a compilation-database entry for a header file by cloning the arguments of a compiled C/C++/Objective-C translation unit, with the source path replaced by the header path and the output flag removed (the synthesized entry has no `output` field). This is off by default: with `enabled: false` the output is unchanged.
+Editors and linters often need compile flags for header files, not only
+for the translation units that were compiled. When enabled, Bear
+synthesizes an entry for a header by cloning the arguments of a compiled
+C/C++/Objective-C translation unit, with the source path replaced by the
+header path and the output flag removed. Off by default.
 
 - **enabled**: Turn header-entry synthesis on or off. Default `false`.
-- **strategy**: How header files are discovered and which translation unit donates the flags. One of:
-  - `siblings` (default): for each directory that contains a compiled source, header files in that same directory receive an entry cloned from a same-directory source. Zero prerequisites, but the flags are approximate (a header gets its directory sibling's flags), and it produces nothing for headers in directories that hold no compiled source -- notably the split `include/` + `src/` layout, for which `dependency-files` is the answer.
-  - `dependency-files`: reads the make-style dependency file (`.d`) the build already emitted (for example via `-MMD`/`-MF`) and synthesizes an entry for each header prerequisite it lists that resolves inside the compilation's working directory. This is the most accurate option for the headers a compilation actually included -- it reaches headers in other directories (a split `include/`+`src/` layout) precisely -- but it requires the build to have emitted dependency files and for them to still be on disk.
+- **strategy**: How headers are discovered and which translation unit
+donates the flags:
+  - `siblings` (default): headers receive an entry cloned from a
+compiled source in the same directory. Zero prerequisites, but the flags
+are approximate, and headers in directories without compiled sources
+(the split `include/` + `src/` layout) get nothing.
+  - `dependency-files`: reads the make-style `.d` dependency files the
+build already emitted (for example via `-MMD`) and synthesizes an entry
+for each header prerequisite that resolves inside the compilation's
+working directory. Accurate, and reaches headers in other directories,
+but requires the build to have left dependency files on disk.
 
-Which file extensions count as headers is fixed (the built-in C-family header set) and is not configurable. Only C, C++, and Objective-C translation units are eligible donors. Synthesized entries pass through duplicate detection and validation like any other entry, so a header that already has a real compilation entry is not duplicated. Entries recorded in `command`-string form (rather than the default `arguments` array) cannot donate and are skipped.
+The header extension set is fixed (the built-in C-family headers).
+Synthesized entries pass through duplicate detection like any other
+entry, so a header with a real compilation entry is not duplicated.
 
-A recipe for a project that keeps headers under `include/` and sources under `src/`, whose build emits dependency files:
 
-```yaml
-headers:
-  enabled: true
-  strategy: dependency-files
-```
+# EXIT STATUS
 
-## Default Configuration
+In combined and intercept mode, Bear exits with the build command's exit
+code: 0 when the build succeeds, the same non-zero code when it fails.
 
-If no configuration file is specified, Bear uses built-in defaults optimized for most use cases.
+In semantic mode, Bear exits 0 on success and non-zero when the analysis
+fails.
+
+In parse-sh mode, Bear exits 0 when at least one line produced an event,
+and also on empty input (with a notice on standard error). It exits
+non-zero when every non-empty input line was skipped, so a run that
+emitted nothing cannot pass for a successful one.
+
+If Bear itself encounters an internal error, it exits non-zero
+regardless of the build command's status.
 
 
 # ENVIRONMENT
 
 **RUST_LOG**
-: Controls the logging level for Bear's internal operations. This environment variable is essential for troubleshooting and debugging Bear's behavior.
+: Controls Bear's log level on standard error: `error`, `warn`, `info`,
+or `debug`, in increasing verbosity. Debug output is essential for
+troubleshooting; see TROUBLESHOOTING.
 
-    Supported log levels (in order of verbosity):
-    
-    - `error` - Only show critical errors
-    - `warn` - Show warnings and errors  
-    - `info` - Show informational messages, warnings, and errors
-    - `debug` - Show detailed debugging information
-
-    Examples:
-    ```
-    RUST_LOG=debug bear -- make all
-    RUST_LOG=info bear intercept -- cmake --build .
-    ```
 
 # FILES
 
-The configuration file `bear.yml` is searched in the following locations, in order:
+The configuration file `bear.yml` is searched in the following
+locations, in order; the first file found is loaded:
 
 **`./bear.yml`**
 : The current working directory.
@@ -362,156 +458,142 @@ The configuration file `bear.yml` is searched in the following locations, in ord
 **`%APPDATA%\bear.yml`**, **`%APPDATA%\Bear\bear.yml`** (Windows)
 : When `%APPDATA%` is set.
 
-The first file found is loaded; remaining locations are not consulted.
 
+# EXAMPLES
 
-# EXIT STATUS
+Generate a database for a Make project:
 
-Bear returns the exit status of the executed build command when running in combined or intercept mode. When the build command succeeds, Bear returns 0. When the build command fails, Bear returns the same non-zero exit code.
+    bear -- make
 
-In semantic mode, Bear returns 0 on success and a non-zero exit code if semantic analysis fails.
+For a CMake project in preload mode, only the build needs Bear:
 
-In parse-sh mode, Bear returns 0 when at least one line produced an event, and also on empty input (with a notice on standard error). It returns a non-zero exit code when every non-empty input line was skipped, so a run that emitted nothing cannot pass for a successful one.
+    cmake -B build
+    bear -- cmake --build build
 
-If Bear itself encounters an internal error or crashes, it returns a non-zero exit code regardless of the build command's status.
+In wrapper mode the configure step must also run under Bear, so it
+discovers the wrapper as the compiler; discard that run's output:
+
+    bear -- cmake -B build
+    bear -- cmake --build build
+
+Capture once, analyze many times. This allows trying output
+configurations without rebuilding:
+
+    bear intercept --output events.json -- make
+    bear semantic --input events.json
+    bear --config strict.yml semantic --input events.json --output strict.json
+
+Recover a database from a dry run, without building:
+
+    make -n | bear parse-sh | bear semantic
+
+For a recursive Make build, add `-w`. The top-level make then prints
+`Entering directory` markers too, and parse-sh resolves every command
+against the right directory:
+
+    make -nw | bear parse-sh | bear semantic
+
+Update the database after rebuilding one part of the project:
+
+    bear --append -- make -C src/module
+
+Drop generated sources (Qt moc output, protobuf stubs) with a `bear.yml`:
+
+```yaml
+sources:
+  files:
+    - pattern: "moc_*.cpp"
+      action: exclude
+    - pattern: "*.pb.cc"
+      action: exclude
+    - pattern: "*.pb.h"
+      action: exclude
+```
+
+Synthesize entries for headers in a split `include/` + `src/` layout,
+when the build emits `.d` dependency files:
+
+```yaml
+headers:
+  enabled: true
+  strategy: dependency-files
+```
 
 
 # TROUBLESHOOTING
 
-The potential problems you can face with are: the build with and without Bear
-behaves differently or the output is empty.
+## Debug logging
 
-## Debug Logging
+Before reporting any issue, run Bear with debug logging enabled and
+include the output in the report:
 
-**Before reporting any issues**, always run Bear with debug logging enabled:
+    RUST_LOG=debug bear -- <build command>
 
-```
-RUST_LOG=debug bear -- your-build-command
-```
+## Empty output
 
-This will provide detailed information about Bear's internal operations. And the
-debug output is essential for diagnosing problems and **must be included** in any
-bug reports.
+The most common cause is that the build executed no compiler: an
+incremental build with everything up to date runs nothing. Bear
+intercepts executed commands only; it does not read the build files.
+Run a clean build.
 
-## Common Issues
+In wrapper mode, a "configure" step that detects compilers captures the
+real compiler path before Bear can substitute the wrapper. Run the
+configure step under Bear too (discarding that output), then run the
+build under Bear.
 
-The most common cause for empty outputs is that the build command did not
-execute any commands. The reason for that could be, because incremental builds
-not running the compilers if everything is up-to-date. Remember, Bear does not
-understand the build file (eg.: makefile), but intercepts the executed
+## Compiler variables with flags
+
+In wrapper mode Bear accepts the GNU Make convention of a compiler
+variable carrying a trailing flag or two (`CC="gcc -std=c11" make`): it
+splits the value on whitespace, resolves the first token as the
+compiler, and rewrites the variable so the build still sees the flags.
+This is a Unix / GNU Make convention; native Windows build systems
+(MSBuild, `nmake`) do not consume `CC`/`CXX` from the environment. For
+anything beyond simple whitespace-separated tokens (quoting,
+metacharacters, substitutions), use `CFLAGS` / `CXXFLAGS` / `LDFLAGS`
+instead; Bear passes those through untouched.
+
+## Preload errors in cross-compilation
+
+An error like `version 'GLIBC_2.33' not found (required by
+.../libexec.so)` means Bear's preload library was built against a newer
+glibc than the one the SDK's compilers load: the library must be
+ABI-compatible with the libc of the intercepted process, not only with
+the host's. Use a Bear build linked against a glibc no newer than the
+SDK's. The project wiki's Troubleshooting page lists diagnostic
 commands.
 
-The other common cause for empty output is that the build has a "configure"
-step, which captures the compiler to build the project. In case of Bear is
-using the _wrapper_ mode, it needs to run the configure step with Bear too
-(and discard that output), before run the build with Bear.
+## Language servers on Vala projects
 
-## GLIBC Version Errors in Cross-Compilation
+vala-language-server reads the `command` field and ignores the
+`arguments` array; build the database with
+`format.entries.use_array_format: false`. In a mixed C/Vala project,
+clangd also indexes the `valac` entries and emits unknown-argument
+noise on them; suppress it with a `.clangd` file:
 
-When the build runs compilers from a cross-compilation SDK and you see an
-error like `version 'GLIBC_2.33' not found (required by .../libexec.so)`,
-Bear's preload library was built against a newer glibc than the SDK toolchain
-provides. The library must be ABI-compatible not only with the host system
-but also with the libc the intercepted compiler process loads from the SDK
-sysroot. Build (or obtain) a Bear linked against a glibc no newer than the
-SDK's. See the project wiki Troubleshooting page (LD_PRELOAD errors) for
-diagnostic commands.
-
-## Compiler Env Vars With Flags
-
-In wrapper mode, Bear accepts compiler environment variables that carry a
-trailing flag or two, matching the GNU Make convention:
-
-```
-CC="gcc -std=c11" make
-CXX="clang++ -stdlib=libc++" make
-CC="/usr/local/bin/gcc -m32" make
+```yaml
+If:
+  PathMatch: .*\.vala
+Diagnostics:
+  Suppress: '*'
 ```
 
-Bear splits the value on whitespace, resolves the first token as the
-compiler, and rewrites the variable so the build still sees the flags
-(`CC=<wrapper_path> -std=c11`).
+## Getting help
 
-This convention is a Unix / GNU Make inheritance; it applies when
-`bear -- make` runs under sh/bash (including MSYS2, Git Bash, WSL on
-Windows), not under native Windows build systems (MSBuild, `nmake`,
-`cmd`, PowerShell), which do not consume `CC`/`CXX` from the
-environment.
+Consult the project wiki for known problems and search existing issues
+before opening a new report. Follow the bug report template, and always
+include the `RUST_LOG=debug` output.
 
-For anything beyond simple whitespace-separated tokens (flags containing
-spaces, shell quoting, metacharacters, command substitutions), use
-`CFLAGS`, `CXXFLAGS`, or `LDFLAGS` instead of packing it into `CC`. Those
-variables are the portable channel for compilation flags and every build
-system expects them. Bear does not parse or rewrite them; they reach the
-compiler untouched.
 
-## Vala Projects
+# SEE ALSO
 
-Bear records `valac` invocations, producing one entry per `valac`
-invocation (valac compiles all of a target's `.vala`/`.gs` sources
-together as one translation unit, so the entry's `file` is the first
-source and every source is kept in the command). Two things are worth
-knowing:
+**clangd**(1), **clang-tidy**(1), **make**(1)
 
-- **vala-language-server might require the command-string form.** It
-  reads the `command` field and ignores the `arguments` array, so build
-  the database with the array format disabled:
+The Clang JSON Compilation Database specification:
+<https://clang.llvm.org/docs/JSONCompilationDatabase.html>
 
-    ```yaml
-    format:
-      entries:
-        use_array_format: false
-    ```
-
-- **Mixed C and Vala projects.** `valac` transpiles to C and then invokes a
-  C compiler on the generated C, so the database also contains entries for
-  that generated C. A C language server such as clangd indexes every entry
-  and will emit unknown-argument noise on the `valac` entries. Exclude the
-  Vala sources on the clangd side with a `.clangd` file:
-
-    ```yaml
-    If:
-      PathMatch: .*\.vala
-    Diagnostics:
-      Suppress: '*'
-    ```
-
-## Swift Projects
-
-Bear records `swiftc` invocations. Unlike `valac`, a whole-module
-`swiftc` invocation that names several `.swift` sources produces one
-entry PER source, not one combined entry -- and every one of those
-entries carries the COMPLETE invocation's arguments (every source in
-the module, not just its own). This matches the shape CMake's own Swift
-support emits and that SourceKit-LSP already consumes: per-file tooling
-looks up a compile command by file path, and whole-module compilation
-means each file's semantics genuinely depend on every other source in
-the invocation, so no entry can be reduced to "this file only". A
-larger whole-module invocation therefore produces a database with more
-duplicated argument data than a comparable GCC/Clang build; this is
-expected, not a bug.
-
-The internal per-file `swift-frontend` jobs that `swiftc` spawns (and a
-legacy toolchain's `swiftc -frontend` self-invocation) are filtered out
-automatically and produce no entries -- only the user-facing `swiftc`
-driver invocation is recorded.
-
-`-index-store-path` is never injected by Bear; if the build already
-passes it, it is recorded like any other flag, which benefits
-SourceKit-LSP's cross-file indexing, but Bear itself does not add it.
-
-On macOS, Xcode's `swiftc` is Apple-signed, so System Integrity
-Protection blocks `DYLD_INSERT_LIBRARIES`; Bear's wrapper interception
-mode applies there, the same as for any other Apple-signed compiler.
-
-## Getting Help
-
-There could be many reasons for any of these failures. When seeking help:
-
-1. **Always include debug logs** (`RUST_LOG=debug`) in your report
-2. Consult the project wiki page for known problems
-3. Search existing issues before opening a new bug report
-4. Follow the bug report template, provide the requested fields
+Project homepage, wiki, and issue tracker:
+<https://github.com/rizsotto/Bear>
 
 # COPYRIGHT
 
