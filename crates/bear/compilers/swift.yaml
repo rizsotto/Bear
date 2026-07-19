@@ -1,4 +1,3 @@
-# Swift compiler (swiftc) flag definitions
 # https://github.com/swiftlang/swift/blob/main/include/swift/Option/Options.td
 # is the authoritative option table this file is verified against.
 #
@@ -20,9 +19,12 @@
 # own internal frontend executions.
 type: swift
 recognize:
-  - executables: ["swiftc"]
-    cross_compilation: false
+  - description: "Swift compiler"
+    references:
+      - "https://www.swift.org/documentation/"
+    executables: ["swiftc"]
     versioned: false
+    cross_compilation: false
 ignore_when:
   executables: ["swift-frontend"]
   flags: ["-frontend"]

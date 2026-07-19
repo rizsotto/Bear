@@ -18,6 +18,16 @@ result values, inheritance, environment variables).
 5. Add a constructor in `flag_based.rs` and register it in `CompilerInterpreter::new_with_config` (`crates/bear/src/semantic/interpreters/compilers/mod.rs`)
 6. Run `cargo build && cargo test`
 
+## `recognize:` entries must be documented and cited
+
+Every `recognize:` entry is mandatory `description` (a short human label,
+e.g. `"GCC compiler"`) and a mandatory `references` (a non-empty list of
+http(s) documentation URLs). Both are validated at codegen time -- the
+build fails if either is missing, blank, or `references` holds a
+non-http(s) entry. `description` is emitted into the generated
+`RECOGNITION_PATTERNS` table and shown by `bear semantic --print-compilers`;
+`references` is validate-only and is never emitted into generated code.
+
 ## Adding a new flag to an existing compiler
 
 1. Find the correct YAML file

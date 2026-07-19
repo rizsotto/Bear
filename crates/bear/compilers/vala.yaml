@@ -1,4 +1,3 @@
-# Vala compiler (valac) flag definitions
 # https://valadoc.org/ -- valac parses GNU/GOption-style options. Every
 # value-taking option accepts both `--opt value` and `--opt=value`; short
 # options also glue (`-ofoo`). Bear treats any bare argument as a source file,
@@ -14,9 +13,12 @@
 # a real C compiler on the generated C. See docs/rationale/vala-transpiler-database.
 type: vala
 recognize:
-  - executables: ["valac"]
-    cross_compilation: true   # Debian/Ubuntu ship x86_64-linux-gnu-valac
+  - description: "Vala compiler"
+    references:
+      - "https://vala.dev/"
+    executables: ["valac"]
     versioned: true           # valac-0.56, valac-0.48 (major.minor)
+    cross_compilation: true   # Debian/Ubuntu ship x86_64-linux-gnu-valac
 slash_prefix: false
 flags:
   # Output and driver stop points

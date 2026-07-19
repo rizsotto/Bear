@@ -1,22 +1,29 @@
-# Intel C/C++ compiler (icx, icpx) flag definitions
-# https://www.intel.com/content/www/us/en/docs/dpcpp-cpp-compiler/developer-guide-reference/current/overview.html
-extends: clang
 type: intel_cc
+extends: clang
 recognize:
-  - executables: ["icx", "icpx"]
-    cross_compilation: false
+  - description: "Intel oneAPI C/C++ compiler"
+    references:
+      - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html"
+    executables: ["icx", "icpx"]
     versioned: true
-  - executables: ["icc", "icpc"]
     cross_compilation: false
+  - description: "Intel C++ Compiler Classic"
+    references:
+      - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html"
+    executables: ["icc", "icpc"]
     versioned: true
+    cross_compilation: false
   # Intel MPI wrappers: mpiicc/mpiicpc/mpiicx/mpiicpx are icc/icx with MPI
   # paths baked in, front-ending a gcc-compatible driver but accepting
   # Intel's flag surface (see docs/rationale/mpi-wrappers-as-compilers.md).
   # Not versioned/cross-compilation: those suffixes are not used for the
   # MPI wrapper names in practice.
-  - executables: ["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"]
-    cross_compilation: false
+  - description: "Intel MPI C/C++ wrapper"
+    references:
+      - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/mpi-library.html"
+    executables: ["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"]
     versioned: false
+    cross_compilation: false
 slash_prefix: false
 flags:
   # Microarchitecture targeting

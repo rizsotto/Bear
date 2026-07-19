@@ -115,7 +115,7 @@ fn snapshot_flags_swift() {
 #[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
-    insta::assert_snapshot!(generate_recognition_patterns(&raw_tables));
+    insta::assert_snapshot!(generate_recognition_patterns(&raw_tables).unwrap());
 }
 
 #[test]

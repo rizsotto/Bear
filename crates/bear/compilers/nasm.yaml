@@ -1,15 +1,14 @@
-# NASM / YASM assembler flag definitions
-# https://www.nasm.us/doc/nasmdoc2.html (NASM command-line options)
-# https://yasm.tortall.net/YasmManual.html (YASM largely mirrors NASM's
-# short options for compatibility; see the long-option note below)
-#
 # NASM/YASM have their own CLI dialect (not derived from gcc/clang), so this
 # family has no `extends:`.
 type: nasm
 recognize:
-  - executables: ["nasm", "yasm"]
-    cross_compilation: false
+  - description: "NASM / YASM assembler"
+    references:
+      - "https://www.nasm.us/doc/nasmdoc2.html"
+      - "https://github.com/yasm/yasm"
+    executables: ["nasm", "yasm"]
     versioned: false
+    cross_compilation: false
 slash_prefix: false
 flags:
   # --- Output format / output file ---

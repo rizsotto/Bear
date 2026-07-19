@@ -1,11 +1,12 @@
-# clang-cl compiler flag definitions (MSVC-compatible Clang driver)
-# https://clang.llvm.org/docs/UsersManual.html#clang-cl
-extends: msvc
 type: clang_cl
+extends: msvc
 recognize:
-  - executables: ["clang-cl"]
-    cross_compilation: false
+  - description: "clang-cl (MSVC-compatible Clang)"
+    references:
+      - "https://clang.llvm.org/docs/UsersManual.html#clang-cl"
+    executables: ["clang-cl"]
     versioned: true
+    cross_compilation: false
 slash_prefix: true
 flags:
   # Pass arg to clang frontend

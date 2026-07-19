@@ -1,14 +1,17 @@
-# NVIDIA HPC SDK compiler (nvc, nvc++, nvfortran) flag definitions
-# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/
-# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-ref/
 type: nvidia_hpc
 recognize:
-  - executables: ["nvc", "nvc++", "nvfortran"]
-    cross_compilation: false
+  - description: "NVIDIA HPC SDK compiler"
+    references:
+      - "https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html"
+    executables: ["nvc", "nvc++", "nvfortran"]
     versioned: true
-  - executables: ["pgcc", "pgc++", "pgfortran"]
     cross_compilation: false
+  - description: "PGI compiler (legacy NVIDIA HPC)"
+    references:
+      - "https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html"
+    executables: ["pgcc", "pgc++", "pgfortran"]
     versioned: true
+    cross_compilation: false
 slash_prefix: false
 flags:
   # Output

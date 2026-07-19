@@ -1,15 +1,19 @@
-# Intel Fortran compiler (ifort, ifx) flag definitions
-# https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html
 type: intel_fortran
 recognize:
-  - executables: ["ifort", "ifx"]
-    cross_compilation: false
+  - description: "Intel Fortran compiler"
+    references:
+      - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html"
+    executables: ["ifort", "ifx"]
     versioned: true
+    cross_compilation: false
   # Intel MPI wrappers: mpiifort/mpiifx are ifort/ifx with MPI paths baked
   # in (see docs/rationale/mpi-wrappers-as-compilers.md).
-  - executables: ["mpiifort", "mpiifx"]
-    cross_compilation: false
+  - description: "Intel MPI Fortran wrapper"
+    references:
+      - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/mpi-library.html"
+    executables: ["mpiifort", "mpiifx"]
     versioned: false
+    cross_compilation: false
 slash_prefix: false
 flags:
   - match: {pattern: "-preprocess-only"}

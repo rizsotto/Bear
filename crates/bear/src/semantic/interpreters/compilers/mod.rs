@@ -352,7 +352,7 @@ mod tests {
         fn every_recognition_pattern_row_is_dispatched_by_a_registered_interpreter() {
             let sut = CompilerInterpreter::new_with_config(&[]);
 
-            for &(type_str, executables, _cross_compilation, _versioned) in
+            for &(type_str, executables, _cross_compilation, _versioned, _description) in
                 compiler_recognition::RECOGNITION_PATTERNS
             {
                 // The hand-written Wrapper pattern is pushed onto DEFAULT_PATTERNS

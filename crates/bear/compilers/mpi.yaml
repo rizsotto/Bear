@@ -8,12 +8,16 @@
 #
 # Open MPI wrapper docs: https://docs.open-mpi.org/en/main/building-apps/customizing-wrappers.html
 # MPICH wrapper docs: mpicc(1) -- -show/-compile_info/-link_info
-extends: gcc
 type: mpi
+extends: gcc
 recognize:
-  - executables: ["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"]
-    cross_compilation: false
+  - description: "MPI compiler wrapper"
+    references:
+      - "https://www.open-mpi.org/doc/"
+      - "https://www.mpich.org/documentation/"
+    executables: ["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"]
     versioned: true
+    cross_compilation: false
 slash_prefix: false
 flags:
   # Wrapper-info invocations print the underlying compiler command and exit;

@@ -1,11 +1,12 @@
-# ARM Compiler 6 (armclang) flag definitions
-# https://developer.arm.com/documentation/100748/latest/
-extends: clang
 type: armclang
+extends: clang
 recognize:
-  - executables: ["armclang", "armclang++"]
-    cross_compilation: false
+  - description: "Arm Compiler 6"
+    references:
+      - "https://developer.arm.com/documentation/100748/latest/"
+    executables: ["armclang", "armclang++"]
     versioned: true
+    cross_compilation: false
 slash_prefix: false
 flags:
   - match: {pattern: "--library_type{=}*"}

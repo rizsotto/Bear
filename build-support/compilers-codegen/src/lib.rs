@@ -145,7 +145,7 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
     let raw_tables = load_tables_from(flags_dir)?;
 
     // Generate recognition patterns
-    let recognition = generate_recognition_patterns(&raw_tables);
+    let recognition = generate_recognition_patterns(&raw_tables)?;
     write_output(out_dir, "recognition.rs", recognition)?;
 
     // Generate each compiler's flag table
@@ -235,7 +235,7 @@ pub fn load_tables() -> Result<HashMap<String, FlagTable>> {
 mod tests {
     use super::*;
     use crate::codegen::pattern_to_rust;
-    use crate::yaml_types::{EnvEntry, EnvMappingYaml, FlagMatch};
+    use crate::yaml_types::{EnvEntry, EnvMappingYaml, FlagMatch, RecognizeEntry};
 
     // -- pattern_to_rust tests --
 
@@ -517,6 +517,56 @@ mod tests {
                 gf.match_.pattern
             );
         }
+    }
+
+    // -- RecognizeEntry::validate tests --
+
+    #[test]
+    fn validate_recognize_entry_valid() {
+        let e = RecognizeEntry {
+            executables: vec!["gcc".to_string()],
+            cross_compilation: true,
+            versioned: true,
+            description: "GCC compiler".to_string(),
+            references: vec!["https://gcc.gnu.org/".to_string()],
+        };
+        assert!(e.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_recognize_entry_empty_description() {
+        let e = RecognizeEntry {
+            executables: vec!["gcc".to_string()],
+            cross_compilation: false,
+            versioned: false,
+            description: "   ".to_string(),
+            references: vec!["https://x".to_string()],
+        };
+        assert!(e.validate().unwrap_err().to_string().contains("description must not be empty"));
+    }
+
+    #[test]
+    fn validate_recognize_entry_empty_reference() {
+        let e = RecognizeEntry {
+            executables: vec!["gcc".to_string()],
+            cross_compilation: false,
+            versioned: false,
+            description: "GCC compiler".to_string(),
+            references: vec![],
+        };
+        assert!(e.validate().unwrap_err().to_string().contains("references must list"));
+    }
+
+    #[test]
+    fn validate_recognize_entry_bad_url() {
+        let e = RecognizeEntry {
+            executables: vec!["gcc".to_string()],
+            cross_compilation: false,
+            versioned: false,
+            description: "GCC compiler".to_string(),
+            references: vec!["gcc.gnu.org".to_string()],
+        };
+        assert!(e.validate().unwrap_err().to_string().contains("http(s) URL"));
     }
 
     // -- EnvEntry::validate tests --

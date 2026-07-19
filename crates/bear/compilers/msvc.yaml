@@ -1,10 +1,11 @@
-# MSVC compiler (cl.exe) flag definitions
-# https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-by-category
 type: msvc
 recognize:
-  - executables: ["cl"]
-    cross_compilation: false
+  - description: "Microsoft Visual C++ compiler"
+    references:
+      - "https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options"
+    executables: ["cl"]
     versioned: false
+    cross_compilation: false
 ignore_when:
   executables: ["c1", "c1xx", "c2"]
 slash_prefix: true

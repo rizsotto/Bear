@@ -309,7 +309,7 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
     let mut patterns = Vec::new();
 
     // Build patterns from generated YAML data
-    for &(type_str, executables, cross_compilation, versioned) in RECOGNITION_PATTERNS {
+    for &(type_str, executables, cross_compilation, versioned, _description) in RECOGNITION_PATTERNS {
         let compiler_type = parse_compiler_type(type_str);
         let regex = create_compiler_regex(executables, cross_compilation, versioned);
         patterns.push((compiler_type, regex));

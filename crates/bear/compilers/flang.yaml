@@ -1,14 +1,18 @@
-# Flang (LLVM Fortran) compiler flag definitions
-# https://flang.llvm.org/docs/FlangDriver.html
-extends: gcc
 type: flang
+extends: gcc
 recognize:
-  - executables: ["flang", "flang-new"]
-    cross_compilation: true
+  - description: "Flang Fortran compiler"
+    references:
+      - "https://flang.llvm.org/docs/FlangDriver.html"
+    executables: ["flang", "flang-new"]
     versioned: true
-  - executables: ["amdflang"]
-    cross_compilation: false
+    cross_compilation: true
+  - description: "AMD ROCm Flang compiler"
+    references:
+      - "https://rocm.docs.amd.com/en/latest/"
+    executables: ["amdflang"]
     versioned: false
+    cross_compilation: false
 slash_prefix: false
 flags:
   - match: {pattern: "-J{ }*"}

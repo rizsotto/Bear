@@ -1,14 +1,18 @@
-# IBM Open XL C/C++ compiler flag definitions
-# https://www.ibm.com/docs/en/openxl-c-and-cpp-lnx
-extends: clang
 type: ibm_xl
+extends: clang
 recognize:
-  - executables: ["ibm-clang", "ibm-clang++"]
-    cross_compilation: false
+  - description: "IBM Open XL C/C++ compiler"
+    references:
+      - "https://www.ibm.com/docs/en/openxl-c-and-cpp-aix"
+    executables: ["ibm-clang", "ibm-clang++"]
     versioned: true
-  - executables: ["xlclang", "xlclang++"]
     cross_compilation: false
+  - description: "IBM XL C/C++ compiler"
+    references:
+      - "https://www.ibm.com/docs/en/xl-c-and-cpp-aix"
+    executables: ["xlclang", "xlclang++"]
     versioned: true
+    cross_compilation: false
 slash_prefix: false
 flags:
   # AltiVec/VSX

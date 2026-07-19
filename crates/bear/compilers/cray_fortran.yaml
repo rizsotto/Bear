@@ -1,10 +1,11 @@
-# Cray Fortran compiler (crayftn) flag definitions
-# https://support.hpe.com/hpesc/public/docDisplay?docId=a00115296en_us&page=Fortran_Command-line_Options.html
 type: cray_fortran
 recognize:
-  - executables: ["crayftn", "ftn"]
-    cross_compilation: false
+  - description: "Cray Fortran compiler"
+    references:
+      - "https://support.hpe.com/hpesc/public/docDisplay?docId=a00115296en_us&page=Fortran_Command-line_Options.html"
+    executables: ["crayftn", "ftn"]
     versioned: true
+    cross_compilation: false
 slash_prefix: false
 flags:
   - match: {pattern: "-no-add-rpath-shared"}

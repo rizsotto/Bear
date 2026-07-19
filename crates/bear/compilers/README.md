@@ -19,12 +19,12 @@ type: gcc
 
 # Executable names this compiler is known by
 recognize:
-  - executables: ["gcc", "g++", "gfortran"]
-    cross_compilation: true    # match with cross-compilation prefix (e.g., arm-linux-gnu-gcc)
-    versioned: true            # match with version suffix (e.g., gcc-11, gcc11)
-  - executables: ["cc", "c++"]
-    cross_compilation: true
-    versioned: false
+  - description: "GCC compiler" # required: short human label, shown by --print-compilers
+    references:                 # required: non-empty list of http(s) doc URLs (validate-only)
+      - "https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html"
+    executables: ["gcc", "g++", "gfortran"]
+    versioned: true             # match with version suffix (e.g., gcc-11, gcc11)
+    cross_compilation: true     # match with cross-compilation prefix (e.g., arm-linux-gnu-gcc)
 
 # Optional: treat '/'-prefixed arguments as flags (default: false)
 # When true, arguments like /Fo, /c, /I are treated as compiler flags.
@@ -124,6 +124,13 @@ Each entry specifies:
   prefix (e.g., `arm-linux-gnueabihf-gcc`)
 - `versioned` -- if `true`, also matches names with a version suffix
   (e.g., `gcc-11`, `gcc11`, `gcc-11.2`)
+- `description` -- required short human label (e.g., `"GCC compiler"`), emitted
+  into the generated recognition table and shown by `bear semantic --print-compilers`
+- `references` -- required non-empty list of http(s) documentation URLs; validated
+  at codegen time but never emitted into generated code
+
+Both `description` and `references` are mandatory: the build fails if either is
+missing, `description` is blank, or `references` holds a non-http(s) entry.
 
 All patterns automatically handle `.exe` extensions on Windows.
 

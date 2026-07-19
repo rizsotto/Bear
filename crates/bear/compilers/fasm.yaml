@@ -1,7 +1,3 @@
-# flat assembler (fasm) flag definitions
-# https://flatassembler.net/docs.php?article=manual (fasm command-line
-# options)
-#
 # fasm's CLI is `fasm [options] source [output]`: the output positional is
 # not recorded as an `output` field by this family -- it is simply not a
 # recognized source extension, so it is classified as a plain argument and
@@ -10,9 +6,12 @@
 # fasm has its own CLI dialect, so this family has no `extends:`.
 type: fasm
 recognize:
-  - executables: ["fasm"]
-    cross_compilation: false
+  - description: "flat assembler"
+    references:
+      - "https://flatassembler.net/docs.php"
+    executables: ["fasm"]
     versioned: false
+    cross_compilation: false
 slash_prefix: false
 flags:
   # Memory limit (in KB, always a separate token, e.g. "-m 65536").

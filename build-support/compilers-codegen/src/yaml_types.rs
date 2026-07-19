@@ -20,11 +20,33 @@ pub struct FlagTable {
 
 #[derive(Deserialize, Clone)]
 pub struct RecognizeEntry {
+    pub description: String,
+    pub references: Vec<String>,
     pub executables: Vec<String>,
     #[serde(default)]
-    pub cross_compilation: bool,
-    #[serde(default)]
     pub versioned: bool,
+    #[serde(default)]
+    pub cross_compilation: bool,
+}
+
+impl RecognizeEntry {
+    /// Validate the enrichment fields: a non-empty description and at
+    /// least one http(s) reference URL. Enforced at codegen time so a
+    /// compiler cannot be added without describing and citing it.
+    pub fn validate(&self) -> Result<()> {
+        if self.description.trim().is_empty() {
+            bail!("recognize entry {:?}: description must not be empty", self.executables);
+        }
+        if self.references.is_empty() {
+            bail!("recognize entry {:?}: references must list at least one URL", self.executables);
+        }
+        for url in &self.references {
+            if !(url.starts_with("http://") || url.starts_with("https://")) {
+                bail!("recognize entry {:?}: reference '{}' must be an http(s) URL", self.executables, url);
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Clone, Default)]

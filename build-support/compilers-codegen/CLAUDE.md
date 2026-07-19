@@ -24,4 +24,7 @@ the generated output against accidental schema drift.
 
 Read `crates/bear/compilers/CLAUDE.md`. After editing YAML, run
 `cargo build` to regenerate, then `cargo test` to validate (the
-snapshot tests will diff the generated tables).
+snapshot tests will diff the generated tables). Every `recognize:`
+entry needs a `description` and a `references` list -- see
+`crates/bear/compilers/CLAUDE.md` for the schema; both are validated
+in `yaml_types.rs::RecognizeEntry::validate`.

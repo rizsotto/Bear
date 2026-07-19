@@ -11,12 +11,15 @@
 # not accept a separate-token spelling (`-V gcc_ntoaarch64le` would be
 # read as `-V` plus an unrelated positional argument), so no `{ }` form is
 # needed here, unlike MPI's `-cc{=}*`.
-extends: gcc
 type: qnx
+extends: gcc
 recognize:
-  - executables: ["qcc", "q++"]
-    cross_compilation: false
+  - description: "QNX qcc compiler driver"
+    references:
+      - "https://www.qnx.com/developers/docs/"
+    executables: ["qcc", "q++"]
     versioned: false
+    cross_compilation: false
 slash_prefix: false
 flags:
   - match: {pattern: "-V*"}

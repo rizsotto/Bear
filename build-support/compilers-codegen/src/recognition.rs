@@ -2,22 +2,27 @@
 
 use std::collections::HashMap;
 
+use anyhow::{Context, Result};
+
 use crate::tables::TABLES;
 use crate::yaml_types::FlagTable;
 
 /// Generate a static array of recognition pattern data from all YAML files.
 ///
 /// Returns the generated Rust source as a string containing `RECOGNITION_PATTERNS`,
-/// a static array of `(&str, &[&str], bool, bool)` tuples:
-/// (compiler_type, executables, cross_compilation, versioned).
+/// a static array of `(&str, &[&str], bool, bool, Option<&str>)` tuples:
+/// (compiler_type, executables, cross_compilation, versioned, description).
 ///
 /// Executables listed in `ignore_when.executables` are automatically added as
 /// recognition entries with `(false, false)` so the recognizer can route them
 /// to the right compiler type (where the interpreter will then ignore them).
-pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>) -> String {
+pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>) -> Result<String> {
     let mut out = String::new();
     out.push_str("// Generated from compilers/*.yaml -- DO NOT EDIT\n");
-    out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[\n");
+    // The 5-tuple row shape trips clippy::type_complexity; it is plain
+    // generated data, not an API to simplify with a type alias.
+    out.push_str("#[allow(clippy::type_complexity)]\n");
+    out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = &[\n");
 
     // Collect entries in a deterministic order (by TABLES order)
     for config in TABLES {
@@ -31,13 +36,16 @@ pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>) ->
         // Emit explicit recognize entries
         if let Some(ref recognize_entries) = table.recognize {
             for entry in recognize_entries {
+                entry.validate().with_context(|| format!("recognize entry in {}", config.yaml_file))?;
+
                 let names_str: Vec<String> = entry.executables.iter().map(|n| format!("\"{}\"", n)).collect();
                 out.push_str(&format!(
-                    "    (\"{}\", &[{}], {}, {}),\n",
+                    "    (\"{}\", &[{}], {}, {}, Some(\"{}\")),\n",
                     type_name,
                     names_str.join(", "),
                     entry.cross_compilation,
                     entry.versioned,
+                    escape(&entry.description),
                 ));
             }
         }
@@ -49,11 +57,19 @@ pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>) ->
         if own_ignore.is_some_and(|iw| !iw.executables.is_empty()) {
             let exes = &own_ignore.unwrap().executables;
             let names_str: Vec<String> = exes.iter().map(|n| format!("\"{}\"", n)).collect();
-            out.push_str(&format!("    (\"{}\", &[{}], false, false),\n", type_name, names_str.join(", "),));
+            out.push_str(&format!(
+                "    (\"{}\", &[{}], false, false, None),\n",
+                type_name,
+                names_str.join(", "),
+            ));
         }
     }
 
     out.push_str("];\n");
 
-    out
+    Ok(out)
+}
+
+fn escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
