@@ -8,9 +8,12 @@
 
 pub mod compiler_recognition;
 mod flag_based;
+mod print;
 mod probe;
 mod response_file;
 mod wrapper;
+
+pub use print::print_compilers;
 
 use super::super::{Interpreter, RecognizeResult};
 use super::combinators::OutputLogger;

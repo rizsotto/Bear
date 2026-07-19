@@ -32,6 +32,8 @@ pub mod interpreters;
 #[cfg(test)]
 pub mod testing;
 
+pub use interpreters::compilers::print_compilers;
+
 use intercept::Execution;
 use interpreters::matchers::looks_like_a_source_file;
 

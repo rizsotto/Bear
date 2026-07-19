@@ -1973,3 +1973,60 @@ fn semantic_output_stdout_rejects_append() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: recognition-compiler-names
+//
+// `--print-compilers` is a pure static dump of the built-in recognition
+// tables: dispatch happens before any input stream is opened, so the
+// command must exit promptly even with stdin left open and undrained --
+// unlike every other `semantic` invocation, which reads an event stream.
+// Spawned directly (rather than through `run_bear`, whose `Command::output`
+// already closes stdin) so an accidental stdin read on this path would show
+// up here as a hang, not as a false pass.
+#[test]
+fn semantic_print_compilers_does_not_block_on_stdin() -> Result<()> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    let env = TestEnvironment::new("semantic_print_compilers")?;
+
+    let mut child = Command::new(env.bear_path())
+        .current_dir(env.test_dir())
+        .args(["semantic", "--print-compilers"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    // Keep the write end of stdin open for the whole wait -- never written
+    // to, never dropped/closed. If the dispatcher read from it, this test
+    // would hang instead of the process exiting on its own.
+    let _stdin = child.stdin.take().context("stdin is piped")?;
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            anyhow::bail!(
+                "bear semantic --print-compilers did not exit within 5s; it must not block on stdin"
+            );
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+
+    assert!(status.success(), "bear semantic --print-compilers must exit successfully");
+
+    let mut stdout = String::new();
+    child.stdout.take().context("stdout is piped")?.read_to_string(&mut stdout)?;
+
+    assert!(stdout.contains("recognizes the following compilers"), "missing banner in stdout: {stdout}");
+    assert!(stdout.contains("GCC compiler"), "missing GCC entry in stdout: {stdout}");
+    assert!(stdout.contains("as gcc"), "missing gcc alias in stdout: {stdout}");
+
+    Ok(())
+}

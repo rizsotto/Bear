@@ -44,6 +44,7 @@ pub enum Mode {
     Semantic { input: BuildEvents, output: BuildSemantic },
     Combined { input: BuildCommand, output: BuildSemantic },
     ParseSh { input: ShScript, output: BuildEvents },
+    PrintCompilers,
 }
 
 /// Represents the execution of a command.
@@ -113,6 +114,7 @@ impl fmt::Display for Mode {
                 writeln!(f, "  Input: {}", input)?;
                 write!(f, "  Output: {}", output)
             }
+            Mode::PrintCompilers => write!(f, "Print Compilers"),
         }
     }
 }
@@ -153,8 +155,15 @@ impl TryFrom<ArgMatches> for Arguments {
 
         // `parse-sh` emits a raw event stream and never consults the config,
         // so accepting `--config` would silently ignore it. Reject it instead.
-        if config.is_some() && matches!(mode, Mode::ParseSh { .. }) {
-            return Err(ParseError::ConfigNotApplicableToParseSh);
+        // `--print-compilers` is the same shape of problem: it only lists the
+        // compilers Bear recognizes from the static, built-in tables, and
+        // consults no config either.
+        if config.is_some() {
+            match mode {
+                Mode::ParseSh { .. } => return Err(ParseError::ConfigNotApplicableToParseSh),
+                Mode::PrintCompilers => return Err(ParseError::ConfigNotApplicableToPrintCompilers),
+                _ => {}
+            }
         }
 
         Ok(Arguments { config, mode })
@@ -176,6 +185,10 @@ impl TryFrom<ArgMatches> for Mode {
                 Ok(Mode::Intercept { input, output: BuildEvents { path } })
             }
             Some((MODE_SEMANTIC_SUBCOMMAND, semantic_matches)) => {
+                if semantic_matches.get_flag("print-compilers") {
+                    return Ok(Mode::PrintCompilers);
+                }
+
                 let path = semantic_matches
                     .get_one::<String>("input")
                     .map(std::path::PathBuf::from)
@@ -241,6 +254,11 @@ pub enum ParseError {
          while parse-sh only emits an event stream"
     )]
     ConfigNotApplicableToParseSh,
+    #[error(
+        "The --config option does not apply to semantic --print-compilers: it only lists the \
+         compilers Bear recognizes from its built-in tables and consults no config"
+    )]
+    ConfigNotApplicableToPrintCompilers,
 }
 
 /// Represents the command line interface of the application.
@@ -285,6 +303,8 @@ pub fn cli() -> Command {
                         .default_value(DEFAULT_OUTPUT_FILE)
                         .hide_default_value(false),
                     arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
+                    arg!(--"print-compilers" "Print the compilers Bear recognizes and exit")
+                        .action(ArgAction::SetTrue),
                 ])
                 .arg_required_else_help(false)
                 .after_help(
@@ -508,6 +528,31 @@ mod test {
 
         // assert
         assert!(matches!(sut, Err(ParseError::ConfigNotApplicableToParseSh)));
+    }
+
+    // Requirements: recognition-compiler-names
+    #[test]
+    fn test_semantic_print_compilers() {
+        let execution = vec!["bear", "semantic", "--print-compilers"];
+
+        let matches = cli().get_matches_from(execution);
+        let arguments = Arguments::try_from(matches).unwrap();
+
+        assert_eq!(arguments, Arguments { config: None, mode: Mode::PrintCompilers });
+    }
+
+    // Requirements: recognition-compiler-names
+    #[test]
+    fn test_semantic_print_compilers_rejects_config() {
+        // arrange
+        let execution = vec!["bear", "-c", "~/bear.yaml", "semantic", "--print-compilers"];
+
+        // act
+        let matches = cli().get_matches_from(execution);
+        let sut = Arguments::try_from(matches);
+
+        // assert
+        assert!(matches!(sut, Err(ParseError::ConfigNotApplicableToPrintCompilers)));
     }
 
     #[test]

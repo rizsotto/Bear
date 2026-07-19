@@ -34,6 +34,9 @@ use std::sync::Arc;
 pub enum Mode {
     Intercept(execution::Interceptor, args::BuildCommand),
     Replay(execution::Replayer),
+    /// Print the compilers Bear recognizes, then exit. Consults no config
+    /// and reads no input -- handled like parse-sh, before config load.
+    PrintCompilers,
 }
 
 impl Mode {
@@ -63,6 +66,13 @@ impl Mode {
 
             let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
             return Ok(Self::Replay(replayer));
+        }
+
+        // print-compilers, like parse-sh, runs without configuration: it only
+        // lists the built-in recognition tables, so it loads none either.
+        if let args::Mode::PrintCompilers = mode {
+            log::debug!("Mode: print recognized compilers");
+            return Ok(Self::PrintCompilers);
         }
 
         let config = config::Loader::load(&context, &config_path)
@@ -146,6 +156,8 @@ impl Mode {
             }
             // parse-sh is handled before configuration is loaded.
             args::Mode::ParseSh { .. } => unreachable!("parse-sh handled above"),
+            // print-compilers is handled above, before configuration loads.
+            args::Mode::PrintCompilers => unreachable!("print-compilers handled above"),
         }
     }
 
@@ -159,6 +171,14 @@ impl Mode {
         let status = match self {
             Self::Intercept(interceptor, command) => interceptor.run(command),
             Self::Replay(replayer) => replayer.run(),
+            Self::PrintCompilers => {
+                print!(
+                    "Bear {} recognizes the following compilers:\n\n{}",
+                    env!("CARGO_PKG_VERSION"),
+                    crate::semantic::print_compilers()
+                );
+                return ExitCode::SUCCESS;
+            }
         };
         status.unwrap_or_else(|error| {
             log::error!("{error}");
