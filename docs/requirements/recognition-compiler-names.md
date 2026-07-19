@@ -5,20 +5,25 @@ status: implemented
 
 ## Intent
 
-Builds using the classic GNU and LLVM compiler drivers, AMD ROCm,
-standalone assemblers, the Cray Compiling Environment, Emscripten, QNX,
-Texas Instruments, Microchip, MPI wrapper commands, or the Swift
-compiler record their compilations in the compilation database without
+Builds that invoke a recognized compiler -- the classic GNU and LLVM
+drivers and the many vendor toolchains built on them (AMD ROCm, the Cray
+Compiling Environment, Emscripten, QNX, Texas Instruments, Microchip,
+Intel, NVIDIA, the standalone assemblers, the MPI wrappers, Swift, and
+others) -- record their compilations in the compilation database without
 any configuration. The recorded compiler is the name the build invoked,
 exactly as executed.
 
+The set Bear recognizes is demand-driven: it grows as users need it,
+rather than being a fixed list.
+
 ## Acceptance criteria
 
-The shared contract for every recognized name below:
-
-- An execution of a recognized name (see the Recognized names table)
-  with a source file yields database entries, parsed with the flag
-  semantics of the family named in that row.
+- The set of recognized compilers is discoverable from the tool's own
+  output (the man page names the command), and that output presents each
+  recognized compiler with a human-readable description and the `as`
+  value it maps to.
+- An execution of a recognized compiler with a source file yields
+  database entries, parsed with that compiler family's flag semantics.
 - The recorded arguments are the invocation as executed. A wrapper or
   driver is never expanded to the underlying compiler command; the name
   the build invoked is what the entry records.
@@ -27,20 +32,22 @@ The shared contract for every recognized name below:
   owned by `output-compilation-entries`; the MPI wrapper-info options
   (`mpicc -showme`, `-show`, `-compile_info`, `-link_info`) are this
   requirement's own addition to that contract.
-- The classic GNU and LLVM driver names (the first two table rows) are
-  also recognized when spelled with a cross-compilation target prefix
-  (`arm-linux-gnueabihf-gcc`, `aarch64-linux-gnu-clang`), a version
-  suffix (`gcc-12`, `gcc12`, `gcc-11.2`, `clang-15`), or both at once
-  (`arm-linux-gnueabi-gcc-12`); every such spelling carries the base
-  name's flag semantics. Other rows note where these shapes also apply.
+- The classic GNU and LLVM driver names are also recognized when spelled
+  with a cross-compilation target prefix (`arm-linux-gnueabihf-gcc`,
+  `aarch64-linux-gnu-clang`), a version suffix (`gcc-12`, `gcc12`,
+  `gcc-11.2`, `clang-15`), or both at once (`arm-linux-gnueabi-gcc-12`);
+  every such spelling carries the base name's flag semantics. Some other
+  families accept one of these shapes; which ones is a property of each
+  compiler, not a blanket rule.
 - A value-carrying wrapper or driver option never swallows a following
   source file, and the option token is retained verbatim in the
   recorded arguments. MPICH's compiler-override options (for example
   `-cc=gcc`) and QNX's variant selector (for example
   `-Vgcc_ntoaarch64le`) are options, never inputs.
 - The names in the Deliberately not recognized table yield no entry.
-- Ambiguous names (`cc`, `c++`, `CC`) are in neither table here; their
-  classification is owned by `recognition-ambiguous-name-probe`.
+- Ambiguous names (`cc`, `c++`, `CC`) are neither recognized nor excluded
+  here; their classification is owned by
+  `recognition-ambiguous-name-probe`.
 - When preload interception records both a driver or wrapper and the
   child compiler it execs for one source, the pair collapses to a
   single entry and the driver invocation survives; this behavior is
@@ -48,22 +55,12 @@ The shared contract for every recognized name below:
 
 ### Recognized names
 
-| Names | Flag semantics | Notes |
-|---|---|---|
-| `gcc`, `g++`, `gfortran`, `f95`, `egfortran` | GCC | classic GNU driver names; the cross-prefix and version-suffix shapes apply |
-| `clang`, `clang++` | Clang | classic LLVM driver names; the cross-prefix and version-suffix shapes apply |
-| `amdclang`, `amdclang++`, `hipcc` | Clang | AMD ROCm; `hipcc` is a driver, recorded like `nvcc` |
-| `amdflang` | Flang | AMD ROCm |
-| `nasm`, `yasm`, `fasm` | own assembler, recorded as executed | standalone assemblers |
-| CCE C/C++ compiler names, including versioned variants | Clang | Cray Compiling Environment; CCE C/C++ is Clang-based |
-| `crayftn`, `ftn` | Cray Fortran | Cray Compiling Environment Fortran; the PrgEnv `ftn` wrapper is statically recognized, not probed |
-| `emcc`, `em++` | Clang | Emscripten |
-| `qcc`, `q++` | GCC | QNX; `-V<variant>` is an attached-value driver option |
-| `tiarmclang` | Clang | Texas Instruments Arm |
-| `xc8-cc`, `xc8` | GCC | Microchip XC8 |
-| `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `mpifort`, `mpif77`, `mpif90` | GCC | MPI wrappers (Open MPI, MPICH), recorded verbatim |
-| `mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx`, `mpiifort`, `mpiifx` | Intel | Intel MPI wrappers |
-| `swiftc` | Swift | one entry per source, whole-module shape (see `output-compilation-entries`) |
+The exhaustive, current list of recognized compiler names -- each with
+its flag-semantics family and the `as` value it maps to -- is produced by
+the tool itself; the man page names the command. It is deliberately not
+duplicated here, so it cannot drift from the code. The behavioral
+contracts above and the exclusions below apply to whatever that list
+contains.
 
 ### Deliberately not recognized
 
@@ -89,7 +86,7 @@ GNU or LLVM driver name in any recognized spelling (`gcc`, `clang++`,
 > parsed with the base name's flag semantics.
 
 Given an event file with a `<name> -c hello.c` execution for any of
-the C-family driver names in the table (the AMD ROCm C/C++ drivers,
+the other recognized C-family driver names (the AMD ROCm C/C++ drivers,
 the CCE C/C++ names, `emcc`/`em++`, `qcc`/`q++`, `tiarmclang`, the
 Microchip XC8 drivers, and the C/C++ MPI wrappers):
 
@@ -97,10 +94,10 @@ Microchip XC8 drivers, and the C/C++ MPI wrappers):
 > then the database contains one entry for `hello.c`
 > whose arguments start with `<name>`.
 
-The assembler, Fortran, and Swift names in the table follow the same
-pattern with a source file and flags from their own toolchain rather
-than a C source and `-c`; the concrete `fasm`, `gfortran`, and
-`swiftc` scenarios below exercise those shapes.
+The assembler, Fortran, and Swift names follow the same pattern with a
+source file and flags from their own toolchain rather than a C source
+and `-c`; the concrete `fasm`, `gfortran`, and `swiftc` scenarios below
+exercise those shapes.
 
 Given an event file with a `gfortran -c hello.f90` execution:
 
@@ -108,9 +105,8 @@ Given an event file with a `gfortran -c hello.f90` execution:
 > then the database contains one entry for `hello.f90`,
 > whose arguments start with `gfortran`,
 > parsed with GCC flag semantics.
-> This scenario is representative of the Fortran rows in the table;
-> each row's names follow the same shape with that row's own flag
-> semantics.
+> This scenario is representative of the Fortran families; each
+> family's names follow the same shape with its own flag semantics.
 
 Given an event file with a `qcc -Vgcc_ntoaarch64le -c hello.c`
 execution:
