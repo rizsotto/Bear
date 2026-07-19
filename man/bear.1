@@ -303,8 +303,8 @@ Bear recognizes GCC\- and Clang\-compatible drivers (including
 cross\-compiler prefixed names), the common vendor compiler drivers and
 standalone assemblers, \f[CR]swiftc\f[R] and \f[CR]valac\f[R], compiler
 launchers, and MPI compiler wrappers.
-Run \f[CR]bear semantic \-\-help\f[R] for the full list of recognized
-compiler names.
+Run \f[CR]bear semantic \-\-print\-compilers\f[R] for the full list of
+recognized compiler names, each with the \f[CR]as\f[R] value it maps to.
 .PP
 A few recognition behaviors are worth knowing.
 Compiler launchers (\f[CR]ccache\f[R], \f[CR]distcc\f[R],
@@ -325,8 +325,8 @@ is recognized wrongly:
 \f[B]path\f[R]: Path of the compiler executable.
 .IP \(bu 2
 \f[B]as\f[R]: Compiler type hint for semantic analysis.
-The accepted names are listed in the \f[CR]bear semantic \-\-help\f[R]
-output.
+The accepted values are the \f[CR]as\f[R] names shown by
+\f[CR]bear semantic \-\-print\-compilers\f[R].
 .IP \(bu 2
 \f[B]ignore\f[R]: Exclude this executable\(cqs invocations from the
 database.

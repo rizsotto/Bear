@@ -294,7 +294,8 @@ Hints for compiler recognition. Bear recognizes GCC- and Clang-compatible
 drivers (including cross-compiler prefixed names), the common vendor
 compiler drivers and standalone assemblers, `swiftc` and `valac`,
 compiler launchers, and MPI compiler wrappers. Run
-`bear semantic --help` for the full list of recognized compiler names.
+`bear semantic --print-compilers` for the full list of recognized
+compiler names, each with the `as` value it maps to.
 
 A few recognition behaviors are worth knowing. Compiler launchers
 (`ccache`, `distcc`, `sccache`, `icecc`) are dropped from the recorded
@@ -310,8 +311,8 @@ Use this section when a compiler at a given path is not recognized, or
 is recognized wrongly:
 
 - **path**: Path of the compiler executable.
-- **as**: Compiler type hint for semantic analysis. The accepted names
-are listed in the `bear semantic --help` output.
+- **as**: Compiler type hint for semantic analysis. The accepted values
+are the `as` names shown by `bear semantic --print-compilers`.
 - **ignore**: Exclude this executable's invocations from the database.
 
 The generic names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` are
