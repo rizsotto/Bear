@@ -1,13 +1,13 @@
 type: ibm_xl
 extends: clang
 recognize:
-  - description: "IBM Open XL C/C++ compiler"
+  - description: "IBM Open XL C/C++"
     references:
       - "https://www.ibm.com/docs/en/openxl-c-and-cpp-aix"
     executables: ["ibm-clang", "ibm-clang++"]
     versioned: true
     cross_compilation: false
-  - description: "IBM XL C/C++ compiler"
+  - description: "IBM XL C/C++"
     references:
       - "https://www.ibm.com/docs/en/xl-c-and-cpp-aix"
     executables: ["xlclang", "xlclang++"]

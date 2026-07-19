@@ -1,6 +1,6 @@
 type: msvc
 recognize:
-  - description: "Microsoft Visual C++ compiler"
+  - description: "Microsoft Visual C++"
     references:
       - "https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options"
     executables: ["cl"]

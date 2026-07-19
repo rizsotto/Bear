@@ -1,12 +1,12 @@
 type: nvidia_hpc
 recognize:
-  - description: "NVIDIA HPC SDK compiler"
+  - description: "NVIDIA HPC SDK"
     references:
       - "https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html"
     executables: ["nvc", "nvc++", "nvfortran"]
     versioned: true
     cross_compilation: false
-  - description: "PGI compiler (legacy NVIDIA HPC)"
+  - description: "PGI (legacy NVIDIA HPC)"
     references:
       - "https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html"
     executables: ["pgcc", "pgc++", "pgfortran"]

@@ -1,6 +1,6 @@
 type: intel_fortran
 recognize:
-  - description: "Intel Fortran compiler"
+  - description: "Intel Fortran"
     references:
       - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html"
     executables: ["ifort", "ifx"]
@@ -8,7 +8,7 @@ recognize:
     cross_compilation: false
   # Intel MPI wrappers: mpiifort/mpiifx are ifort/ifx with MPI paths baked
   # in (see docs/rationale/mpi-wrappers-as-compilers.md).
-  - description: "Intel MPI Fortran wrapper"
+  - description: "Intel Fortran MPI wrapper"
     references:
       - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/mpi-library.html"
     executables: ["mpiifort", "mpiifx"]

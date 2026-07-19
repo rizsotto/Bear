@@ -9,7 +9,7 @@
 type: cray_cc
 extends: clang
 recognize:
-  - description: "Cray C/C++ compiler"
+  - description: "Cray C/C++"
     references:
       - "https://support.hpe.com/hpesc/public/docDisplay?docId=a00113893en_us&page=index.html"
     executables: ["craycc", "crayCC", "craycxx"]

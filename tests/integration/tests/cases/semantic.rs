@@ -2025,7 +2025,7 @@ fn semantic_print_compilers_does_not_block_on_stdin() -> Result<()> {
     child.stdout.take().context("stdout is piped")?.read_to_string(&mut stdout)?;
 
     assert!(stdout.contains("recognizes the following compilers"), "missing banner in stdout: {stdout}");
-    assert!(stdout.contains("GCC compiler"), "missing GCC entry in stdout: {stdout}");
+    assert!(stdout.contains("GCC"), "missing GCC entry in stdout: {stdout}");
     assert!(stdout.contains("as gcc"), "missing gcc alias in stdout: {stdout}");
 
     Ok(())

@@ -128,7 +128,7 @@ mod tests {
     fn lists_a_known_compiler_with_its_alias_and_executables() {
         let sut = print_compilers();
 
-        assert!(sut.contains("GCC compiler"), "missing GCC description:\n{sut}");
+        assert!(sut.contains("GCC"), "missing GCC description:\n{sut}");
         assert!(sut.contains("as gcc"), "missing gcc alias:\n{sut}");
         assert!(sut.contains("gcc, g++"), "missing gcc executables:\n{sut}");
     }

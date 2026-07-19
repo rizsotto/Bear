@@ -19,7 +19,7 @@
 # own internal frontend executions.
 type: swift
 recognize:
-  - description: "Swift compiler"
+  - description: "Swift"
     references:
       - "https://www.swift.org/documentation/"
     executables: ["swiftc"]

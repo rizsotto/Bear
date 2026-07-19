@@ -1,7 +1,7 @@
 type: intel_cc
 extends: clang
 recognize:
-  - description: "Intel oneAPI C/C++ compiler"
+  - description: "Intel oneAPI C/C++"
     references:
       - "https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html"
     executables: ["icx", "icpx"]

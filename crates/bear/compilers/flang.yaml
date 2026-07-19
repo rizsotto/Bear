@@ -1,13 +1,13 @@
 type: flang
 extends: gcc
 recognize:
-  - description: "Flang Fortran compiler"
+  - description: "Flang"
     references:
       - "https://flang.llvm.org/docs/FlangDriver.html"
     executables: ["flang", "flang-new"]
     versioned: true
     cross_compilation: true
-  - description: "AMD ROCm Flang compiler"
+  - description: "AMD ROCm Flang"
     references:
       - "https://rocm.docs.amd.com/en/latest/"
     executables: ["amdflang"]

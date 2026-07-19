@@ -21,7 +21,7 @@ result values, inheritance, environment variables).
 ## `recognize:` entries must be documented and cited
 
 Every `recognize:` entry is mandatory `description` (a short human label,
-e.g. `"GCC compiler"`) and a mandatory `references` (a non-empty list of
+e.g. `"GCC"`) and a mandatory `references` (a non-empty list of
 http(s) documentation URLs). Both are validated at codegen time -- the
 build fails if either is missing, blank, or `references` holds a
 non-http(s) entry. `description` is emitted into the generated

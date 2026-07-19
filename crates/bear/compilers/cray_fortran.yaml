@@ -1,6 +1,6 @@
 type: cray_fortran
 recognize:
-  - description: "Cray Fortran compiler"
+  - description: "Cray Fortran"
     references:
       - "https://support.hpe.com/hpesc/public/docDisplay?docId=a00115296en_us&page=Fortran_Command-line_Options.html"
     executables: ["crayftn", "ftn"]

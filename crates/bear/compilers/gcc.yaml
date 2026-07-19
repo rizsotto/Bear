@@ -1,6 +1,6 @@
 type: gcc
 recognize:
-  - description: "GCC compiler"
+  - description: "GCC"
     references:
       - "https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html"
     executables: ["gcc", "g++", "gfortran", "egfortran", "f95"]
@@ -11,7 +11,7 @@ recognize:
   # GCC table fits; xc16-gcc/xc32-gcc already match the cross-prefix rule
   # above. The XC8 archiver (xc8-ar) is deliberately absent -- it is not a
   # compiler driver.
-  - description: "Microchip XC8 compiler"
+  - description: "Microchip XC8"
     references:
       - "https://www.microchip.com/en-us/tools-resources/develop/mplab-xc-compilers"
     executables: ["xc8-cc", "xc8"]

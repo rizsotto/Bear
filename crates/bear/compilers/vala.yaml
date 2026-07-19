@@ -13,7 +13,7 @@
 # a real C compiler on the generated C. See docs/rationale/vala-transpiler-database.
 type: vala
 recognize:
-  - description: "Vala compiler"
+  - description: "Vala"
     references:
       - "https://vala.dev/"
     executables: ["valac"]

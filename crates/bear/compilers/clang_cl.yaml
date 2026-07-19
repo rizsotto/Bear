@@ -1,7 +1,7 @@
 type: clang_cl
 extends: msvc
 recognize:
-  - description: "clang-cl (MSVC-compatible Clang)"
+  - description: "Clang (MSVC mode)"
     references:
       - "https://clang.llvm.org/docs/UsersManual.html#clang-cl"
     executables: ["clang-cl"]

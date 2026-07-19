@@ -1,13 +1,13 @@
 type: clang
 extends: gcc
 recognize:
-  - description: "Clang compiler"
+  - description: "Clang"
     references:
       - "https://clang.llvm.org/docs/ClangCommandLineReference.html"
     executables: ["clang", "clang++"]
     versioned: true
     cross_compilation: true
-  - description: "AMD ROCm Clang/HIP compiler"
+  - description: "AMD ROCm Clang/HIP"
     references:
       - "https://rocm.docs.amd.com/en/latest/"
     executables: ["amdclang", "amdclang++", "hipcc"]
@@ -18,13 +18,13 @@ recognize:
   # no hyphen, so the <prefix>-clang cross rule does not catch it; it must
   # be listed explicitly. Emscripten's binutils companions (emar, emranlib)
   # are deliberately absent -- they are not compiler drivers.
-  - description: "Emscripten compiler"
+  - description: "Emscripten"
     references:
       - "https://emscripten.org/docs/tools_reference/emcc.html"
     executables: ["emcc", "em++", "emcc.py", "em++.py"]
     versioned: false
     cross_compilation: false
-  - description: "Texas Instruments Arm Clang compiler"
+  - description: "Texas Instruments Arm Clang"
     references:
       - "https://www.ti.com/tool/ARM-CGT"
     executables: ["tiarmclang"]
