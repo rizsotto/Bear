@@ -4,7 +4,9 @@
 # ignored.
 #
 # fasm has its own CLI dialect, so this family has no `extends:`.
-type: fasm
+type: compiler
+compiler:
+  id: fasm
 recognize:
   - description: "flat assembler"
     references:

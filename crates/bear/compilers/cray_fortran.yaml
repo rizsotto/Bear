@@ -1,4 +1,6 @@
-type: cray_fortran
+type: compiler
+compiler:
+  id: cray_fortran
 recognize:
   - description: "Cray Fortran"
     references:

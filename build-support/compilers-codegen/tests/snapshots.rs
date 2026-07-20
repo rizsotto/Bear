@@ -115,7 +115,15 @@ fn snapshot_flags_swift() {
 #[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
-    insta::assert_snapshot!(generate_recognition_patterns(&raw_tables).unwrap());
+    // load_tables() keys by compiler.id; every real YAML file's id equals
+    // its stem (see the migration table in the schema-split commit), so
+    // rebuilding that mapping here reproduces the real yaml_file -> id
+    // index generate() builds from the same load loop.
+    let file_to_id: std::collections::HashMap<&'static str, String> = TABLES
+        .iter()
+        .map(|c| (c.yaml_file, c.yaml_file.strip_suffix(".yaml").unwrap().to_string()))
+        .collect();
+    insta::assert_snapshot!(generate_recognition_patterns(&raw_tables, &file_to_id).unwrap());
 }
 
 #[test]

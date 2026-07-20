@@ -28,7 +28,7 @@ fn resolve_flags_recursive(
     let table = &raw_tables[key];
     let mut entries = table.flags.clone();
 
-    if let Some(ref base_name) = table.extends
+    if let Some(ref base_name) = table.compiler.extends
         && raw_tables.contains_key(base_name.as_str())
     {
         entries.extend(resolve_flags_recursive(base_name, raw_tables, visited));
@@ -86,7 +86,7 @@ fn resolve_ignore_when_recursive(
     let table = &raw_tables[key];
     let own = table.ignore_when.clone().unwrap_or_default();
 
-    if let Some(ref base_name) = table.extends
+    if let Some(ref base_name) = table.compiler.extends
         && raw_tables.contains_key(base_name.as_str())
     {
         let base = resolve_ignore_when_recursive(base_name, raw_tables, visited);
@@ -119,7 +119,7 @@ fn resolve_slash_prefix_recursive(
     if let Some(value) = table.slash_prefix {
         return value;
     }
-    if let Some(ref base_name) = table.extends
+    if let Some(ref base_name) = table.compiler.extends
         && raw_tables.contains_key(base_name.as_str())
     {
         return resolve_slash_prefix_recursive(base_name, raw_tables, visited);
@@ -147,7 +147,7 @@ fn resolve_environment_recursive(
     let table = &raw_tables[key];
     let mut entries = table.environment.clone().unwrap_or_default();
 
-    if let Some(ref base_name) = table.extends
+    if let Some(ref base_name) = table.compiler.extends
         && raw_tables.contains_key(base_name.as_str())
     {
         let base_entries = resolve_environment_recursive(base_name, raw_tables, visited);

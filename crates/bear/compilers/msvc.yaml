@@ -1,4 +1,6 @@
-type: msvc
+type: compiler
+compiler:
+  id: msvc
 recognize:
   - description: "Microsoft Visual C++"
     references:

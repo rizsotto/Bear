@@ -1,6 +1,8 @@
 # NASM/YASM have their own CLI dialect (not derived from gcc/clang), so this
 # family has no `extends:`.
-type: nasm
+type: compiler
+compiler:
+  id: nasm
 recognize:
   - description: "NASM / YASM assembler"
     references:

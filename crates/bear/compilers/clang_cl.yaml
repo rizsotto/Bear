@@ -1,5 +1,7 @@
-type: clang_cl
-extends: msvc
+type: compiler
+compiler:
+  id: clang_cl
+  extends: msvc
 recognize:
   - description: "Clang (MSVC mode)"
     references:

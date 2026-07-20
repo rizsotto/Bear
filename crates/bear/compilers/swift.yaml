@@ -17,7 +17,9 @@
 # (legacy toolchains self-invoke as `swiftc -frontend`); both are filtered
 # via `ignore_when`, the same mechanism gcc.yaml/clang.yaml use for their
 # own internal frontend executions.
-type: swift
+type: compiler
+compiler:
+  id: swift
 recognize:
   - description: "Swift"
     references:

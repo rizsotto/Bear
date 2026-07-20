@@ -6,8 +6,10 @@
 # cannot say which compiler it is. It is classified by the ambiguous-name
 # version probe instead (see
 # docs/requirements/recognition-ambiguous-name-probe.md).
-type: cray_cc
-extends: clang
+type: compiler
+compiler:
+  id: cray_cc
+  extends: clang
 recognize:
   - description: "Cray C/C++"
     references:

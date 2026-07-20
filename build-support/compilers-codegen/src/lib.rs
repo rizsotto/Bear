@@ -142,16 +142,18 @@ impl ResolvedTable {
 ///
 /// Prints `cargo:rerun-if-changed` lines to stdout (for build.rs integration).
 pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
-    let raw_tables = load_tables_from(flags_dir)?;
+    let (raw_tables, file_to_id) = load_tables_from(flags_dir)?;
 
     // Generate recognition patterns
-    let recognition = generate_recognition_patterns(&raw_tables)?;
+    let recognition = generate_recognition_patterns(&raw_tables, &file_to_id)?;
     write_output(out_dir, "recognition.rs", recognition)?;
 
     // Generate each compiler's flag table
     for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let resolved = ResolvedTable::new(key, config, &raw_tables)?;
+        let id = file_to_id
+            .get(config.yaml_file)
+            .with_context(|| format!("no table loaded for {}", config.yaml_file))?;
+        let resolved = ResolvedTable::new(id, config, &raw_tables)?;
         write_output(out_dir, config.output_file, resolved.generate()?)?;
     }
 
@@ -171,28 +173,88 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
 ///
 /// Prints `cargo:rerun-if-changed` lines to stdout (for build.rs integration).
 pub fn generate_env_keys_only(flags_dir: &Path, out_dir: &Path) -> Result<()> {
-    let raw_tables = load_tables_from(flags_dir)?;
+    let (raw_tables, _file_to_id) = load_tables_from(flags_dir)?;
     let env_keys = generate_env_keys(&raw_tables);
     write_output(out_dir, "env_keys.rs", env_keys)?;
     Ok(())
 }
 
-/// Load YAML flag tables from a directory, printing cargo:rerun-if-changed.
-fn load_tables_from(flags_dir: &Path) -> Result<HashMap<String, FlagTable>> {
+/// Parse a single YAML table, attaching the source file name to any parse
+/// error so a schema violation names the offending file.
+pub fn parse_table(yaml_file: &str, content: &str) -> Result<FlagTable> {
+    serde_saphyr::from_str(content).with_context(|| format!("parsing {}", yaml_file))
+}
+
+/// Insert a parsed table into an id-keyed map, keyed by `table.compiler.id`.
+///
+/// Bails with a clear error naming both the id and the file that redefines
+/// it if the id collides with a table already present. Returns the id on
+/// success, so callers that also need a `yaml_file -> id` side index don't
+/// have to clone it themselves.
+pub fn insert_by_id(
+    raw_tables: &mut HashMap<String, FlagTable>,
+    yaml_file: &str,
+    table: FlagTable,
+) -> Result<String> {
+    let id = table.compiler.id.clone();
+    if raw_tables.contains_key(&id) {
+        bail!("duplicate compiler id '{}': {} redefines an id already used by another table", id, yaml_file);
+    }
+    raw_tables.insert(id.clone(), table);
+    Ok(id)
+}
+
+/// Tables keyed by `compiler.id`, plus a side index mapping each `TABLES`
+/// entry's `yaml_file` to the id it declared -- callers that iterate
+/// `TABLES` (for output order) use the index to find the right table
+/// without assuming a file's stem equals its id.
+type LoadedTables = (HashMap<String, FlagTable>, HashMap<&'static str, String>);
+
+/// Load YAML flag tables from `flags_dir`, keyed by id, validated.
+///
+/// `print_rerun` controls whether `cargo:rerun-if-changed` lines are
+/// printed (only meaningful when called from a `build.rs`).
+fn load_and_index(flags_dir: &Path, print_rerun: bool) -> Result<LoadedTables> {
     let mut raw_tables = HashMap::new();
+    let mut file_to_id = HashMap::new();
     for config in TABLES {
         let yaml_path = flags_dir.join(config.yaml_file);
-        println!("cargo:rerun-if-changed={}", yaml_path.display());
+        if print_rerun {
+            println!("cargo:rerun-if-changed={}", yaml_path.display());
+        }
 
         let content = std::fs::read_to_string(&yaml_path)
             .with_context(|| format!("reading {}", yaml_path.display()))?;
-        let table: FlagTable =
-            serde_saphyr::from_str(&content).with_context(|| format!("parsing {}", yaml_path.display()))?;
+        let table = parse_table(config.yaml_file, &content)?;
 
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap().to_string();
-        raw_tables.insert(key, table);
+        let id = insert_by_id(&mut raw_tables, config.yaml_file, table)?;
+        file_to_id.insert(config.yaml_file, id);
     }
-    Ok(raw_tables)
+    validate_extends(&raw_tables, &file_to_id)?;
+    Ok((raw_tables, file_to_id))
+}
+
+/// Validate that every table's `compiler.extends` (if set) names an id
+/// that was actually loaded. Bails with a message naming the offending
+/// file so a dangling `extends:` target fails codegen, not just a test.
+pub fn validate_extends(
+    raw_tables: &HashMap<String, FlagTable>,
+    file_to_id: &HashMap<&'static str, String>,
+) -> Result<()> {
+    for (yaml_file, id) in file_to_id {
+        let table = &raw_tables[id];
+        if let Some(ref base) = table.compiler.extends
+            && !raw_tables.contains_key(base.as_str())
+        {
+            bail!("{} extends '{}', which does not exist", yaml_file, base);
+        }
+    }
+    Ok(())
+}
+
+/// Load YAML flag tables from a directory, printing cargo:rerun-if-changed.
+fn load_tables_from(flags_dir: &Path) -> Result<LoadedTables> {
+    load_and_index(flags_dir, true)
 }
 
 fn write_output(out_dir: &Path, filename: &str, content: String) -> Result<()> {
@@ -217,17 +279,7 @@ pub(crate) fn flags_dir() -> std::path::PathBuf {
 
 /// Load all YAML flag tables from the workspace compilers directory.
 pub fn load_tables() -> Result<HashMap<String, FlagTable>> {
-    let flags_dir = flags_dir();
-    let mut raw_tables = HashMap::new();
-    for config in TABLES {
-        let yaml_path = flags_dir.join(config.yaml_file);
-        let content = std::fs::read_to_string(&yaml_path)
-            .with_context(|| format!("reading {}", yaml_path.display()))?;
-        let table: FlagTable =
-            serde_saphyr::from_str(&content).with_context(|| format!("parsing {}", yaml_path.display()))?;
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap().to_string();
-        raw_tables.insert(key, table);
-    }
+    let (raw_tables, _file_to_id) = load_and_index(&flags_dir(), false)?;
     Ok(raw_tables)
 }
 
@@ -235,7 +287,7 @@ pub fn load_tables() -> Result<HashMap<String, FlagTable>> {
 mod tests {
     use super::*;
     use crate::codegen::pattern_to_rust;
-    use crate::yaml_types::{EnvEntry, EnvMappingYaml, FlagMatch, RecognizeEntry};
+    use crate::yaml_types::{CompilerIdentity, EnvEntry, EnvMappingYaml, FlagMatch, Kind, RecognizeEntry};
 
     // -- pattern_to_rust tests --
 
@@ -357,8 +409,8 @@ mod tests {
         tables.insert(
             "a".to_string(),
             FlagTable {
-                extends: Some("b".to_string()),
-                type_: None,
+                type_: Kind::Compiler,
+                compiler: CompilerIdentity { id: "a".to_string(), extends: Some("b".to_string()) },
                 recognize: None,
                 ignore_when: None,
                 slash_prefix: None,
@@ -369,8 +421,8 @@ mod tests {
         tables.insert(
             "b".to_string(),
             FlagTable {
-                extends: Some("a".to_string()),
-                type_: None,
+                type_: Kind::Compiler,
+                compiler: CompilerIdentity { id: "b".to_string(), extends: Some("a".to_string()) },
                 recognize: None,
                 ignore_when: None,
                 slash_prefix: None,
@@ -398,10 +450,10 @@ mod tests {
             Some(IgnoreWhen { executables: vec!["cpp".to_string()], flags: vec!["-E".to_string()] });
         tables.insert("gp".to_string(), gp);
         let mut parent = make_empty_table();
-        parent.extends = Some("gp".to_string());
+        parent.compiler.extends = Some("gp".to_string());
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
-        child.extends = Some("parent".to_string());
+        child.compiler.extends = Some("parent".to_string());
         tables.insert("child".to_string(), child);
         let result = resolve_ignore_when("child", &tables);
         assert_eq!(result.executables, vec!["cpp"]);
@@ -416,7 +468,7 @@ mod tests {
             Some(IgnoreWhen { executables: vec!["cpp".to_string()], flags: vec!["-E".to_string()] });
         tables.insert("base".to_string(), base);
         let mut child = make_empty_table();
-        child.extends = Some("base".to_string());
+        child.compiler.extends = Some("base".to_string());
         child.ignore_when = Some(IgnoreWhen { executables: vec!["cc1".to_string()], flags: vec![] });
         tables.insert("child".to_string(), child);
         let result = resolve_ignore_when("child", &tables);
@@ -438,10 +490,10 @@ mod tests {
         gp.slash_prefix = Some(true);
         tables.insert("gp".to_string(), gp);
         let mut parent = make_empty_table();
-        parent.extends = Some("gp".to_string());
+        parent.compiler.extends = Some("gp".to_string());
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
-        child.extends = Some("parent".to_string());
+        child.compiler.extends = Some("parent".to_string());
         tables.insert("child".to_string(), child);
         assert!(resolve_slash_prefix("child", &tables));
     }
@@ -453,11 +505,11 @@ mod tests {
         gp.flags = vec![make_test_flag("-gp", "output")];
         tables.insert("gp".to_string(), gp);
         let mut parent = make_empty_table();
-        parent.extends = Some("gp".to_string());
+        parent.compiler.extends = Some("gp".to_string());
         parent.flags = vec![make_test_flag("-p", "output")];
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
-        child.extends = Some("parent".to_string());
+        child.compiler.extends = Some("parent".to_string());
         child.flags = vec![make_test_flag("-ch", "output")];
         tables.insert("child".to_string(), child);
 
@@ -475,7 +527,7 @@ mod tests {
         parent.flags = vec![make_test_flag("-c", "stops_at_compiling")];
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
-        child.extends = Some("parent".to_string());
+        child.compiler.extends = Some("parent".to_string());
         child.flags = vec![make_test_flag("-c", "stops_at_compiling")];
         tables.insert("child".to_string(), child);
         let flags = resolve_flags("child", &tables).unwrap();
@@ -489,7 +541,7 @@ mod tests {
         parent.flags = vec![make_test_flag("-c", "stops_at_compiling")];
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
-        child.extends = Some("parent".to_string());
+        child.compiler.extends = Some("parent".to_string());
         child.flags = vec![make_test_flag("-c", "output")];
         tables.insert("child".to_string(), child);
         let err = resolve_flags("child", &tables).unwrap_err();
@@ -664,8 +716,8 @@ mod tests {
 
     fn make_empty_table() -> FlagTable {
         FlagTable {
-            extends: None,
-            type_: None,
+            type_: Kind::Compiler,
+            compiler: CompilerIdentity { id: "test".to_string(), extends: None },
             recognize: None,
             ignore_when: None,
             slash_prefix: None,

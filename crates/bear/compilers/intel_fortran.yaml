@@ -1,4 +1,6 @@
-type: intel_fortran
+type: compiler
+compiler:
+  id: intel_fortran
 recognize:
   - description: "Intel Fortran"
     references:

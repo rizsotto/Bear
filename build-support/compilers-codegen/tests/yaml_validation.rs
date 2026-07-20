@@ -6,9 +6,9 @@
 //! providing better error messages than build-time panics.
 
 use compilers_codegen::codegen::{pattern_to_rust, result_to_rust};
-use compilers_codegen::load_tables;
 use compilers_codegen::resolve::resolve_environment;
 use compilers_codegen::tables::TABLES;
+use compilers_codegen::{insert_by_id, load_tables, parse_table, validate_extends};
 
 /// Every YAML file parses successfully.
 #[test]
@@ -24,7 +24,7 @@ fn extends_references_are_valid() {
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];
-        if let Some(ref base_name) = table.extends {
+        if let Some(ref base_name) = table.compiler.extends {
             assert!(
                 tables.contains_key(base_name.as_str()),
                 "{} extends '{}', which does not exist",
@@ -132,25 +132,27 @@ fn no_circular_extends() {
                 config.yaml_file,
                 k
             );
-            current = tables.get(k.as_str()).and_then(|t| t.extends.clone());
+            current = tables.get(k.as_str()).and_then(|t| t.compiler.extends.clone());
         }
     }
 }
 
-/// Every table with a `type` field has at least one `recognize` entry.
+/// Every table has at least one `recognize` entry.
+///
+/// `type:` is mandatory now, so every loaded table is typed by construction;
+/// this asserts the invariant unconditionally instead of gating on
+/// `Kind::Compiler` (the only kind any table uses today).
 #[test]
 fn typed_tables_have_recognition_entries() {
     let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];
-        if table.type_.is_some() {
-            assert!(
-                table.recognize.as_ref().is_some_and(|r| !r.is_empty()),
-                "{}: has type but no recognize entries",
-                config.yaml_file
-            );
-        }
+        assert!(
+            table.recognize.as_ref().is_some_and(|r| !r.is_empty()),
+            "{}: has type but no recognize entries",
+            config.yaml_file
+        );
     }
 }
 
@@ -163,10 +165,69 @@ fn all_tables_have_flags() {
         let table = &tables[key];
         let has_own = !table.flags.is_empty();
         let has_inherited = table
+            .compiler
             .extends
             .as_ref()
             .and_then(|base| tables.get(base.as_str()))
             .is_some_and(|base| !base.flags.is_empty());
         assert!(has_own || has_inherited, "{}: no flags defined (own or inherited)", config.yaml_file);
     }
+}
+
+// -- Negative-case tests for the `type:`/`compiler:` schema split --
+//
+// These exercise the loader against small inline YAML fixtures rather than
+// mutating the real compiler YAML files on disk.
+
+const MINIMAL_FLAGS: &str = "flags: []\n";
+
+/// Two tables declaring the same `compiler.id` fail to load, and the error
+/// names the file that redefines the id.
+#[test]
+fn duplicate_ids_fail_naming_the_file() {
+    let yaml = format!("type: compiler\ncompiler:\n  id: dup\n{}", MINIMAL_FLAGS);
+    let first = parse_table("first.yaml", &yaml).unwrap();
+    let second = parse_table("second.yaml", &yaml).unwrap();
+
+    let mut tables = std::collections::HashMap::new();
+    insert_by_id(&mut tables, "first.yaml", first).unwrap();
+    let err = insert_by_id(&mut tables, "second.yaml", second).unwrap_err();
+
+    assert!(err.to_string().contains("dup"), "{}", err);
+    assert!(err.to_string().contains("second.yaml"), "{}", err);
+}
+
+/// An `extends:` target that no loaded table declares as its id fails
+/// validation, and the error names the file with the dangling reference.
+#[test]
+fn dangling_extends_target_is_detected() {
+    let yaml = format!("type: compiler\ncompiler:\n  id: leaf\n  extends: nonexistent\n{}", MINIMAL_FLAGS);
+    let table = parse_table("leaf.yaml", &yaml).unwrap();
+
+    let mut tables = std::collections::HashMap::new();
+    let mut file_to_id = std::collections::HashMap::new();
+    let id = insert_by_id(&mut tables, "leaf.yaml", table).unwrap();
+    file_to_id.insert("leaf.yaml", id);
+
+    let err = validate_extends(&tables, &file_to_id).unwrap_err();
+    assert!(err.to_string().contains("leaf.yaml"), "{}", err);
+    assert!(err.to_string().contains("nonexistent"), "{}", err);
+}
+
+/// A `compiler:` block missing the mandatory `id:` fails to parse, and the
+/// error names the offending file.
+#[test]
+fn missing_id_on_compiler_table_fails() {
+    let yaml = format!("type: compiler\ncompiler:\n  extends: base\n{}", MINIMAL_FLAGS);
+    let err = parse_table("no_id.yaml", &yaml).err().unwrap();
+    assert!(err.to_string().contains("no_id.yaml"), "{}", err);
+}
+
+/// An unrecognized `type:` value fails to parse, and the error names the
+/// offending file.
+#[test]
+fn unknown_type_value_fails() {
+    let yaml = format!("type: bogus\ncompiler:\n  id: x\n{}", MINIMAL_FLAGS);
+    let err = parse_table("bad_type.yaml", &yaml).err().unwrap();
+    assert!(err.to_string().contains("bad_type.yaml"), "{}", err);
 }

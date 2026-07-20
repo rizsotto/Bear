@@ -1,5 +1,7 @@
-type: armclang
-extends: clang
+type: compiler
+compiler:
+  id: armclang
+  extends: clang
 recognize:
   - description: "Arm Compiler 6"
     references:

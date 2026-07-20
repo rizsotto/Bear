@@ -8,8 +8,10 @@
 #
 # Open MPI wrapper docs: https://docs.open-mpi.org/en/main/building-apps/customizing-wrappers.html
 # MPICH wrapper docs: mpicc(1) -- -show/-compile_info/-link_info
-type: mpi
-extends: gcc
+type: compiler
+compiler:
+  id: mpi
+  extends: gcc
 recognize:
   - description: "MPI compiler wrapper"
     references:

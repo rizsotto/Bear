@@ -1,5 +1,7 @@
-type: cuda
-extends: gcc
+type: compiler
+compiler:
+  id: cuda
+  extends: gcc
 recognize:
   - description: "NVIDIA CUDA"
     references:

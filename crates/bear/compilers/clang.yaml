@@ -1,5 +1,7 @@
-type: clang
-extends: gcc
+type: compiler
+compiler:
+  id: clang
+  extends: gcc
 recognize:
   - description: "Clang"
     references:

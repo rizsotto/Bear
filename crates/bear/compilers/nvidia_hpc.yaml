@@ -1,4 +1,6 @@
-type: nvidia_hpc
+type: compiler
+compiler:
+  id: nvidia_hpc
 recognize:
   - description: "NVIDIA HPC SDK"
     references:

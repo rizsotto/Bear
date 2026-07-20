@@ -1,5 +1,7 @@
-type: ibm_xl
-extends: clang
+type: compiler
+compiler:
+  id: ibm_xl
+  extends: clang
 recognize:
   - description: "IBM Open XL C/C++"
     references:

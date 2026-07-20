@@ -1,5 +1,7 @@
-type: flang
-extends: gcc
+type: compiler
+compiler:
+  id: flang
+  extends: gcc
 recognize:
   - description: "Flang"
     references:

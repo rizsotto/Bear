@@ -11,7 +11,9 @@
 #
 # valac is a transpiler-driver: it emits C and, unless given -C/--ccode, spawns
 # a real C compiler on the generated C. See docs/rationale/vala-transpiler-database.
-type: vala
+type: compiler
+compiler:
+  id: vala
 recognize:
   - description: "Vala"
     references:

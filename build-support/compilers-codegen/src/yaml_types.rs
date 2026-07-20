@@ -3,11 +3,31 @@
 use anyhow::{Result, bail};
 use serde::Deserialize;
 
+/// Which schema a compiler-family YAML file follows. Closed: only
+/// `compiler` exists today; `wrapper` is reserved for compiler-launcher
+/// YAML files (a later commit adds that schema and its loading logic).
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum Kind {
+    Compiler,
+    Wrapper,
+}
+
+/// The family identity of a compiler table: a unique `id` (the `extends:`
+/// target, emitted into `RECOGNITION_PATTERNS`, and mirrors the config
+/// `as:` value) and an optional `extends:` reference to another table's id.
+#[derive(Deserialize, Clone)]
+pub struct CompilerIdentity {
+    pub id: String,
+    #[serde(default)]
+    pub extends: Option<String>,
+}
+
 #[derive(Deserialize)]
 pub struct FlagTable {
-    pub extends: Option<String>,
     #[serde(rename = "type")]
-    pub type_: Option<String>,
+    pub type_: Kind,
+    pub compiler: CompilerIdentity,
     pub recognize: Option<Vec<RecognizeEntry>>,
     pub ignore_when: Option<IgnoreWhen>,
     /// When true, arguments starting with '/' are treated as flags (MSVC-style).

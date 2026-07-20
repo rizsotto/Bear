@@ -1,5 +1,7 @@
-type: intel_cc
-extends: clang
+type: compiler
+compiler:
+  id: intel_cc
+  extends: clang
 recognize:
   - description: "Intel oneAPI C/C++"
     references:

@@ -1,4 +1,6 @@
-type: gcc
+type: compiler
+compiler:
+  id: gcc
 recognize:
   - description: "GCC"
     references:
