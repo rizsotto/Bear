@@ -9,7 +9,7 @@
 use compilers_codegen::env_keys::generate_env_keys;
 use compilers_codegen::recognition::generate_recognition_patterns;
 use compilers_codegen::tables::TABLES;
-use compilers_codegen::{ResolvedTable, load_tables};
+use compilers_codegen::{ResolvedTable, load_tables, load_wrapper_tables};
 
 fn generate_flag_file(yaml_stem: &str) -> String {
     let raw_tables = load_tables().unwrap();
@@ -123,7 +123,23 @@ fn snapshot_recognition() {
         .iter()
         .map(|c| (c.yaml_file, c.yaml_file.strip_suffix(".yaml").unwrap().to_string()))
         .collect();
-    insta::assert_snapshot!(generate_recognition_patterns(&raw_tables, &file_to_id).unwrap());
+    let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
+    insta::assert_snapshot!(
+        generate_recognition_patterns(&raw_tables, &file_to_id, &wrapper_tables).unwrap()
+    );
+}
+
+/// Path to the real compiler-definitions directory. Mirrors the library's
+/// private `flags_dir()` helper (`pub(crate)`, not visible to this
+/// integration-test binary); `CARGO_MANIFEST_DIR` here is the same
+/// `build-support/compilers-codegen` directory, so the walk-up is identical.
+fn flags_dir() -> std::path::PathBuf {
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .ancestors()
+        .nth(2)
+        .expect("CARGO_MANIFEST_DIR is build-support/compilers-codegen, two levels below the workspace root");
+    workspace_root.join("crates/bear/compilers")
 }
 
 #[test]

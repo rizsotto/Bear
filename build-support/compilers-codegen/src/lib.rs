@@ -146,8 +146,12 @@ impl ResolvedTable {
 pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
     let (raw_tables, file_to_id) = load_tables_from(flags_dir)?;
 
-    // Generate recognition patterns
-    let recognition = generate_recognition_patterns(&raw_tables, &file_to_id)?;
+    // Load compiler-launcher (wrapper) tables first: both the recognition
+    // patterns and the wrapper tables output need the same loaded value.
+    let wrapper_tables = load_wrapper_tables(flags_dir, true)?;
+
+    // Generate recognition patterns (compiler rows, then wrapper rows)
+    let recognition = generate_recognition_patterns(&raw_tables, &file_to_id, &wrapper_tables)?;
     write_output(out_dir, "recognition.rs", recognition)?;
 
     // Generate each compiler's flag table
@@ -164,7 +168,6 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
     write_output(out_dir, "env_keys.rs", env_keys)?;
 
     // Generate compiler-launcher (wrapper) tables: ccache, distcc, ...
-    let wrapper_tables = load_wrapper_tables(flags_dir, true)?;
     let wrappers = generate_wrappers(&wrapper_tables);
     write_output(out_dir, "wrappers.rs", wrappers)?;
 
@@ -290,7 +293,7 @@ struct KindPeek {
 ///
 /// `print_rerun` controls whether `cargo:rerun-if-changed` lines are
 /// printed (only meaningful when called from a `build.rs`).
-fn load_wrapper_tables(flags_dir: &Path, print_rerun: bool) -> Result<Vec<(String, WrapperTable)>> {
+pub fn load_wrapper_tables(flags_dir: &Path, print_rerun: bool) -> Result<Vec<(String, WrapperTable)>> {
     let known: std::collections::HashSet<&str> = TABLES.iter().map(|c| c.yaml_file).collect();
 
     let mut yaml_files: Vec<String> = std::fs::read_dir(flags_dir)

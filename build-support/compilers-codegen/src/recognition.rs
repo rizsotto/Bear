@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 
 use crate::tables::TABLES;
-use crate::yaml_types::{FlagTable, Kind};
+use crate::yaml_types::{FlagTable, Kind, WrapperTable};
 
 /// Generate a static array of recognition pattern data from all YAML files.
 ///
@@ -21,9 +21,15 @@ use crate::yaml_types::{FlagTable, Kind};
 /// file declared, so this can walk `TABLES` (which fixes output order) while
 /// looking `raw_tables` (keyed by id) up correctly, without assuming a file's
 /// stem equals its id.
+///
+/// `wrapper_tables` supplies the compiler-launcher (`type: wrapper`) files;
+/// their `recognize` rows are appended after every compiler row, sorted by
+/// `(description, yaml_file)`, with the literal type column `"wrapper"` and
+/// `cross_compilation`/`versioned` forced to `false`.
 pub fn generate_recognition_patterns(
     raw_tables: &HashMap<String, FlagTable>,
     file_to_id: &HashMap<&'static str, String>,
+    wrapper_tables: &[(String, WrapperTable)],
 ) -> Result<String> {
     let mut out = String::new();
     out.push_str("// Generated from compilers/*.yaml -- DO NOT EDIT\n");
@@ -39,8 +45,9 @@ pub fn generate_recognition_patterns(
             .with_context(|| format!("no table loaded for {}", config.yaml_file))?;
         let table = &raw_tables[id.as_str()];
 
-        // No wrapper recognize rows exist yet; skip anything that is not
-        // `type: compiler` (wrapper-kind recognition is a later commit).
+        // This loop only ever walks TABLES, which lists compiler-kind files;
+        // wrapper-kind rows are emitted separately below from
+        // `wrapper_tables`. The guard stays as a defensive check.
         if !matches!(table.type_, Kind::Compiler) {
             continue;
         }
@@ -76,6 +83,28 @@ pub fn generate_recognition_patterns(
                 names_str.join(", "),
             ));
         }
+    }
+
+    // Wrapper (launcher) rows: flattened to one tuple per recognize entry,
+    // then sorted by (description, yaml_file) so the four current launcher
+    // files land in a stable, review-friendly order, still after every
+    // compiler row.
+    let mut wrapper_rows: Vec<(&str, &str, &crate::yaml_types::RecognizeEntry)> = Vec::new();
+    for (yaml_file, wrapper_table) in wrapper_tables {
+        for entry in &wrapper_table.recognize {
+            entry.validate().with_context(|| format!("recognize entry in {}", yaml_file))?;
+            wrapper_rows.push((entry.description.as_str(), yaml_file.as_str(), entry));
+        }
+    }
+    wrapper_rows.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+
+    for (_, _, entry) in wrapper_rows {
+        let names_str: Vec<String> = entry.executables.iter().map(|n| format!("\"{}\"", n)).collect();
+        out.push_str(&format!(
+            "    (\"wrapper\", &[{}], false, false, Some(\"{}\")),\n",
+            names_str.join(", "),
+            escape(&entry.description),
+        ));
     }
 
     out.push_str("];\n");

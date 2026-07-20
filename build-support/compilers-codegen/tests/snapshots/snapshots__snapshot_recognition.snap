@@ -1,7 +1,7 @@
 ---
 source: build-support/compilers-codegen/tests/snapshots.rs
-assertion_line: 118
-expression: generate_recognition_patterns(&raw_tables).unwrap()
+assertion_line: 127
+expression: "generate_recognition_patterns(&raw_tables, &file_to_id,\n&wrapper_tables).unwrap()"
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
 #[allow(clippy::type_complexity)]
@@ -38,4 +38,8 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = 
     ("fasm", &["fasm"], false, false, Some("flat assembler")),
     ("swift", &["swiftc"], false, false, Some("Swift")),
     ("swift", &["swift-frontend"], false, false, None),
+    ("wrapper", &["ccache"], false, false, Some("Compiler cache")),
+    ("wrapper", &["sccache"], false, false, Some("Compiler cache")),
+    ("wrapper", &["distcc"], false, false, Some("Distributed compiler")),
+    ("wrapper", &["icecc"], false, false, Some("Distributed compiler")),
 ];

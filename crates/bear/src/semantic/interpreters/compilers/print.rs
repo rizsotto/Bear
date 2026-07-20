@@ -3,15 +3,16 @@
 //! Renders the compilers Bear recognizes as a human-readable list, for
 //! `bear semantic --print-compilers`.
 //!
-//! Pure formatting over the generated [`RECOGNITION_PATTERNS`] table and
-//! [`WRAPPER_NAMES`]: no I/O, no config lookup. Rows whose `description`
-//! is `None` are internal helper executables (e.g. `cc1`,
-//! `swift-frontend`) that exist only so the recognizer can route them to
-//! the right interpreter for ignoring; they are not user-facing
-//! compilers and are skipped here.
+//! Pure formatting over the generated [`RECOGNITION_PATTERNS`] table: no
+//! I/O, no config lookup. Rows whose `description` is `None` are internal
+//! helper executables (e.g. `cc1`, `swift-frontend`) that exist only so the
+//! recognizer can route them to the right interpreter for ignoring; they
+//! are not user-facing compilers and are skipped here. Compiler-launcher
+//! (wrapper) rows arrive in the same table as every compiler row, with the
+//! literal type column `"wrapper"` and a blank displayed alias (see
+//! `build_rows`).
 
 use super::compiler_recognition::RECOGNITION_PATTERNS;
-use super::wrapper::WRAPPER_NAMES;
 
 /// Maximum output line width in columns. The executables column wraps on
 /// `, ` boundaries to keep every line within this budget.
@@ -26,9 +27,11 @@ struct Row {
 }
 
 impl Row {
-    /// The literal `as <alias>` label rendered in the second column.
+    /// The literal `as <alias>` label rendered in the second column. A
+    /// blank alias (wrapper rows, which carry no identity) renders as an
+    /// empty string -- no `"as "` prefix at all.
     fn alias_column(&self) -> String {
-        format!("as {}", self.alias)
+        if self.alias.is_empty() { String::new() } else { format!("as {}", self.alias) }
     }
 }
 
@@ -49,23 +52,21 @@ pub fn print_compilers() -> String {
 }
 
 /// Builds the row list from [`RECOGNITION_PATTERNS`], preserving its
-/// order and skipping internal-only (`description: None`) rows, then
-/// appends one final row for the launchers (ccache/distcc/sccache/icecc).
+/// order (compiler rows first, then wrapper rows -- generation appends
+/// them in that order) and skipping internal-only (`description: None`)
+/// rows. The alias column shows the id verbatim, no cosmetic rewriting.
+/// Wrapper rows (`type_str == "wrapper"`) render with a blank alias:
+/// they carry no identity and no config `as:` spelling of their own.
 fn build_rows() -> Vec<Row> {
-    let mut rows: Vec<Row> = RECOGNITION_PATTERNS
+    RECOGNITION_PATTERNS
         .iter()
         .filter_map(|&(type_str, executables, _cross_compilation, _versioned, description)| {
-            description.map(|desc| Row { description: desc, alias: type_str.replace('_', "-"), executables })
+            description.map(|desc| {
+                let alias = if type_str == "wrapper" { String::new() } else { type_str.to_string() };
+                Row { description: desc, alias, executables }
+            })
         })
-        .collect();
-
-    rows.push(Row {
-        description: "Compiler launcher",
-        alias: "wrapper".to_string(),
-        executables: WRAPPER_NAMES,
-    });
-
-    rows
+        .collect()
 }
 
 /// Appends one row's rendered lines to `out`: the first line carries the
@@ -134,12 +135,26 @@ mod tests {
     }
 
     #[test]
-    fn lists_the_launcher_row_last() {
+    fn lists_the_launcher_rows_last_with_no_alias_text() {
         let sut = print_compilers();
 
-        assert!(sut.contains("Compiler launcher"), "missing launcher description:\n{sut}");
-        assert!(sut.contains("as wrapper"), "missing wrapper alias:\n{sut}");
-        assert!(sut.contains("ccache"), "missing launcher executables:\n{sut}");
+        assert!(sut.contains("Compiler cache"), "missing compiler-cache description:\n{sut}");
+        assert!(sut.contains("Distributed compiler"), "missing distributed-compiler description:\n{sut}");
+        assert!(sut.contains("ccache"), "missing launcher executable:\n{sut}");
+
+        // Still "last" as a group: every wrapper description's byte offset
+        // comes after a known compiler description's.
+        let gcc_offset = sut.find("GCC").expect("GCC row present");
+        let cache_offset = sut.find("Compiler cache").expect("Compiler cache row present");
+        let distributed_offset = sut.find("Distributed compiler").expect("Distributed compiler row present");
+        assert!(cache_offset > gcc_offset, "wrapper rows must come after compiler rows:\n{sut}");
+        assert!(distributed_offset > gcc_offset, "wrapper rows must come after compiler rows:\n{sut}");
+
+        // No "as " text anywhere on a wrapper row: check line-by-line so
+        // column-alignment padding elsewhere in the table cannot false-positive.
+        for line in sut.lines().filter(|line| line.contains("ccache") || line.contains("distcc")) {
+            assert!(!line.contains("as "), "wrapper row must not render an alias column: {line:?}");
+        }
     }
 
     #[test]
@@ -174,16 +189,46 @@ mod tests {
     /// copy-pasting a broken config -- catches it.
     #[test]
     fn every_displayed_alias_deserializes_as_a_compiler_type() {
-        let mut aliases: Vec<String> = RECOGNITION_PATTERNS
+        let aliases: Vec<String> = RECOGNITION_PATTERNS
             .iter()
-            .filter_map(|&(type_str, _, _, _, description)| description.map(|_| type_str.replace('_', "-")))
+            .filter_map(|&(type_str, _, _, _, description)| {
+                description.map(|_| if type_str == "wrapper" { String::new() } else { type_str.to_string() })
+            })
+            .filter(|alias| !alias.is_empty())
             .collect();
-        aliases.push("wrapper".to_string());
 
         for alias in aliases {
             let json = format!("\"{alias}\"");
             let sut: Result<CompilerType, _> = serde_json::from_str(&json);
             assert!(sut.is_ok(), "alias '{alias}' does not deserialize as a CompilerType: {sut:?}");
+        }
+    }
+
+    /// Round-trip guard for the wrapper side: `--print-compilers` shows no
+    /// alias text for wrapper rows (see `alias_column`), so the previous
+    /// test's filter skips them -- but the actual launcher basenames
+    /// (`ccache`, `distcc`, ...) must still deserialize to
+    /// `CompilerType::Wrapper` through its hand-coded serde aliases (no
+    /// generated map; config `as:` aliases were dropped from this whole
+    /// plan). This proves that hand list still covers every launcher name
+    /// `RECOGNITION_PATTERNS` actually recognizes.
+    #[test]
+    fn every_wrapper_executable_deserializes_as_compiler_type_wrapper() {
+        let executables: Vec<&str> = RECOGNITION_PATTERNS
+            .iter()
+            .filter(|&&(type_str, _, _, _, _)| type_str == "wrapper")
+            .flat_map(|&(_, executables, _, _, _)| executables.iter().copied())
+            .collect();
+        assert!(!executables.is_empty(), "expected at least one wrapper row in RECOGNITION_PATTERNS");
+
+        for name in executables {
+            let json = format!("\"{name}\"");
+            let sut: Result<CompilerType, _> = serde_json::from_str(&json);
+            assert_eq!(
+                sut.ok(),
+                Some(CompilerType::Wrapper),
+                "wrapper executable '{name}' does not deserialize as CompilerType::Wrapper"
+            );
         }
     }
 }

@@ -302,9 +302,13 @@ include!(concat!(env!("OUT_DIR"), "/recognition.rs"));
 
 /// Compile-time initialized default regex patterns for compiler recognition.
 ///
-/// Built from YAML-defined `recognize` entries plus a hand-written Wrapper pattern.
-/// Each entry maps a `CompilerType` to a regex that matches executable filenames,
-/// supporting cross-compilation prefixes, version suffixes, and `.exe` extensions.
+/// Built entirely from YAML-defined `recognize` entries, including the four
+/// compiler-launcher (wrapper) files: each contributes its own `(Wrapper,
+/// regex)` pattern matching only its own executable name(s), which is
+/// behaviorally equivalent to one combined regex since matching is a linear
+/// scan. Each entry maps a `CompilerType` to a regex that matches executable
+/// filenames, supporting cross-compilation prefixes, version suffixes, and
+/// `.exe` extensions.
 static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(|| {
     let mut patterns = Vec::new();
 
@@ -314,9 +318,6 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
         let regex = create_compiler_regex(executables, cross_compilation, versioned);
         patterns.push((compiler_type, regex));
     }
-
-    // Wrapper pattern stays hand-written (not YAML-driven)
-    patterns.push((CompilerType::Wrapper, create_compiler_regex(WRAPPER_NAMES, false, false)));
 
     patterns
 });
@@ -343,6 +344,7 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "nasm" => CompilerType::Nasm,
         "fasm" => CompilerType::Fasm,
         "swift" => CompilerType::Swift,
+        "wrapper" => CompilerType::Wrapper,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }

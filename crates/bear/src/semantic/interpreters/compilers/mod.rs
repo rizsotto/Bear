@@ -358,10 +358,6 @@ mod tests {
             for &(type_str, executables, _cross_compilation, _versioned, _description) in
                 compiler_recognition::RECOGNITION_PATTERNS
             {
-                // The hand-written Wrapper pattern is pushed onto DEFAULT_PATTERNS
-                // separately in compiler_recognition.rs and is not part of the
-                // generated RECOGNITION_PATTERNS table, so no wrapper row ever
-                // reaches this loop -- nothing to special-case here.
                 let name = executables[0];
                 // Every family dispatches on a plain "-c hello.c" invocation
                 // regardless of the source extension: source-vs-flag
@@ -370,8 +366,18 @@ mod tests {
                 // and the fortran families -- all still recognize a `.c`
                 // source; extension only affects the binary-vs-source flag on
                 // an already-classified Source argument, not the RecognizeResult
-                // variant).
-                let execution = create_execution(name, vec![name, "-c", "hello.c"], "/project");
+                // variant). Wrapper rows are the one exception: `-c` is not a
+                // real compiler name, so a wrapper's own unwrap logic would
+                // resolve NotRecognized on that invocation; dispatch a full
+                // valid wrapper invocation instead (`<name> gcc -c hello.c`),
+                // which also proves every wrapper basename unwraps to a
+                // registered inner compiler.
+                let args = if type_str == "wrapper" {
+                    vec![name, "gcc", "-c", "hello.c"]
+                } else {
+                    vec![name, "-c", "hello.c"]
+                };
+                let execution = create_execution(name, args, "/project");
                 let result = sut.recognize(execution);
                 assert!(
                     !matches!(result, RecognizeResult::NotRecognized(_)),
