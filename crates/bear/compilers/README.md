@@ -10,12 +10,30 @@ code is included in the interpreter and recognition modules via `include!()`.
 
 ## File structure
 
-```yaml
-# Optional: inherit all flags from another file (by filename stem)
-extends: gcc
+Every file in this directory declares two things up front: `type:`, a
+closed kind enum naming which of the two schemas the rest of the file
+follows (`compiler` or `wrapper`), and, for `type: compiler`, a nested
+`compiler:` block holding the family's identity. `type: wrapper` files
+(compiler launchers such as ccache) are a different, simpler schema --
+see "Compiler-launcher (wrapper) files" below.
 
-# Required: maps to a CompilerType variant (gcc, clang, flang, cuda, intel_fortran, cray_fortran)
-type: gcc
+```yaml
+# Required: closed kind enum. This file follows the compiler schema.
+type: compiler
+
+# Required for type: compiler -- the family's identity.
+compiler:
+  id: gcc          # Required, unique across every file in this directory
+                    # (checked at codegen). This is the `extends:` target,
+                    # the value emitted into RECOGNITION_PATTERNS, and the
+                    # ONLY accepted config `as:` spelling for this family
+                    # -- no aliases.
+  extends: <base>  # Optional: another file's compiler.id to inherit
+                    # flags, ignore filters, slash_prefix, and environment
+                    # entries from. References an id, not a filename --
+                    # file names are pure packaging. By convention a
+                    # file's stem still matches its own id (see the real
+                    # files in this directory), but nothing enforces that.
 
 # Executable names this compiler is known by
 recognize:
@@ -101,15 +119,15 @@ a user-facing compilation:
   any entry, the command is ignored. Used by Clang to skip `-cc1` frontend
   invocations.
 
-Both fields are optional and default to empty. When a file uses `extends`, the
-ignore filters are inherited from the base file only if the extending file does
-not define its own list for that field (i.e., own values take precedence per field,
-not per entry).
+Both fields are optional and default to empty. When a file's `compiler.extends`
+is set, the ignore filters are inherited from the base file only if the extending
+file does not define its own list for that field (i.e., own values take precedence
+per field, not per entry).
 
 ## Inheritance
 
-Files with `extends: gcc` inherit all GCC flags and (unless overridden) ignore
-filters. The build script concatenates own flags before base flags, then sorts
+Files with `compiler.extends: gcc` inherit all GCC flags and (unless overridden)
+ignore filters. The build script concatenates own flags before base flags, then sorts
 all entries by flag name length (longest first) so more specific flags match
 before shorter prefixes. The sort is stable, so own flags take priority over
 base flags of the same length.
@@ -138,6 +156,46 @@ Executables listed in `ignore_when.executables` are automatically added as
 recognition entries with `cross_compilation: false, versioned: false`. This
 ensures the recognizer routes them to the right compiler type, where the
 interpreter then ignores them. You do not need to list them under `recognize`.
+
+## Compiler-launcher (wrapper) files
+
+A compiler launcher (`ccache`, `distcc`, `sccache`, `icecc`) is not a compiler:
+it carries the real compiler in its own argv (`ccache gcc -c main.c`), and Bear
+records the invocation as the real compiler's, not the launcher's. Dispatch for
+every launcher is uniform (one runtime `CompilerType::Wrapper`), so a launcher
+file needs no family identity of its own -- no `compiler:` block, no `id`, no
+`extends:`, no `flags:`, `ignore_when:`, `slash_prefix:`, or `environment:`.
+Its only job is to say what the launcher is (`recognize:`) and, optionally,
+which of its own options precede the inner compiler in argv (`options:`):
+
+```yaml
+type: wrapper
+recognize:
+  - description: "Compiler cache"     # same description/references contract as compiler recognize
+    references:
+      - "https://ccache.dev/manual/latest.html"
+    executables: ["ccache"]
+    # versioned and cross_compilation must both be false (or omitted): a
+    # launcher basename is matched exactly, never version-suffixed or
+    # cross-compilation prefixed.
+options:               # optional; only distcc.yaml has this today
+  - match: {pattern: "-j", count: 1}
+  - match: {pattern: "-v"}
+```
+
+`options:` reuses the `match`/`count` sub-language from "Pattern syntax"
+above, but only its exact-token form: no `*` prefix matching and no
+`{ }`/`{=}`/`{:}` glued-or-separate forms. `WrapperTable::validate` (in
+`build-support/compilers-codegen/src/yaml_types.rs`) rejects any pattern
+containing `*` or `{` at codegen time, because the unwrap loop that consumes
+this data only compares argv tokens for equality -- it does not implement
+prefix or glued-value matching. `count` is how many following argv tokens
+the option's value consumes, so the skip loop advances `1 + count` slots per
+matched option.
+
+The *absence* of `options:` is itself the contract: "argv[1] is the real
+compiler" (true for ccache, sccache, and icecc; distcc is the one launcher
+whose own flags can precede the compiler).
 
 ## Environment variables
 
@@ -240,14 +298,46 @@ the YAML schema:
 ## Adding a new compiler
 
 1. Create a new YAML file in this directory (e.g., `mycompiler.yaml`)
-2. Add `type:`, `recognize:`, `flags:` entries and optionally `extends:`, `ignore_when:`, `environment:`
+2. Add `type: compiler`, a `compiler:` block (`id:`, and optionally
+   `extends:`), `recognize:`, and `flags:` entries, optionally
+   `ignore_when:`, `environment:`. `id:` must be unique across every YAML
+   file in this directory (checked at codegen); it is also the `extends:`
+   target and the ONLY accepted config `as:` spelling for this family --
+   there is no separate alias step.
 3. Add a `TableConfig` entry in `build-support/compilers-codegen/src/tables.rs`
 4. Add a `CompilerType` variant in `crates/bear/src/config/types.rs` and a mapping in
-   `crates/bear/src/semantic/interpreters/compilers/compiler_recognition.rs::parse_compiler_type`
+   `crates/bear/src/semantic/interpreters/compilers/compiler_recognition.rs::parse_compiler_type`.
+   Add `#[serde(rename = "...")]` on the variant only if the derive's default
+   `rename_all = "lowercase"` spelling would not already match the id verbatim
+   (e.g. `Gcc` needs no attribute, since `gcc` already matches; `IntelFortran`
+   needs `#[serde(rename = "intel_fortran")]` because the derive default would
+   otherwise squash it to `intelfortran`).
 5. Add a constructor in `flag_based.rs` and register it in
    `CompilerInterpreter::new_with_config`
    (`crates/bear/src/semantic/interpreters/compilers/mod.rs`)
 6. Run `cargo build && cargo test`
+
+## Adding a new wrapper
+
+1. Create `mywrapper.yaml` in this directory with `type: wrapper`, a
+   `recognize:` entry (description + references + executables, with
+   `versioned`/`cross_compilation` false or omitted), and an optional
+   `options:` list of exact-token flags the launcher accepts before its
+   inner compiler.
+2. That is the whole YAML-side change for recognition and unwrapping.
+   Codegen discovers `type: wrapper` files by kind (`load_wrapper_tables`
+   in `build-support/compilers-codegen/src/lib.rs`), not by a registry:
+   no `TABLES` entry is needed. `wrapper.rs`'s unwrap logic
+   (`extract_real_compiler`) is fully generic over the generated
+   `WRAPPER_NAMES`/`WRAPPER_OPTIONS` data, so a new launcher basename
+   needs no wrapper-specific Rust code to be recognized and unwrapped.
+3. The one surviving hand-wired spot: if a user config's `as:` field
+   should accept the new basename explicitly (`as: mywrapper`), add it to
+   `CompilerType::Wrapper`'s `#[serde(alias = ...)]` list in
+   `crates/bear/src/config/types.rs`. Wrapper files carry no `id`, so
+   there is no generated spelling to draw an accepted `as:` value from --
+   this is the one place still hand-maintained per launcher.
+4. Run `cargo build && cargo test`
 
 ## Adding a new flag
 

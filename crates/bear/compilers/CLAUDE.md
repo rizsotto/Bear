@@ -3,20 +3,36 @@
 Read `README.md` in this directory for full schema documentation (pattern syntax,
 result values, inheritance, environment variables).
 
+## Two schemas live side by side here
+
+`type:` is a closed kind enum. Compiler files (`type: compiler`) declare a
+family identity in a nested `compiler:` block (`id:`, optional `extends:`)
+and need a `TABLES` entry in `build-support/compilers-codegen/src/tables.rs`.
+Wrapper files (`type: wrapper` -- the four compiler launchers: ccache,
+distcc, sccache, icecc) carry no identity block and need no `TABLES` entry;
+codegen discovers them by kind. See `README.md` for the full schema of both.
+
 ## Rules for modifying YAML files
 
-- Every YAML file maps to one compiler or compiler family
+- Every compiler-kind YAML file maps to one compiler or compiler family;
+  every wrapper-kind file maps to one compiler launcher
 - `compilers-codegen` reads these at build time (via `crates/bear/build.rs`) and generates static Rust arrays
 - After any edit: `cargo build && cargo test` to validate
 
 ## Adding a new compiler
 
 1. Create `mycompiler.yaml` in this directory
-2. Add `type:`, `recognize:`, `flags:` entries (optionally `extends:`, `ignore_when:`, `environment:`)
+2. Add `type: compiler`, a `compiler:` block (`id:`, optionally `extends:`), `recognize:`, `flags:` entries (optionally `ignore_when:`, `environment:`). `id:` must be unique across this directory (checked at codegen) and is the only accepted config `as:` spelling for this family -- no aliases.
 3. Add a `TableConfig` entry in `build-support/compilers-codegen/src/tables.rs`
 4. Add a `CompilerType` variant in `crates/bear/src/config/types.rs` and a mapping in `crates/bear/src/semantic/interpreters/compilers/compiler_recognition.rs::parse_compiler_type`
 5. Add a constructor in `flag_based.rs` and register it in `CompilerInterpreter::new_with_config` (`crates/bear/src/semantic/interpreters/compilers/mod.rs`)
 6. Run `cargo build && cargo test`
+
+## Adding a new wrapper
+
+1. Create `mywrapper.yaml` with `type: wrapper`, a `recognize:` entry, and optionally `options:` (exact-token launcher flags only)
+2. No `TABLES` entry, no `CompilerType` variant, no Rust change needed for recognition/unwrapping -- see `README.md` for the details
+3. Run `cargo build && cargo test`
 
 ## `recognize:` entries must be documented and cited
 
