@@ -144,6 +144,15 @@ impl ResolvedTable {
 ///
 /// Prints `cargo:rerun-if-changed` lines to stdout (for build.rs integration).
 pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
+    // A per-file rerun-if-changed (printed by load_and_index/load_wrapper_tables
+    // below) only ever covers files that already existed at the previous build.
+    // Wrapper files need no other Rust-side registration to be picked up, so
+    // adding a brand-new one is exactly the case a per-file-only watch misses:
+    // cargo has no reason to rerun this build script, and the new launcher goes
+    // unrecognized until something else forces a rebuild. Watch the whole
+    // directory so a new (or removed) file is never silently missed.
+    println!("cargo:rerun-if-changed={}", flags_dir.display());
+
     let (raw_tables, file_to_id) = load_tables_from(flags_dir)?;
 
     // Load compiler-launcher (wrapper) tables first: both the recognition

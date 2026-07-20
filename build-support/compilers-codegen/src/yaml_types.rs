@@ -3,9 +3,9 @@
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-/// Which schema a compiler-family YAML file follows. Closed: only
-/// `compiler` exists today; `wrapper` is reserved for compiler-launcher
-/// YAML files (a later commit adds that schema and its loading logic).
+/// Which schema a YAML file follows. Closed: `compiler` is a compiler
+/// family (`FlagTable`, registered in `TABLES`); `wrapper` is a compiler
+/// launcher (`WrapperTable`, discovered by kind, no `TABLES` entry).
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {

@@ -10,10 +10,13 @@
 //! then dispatches that execution as if the wrapper had never been there.
 //!
 //! This module is the authority on what counts as a wrapper:
-//! [`WRAPPER_NAMES`] is shared with `compiler_recognition` for the
-//! recognizer's regex pattern and probe guard. Both `WRAPPER_NAMES` and
-//! `WRAPPER_OPTIONS` are generated from `crates/bear/compilers/*.yaml`
-//! (the `type: wrapper` files) -- see `build-support/compilers-codegen`.
+//! [`WRAPPER_NAMES`] is shared with `compiler_recognition`, which consults
+//! it to skip the `--version` probe for a wrapper's own basename (the
+//! recognizer's regex pattern itself comes from `RECOGNITION_PATTERNS`,
+//! generated from each wrapper file's own `recognize` entry). Both
+//! `WRAPPER_NAMES` and `WRAPPER_OPTIONS` are generated from
+//! `crates/bear/compilers/*.yaml` (the `type: wrapper` files) -- see
+//! `build-support/compilers-codegen`.
 
 use super::compiler_recognition::CompilerRecognizer;
 use crate::config::CompilerType;
