@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
 /// Which schema a compiler-family YAML file follows. Closed: only
@@ -36,6 +36,63 @@ pub struct FlagTable {
     pub flags: Vec<FlagEntry>,
     #[serde(default)]
     pub environment: Option<Vec<EnvEntry>>,
+}
+
+/// A compiler-launcher YAML file (`ccache.yaml`, `distcc.yaml`, ...):
+/// no identity block, no flags -- just what it is recognized as and,
+/// optionally, its own argv options to skip before the real compiler.
+#[derive(Deserialize)]
+pub struct WrapperTable {
+    #[serde(rename = "type")]
+    pub type_: Kind,
+    pub recognize: Vec<RecognizeEntry>,
+    #[serde(default)]
+    pub options: Vec<WrapperOption>,
+}
+
+impl WrapperTable {
+    /// Validate a wrapper table: every `recognize` entry passes the usual
+    /// description/references check and has `versioned`/`cross_compilation`
+    /// both false (a launcher basename is matched exactly, never version-
+    /// suffixed or treated as a cross-compilation prefix); every `options`
+    /// entry's pattern is an exact token, not a glued/prefix/eq/colon form
+    /// (the skip loop only compares argv tokens for equality).
+    pub fn validate(&self, yaml_file: &str) -> Result<()> {
+        for entry in &self.recognize {
+            entry.validate().with_context(|| format!("recognize entry in {}", yaml_file))?;
+            if entry.versioned {
+                bail!(
+                    "{}: recognize entry {:?} must not set versioned: true for a wrapper",
+                    yaml_file,
+                    entry.executables
+                );
+            }
+            if entry.cross_compilation {
+                bail!(
+                    "{}: recognize entry {:?} must not set cross_compilation: true for a wrapper",
+                    yaml_file,
+                    entry.executables
+                );
+            }
+        }
+        for option in &self.options {
+            let pattern = &option.match_.pattern;
+            if pattern.contains('*') || pattern.contains('{') {
+                bail!(
+                    "{}: wrapper option pattern '{}' must be an exact token (no '*' or '{{ }}' forms)",
+                    yaml_file,
+                    pattern
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct WrapperOption {
+    #[serde(rename = "match")]
+    pub match_: FlagMatch,
 }
 
 #[derive(Deserialize, Clone)]

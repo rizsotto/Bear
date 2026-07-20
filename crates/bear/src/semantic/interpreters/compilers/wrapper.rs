@@ -11,7 +11,9 @@
 //!
 //! This module is the authority on what counts as a wrapper:
 //! [`WRAPPER_NAMES`] is shared with `compiler_recognition` for the
-//! recognizer's regex pattern and probe guard.
+//! recognizer's regex pattern and probe guard. Both `WRAPPER_NAMES` and
+//! `WRAPPER_OPTIONS` are generated from `crates/bear/compilers/*.yaml`
+//! (the `type: wrapper` files) -- see `build-support/compilers-codegen`.
 
 use super::compiler_recognition::CompilerRecognizer;
 use crate::config::CompilerType;
@@ -19,13 +21,7 @@ use intercept::Execution;
 
 use std::path::{Path, PathBuf};
 
-/// Wrapper executable basenames. Single source of truth; consumed by
-/// [`CompilerRecognizer`] to build the regex that classifies wrappers and
-/// to skip them during the `--version` probe.
-///
-/// icecream's `icerun` is deliberately absent: it launches arbitrary
-/// commands on the cluster, not compiler invocations.
-pub(super) const WRAPPER_NAMES: &[&str] = &["ccache", "distcc", "sccache", "icecc"];
+include!(concat!(env!("OUT_DIR"), "/wrappers.rs"));
 
 /// Try to strip a wrapper from `execution`, returning the inner compiler
 /// invocation along with its recognized [`CompilerType`].
@@ -82,42 +78,29 @@ fn detect_wrapper_name(executable: &Path) -> Option<&'static str> {
 /// surviving argv slice (compiler at index 0). Pure argv parsing -- does
 /// not consult the recognizer; callers are responsible for validating that
 /// the returned path is actually a compiler.
+///
+/// Generic across every wrapper: skip `wrapper_name`'s own options (each
+/// consuming `1 + arity` argv slots), then the next slot is the real
+/// compiler. Most wrappers (ccache, sccache, icecc) have no options of
+/// their own, so the loop body never matches and `i` stays 1 -- argv[1] is
+/// the compiler, exactly as before this became data-driven.
 fn extract_real_compiler(wrapper_name: &str, args: &[String]) -> Option<(PathBuf, Vec<String>)> {
-    match wrapper_name {
-        // ccache, sccache, and icecc: argv[1] is the real compiler,
-        // argv[2..] are its flags. In prefix usage they have no
-        // wrapper-specific flags of their own that we need to skip.
-        "ccache" | "sccache" | "icecc" => {
-            let inner = args.get(1)?;
-            Some((PathBuf::from(inner), args[1..].to_vec()))
+    let opts = wrapper_options(wrapper_name);
+    let mut i = 1;
+    while i < args.len() {
+        match opts.iter().find(|(flag, _)| *flag == args[i]) {
+            Some((_, arity)) => i += 1 + *arity as usize,
+            None => break,
         }
-        // distcc accepts its own flags before the compiler name. Skip
-        // them (consuming any flag values too) until we find a non-distcc
-        // argv slot, which is the compiler.
-        "distcc" => {
-            let mut i = 1;
-            while i < args.len() {
-                let consumed = distcc_option_count(&args[i]);
-                if consumed == 0 {
-                    break;
-                }
-                i += consumed;
-            }
-            let inner = args.get(i)?;
-            Some((PathBuf::from(inner), args[i..].to_vec()))
-        }
-        _ => None,
     }
+    let inner = args.get(i)?;
+    Some((PathBuf::from(inner), args[i..].to_vec()))
 }
 
-/// Number of argv slots a distcc-specific option consumes (the flag plus
-/// any value that follows). Zero means the argument is not a distcc option.
-fn distcc_option_count(arg: &str) -> usize {
-    match arg {
-        "-j" | "--jobs" => 2,
-        "-v" | "--verbose" | "-i" | "--show-hosts" | "--scan-avail" | "--show-principal" => 1,
-        _ => 0,
-    }
+/// The `(option, arity)` pairs `wrapper_name` accepts before its inner
+/// compiler argv, or an empty slice if it declares none.
+fn wrapper_options(wrapper_name: &str) -> &'static [(&'static str, u32)] {
+    WRAPPER_OPTIONS.iter().find(|(name, _)| *name == wrapper_name).map(|(_, opts)| *opts).unwrap_or(&[])
 }
 
 #[cfg(test)]
@@ -146,18 +129,28 @@ mod tests {
     }
 
     #[test]
-    fn test_distcc_option_count() {
-        assert_eq!(2, distcc_option_count("-j"));
-        assert_eq!(2, distcc_option_count("--jobs"));
-        assert_eq!(1, distcc_option_count("-v"));
-        assert_eq!(1, distcc_option_count("--verbose"));
-        assert_eq!(1, distcc_option_count("-i"));
-        assert_eq!(1, distcc_option_count("--show-hosts"));
-        assert_eq!(1, distcc_option_count("--scan-avail"));
-        assert_eq!(1, distcc_option_count("--show-principal"));
-        assert_eq!(0, distcc_option_count("-c"));
-        assert_eq!(0, distcc_option_count("-Wall"));
-        assert_eq!(0, distcc_option_count("--output"));
+    fn test_distcc_options_have_expected_arity() {
+        let opts = wrapper_options("distcc");
+        let cases: &[(&str, u32)] = &[
+            ("-j", 1),
+            ("--jobs", 1),
+            ("-v", 0),
+            ("--verbose", 0),
+            ("-i", 0),
+            ("--show-hosts", 0),
+            ("--scan-avail", 0),
+            ("--show-principal", 0),
+        ];
+        for (flag, expected_arity) in cases {
+            let arity = opts.iter().find(|(f, _)| f == flag).map(|(_, a)| *a);
+            assert_eq!(arity, Some(*expected_arity), "flag: {}", flag);
+        }
+
+        // Unknown flags (including compiler-own flags like -c/-Wall/--output
+        // that distcc never claims) are not in the table.
+        for unknown in ["-c", "-Wall", "--output"] {
+            assert!(opts.iter().find(|(f, _)| *f == unknown).is_none(), "flag: {}", unknown);
+        }
     }
 
     // Requirements: recognition-compiler-launchers

@@ -1,0 +1,21 @@
+# A compiler launcher: not a compiler itself; it carries the real
+# compiler in its own argv (`distcc gcc -c main.c`).
+type: wrapper
+recognize:
+  - description: "Distributed compiler"
+    references:
+      - "https://www.distcc.org/man/distcc_1.html"
+    executables: ["distcc"]
+# Launcher-own options that may precede the inner compiler in argv.
+# Same match sub-language as compiler flags: `count` is how many
+# following argv tokens the option's value consumes (so the skip loop
+# advances 1 + count slots).
+options:
+  - match: {pattern: "-j", count: 1}
+  - match: {pattern: "--jobs", count: 1}
+  - match: {pattern: "-v"}
+  - match: {pattern: "--verbose"}
+  - match: {pattern: "-i"}
+  - match: {pattern: "--show-hosts"}
+  - match: {pattern: "--scan-avail"}
+  - match: {pattern: "--show-principal"}

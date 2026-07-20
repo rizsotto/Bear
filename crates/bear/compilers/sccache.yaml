@@ -1,0 +1,6 @@
+type: wrapper
+recognize:
+  - description: "Compiler cache"
+    references:
+      - "https://github.com/mozilla/sccache/blob/main/README.md"
+    executables: ["sccache"]

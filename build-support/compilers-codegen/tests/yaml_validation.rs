@@ -8,7 +8,7 @@
 use compilers_codegen::codegen::{pattern_to_rust, result_to_rust};
 use compilers_codegen::resolve::resolve_environment;
 use compilers_codegen::tables::TABLES;
-use compilers_codegen::{insert_by_id, load_tables, parse_table, validate_extends};
+use compilers_codegen::{insert_by_id, load_tables, parse_table, parse_wrapper_table, validate_extends};
 
 /// Every YAML file parses successfully.
 #[test]
@@ -230,4 +230,85 @@ fn unknown_type_value_fails() {
     let yaml = format!("type: bogus\ncompiler:\n  id: x\n{}", MINIMAL_FLAGS);
     let err = parse_table("bad_type.yaml", &yaml).err().unwrap();
     assert!(err.to_string().contains("bad_type.yaml"), "{}", err);
+}
+
+// -- Negative-case tests for `WrapperTable` --
+//
+// These exercise `WrapperTable::validate` against small inline YAML
+// fixtures rather than mutating the real launcher YAML files on disk.
+
+const MINIMAL_WRAPPER_RECOGNIZE: &str = concat!(
+    "recognize:\n",
+    "  - description: \"Compiler cache\"\n",
+    "    references:\n",
+    "      - \"https://example.com/docs\"\n",
+    "    executables: [\"fake-wrapper\"]\n",
+);
+
+/// A minimal, valid wrapper table (no options) passes validation.
+#[test]
+fn valid_wrapper_table_passes_validation() {
+    let yaml = format!("type: wrapper\n{}", MINIMAL_WRAPPER_RECOGNIZE);
+    let table = parse_wrapper_table("fake_wrapper.yaml", &yaml).unwrap();
+    assert!(table.validate("fake_wrapper.yaml").is_ok());
+}
+
+/// A wrapper `recognize` entry with `versioned: true` fails validation,
+/// naming the offending file.
+#[test]
+fn wrapper_recognize_versioned_true_fails() {
+    let yaml = "type: wrapper\nrecognize:\n  - description: \"Compiler cache\"\n    references:\n      - \"https://example.com/docs\"\n    executables: [\"fake-wrapper\"]\n    versioned: true\n";
+    let table = parse_wrapper_table("fake_wrapper.yaml", yaml).unwrap();
+    let err = table.validate("fake_wrapper.yaml").unwrap_err();
+    assert!(err.to_string().contains("fake_wrapper.yaml"), "{}", err);
+    assert!(err.to_string().contains("versioned"), "{}", err);
+}
+
+/// A wrapper `recognize` entry with `cross_compilation: true` fails
+/// validation, naming the offending file.
+#[test]
+fn wrapper_recognize_cross_compilation_true_fails() {
+    let yaml = "type: wrapper\nrecognize:\n  - description: \"Compiler cache\"\n    references:\n      - \"https://example.com/docs\"\n    executables: [\"fake-wrapper\"]\n    cross_compilation: true\n";
+    let table = parse_wrapper_table("fake_wrapper.yaml", yaml).unwrap();
+    let err = table.validate("fake_wrapper.yaml").unwrap_err();
+    assert!(err.to_string().contains("fake_wrapper.yaml"), "{}", err);
+    assert!(err.to_string().contains("cross_compilation"), "{}", err);
+}
+
+/// A wrapper `options` entry with a glued/prefix pattern (`-j{ }*`) fails
+/// validation, naming the offending file and pattern -- the skip loop only
+/// compares argv tokens for equality, so the schema must reject anything
+/// that implies glued/prefix/eq/colon matching.
+#[test]
+fn wrapper_option_glued_pattern_fails() {
+    let yaml = format!(
+        "type: wrapper\n{}options:\n  - match: {{pattern: \"-j{{ }}*\"}}\n",
+        MINIMAL_WRAPPER_RECOGNIZE
+    );
+    let table = parse_wrapper_table("fake_wrapper.yaml", &yaml).unwrap();
+    let err = table.validate("fake_wrapper.yaml").unwrap_err();
+    assert!(err.to_string().contains("fake_wrapper.yaml"), "{}", err);
+    assert!(err.to_string().contains("-j{ }*"), "{}", err);
+}
+
+/// A wrapper `options` entry with a prefix-star pattern (`-j*`) fails
+/// validation for the same reason.
+#[test]
+fn wrapper_option_prefix_star_pattern_fails() {
+    let yaml =
+        format!("type: wrapper\n{}options:\n  - match: {{pattern: \"-j*\"}}\n", MINIMAL_WRAPPER_RECOGNIZE);
+    let table = parse_wrapper_table("fake_wrapper.yaml", &yaml).unwrap();
+    let err = table.validate("fake_wrapper.yaml").unwrap_err();
+    assert!(err.to_string().contains("fake_wrapper.yaml"), "{}", err);
+}
+
+/// An exact-token `options` pattern (no `*` or `{ }`) passes validation.
+#[test]
+fn wrapper_option_exact_token_passes() {
+    let yaml = format!(
+        "type: wrapper\n{}options:\n  - match: {{pattern: \"-j\", count: 1}}\n",
+        MINIMAL_WRAPPER_RECOGNIZE
+    );
+    let table = parse_wrapper_table("fake_wrapper.yaml", &yaml).unwrap();
+    assert!(table.validate("fake_wrapper.yaml").is_ok());
 }

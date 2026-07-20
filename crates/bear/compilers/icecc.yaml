@@ -1,0 +1,8 @@
+type: wrapper
+recognize:
+  - description: "Distributed compiler"
+    references:
+      - "https://github.com/icecc/icecream/blob/master/README.md"
+    executables: ["icecc"]
+# icerun is deliberately absent: it runs arbitrary commands on the
+# cluster, not compiler invocations (see recognition-compiler-launchers).

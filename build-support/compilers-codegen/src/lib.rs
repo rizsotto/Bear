@@ -5,6 +5,7 @@ pub mod env_keys;
 pub mod recognition;
 pub mod resolve;
 pub mod tables;
+pub mod wrappers;
 pub mod yaml_types;
 
 use std::collections::HashMap;
@@ -17,7 +18,8 @@ use env_keys::generate_env_keys;
 use recognition::generate_recognition_patterns;
 use resolve::{resolve_environment, resolve_flags, resolve_ignore_when, resolve_slash_prefix};
 use tables::{TABLES, TableConfig};
-use yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen};
+use wrappers::generate_wrappers;
+use yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen, Kind, WrapperTable};
 
 /// A compiler flag table with all inheritance resolved and ready for code generation.
 pub struct ResolvedTable {
@@ -161,6 +163,11 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
     let env_keys = generate_env_keys(&raw_tables);
     write_output(out_dir, "env_keys.rs", env_keys)?;
 
+    // Generate compiler-launcher (wrapper) tables: ccache, distcc, ...
+    let wrapper_tables = load_wrapper_tables(flags_dir, true)?;
+    let wrappers = generate_wrappers(&wrapper_tables);
+    write_output(out_dir, "wrappers.rs", wrappers)?;
+
     Ok(())
 }
 
@@ -182,6 +189,12 @@ pub fn generate_env_keys_only(flags_dir: &Path, out_dir: &Path) -> Result<()> {
 /// Parse a single YAML table, attaching the source file name to any parse
 /// error so a schema violation names the offending file.
 pub fn parse_table(yaml_file: &str, content: &str) -> Result<FlagTable> {
+    serde_saphyr::from_str(content).with_context(|| format!("parsing {}", yaml_file))
+}
+
+/// Parse a single wrapper table, attaching the source file name to any
+/// parse error so a schema violation names the offending file.
+pub fn parse_wrapper_table(yaml_file: &str, content: &str) -> Result<WrapperTable> {
     serde_saphyr::from_str(content).with_context(|| format!("parsing {}", yaml_file))
 }
 
@@ -255,6 +268,64 @@ pub fn validate_extends(
 /// Load YAML flag tables from a directory, printing cargo:rerun-if-changed.
 fn load_tables_from(flags_dir: &Path) -> Result<LoadedTables> {
     load_and_index(flags_dir, true)
+}
+
+/// Just enough of a YAML file's shape to decide which full schema to parse
+/// it as. Serde ignores unknown fields by default, so this deserializes
+/// correctly regardless of the rest of the file.
+#[derive(serde::Deserialize)]
+struct KindPeek {
+    #[serde(rename = "type")]
+    type_: Kind,
+}
+
+/// Load every `type: wrapper` YAML file present in `flags_dir` that is not
+/// one of the `TABLES` compiler files, sorted by file name for
+/// deterministic generated output.
+///
+/// `TABLES`-driven compiler loading (`load_and_index`) is untouched by this
+/// second pass; this only discovers files it does not already know about.
+/// A discovered file that peeks as `type: compiler` is a compiler file
+/// missing from `TABLES` -- a codegen error, not a wrapper.
+///
+/// `print_rerun` controls whether `cargo:rerun-if-changed` lines are
+/// printed (only meaningful when called from a `build.rs`).
+fn load_wrapper_tables(flags_dir: &Path, print_rerun: bool) -> Result<Vec<(String, WrapperTable)>> {
+    let known: std::collections::HashSet<&str> = TABLES.iter().map(|c| c.yaml_file).collect();
+
+    let mut yaml_files: Vec<String> = std::fs::read_dir(flags_dir)
+        .with_context(|| format!("reading directory {}", flags_dir.display()))?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.ends_with(".yaml"))
+        .filter(|name| !known.contains(name.as_str()))
+        .collect();
+    yaml_files.sort();
+
+    let mut wrapper_tables = Vec::new();
+    for yaml_file in yaml_files {
+        let yaml_path = flags_dir.join(&yaml_file);
+        if print_rerun {
+            println!("cargo:rerun-if-changed={}", yaml_path.display());
+        }
+
+        let content = std::fs::read_to_string(&yaml_path)
+            .with_context(|| format!("reading {}", yaml_path.display()))?;
+        let peek: KindPeek =
+            serde_saphyr::from_str(&content).with_context(|| format!("parsing {}", yaml_file))?;
+
+        match peek.type_ {
+            Kind::Wrapper => {
+                let table = parse_wrapper_table(&yaml_file, &content)?;
+                table.validate(&yaml_file)?;
+                wrapper_tables.push((yaml_file, table));
+            }
+            Kind::Compiler => {
+                bail!("{} is a compiler-kind YAML file not registered in TABLES", yaml_file);
+            }
+        }
+    }
+    Ok(wrapper_tables)
 }
 
 fn write_output(out_dir: &Path, filename: &str, content: String) -> Result<()> {
@@ -710,6 +781,31 @@ mod tests {
                 .unwrap()
                 .contains("COMPILER_ENV_KEYS")
         );
+        let wrappers_rs = std::fs::read_to_string(out_dir.path().join("wrappers.rs")).unwrap();
+        assert!(wrappers_rs.contains("WRAPPER_NAMES"));
+        assert!(wrappers_rs.contains("WRAPPER_OPTIONS"));
+        assert!(wrappers_rs.contains("\"ccache\""));
+        assert!(wrappers_rs.contains("\"distcc\""));
+    }
+
+    // -- load_wrapper_tables tests --
+
+    #[test]
+    fn load_wrapper_tables_finds_the_four_real_launcher_files() {
+        let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
+        let mut names: Vec<&str> = wrapper_tables.iter().map(|(f, _)| f.as_str()).collect();
+        names.sort();
+        assert_eq!(names, vec!["ccache.yaml", "distcc.yaml", "icecc.yaml", "sccache.yaml"]);
+    }
+
+    #[test]
+    fn load_wrapper_tables_rejects_an_unregistered_compiler_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("stray.yaml"), "type: compiler\ncompiler:\n  id: stray\nflags: []\n")
+            .unwrap();
+
+        let err = load_wrapper_tables(dir.path(), false).err().unwrap();
+        assert!(err.to_string().contains("stray.yaml"), "{}", err);
     }
 
     // -- helpers --

@@ -1,0 +1,6 @@
+type: wrapper
+recognize:
+  - description: "Compiler cache"
+    references:
+      - "https://ccache.dev/manual/latest.html"
+    executables: ["ccache"]
