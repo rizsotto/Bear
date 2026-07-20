@@ -89,43 +89,31 @@ pub struct Compiler {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CompilerType {
-    #[serde(alias = "gcc", alias = "gnu")]
     Gcc,
-    #[serde(alias = "clang", alias = "llvm")]
     Clang,
-    #[serde(alias = "fortran", alias = "gfortran", alias = "flang")]
     Flang,
-    #[serde(alias = "ifort", alias = "intel-fortran", alias = "intel_fortran")]
+    #[serde(rename = "intel_fortran")]
     IntelFortran,
-    #[serde(alias = "crayftn", alias = "cray-fortran", alias = "cray_fortran")]
+    #[serde(rename = "cray_fortran")]
     CrayFortran,
-    #[serde(alias = "nvcc", alias = "cuda")]
     Cuda,
-    #[serde(alias = "msvc", alias = "cl")]
     Msvc,
-    #[serde(alias = "clang_cl", alias = "clang-cl")]
+    #[serde(rename = "clang_cl")]
     ClangCl,
-    #[serde(alias = "intel_cc", alias = "intel-cc", alias = "icx")]
+    #[serde(rename = "intel_cc")]
     IntelCc,
-    #[serde(alias = "nvidia_hpc", alias = "nvidia-hpc", alias = "nvc", alias = "pgi")]
+    #[serde(rename = "nvidia_hpc")]
     NvidiaHpc,
-    #[serde(alias = "armclang", alias = "arm-clang")]
     Armclang,
-    #[serde(alias = "ibm_xl", alias = "ibm-xl", alias = "xlclang")]
+    #[serde(rename = "ibm_xl")]
     IbmXl,
-    #[serde(alias = "vala", alias = "valac")]
     Vala,
-    #[serde(alias = "mpi", alias = "mpicc")]
     Mpi,
-    #[serde(alias = "cray_cc", alias = "cray-cc", alias = "craycc")]
+    #[serde(rename = "cray_cc")]
     CrayCc,
-    #[serde(alias = "qnx", alias = "qcc")]
     Qnx,
-    #[serde(alias = "nasm", alias = "yasm")]
     Nasm,
-    #[serde(alias = "fasm")]
     Fasm,
-    #[serde(alias = "swift", alias = "swiftc")]
     Swift,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache", alias = "icecc")]
     Wrapper,

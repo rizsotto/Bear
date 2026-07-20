@@ -448,97 +448,54 @@ mod test {
             assert_eq!(result, expected);
         }
 
-        // Test canonical names
+        // Test canonical names (verbatim YAML `compiler.id` spellings)
         assert_compiler_type_deserializes("\"gcc\"", CompilerType::Gcc);
         assert_compiler_type_deserializes("\"clang\"", CompilerType::Clang);
-        assert_compiler_type_deserializes("\"fortran\"", CompilerType::Flang);
-        assert_compiler_type_deserializes("\"intelfortran\"", CompilerType::IntelFortran);
-        assert_compiler_type_deserializes("\"crayfortran\"", CompilerType::CrayFortran);
-
-        // Test aliases for GCC
-        assert_compiler_type_deserializes("\"gnu\"", CompilerType::Gcc);
-
-        // Test aliases for Clang
-        assert_compiler_type_deserializes("\"llvm\"", CompilerType::Clang);
-
-        // Test aliases for Fortran
-        assert_compiler_type_deserializes("\"gfortran\"", CompilerType::Flang);
-
-        // Test aliases for Intel Fortran
-        assert_compiler_type_deserializes("\"ifort\"", CompilerType::IntelFortran);
-        assert_compiler_type_deserializes("\"intel-fortran\"", CompilerType::IntelFortran);
+        assert_compiler_type_deserializes("\"flang\"", CompilerType::Flang);
         assert_compiler_type_deserializes("\"intel_fortran\"", CompilerType::IntelFortran);
-
-        // Test aliases for Cray Fortran
-        assert_compiler_type_deserializes("\"crayftn\"", CompilerType::CrayFortran);
-        assert_compiler_type_deserializes("\"cray-fortran\"", CompilerType::CrayFortran);
         assert_compiler_type_deserializes("\"cray_fortran\"", CompilerType::CrayFortran);
-
-        // Test MSVC
+        assert_compiler_type_deserializes("\"cuda\"", CompilerType::Cuda);
         assert_compiler_type_deserializes("\"msvc\"", CompilerType::Msvc);
-        assert_compiler_type_deserializes("\"cl\"", CompilerType::Msvc);
-
-        // Test clang-cl
-        assert_compiler_type_deserializes("\"clangcl\"", CompilerType::ClangCl);
         assert_compiler_type_deserializes("\"clang_cl\"", CompilerType::ClangCl);
-        assert_compiler_type_deserializes("\"clang-cl\"", CompilerType::ClangCl);
-
-        // Test Intel C/C++
-        assert_compiler_type_deserializes("\"intelcc\"", CompilerType::IntelCc);
         assert_compiler_type_deserializes("\"intel_cc\"", CompilerType::IntelCc);
-        assert_compiler_type_deserializes("\"intel-cc\"", CompilerType::IntelCc);
-        assert_compiler_type_deserializes("\"icx\"", CompilerType::IntelCc);
-
-        // Test NVIDIA HPC
-        assert_compiler_type_deserializes("\"nvidiahpc\"", CompilerType::NvidiaHpc);
         assert_compiler_type_deserializes("\"nvidia_hpc\"", CompilerType::NvidiaHpc);
-        assert_compiler_type_deserializes("\"nvidia-hpc\"", CompilerType::NvidiaHpc);
-        assert_compiler_type_deserializes("\"nvc\"", CompilerType::NvidiaHpc);
-        assert_compiler_type_deserializes("\"pgi\"", CompilerType::NvidiaHpc);
-
-        // Test ARM Compiler
         assert_compiler_type_deserializes("\"armclang\"", CompilerType::Armclang);
-        assert_compiler_type_deserializes("\"arm-clang\"", CompilerType::Armclang);
-
-        // Test IBM Open XL
-        assert_compiler_type_deserializes("\"ibmxl\"", CompilerType::IbmXl);
         assert_compiler_type_deserializes("\"ibm_xl\"", CompilerType::IbmXl);
-        assert_compiler_type_deserializes("\"ibm-xl\"", CompilerType::IbmXl);
-        assert_compiler_type_deserializes("\"xlclang\"", CompilerType::IbmXl);
-
-        // Test Vala
         assert_compiler_type_deserializes("\"vala\"", CompilerType::Vala);
-        assert_compiler_type_deserializes("\"valac\"", CompilerType::Vala);
-
-        // Test MPI wrapper
         assert_compiler_type_deserializes("\"mpi\"", CompilerType::Mpi);
-        assert_compiler_type_deserializes("\"mpicc\"", CompilerType::Mpi);
-
-        // Test Cray C/C++ (CCE)
         assert_compiler_type_deserializes("\"cray_cc\"", CompilerType::CrayCc);
-        assert_compiler_type_deserializes("\"cray-cc\"", CompilerType::CrayCc);
-        assert_compiler_type_deserializes("\"craycc\"", CompilerType::CrayCc);
-
-        // Test QNX
         assert_compiler_type_deserializes("\"qnx\"", CompilerType::Qnx);
-        assert_compiler_type_deserializes("\"qcc\"", CompilerType::Qnx);
-
-        // Test NASM/YASM
         assert_compiler_type_deserializes("\"nasm\"", CompilerType::Nasm);
-        assert_compiler_type_deserializes("\"yasm\"", CompilerType::Nasm);
-
-        // Test fasm
         assert_compiler_type_deserializes("\"fasm\"", CompilerType::Fasm);
-
-        // Test Swift
         assert_compiler_type_deserializes("\"swift\"", CompilerType::Swift);
-        assert_compiler_type_deserializes("\"swiftc\"", CompilerType::Swift);
 
-        // Test compiler launchers (wrappers)
+        // Test compiler launchers (wrappers) - Wrapper keeps its hand-coded aliases
         assert_compiler_type_deserializes("\"ccache\"", CompilerType::Wrapper);
         assert_compiler_type_deserializes("\"distcc\"", CompilerType::Wrapper);
         assert_compiler_type_deserializes("\"sccache\"", CompilerType::Wrapper);
         assert_compiler_type_deserializes("\"icecc\"", CompilerType::Wrapper);
+    }
+
+    #[test]
+    fn test_compiler_type_rejects_dropped_aliases() {
+        let dropped_spellings = ["clangcl", "llvm", "intel-cc", "craycc"];
+
+        for spelling in dropped_spellings {
+            let json_str = format!("\"{spelling}\"");
+
+            let result = serde_json::from_str::<CompilerType>(&json_str);
+
+            match result {
+                Err(error) => {
+                    let message = error.to_string();
+                    assert!(
+                        message.contains("unknown variant"),
+                        "case: {spelling}, unexpected error message: {message}"
+                    );
+                }
+                Ok(value) => panic!("expected {spelling} to be rejected, got: {value:?}"),
+            }
+        }
     }
 
     #[test]
@@ -578,11 +535,11 @@ mod test {
                   - path: {}
                     as: "gcc"
                   - path: {}
-                    as: "llvm"
+                    as: "clang"
                   - path: {}
-                    as: "gfortran"
+                    as: "flang"
                   - path: {}
-                    as: "intel-fortran"
+                    as: "intel_fortran"
                   - path: {}
                     as: "cray_fortran"
                 "#,
