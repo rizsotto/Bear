@@ -36,7 +36,7 @@ pub(super) enum Syntax {
 /// Selects the tokenization syntax for the compiler family Bear identified.
 pub(super) fn syntax_for(compiler_type: CompilerType) -> Syntax {
     match compiler_type {
-        CompilerType::Msvc | CompilerType::ClangCl => Syntax::Msvc,
+        CompilerType::Compiler(id) if matches!(id.as_str(), "msvc" | "clang_cl") => Syntax::Msvc,
         _ => Syntax::GnuClang,
     }
 }
@@ -318,10 +318,15 @@ mod tests {
 
     #[test]
     fn syntax_selection_follows_compiler_family() {
-        for ty in [CompilerType::Msvc, CompilerType::ClangCl] {
+        for ty in [CompilerType::compiler("msvc"), CompilerType::compiler("clang_cl")] {
             assert!(matches!(syntax_for(ty), Syntax::Msvc), "{ty} should use MSVC syntax");
         }
-        for ty in [CompilerType::Gcc, CompilerType::Clang, CompilerType::Cuda, CompilerType::Vala] {
+        for ty in [
+            CompilerType::compiler("gcc"),
+            CompilerType::compiler("clang"),
+            CompilerType::compiler("cuda"),
+            CompilerType::compiler("vala"),
+        ] {
             assert!(matches!(syntax_for(ty), Syntax::GnuClang), "{ty} should use GNU/Clang syntax");
         }
     }

@@ -7,7 +7,7 @@
 //! logic is caught as a snapshot diff.
 
 use compilers_codegen::env_keys::generate_env_keys;
-use compilers_codegen::recognition::generate_recognition_patterns;
+use compilers_codegen::recognition::{generate_compiler_ids, generate_recognition_patterns};
 use compilers_codegen::tables::TABLES;
 use compilers_codegen::{ResolvedTable, load_tables, load_wrapper_tables};
 
@@ -146,4 +146,15 @@ fn flags_dir() -> std::path::PathBuf {
 fn snapshot_env_keys() {
     let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_env_keys(&raw_tables));
+}
+
+#[test]
+fn snapshot_compiler_ids() {
+    // Mirror generate()'s yaml_file -> id index (see snapshot_recognition).
+    let file_to_id: std::collections::HashMap<&'static str, String> = TABLES
+        .iter()
+        .map(|c| (c.yaml_file, c.yaml_file.strip_suffix(".yaml").unwrap().to_string()))
+        .collect();
+    let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
+    insta::assert_snapshot!(generate_compiler_ids(&file_to_id, &wrapper_tables).unwrap());
 }

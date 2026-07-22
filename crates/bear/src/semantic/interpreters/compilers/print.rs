@@ -208,9 +208,10 @@ mod tests {
     /// alias text for wrapper rows (see `alias_column`), so the previous
     /// test's filter skips them -- but the actual launcher basenames
     /// (`ccache`, `distcc`, ...) must still deserialize to
-    /// `CompilerType::Wrapper` through its hand-coded serde aliases (no
-    /// generated map; config `as:` aliases were dropped from this whole
-    /// plan). This proves that hand list still covers every launcher name
+    /// `CompilerType::Wrapper` through the generated `WRAPPER_AS_NAMES` the
+    /// deserializer resolves against (config `as:` aliases were dropped;
+    /// these are the launcher tool names, not aliases of a shared id). This
+    /// proves that generated list still covers every launcher name
     /// `RECOGNITION_PATTERNS` actually recognizes.
     #[test]
     fn every_wrapper_executable_deserializes_as_compiler_type_wrapper() {

@@ -115,3 +115,45 @@ pub fn generate_recognition_patterns(
 fn escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
+
+/// Generate the compiler-id data the config module needs to resolve the
+/// `as:` field: `KNOWN_IDS` (every real compiler family's `compiler.id`, in
+/// `TABLES` order) and `WRAPPER_AS_NAMES` (the launcher basenames that also
+/// resolve to the one wrapper kind). Both are the sole accepted `as:`
+/// spellings; there are no aliases (see `compiler-as-no-aliases`).
+///
+/// Emitted as `pub(crate)` statics for the `bear` crate to `include!` into
+/// its config module, so `CompilerType`'s hand-written deserializer validates
+/// against generated data instead of a hand-maintained mirror of the ids.
+pub fn generate_compiler_ids(
+    file_to_id: &HashMap<&'static str, String>,
+    wrapper_tables: &[(String, WrapperTable)],
+) -> Result<String> {
+    let ids: Vec<&str> = TABLES
+        .iter()
+        .map(|config| {
+            file_to_id
+                .get(config.yaml_file)
+                .map(String::as_str)
+                .with_context(|| format!("no table loaded for {}", config.yaml_file))
+        })
+        .collect::<Result<_>>()?;
+
+    let mut wrapper_names: Vec<&str> = wrapper_tables
+        .iter()
+        .flat_map(|(_, table)| table.recognize.iter())
+        .flat_map(|entry| entry.executables.iter().map(String::as_str))
+        .collect();
+    wrapper_names.sort_unstable();
+    wrapper_names.dedup();
+
+    let mut out = String::new();
+    out.push_str("// Generated from compilers/*.yaml -- DO NOT EDIT\n");
+    out.push_str("pub(crate) static KNOWN_IDS: &[&str] = &[");
+    out.push_str(&ids.iter().map(|id| format!("\"{}\"", id)).collect::<Vec<_>>().join(", "));
+    out.push_str("];\n");
+    out.push_str("pub(crate) static WRAPPER_AS_NAMES: &[&str] = &[");
+    out.push_str(&wrapper_names.iter().map(|name| format!("\"{}\"", name)).collect::<Vec<_>>().join(", "));
+    out.push_str("];\n");
+    Ok(out)
+}

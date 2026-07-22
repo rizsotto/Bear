@@ -990,24 +990,26 @@ fn probe_dispatches_cc_to_clang_when_version_advertises_clang() -> Result<()> {
     assert!(!hello_entries.is_empty(), "expected an entry for hello.c, got entries: {:#?}", db.entries());
 
     // (2) Dispatch must have gone through the Clang interpreter. The
-    // OutputLogger combinator emits `Clang               : Recognized(...)`
-    // when the Clang flag table parses the command, and `GCC                 :
-    // Recognized(...)` if the GCC flag table did. We assert the former is
-    // present and the latter is absent for this run.
+    // OutputLogger combinator labels each line with the compiler id, so it
+    // emits `clang               : Recognized(...)` when the Clang flag table
+    // parses the command, and `gcc                 : Recognized(...)` if the
+    // GCC flag table did. We assert the former is present and the latter is
+    // absent for this run.
     //
     // Note: we look for "Recognized(" specifically to ignore any unrelated
-    // log lines that might mention the type names in passing.
-    let saw_clang_recognized = stderr.lines().any(|l| l.contains("Clang") && l.contains("Recognized("));
-    let saw_gcc_recognized = stderr.lines().any(|l| l.contains("GCC") && l.contains("Recognized("));
+    // log lines that might mention the id in passing (e.g. the probe's
+    // "clang version" reading of `cc --version`).
+    let saw_clang_recognized = stderr.lines().any(|l| l.contains("clang") && l.contains("Recognized("));
+    let saw_gcc_recognized = stderr.lines().any(|l| l.contains("gcc") && l.contains("Recognized("));
 
     assert!(
         saw_clang_recognized,
-        "expected a `Clang ... Recognized(` log line proving probe dispatched to Clang.\nstderr:\n{}",
+        "expected a `clang ... Recognized(` log line proving probe dispatched to Clang.\nstderr:\n{}",
         stderr
     );
     assert!(
         !saw_gcc_recognized,
-        "did not expect a `GCC ... Recognized(` log line; that would mean the probe was bypassed and the regex fell back to GCC.\nstderr:\n{}",
+        "did not expect a `gcc ... Recognized(` log line; that would mean the probe was bypassed and the regex fell back to GCC.\nstderr:\n{}",
         stderr
     );
 

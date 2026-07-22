@@ -203,7 +203,7 @@ impl CompilerRecognizer {
     /// 1. **Explicit `as_` field**: If the compiler has an `as_` field specified, that type is used
     /// 2. **Pattern matching**: If `as_` is `None`, the filename is matched against default patterns
     ///    (GCC, Clang, Fortran, Intel Fortran, Cray Fortran)
-    /// 3. **Fallback**: If no pattern matches, defaults to [`CompilerType::Gcc`]
+    /// 3. **Fallback**: If no pattern matches, defaults to the `gcc` family
     ///
     /// # Path Canonicalization
     ///
@@ -253,7 +253,7 @@ impl CompilerRecognizer {
                     .map(|(compiler_type, _)| *compiler_type);
 
                 // Fall back to GCC if no pattern matches
-                guessed_type.unwrap_or(CompilerType::Gcc)
+                guessed_type.unwrap_or(CompilerType::compiler("gcc"))
             };
 
             if let Some(name) = compiler.path.file_name() {
@@ -312,42 +312,17 @@ include!(concat!(env!("OUT_DIR"), "/recognition.rs"));
 static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(|| {
     let mut patterns = Vec::new();
 
-    // Build patterns from generated YAML data
+    // Build patterns from generated YAML data. The id column is trusted
+    // generated data, so it maps to a `CompilerType` without validation:
+    // `"wrapper"` is the launcher kind, every other value is a compiler id.
     for &(type_str, executables, cross_compilation, versioned, _description) in RECOGNITION_PATTERNS {
-        let compiler_type = parse_compiler_type(type_str);
+        let compiler_type = CompilerType::from_recognized_id(type_str);
         let regex = create_compiler_regex(executables, cross_compilation, versioned);
         patterns.push((compiler_type, regex));
     }
 
     patterns
 });
-
-/// Map a YAML `type` string to a `CompilerType` variant.
-fn parse_compiler_type(type_str: &str) -> CompilerType {
-    match type_str {
-        "gcc" => CompilerType::Gcc,
-        "clang" => CompilerType::Clang,
-        "flang" => CompilerType::Flang,
-        "intel_fortran" => CompilerType::IntelFortran,
-        "cray_fortran" => CompilerType::CrayFortran,
-        "cuda" => CompilerType::Cuda,
-        "msvc" => CompilerType::Msvc,
-        "clang_cl" => CompilerType::ClangCl,
-        "intel_cc" => CompilerType::IntelCc,
-        "nvidia_hpc" => CompilerType::NvidiaHpc,
-        "armclang" => CompilerType::Armclang,
-        "ibm_xl" => CompilerType::IbmXl,
-        "vala" => CompilerType::Vala,
-        "mpi" => CompilerType::Mpi,
-        "cray_cc" => CompilerType::CrayCc,
-        "qnx" => CompilerType::Qnx,
-        "nasm" => CompilerType::Nasm,
-        "fasm" => CompilerType::Fasm,
-        "swift" => CompilerType::Swift,
-        "wrapper" => CompilerType::Wrapper,
-        other => panic!("Unknown compiler type in YAML: '{}'", other),
-    }
-}
 
 /// Build a regex that matches any of the given `executables`, with optional
 /// cross-compilation prefix and version suffix support, plus `.exe` extension.
@@ -430,21 +405,21 @@ mod tests {
             &no_probe_recognizer(),
             &[
                 // Basic GCC names
-                ("gcc", Some(CompilerType::Gcc)),
-                ("g++", Some(CompilerType::Gcc)),
+                ("gcc", Some(CompilerType::compiler("gcc"))),
+                ("g++", Some(CompilerType::compiler("gcc"))),
                 // Cross-compilation variants
-                ("arm-linux-gnueabi-gcc", Some(CompilerType::Gcc)),
-                ("aarch64-linux-gnu-g++", Some(CompilerType::Gcc)),
-                ("x86_64-w64-mingw32-gcc", Some(CompilerType::Gcc)),
+                ("arm-linux-gnueabi-gcc", Some(CompilerType::compiler("gcc"))),
+                ("aarch64-linux-gnu-g++", Some(CompilerType::compiler("gcc"))),
+                ("x86_64-w64-mingw32-gcc", Some(CompilerType::compiler("gcc"))),
                 // Versioned variants
-                ("gcc-9", Some(CompilerType::Gcc)),
-                ("g++-11", Some(CompilerType::Gcc)),
-                ("gcc-11.2", Some(CompilerType::Gcc)),
-                ("gcc9", Some(CompilerType::Gcc)),
-                ("g++11", Some(CompilerType::Gcc)),
+                ("gcc-9", Some(CompilerType::compiler("gcc"))),
+                ("g++-11", Some(CompilerType::compiler("gcc"))),
+                ("gcc-11.2", Some(CompilerType::compiler("gcc"))),
+                ("gcc9", Some(CompilerType::compiler("gcc"))),
+                ("g++11", Some(CompilerType::compiler("gcc"))),
                 // With full paths
-                ("/usr/bin/gcc", Some(CompilerType::Gcc)),
-                ("/opt/gcc/bin/g++", Some(CompilerType::Gcc)),
+                ("/usr/bin/gcc", Some(CompilerType::compiler("gcc"))),
+                ("/opt/gcc/bin/g++", Some(CompilerType::compiler("gcc"))),
             ],
         );
     }
@@ -454,20 +429,20 @@ mod tests {
     fn test_clang_recognition() {
         assert_recognition(&[
             // Basic Clang names
-            ("clang", Some(CompilerType::Clang)),
-            ("clang++", Some(CompilerType::Clang)),
+            ("clang", Some(CompilerType::compiler("clang"))),
+            ("clang++", Some(CompilerType::compiler("clang"))),
             // Cross-compilation variants
-            ("aarch64-linux-gnu-clang", Some(CompilerType::Clang)),
-            ("arm-linux-gnueabi-clang++", Some(CompilerType::Clang)),
+            ("aarch64-linux-gnu-clang", Some(CompilerType::compiler("clang"))),
+            ("arm-linux-gnueabi-clang++", Some(CompilerType::compiler("clang"))),
             // Versioned variants
-            ("clang-15", Some(CompilerType::Clang)),
-            ("clang++-16", Some(CompilerType::Clang)),
-            ("clang15", Some(CompilerType::Clang)),
-            ("clang++16", Some(CompilerType::Clang)),
-            ("clang-15.0", Some(CompilerType::Clang)),
+            ("clang-15", Some(CompilerType::compiler("clang"))),
+            ("clang++-16", Some(CompilerType::compiler("clang"))),
+            ("clang15", Some(CompilerType::compiler("clang"))),
+            ("clang++16", Some(CompilerType::compiler("clang"))),
+            ("clang-15.0", Some(CompilerType::compiler("clang"))),
             // With full paths
-            ("/usr/bin/clang", Some(CompilerType::Clang)),
-            ("/opt/llvm/bin/clang++", Some(CompilerType::Clang)),
+            ("/usr/bin/clang", Some(CompilerType::compiler("clang"))),
+            ("/opt/llvm/bin/clang++", Some(CompilerType::compiler("clang"))),
         ]);
     }
 
@@ -478,37 +453,43 @@ mod tests {
         // GCC with .exe extensions. (`cc.exe`/`c++.exe` are intentionally
         // absent: those names are ambiguous and the probe owns dispatch
         // for them; the regex returns no match.)
-        assert_eq!(recognizer.recognize(path("gcc.exe")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("g++.exe")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc.exe")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("g++.exe")), Some(CompilerType::compiler("gcc")));
 
         // Cross-compilation variants with .exe
-        assert_eq!(recognizer.recognize(path("arm-linux-gnueabi-gcc.exe")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("x86_64-w64-mingw32-g++.exe")), Some(CompilerType::Gcc));
+        assert_eq!(
+            recognizer.recognize(path("arm-linux-gnueabi-gcc.exe")),
+            Some(CompilerType::compiler("gcc"))
+        );
+        assert_eq!(
+            recognizer.recognize(path("x86_64-w64-mingw32-g++.exe")),
+            Some(CompilerType::compiler("gcc"))
+        );
 
         // Versioned variants with .exe
-        assert_eq!(recognizer.recognize(path("gcc-9.exe")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("g++-11.2.exe")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc-9.exe")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("g++-11.2.exe")), Some(CompilerType::compiler("gcc")));
 
         // Clang with .exe extensions
-        assert_eq!(recognizer.recognize(path("clang.exe")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang++.exe")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang-15.exe")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("clang.exe")), Some(CompilerType::compiler("clang")));
+        assert_eq!(recognizer.recognize(path("clang++.exe")), Some(CompilerType::compiler("clang")));
+        assert_eq!(recognizer.recognize(path("clang-15.exe")), Some(CompilerType::compiler("clang")));
 
         // Fortran with .exe extensions
-        assert_eq!(recognizer.recognize(path("gfortran.exe")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("flang.exe")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f95.exe")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gfortran.exe")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("flang.exe")), Some(CompilerType::compiler("flang")));
+        assert_eq!(recognizer.recognize(path("f95.exe")), Some(CompilerType::compiler("gcc")));
 
         // Intel Fortran with .exe extensions
-        assert_eq!(recognizer.recognize(path("ifort.exe")), Some(CompilerType::IntelFortran));
-        assert_eq!(recognizer.recognize(path("ifx.exe")), Some(CompilerType::IntelFortran));
+        assert_eq!(recognizer.recognize(path("ifort.exe")), Some(CompilerType::compiler("intel_fortran")));
+        assert_eq!(recognizer.recognize(path("ifx.exe")), Some(CompilerType::compiler("intel_fortran")));
 
         // Cray Fortran with .exe extensions
-        assert_eq!(recognizer.recognize(path("crayftn.exe")), Some(CompilerType::CrayFortran));
-        assert_eq!(recognizer.recognize(path("ftn.exe")), Some(CompilerType::CrayFortran));
+        assert_eq!(recognizer.recognize(path("crayftn.exe")), Some(CompilerType::compiler("cray_fortran")));
+        assert_eq!(recognizer.recognize(path("ftn.exe")), Some(CompilerType::compiler("cray_fortran")));
 
         // CUDA with .exe extensions
-        assert_eq!(recognizer.recognize(path("nvcc.exe")), Some(CompilerType::Cuda));
+        assert_eq!(recognizer.recognize(path("nvcc.exe")), Some(CompilerType::compiler("cuda")));
 
         // Wrapper tools with .exe extensions
         assert_eq!(recognizer.recognize(path("ccache.exe")), Some(CompilerType::Wrapper));
@@ -521,8 +502,8 @@ mod tests {
         let recognizer = CompilerRecognizer::new();
 
         // Simple Unix-style paths with .exe (should work cross-platform)
-        assert_eq!(recognizer.recognize(path("/mingw64/bin/gcc.exe")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("/usr/bin/clang.exe")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("/mingw64/bin/gcc.exe")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("/usr/bin/clang.exe")), Some(CompilerType::compiler("clang")));
     }
 
     // Requirements: recognition-compiler-names
@@ -530,16 +511,16 @@ mod tests {
     fn test_fortran_recognition() {
         assert_recognition(&[
             // Basic Fortran names
-            ("gfortran", Some(CompilerType::Gcc)),
-            ("f95", Some(CompilerType::Gcc)),
-            ("flang", Some(CompilerType::Flang)),
-            ("flang-new", Some(CompilerType::Flang)),
+            ("gfortran", Some(CompilerType::compiler("gcc"))),
+            ("f95", Some(CompilerType::compiler("gcc"))),
+            ("flang", Some(CompilerType::compiler("flang"))),
+            ("flang-new", Some(CompilerType::compiler("flang"))),
             // Cross-compilation variants
-            ("arm-linux-gnueabi-gfortran", Some(CompilerType::Gcc)),
+            ("arm-linux-gnueabi-gfortran", Some(CompilerType::compiler("gcc"))),
             // Versioned variants
-            ("gfortran-11", Some(CompilerType::Gcc)),
-            ("gfortran11", Some(CompilerType::Gcc)),
-            ("f95-4.8", Some(CompilerType::Gcc)),
+            ("gfortran-11", Some(CompilerType::compiler("gcc"))),
+            ("gfortran11", Some(CompilerType::compiler("gcc"))),
+            ("f95-4.8", Some(CompilerType::compiler("gcc"))),
         ]);
     }
 
@@ -547,11 +528,11 @@ mod tests {
     fn test_intel_fortran_recognition() {
         assert_recognition(&[
             // Intel Fortran names
-            ("ifort", Some(CompilerType::IntelFortran)),
-            ("ifx", Some(CompilerType::IntelFortran)),
+            ("ifort", Some(CompilerType::compiler("intel_fortran"))),
+            ("ifx", Some(CompilerType::compiler("intel_fortran"))),
             // Versioned variants
-            ("ifort-2021", Some(CompilerType::IntelFortran)),
-            ("ifx-2023", Some(CompilerType::IntelFortran)),
+            ("ifort-2021", Some(CompilerType::compiler("intel_fortran"))),
+            ("ifx-2023", Some(CompilerType::compiler("intel_fortran"))),
         ]);
     }
 
@@ -560,8 +541,8 @@ mod tests {
     fn test_cray_fortran_recognition() {
         assert_recognition(&[
             // Cray Fortran names
-            ("crayftn", Some(CompilerType::CrayFortran)),
-            ("ftn", Some(CompilerType::CrayFortran)),
+            ("crayftn", Some(CompilerType::compiler("cray_fortran"))),
+            ("ftn", Some(CompilerType::compiler("cray_fortran"))),
         ]);
     }
 
@@ -588,7 +569,7 @@ mod tests {
         for path_str in paths {
             assert_eq!(
                 recognizer.recognize(path(path_str)),
-                Some(CompilerType::Gcc),
+                Some(CompilerType::compiler("gcc")),
                 "Failed for path: {}",
                 path_str
             );
@@ -604,12 +585,12 @@ mod tests {
         let compilers = vec![
             Compiler {
                 path: PathBuf::from("custom-gcc-wrapper"),
-                as_: Some(CompilerType::Gcc),
+                as_: Some(CompilerType::compiler("gcc")),
                 ignore: false,
             },
             Compiler {
                 path: PathBuf::from("weird-clang-name"),
-                as_: Some(CompilerType::Clang),
+                as_: Some(CompilerType::compiler("clang")),
                 ignore: false,
             },
         ];
@@ -617,11 +598,11 @@ mod tests {
         let recognizer = CompilerRecognizer::new_with_config(&compilers);
 
         // Configured hints take priority
-        assert_eq!(recognizer.recognize(path("custom-gcc-wrapper")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("weird-clang-name")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("custom-gcc-wrapper")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("weird-clang-name")), Some(CompilerType::compiler("clang")));
 
         // Regex detection still works for non-configured compilers
-        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::compiler("gcc")));
         assert_eq!(recognizer.recognize(path("unknown-compiler")), None);
     }
 
@@ -636,13 +617,13 @@ mod tests {
         // everything and `cc` has no regex, so a hit proves the hint.
         let compilers = vec![Compiler {
             path: PathBuf::from("/opt/toolchain/cc"),
-            as_: Some(CompilerType::Clang),
+            as_: Some(CompilerType::compiler("clang")),
             ignore: false,
         }];
 
         let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
 
-        assert_eq!(sut.recognize(path("cc")), Some(CompilerType::Clang));
+        assert_eq!(sut.recognize(path("cc")), Some(CompilerType::compiler("clang")));
     }
 
     // Requirements: recognition-ambiguous-name-probe
@@ -655,7 +636,7 @@ mod tests {
         // classification of a differently-located configured entry.
         let compilers = vec![Compiler {
             path: PathBuf::from("/opt/toolchain/cc"),
-            as_: Some(CompilerType::Clang),
+            as_: Some(CompilerType::compiler("clang")),
             ignore: false,
         }];
 
@@ -672,27 +653,35 @@ mod tests {
         use std::path::PathBuf;
 
         let compilers = vec![
-            Compiler { path: PathBuf::from("/opt/a/cc"), as_: Some(CompilerType::Clang), ignore: false },
-            Compiler { path: PathBuf::from("/opt/b/cc"), as_: Some(CompilerType::Gcc), ignore: false },
+            Compiler {
+                path: PathBuf::from("/opt/a/cc"),
+                as_: Some(CompilerType::compiler("clang")),
+                ignore: false,
+            },
+            Compiler {
+                path: PathBuf::from("/opt/b/cc"),
+                as_: Some(CompilerType::compiler("gcc")),
+                ignore: false,
+            },
         ];
 
         let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
 
         // The bare spelling takes the first configured entry (a warning is
         // logged for the disagreeing second); path spellings keep their own.
-        assert_eq!(sut.recognize(path("cc")), Some(CompilerType::Clang));
-        assert_eq!(sut.recognize(path("/opt/a/cc")), Some(CompilerType::Clang));
-        assert_eq!(sut.recognize(path("/opt/b/cc")), Some(CompilerType::Gcc));
+        assert_eq!(sut.recognize(path("cc")), Some(CompilerType::compiler("clang")));
+        assert_eq!(sut.recognize(path("/opt/a/cc")), Some(CompilerType::compiler("clang")));
+        assert_eq!(sut.recognize(path("/opt/b/cc")), Some(CompilerType::compiler("gcc")));
     }
 
     #[test]
     fn test_is_compiler_type() {
         let recognizer = CompilerRecognizer::new();
 
-        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("clang")), Some(CompilerType::Clang));
-        assert_ne!(recognizer.recognize(path("gcc")), Some(CompilerType::Clang));
-        assert_ne!(recognizer.recognize(path("clang")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("clang")), Some(CompilerType::compiler("clang")));
+        assert_ne!(recognizer.recognize(path("gcc")), Some(CompilerType::compiler("clang")));
+        assert_ne!(recognizer.recognize(path("clang")), Some(CompilerType::compiler("gcc")));
     }
 
     #[test]
@@ -713,16 +702,16 @@ mod tests {
     fn test_gcc_internal_executables_recognition() {
         assert_recognition(&[
             // GCC internal executables are recognized as GCC type
-            ("cc1", Some(CompilerType::Gcc)),
-            ("cc1plus", Some(CompilerType::Gcc)),
-            ("cc1obj", Some(CompilerType::Gcc)),
-            ("cc1objplus", Some(CompilerType::Gcc)),
-            ("collect2", Some(CompilerType::Gcc)),
-            ("f951", Some(CompilerType::Gcc)),
-            ("lto1", Some(CompilerType::Gcc)),
+            ("cc1", Some(CompilerType::compiler("gcc"))),
+            ("cc1plus", Some(CompilerType::compiler("gcc"))),
+            ("cc1obj", Some(CompilerType::compiler("gcc"))),
+            ("cc1objplus", Some(CompilerType::compiler("gcc"))),
+            ("collect2", Some(CompilerType::compiler("gcc"))),
+            ("f951", Some(CompilerType::compiler("gcc"))),
+            ("lto1", Some(CompilerType::compiler("gcc"))),
             // With full paths
-            ("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1", Some(CompilerType::Gcc)),
-            ("/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus", Some(CompilerType::Gcc)),
+            ("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1", Some(CompilerType::compiler("gcc"))),
+            ("/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus", Some(CompilerType::compiler("gcc"))),
             // Non-GCC internal executables are not matched by this pattern
             ("cc1foo", None),
             ("foo-cc1", None),
@@ -737,13 +726,21 @@ mod tests {
         // Create test compiler configurations with various scenarios
         let compilers = vec![
             // Compiler with explicit 'as' field - should use that type
-            Compiler { path: PathBuf::from("custom-wrapper"), as_: Some(CompilerType::Clang), ignore: false },
+            Compiler {
+                path: PathBuf::from("custom-wrapper"),
+                as_: Some(CompilerType::compiler("clang")),
+                ignore: false,
+            },
             // Compiler without 'as' field but matches default pattern - should guess Clang
             Compiler { path: PathBuf::from("clang++"), as_: None, ignore: false },
             // Compiler without 'as' field and no pattern match - should fall back to GCC
             Compiler { path: PathBuf::from("unknown-compiler"), as_: None, ignore: false },
             // Ignored compiler - should not be included in hints
-            Compiler { path: PathBuf::from("ignored-gcc"), as_: Some(CompilerType::Gcc), ignore: true },
+            Compiler {
+                path: PathBuf::from("ignored-gcc"),
+                as_: Some(CompilerType::compiler("gcc")),
+                ignore: true,
+            },
             // Another compiler without 'as' field matching Fortran pattern
             Compiler { path: PathBuf::from("gfortran"), as_: None, ignore: false },
         ];
@@ -751,37 +748,37 @@ mod tests {
         let recognizer = CompilerRecognizer::new_with_config(&compilers);
 
         // Test explicit 'as' field is used
-        assert_eq!(recognizer.recognize(path("custom-wrapper")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("custom-wrapper")), Some(CompilerType::compiler("clang")));
 
         // Test pattern matching works when 'as' is None
-        assert_eq!(recognizer.recognize(path("clang++")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("clang++")), Some(CompilerType::compiler("clang")));
 
         // Test fallback to GCC when no pattern matches
-        assert_eq!(recognizer.recognize(path("unknown-compiler")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("unknown-compiler")), Some(CompilerType::compiler("gcc")));
 
         // Test ignored compiler is not recognized via hints
         assert_eq!(
             recognizer.recognize(path("ignored-gcc")),
-            Some(CompilerType::Gcc) // Should fall back to regex pattern, not hint
+            Some(CompilerType::compiler("gcc")) // Should fall back to regex pattern, not hint
         );
 
         // Test Fortran pattern matching when 'as' is None
-        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::compiler("gcc")));
     }
 
     #[test]
     fn test_cuda_recognition() {
         assert_recognition(&[
-            ("nvcc", Some(CompilerType::Cuda)),
+            ("nvcc", Some(CompilerType::compiler("cuda"))),
             // Versioned variant
-            ("nvcc-12.0", Some(CompilerType::Cuda)),
+            ("nvcc-12.0", Some(CompilerType::compiler("cuda"))),
             // Cross-compilation variant
-            ("aarch64-linux-gnu-nvcc", Some(CompilerType::Cuda)),
+            ("aarch64-linux-gnu-nvcc", Some(CompilerType::compiler("cuda"))),
             // Non-CUDA executables don't match: "nvcc-fake" has an invalid
             // version suffix, "not-nvcc-at-all" merely contains the substring.
             ("nvcc-fake", None),
             ("not-nvcc-at-all", None),
-            ("gcc", Some(CompilerType::Gcc)),
+            ("gcc", Some(CompilerType::compiler("gcc"))),
         ]);
     }
 
@@ -811,22 +808,22 @@ mod tests {
         let recognizer = CompilerRecognizer::new();
 
         // Test basic dash-separated versions
-        assert_eq!(recognizer.recognize(path("gcc-11")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("g++-9.3.0")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("clang-15")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang-12.1")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("gfortran-12")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("ifort-2023")), Some(CompilerType::IntelFortran));
-        assert_eq!(recognizer.recognize(path("nvcc-11.8")), Some(CompilerType::Cuda));
+        assert_eq!(recognizer.recognize(path("gcc-11")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("g++-9.3.0")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("clang-15")), Some(CompilerType::compiler("clang")));
+        assert_eq!(recognizer.recognize(path("clang-12.1")), Some(CompilerType::compiler("clang")));
+        assert_eq!(recognizer.recognize(path("gfortran-12")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("ifort-2023")), Some(CompilerType::compiler("intel_fortran")));
+        assert_eq!(recognizer.recognize(path("nvcc-11.8")), Some(CompilerType::compiler("cuda")));
 
         // Test underscore-separated versions
-        assert_eq!(recognizer.recognize(path("gcc_11")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("clang_15.0.7")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("gcc_11")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("clang_15.0.7")), Some(CompilerType::compiler("clang")));
 
         // Test that non-versioned compilers still work
-        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("clang")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(path("clang")), Some(CompilerType::compiler("clang")));
+        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::compiler("gcc")));
 
         // Test that wrapper executables don't have version patterns (as expected)
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
@@ -835,60 +832,60 @@ mod tests {
         // Verify behaviorally that GCC patterns include a versioned variant:
         // a numeric-suffixed name resolves to GCC, while a non-numeric suffix
         // (which the version sub-pattern rejects) does not.
-        assert_eq!(recognizer.recognize(path("gcc-11")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc-11")), Some(CompilerType::compiler("gcc")));
         assert_eq!(recognizer.recognize(path("gcc-abc")), None);
     }
 
     #[test]
     fn test_msvc_recognition() {
         assert_recognition(&[
-            ("cl", Some(CompilerType::Msvc)),
-            ("cl.exe", Some(CompilerType::Msvc)),
+            ("cl", Some(CompilerType::compiler("msvc"))),
+            ("cl.exe", Some(CompilerType::compiler("msvc"))),
             // Internal executables should be recognized as MSVC (then ignored by interpreter)
-            ("c1", Some(CompilerType::Msvc)),
-            ("c1xx", Some(CompilerType::Msvc)),
-            ("c2", Some(CompilerType::Msvc)),
+            ("c1", Some(CompilerType::compiler("msvc"))),
+            ("c1xx", Some(CompilerType::compiler("msvc"))),
+            ("c2", Some(CompilerType::compiler("msvc"))),
         ]);
     }
 
     #[test]
     fn test_clang_cl_recognition() {
         assert_recognition(&[
-            ("clang-cl", Some(CompilerType::ClangCl)),
-            ("clang-cl.exe", Some(CompilerType::ClangCl)),
-            ("clang-cl-17", Some(CompilerType::ClangCl)),
+            ("clang-cl", Some(CompilerType::compiler("clang_cl"))),
+            ("clang-cl.exe", Some(CompilerType::compiler("clang_cl"))),
+            ("clang-cl-17", Some(CompilerType::compiler("clang_cl"))),
         ]);
     }
 
     #[test]
     fn test_intel_cc_recognition() {
         assert_recognition(&[
-            ("icx", Some(CompilerType::IntelCc)),
-            ("icpx", Some(CompilerType::IntelCc)),
-            ("icc", Some(CompilerType::IntelCc)),
-            ("icpc", Some(CompilerType::IntelCc)),
-            ("icx-2024", Some(CompilerType::IntelCc)),
+            ("icx", Some(CompilerType::compiler("intel_cc"))),
+            ("icpx", Some(CompilerType::compiler("intel_cc"))),
+            ("icc", Some(CompilerType::compiler("intel_cc"))),
+            ("icpc", Some(CompilerType::compiler("intel_cc"))),
+            ("icx-2024", Some(CompilerType::compiler("intel_cc"))),
         ]);
     }
 
     #[test]
     fn test_nvidia_hpc_recognition() {
         assert_recognition(&[
-            ("nvc", Some(CompilerType::NvidiaHpc)),
-            ("nvc++", Some(CompilerType::NvidiaHpc)),
-            ("nvfortran", Some(CompilerType::NvidiaHpc)),
-            ("pgcc", Some(CompilerType::NvidiaHpc)),
-            ("pgc++", Some(CompilerType::NvidiaHpc)),
-            ("pgfortran", Some(CompilerType::NvidiaHpc)),
+            ("nvc", Some(CompilerType::compiler("nvidia_hpc"))),
+            ("nvc++", Some(CompilerType::compiler("nvidia_hpc"))),
+            ("nvfortran", Some(CompilerType::compiler("nvidia_hpc"))),
+            ("pgcc", Some(CompilerType::compiler("nvidia_hpc"))),
+            ("pgc++", Some(CompilerType::compiler("nvidia_hpc"))),
+            ("pgfortran", Some(CompilerType::compiler("nvidia_hpc"))),
         ]);
     }
 
     #[test]
     fn test_armclang_recognition() {
         assert_recognition(&[
-            ("armclang", Some(CompilerType::Armclang)),
-            ("armclang++", Some(CompilerType::Armclang)),
-            ("armclang-14", Some(CompilerType::Armclang)),
+            ("armclang", Some(CompilerType::compiler("armclang"))),
+            ("armclang++", Some(CompilerType::compiler("armclang"))),
+            ("armclang-14", Some(CompilerType::compiler("armclang"))),
         ]);
     }
 
@@ -900,11 +897,11 @@ mod tests {
         // its own literal alternative in cray_cc.yaml, not because "craycc"
         // case-folds to it. Both spellings must resolve independently.
         assert_recognition(&[
-            ("craycc", Some(CompilerType::CrayCc)),
-            ("crayCC", Some(CompilerType::CrayCc)),
-            ("craycxx", Some(CompilerType::CrayCc)),
+            ("craycc", Some(CompilerType::compiler("cray_cc"))),
+            ("crayCC", Some(CompilerType::compiler("cray_cc"))),
+            ("craycxx", Some(CompilerType::compiler("cray_cc"))),
             // Versioned variant
-            ("craycc-17", Some(CompilerType::CrayCc)),
+            ("craycc-17", Some(CompilerType::compiler("cray_cc"))),
         ]);
     }
 
@@ -912,10 +909,10 @@ mod tests {
     #[test]
     fn test_amd_compiler_recognition() {
         assert_recognition(&[
-            ("amdclang", Some(CompilerType::Clang)),
-            ("amdclang++", Some(CompilerType::Clang)),
-            ("hipcc", Some(CompilerType::Clang)),
-            ("amdflang", Some(CompilerType::Flang)),
+            ("amdclang", Some(CompilerType::compiler("clang"))),
+            ("amdclang++", Some(CompilerType::compiler("clang"))),
+            ("hipcc", Some(CompilerType::compiler("clang"))),
+            ("amdflang", Some(CompilerType::compiler("flang"))),
             // A GPU-arch reporting tool, not a compiler driver -- must not be recognized.
             ("amdgpu-arch", None),
         ]);
@@ -925,15 +922,15 @@ mod tests {
     #[test]
     fn test_mpi_wrapper_recognition() {
         assert_recognition(&[
-            ("mpicc", Some(CompilerType::Mpi)),
-            ("mpicxx", Some(CompilerType::Mpi)),
-            ("mpic++", Some(CompilerType::Mpi)),
-            ("mpiCC", Some(CompilerType::Mpi)),
-            ("mpifort", Some(CompilerType::Mpi)),
-            ("mpif77", Some(CompilerType::Mpi)),
-            ("mpif90", Some(CompilerType::Mpi)),
+            ("mpicc", Some(CompilerType::compiler("mpi"))),
+            ("mpicxx", Some(CompilerType::compiler("mpi"))),
+            ("mpic++", Some(CompilerType::compiler("mpi"))),
+            ("mpiCC", Some(CompilerType::compiler("mpi"))),
+            ("mpifort", Some(CompilerType::compiler("mpi"))),
+            ("mpif77", Some(CompilerType::compiler("mpi"))),
+            ("mpif90", Some(CompilerType::compiler("mpi"))),
             // Versioned variant
-            ("mpicc-14", Some(CompilerType::Mpi)),
+            ("mpicc-14", Some(CompilerType::compiler("mpi"))),
             // MPI launchers execute programs, they do not compile -- must not be recognized.
             ("mpirun", None),
             ("mpiexec", None),
@@ -944,12 +941,12 @@ mod tests {
     #[test]
     fn test_intel_mpi_wrapper_recognition() {
         assert_recognition(&[
-            ("mpiicc", Some(CompilerType::IntelCc)),
-            ("mpiicpc", Some(CompilerType::IntelCc)),
-            ("mpiicx", Some(CompilerType::IntelCc)),
-            ("mpiicpx", Some(CompilerType::IntelCc)),
-            ("mpiifort", Some(CompilerType::IntelFortran)),
-            ("mpiifx", Some(CompilerType::IntelFortran)),
+            ("mpiicc", Some(CompilerType::compiler("intel_cc"))),
+            ("mpiicpc", Some(CompilerType::compiler("intel_cc"))),
+            ("mpiicx", Some(CompilerType::compiler("intel_cc"))),
+            ("mpiicpx", Some(CompilerType::compiler("intel_cc"))),
+            ("mpiifort", Some(CompilerType::compiler("intel_fortran"))),
+            ("mpiifx", Some(CompilerType::compiler("intel_fortran"))),
         ]);
     }
 
@@ -957,8 +954,8 @@ mod tests {
     #[test]
     fn test_qnx_recognition() {
         assert_recognition(&[
-            ("qcc", Some(CompilerType::Qnx)),
-            ("q++", Some(CompilerType::Qnx)),
+            ("qcc", Some(CompilerType::compiler("qnx"))),
+            ("q++", Some(CompilerType::compiler("qnx"))),
             // A name that merely shares the "q" prefix is not a QNX driver.
             ("qnxcc", None),
             ("qcc-fake", None),
@@ -969,9 +966,9 @@ mod tests {
     #[test]
     fn test_assembler_recognition() {
         assert_recognition(&[
-            ("nasm", Some(CompilerType::Nasm)),
-            ("yasm", Some(CompilerType::Nasm)),
-            ("fasm", Some(CompilerType::Fasm)),
+            ("nasm", Some(CompilerType::compiler("nasm"))),
+            ("yasm", Some(CompilerType::compiler("nasm"))),
+            ("fasm", Some(CompilerType::compiler("fasm"))),
             // The GNU assembler is deliberately not recognized: gcc/clang
             // spawn it internally on temporary .s files during ordinary
             // compiles (see the recognition-compiler-names Deliberately
@@ -991,11 +988,11 @@ mod tests {
             // installs expose. tiarmclang is a single token (no hyphen), so
             // the <prefix>-clang cross rule does not catch it; it must be
             // listed.
-            ("emcc", Some(CompilerType::Clang)),
-            ("em++", Some(CompilerType::Clang)),
-            ("emcc.py", Some(CompilerType::Clang)),
-            ("em++.py", Some(CompilerType::Clang)),
-            ("tiarmclang", Some(CompilerType::Clang)),
+            ("emcc", Some(CompilerType::compiler("clang"))),
+            ("em++", Some(CompilerType::compiler("clang"))),
+            ("emcc.py", Some(CompilerType::compiler("clang"))),
+            ("em++.py", Some(CompilerType::compiler("clang"))),
+            ("tiarmclang", Some(CompilerType::compiler("clang"))),
             // Emscripten's binutils companions are not compiler drivers.
             ("emar", None),
             ("emranlib", None),
@@ -1010,12 +1007,12 @@ mod tests {
     #[test]
     fn test_swift_recognition() {
         assert_recognition(&[
-            ("swiftc", Some(CompilerType::Swift)),
+            ("swiftc", Some(CompilerType::compiler("swift"))),
             // swift-frontend is routed to the Swift type via ignore_when
             // (the same mechanism gcc's cc1 uses) so the interpreter can
             // filter it; the recognizer itself still classifies the
             // basename as Swift.
-            ("swift-frontend", Some(CompilerType::Swift)),
+            ("swift-frontend", Some(CompilerType::compiler("swift"))),
             // `swift` is the package-manager subcommand driver (`swift
             // build`, `swift run`, ...), a different command-line model
             // (subcommand dispatcher, not a compiler invocation) -- it is
@@ -1028,8 +1025,8 @@ mod tests {
     #[test]
     fn test_microchip_xc8_recognition() {
         assert_recognition(&[
-            ("xc8-cc", Some(CompilerType::Gcc)),
-            ("xc8", Some(CompilerType::Gcc)),
+            ("xc8-cc", Some(CompilerType::compiler("gcc"))),
+            ("xc8", Some(CompilerType::compiler("gcc"))),
             // The XC8 archiver is not a compiler driver.
             ("xc8-ar", None),
         ]);
@@ -1045,20 +1042,30 @@ mod tests {
         let recognizer = CompilerRecognizer::new();
 
         for name in ["hexagon-clang", "hexagon-unknown-linux-musl-clang"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Clang), "name: {}", name);
+            assert_eq!(
+                recognizer.recognize(path(name)),
+                Some(CompilerType::compiler("clang")),
+                "name: {}",
+                name
+            );
         }
         for name in ["xc32-gcc", "riscv64-unknown-elf-gcc"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Gcc), "name: {}", name);
+            assert_eq!(
+                recognizer.recognize(path(name)),
+                Some(CompilerType::compiler("gcc")),
+                "name: {}",
+                name
+            );
         }
     }
 
     #[test]
     fn test_ibm_xl_recognition() {
         assert_recognition(&[
-            ("ibm-clang", Some(CompilerType::IbmXl)),
-            ("ibm-clang++", Some(CompilerType::IbmXl)),
-            ("xlclang", Some(CompilerType::IbmXl)),
-            ("xlclang++", Some(CompilerType::IbmXl)),
+            ("ibm-clang", Some(CompilerType::compiler("ibm_xl"))),
+            ("ibm-clang++", Some(CompilerType::compiler("ibm_xl"))),
+            ("xlclang", Some(CompilerType::compiler("ibm_xl"))),
+            ("xlclang++", Some(CompilerType::compiler("ibm_xl"))),
         ]);
     }
 
@@ -1073,9 +1080,9 @@ mod tests {
         let mixed_gcc = recognizer.recognize(path("Gcc"));
 
         if cfg!(windows) {
-            assert_eq!(upper_gcc, Some(CompilerType::Gcc));
-            assert_eq!(upper_clang, Some(CompilerType::Clang));
-            assert_eq!(mixed_gcc, Some(CompilerType::Gcc));
+            assert_eq!(upper_gcc, Some(CompilerType::compiler("gcc")));
+            assert_eq!(upper_clang, Some(CompilerType::compiler("clang")));
+            assert_eq!(mixed_gcc, Some(CompilerType::compiler("gcc")));
         } else {
             assert_eq!(upper_gcc, None);
             assert_eq!(upper_clang, None);
@@ -1091,7 +1098,7 @@ mod tests {
         let upper_exe = recognizer.recognize(path("gcc.EXE"));
 
         if cfg!(windows) {
-            assert_eq!(upper_exe, Some(CompilerType::Gcc));
+            assert_eq!(upper_exe, Some(CompilerType::compiler("gcc")));
         } else {
             assert_eq!(upper_exe, None);
         }
@@ -1136,19 +1143,19 @@ mod tests {
         // Simulates `/usr/bin/cc` resolving to Clang (FreeBSD, macOS).
         // The relative path "cc" canonicalizes to itself when the file does
         // not exist, so the probe key is the original PathBuf.
-        let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::Clang));
+        let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::compiler("clang")));
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("clang")));
     }
 
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn probe_classifies_cc_as_gcc_on_linux_like_host() {
-        let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::Gcc));
+        let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::compiler("gcc")));
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("gcc")));
     }
 
     // Requirements: recognition-ambiguous-name-probe
@@ -1175,32 +1182,35 @@ mod tests {
         // version ...") contains the substring "clang version", which
         // classify_version_output already recognizes -- no change to the
         // classifier itself is needed for this case.
-        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::Clang));
+        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::compiler("clang")));
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("clang")));
     }
 
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn probe_classifies_cray_prgenv_cc_as_gcc_via_fsf_banner() {
         // Simulates "CC" resolving to g++ under PrgEnv-gnu.
-        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::Gcc));
+        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::compiler("gcc")));
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("gcc")));
     }
 
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn config_hint_beats_probe_and_suppresses_it_for_cray_prgenv_cc() {
-        let compilers =
-            vec![Compiler { path: PathBuf::from("CC"), as_: Some(CompilerType::CrayCc), ignore: false }];
-        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::Clang));
+        let compilers = vec![Compiler {
+            path: PathBuf::from("CC"),
+            as_: Some(CompilerType::compiler("cray_cc")),
+            ignore: false,
+        }];
+        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::compiler("clang")));
         let probe_ptr: *const FakeProbe = &*probe;
         let recognizer = CompilerRecognizer::with_probe(&compilers, probe);
 
-        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::CrayCc));
+        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("cray_cc")));
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0, "hint must short-circuit the probe");
     }
@@ -1223,16 +1233,19 @@ mod tests {
     fn config_hint_beats_probe_and_suppresses_it() {
         // The user's compilers: entry must win, and the probe must not run
         // when a hint already classifies the path.
-        let compilers =
-            vec![Compiler { path: PathBuf::from("cc"), as_: Some(CompilerType::Gcc), ignore: false }];
-        let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::Clang));
+        let compilers = vec![Compiler {
+            path: PathBuf::from("cc"),
+            as_: Some(CompilerType::compiler("gcc")),
+            ignore: false,
+        }];
+        let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::compiler("clang")));
         // Take a raw pointer to the FakeProbe so we can read the call count
         // after handing ownership to the recognizer. Safe because the
         // recognizer owns the box for the duration of the test.
         let probe_ptr: *const FakeProbe = &*probe;
         let recognizer = CompilerRecognizer::with_probe(&compilers, probe);
 
-        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("gcc")));
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0, "hint must short-circuit the probe");
     }
@@ -1302,7 +1315,7 @@ mod tests {
         impl super::super::probe::CompilerProbe for CountingProbe {
             fn probe(&self, _: &Path) -> Option<CompilerType> {
                 self.calls.fetch_add(1, Ordering::SeqCst);
-                Some(CompilerType::Clang)
+                Some(CompilerType::compiler("clang"))
             }
         }
 
@@ -1324,8 +1337,8 @@ mod tests {
         let probe: Box<dyn super::super::probe::CompilerProbe> = Box::new(CachingProbe::new(counting));
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        assert_eq!(recognizer.recognize(&link_a), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(&link_b), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(&link_a), Some(CompilerType::compiler("clang")));
+        assert_eq!(recognizer.recognize(&link_b), Some(CompilerType::compiler("clang")));
 
         assert_eq!(
             calls.load(Ordering::SeqCst),
@@ -1358,13 +1371,13 @@ mod tests {
 
         // The canned answer is keyed by the INVOKED path: a hit proves the
         // probe received it rather than the canonical wrapper path.
-        let probe = Box::new(FakeProbe::new().answer(link.to_str().unwrap(), CompilerType::Gcc));
+        let probe = Box::new(FakeProbe::new().answer(link.to_str().unwrap(), CompilerType::compiler("gcc")));
         let probe_ptr: *const FakeProbe = &*probe;
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
         let sut = recognizer.recognize(&link);
 
-        assert_eq!(sut, Some(CompilerType::Gcc));
+        assert_eq!(sut, Some(CompilerType::compiler("gcc")));
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 1, "the masquerade link must be probed exactly once, as invoked");
     }
@@ -1388,7 +1401,7 @@ mod tests {
         impl super::super::probe::CompilerProbe for CountingProbe {
             fn probe(&self, _: &Path) -> Option<CompilerType> {
                 self.calls.fetch_add(1, Ordering::SeqCst);
-                Some(CompilerType::Gcc)
+                Some(CompilerType::compiler("gcc"))
             }
         }
 
@@ -1408,9 +1421,9 @@ mod tests {
         let probe: Box<dyn super::super::probe::CompilerProbe> = Box::new(CachingProbe::new(counting));
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
 
-        assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(&link_cxx), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(&link_cxx), Some(CompilerType::compiler("gcc")));
+        assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::compiler("gcc")));
 
         assert_eq!(
             calls.load(Ordering::SeqCst),

@@ -60,25 +60,25 @@ impl CompilerInterpreter {
     /// Registers every supported compiler type, threading `from_environment`
     /// into each per-family interpreter.
     fn register_all(&mut self, from_environment: bool) {
-        self.register(CompilerType::Gcc, flag_based::gcc(from_environment));
-        self.register(CompilerType::Clang, flag_based::clang(from_environment));
-        self.register(CompilerType::Flang, flag_based::flang(from_environment));
-        self.register(CompilerType::IntelFortran, flag_based::intel_fortran(from_environment));
-        self.register(CompilerType::CrayFortran, flag_based::cray_fortran(from_environment));
-        self.register(CompilerType::Cuda, flag_based::cuda(from_environment));
-        self.register(CompilerType::Msvc, flag_based::msvc(from_environment));
-        self.register(CompilerType::ClangCl, flag_based::clang_cl(from_environment));
-        self.register(CompilerType::IntelCc, flag_based::intel_cc(from_environment));
-        self.register(CompilerType::NvidiaHpc, flag_based::nvidia_hpc(from_environment));
-        self.register(CompilerType::Armclang, flag_based::armclang(from_environment));
-        self.register(CompilerType::IbmXl, flag_based::ibm_xl(from_environment));
-        self.register(CompilerType::Vala, flag_based::vala(from_environment));
-        self.register(CompilerType::Mpi, flag_based::mpi(from_environment));
-        self.register(CompilerType::CrayCc, flag_based::cray_cc(from_environment));
-        self.register(CompilerType::Qnx, flag_based::qnx(from_environment));
-        self.register(CompilerType::Nasm, flag_based::nasm(from_environment));
-        self.register(CompilerType::Fasm, flag_based::fasm(from_environment));
-        self.register(CompilerType::Swift, flag_based::swift(from_environment));
+        self.register(CompilerType::compiler("gcc"), flag_based::gcc(from_environment));
+        self.register(CompilerType::compiler("clang"), flag_based::clang(from_environment));
+        self.register(CompilerType::compiler("flang"), flag_based::flang(from_environment));
+        self.register(CompilerType::compiler("intel_fortran"), flag_based::intel_fortran(from_environment));
+        self.register(CompilerType::compiler("cray_fortran"), flag_based::cray_fortran(from_environment));
+        self.register(CompilerType::compiler("cuda"), flag_based::cuda(from_environment));
+        self.register(CompilerType::compiler("msvc"), flag_based::msvc(from_environment));
+        self.register(CompilerType::compiler("clang_cl"), flag_based::clang_cl(from_environment));
+        self.register(CompilerType::compiler("intel_cc"), flag_based::intel_cc(from_environment));
+        self.register(CompilerType::compiler("nvidia_hpc"), flag_based::nvidia_hpc(from_environment));
+        self.register(CompilerType::compiler("armclang"), flag_based::armclang(from_environment));
+        self.register(CompilerType::compiler("ibm_xl"), flag_based::ibm_xl(from_environment));
+        self.register(CompilerType::compiler("vala"), flag_based::vala(from_environment));
+        self.register(CompilerType::compiler("mpi"), flag_based::mpi(from_environment));
+        self.register(CompilerType::compiler("cray_cc"), flag_based::cray_cc(from_environment));
+        self.register(CompilerType::compiler("qnx"), flag_based::qnx(from_environment));
+        self.register(CompilerType::compiler("nasm"), flag_based::nasm(from_environment));
+        self.register(CompilerType::compiler("fasm"), flag_based::fasm(from_environment));
+        self.register(CompilerType::compiler("swift"), flag_based::swift(from_environment));
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it
@@ -265,10 +265,14 @@ mod tests {
         fn end_to_end_config_based_compiler_hints() {
             use crate::config::{Compiler, CompilerType};
             let config = vec![
-                Compiler { path: "/custom/path/my-gcc".into(), as_: Some(CompilerType::Gcc), ignore: false },
+                Compiler {
+                    path: "/custom/path/my-gcc".into(),
+                    as_: Some(CompilerType::compiler("gcc")),
+                    ignore: false,
+                },
                 Compiler {
                     path: "/opt/clang/bin/clang++".into(),
-                    as_: Some(CompilerType::Clang),
+                    as_: Some(CompilerType::compiler("clang")),
                     ignore: false,
                 },
             ];

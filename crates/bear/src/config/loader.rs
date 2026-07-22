@@ -205,7 +205,7 @@ mod test {
             compilers: vec![
                 Compiler {
                     path: PathBuf::from("/usr/local/bin/cc"),
-                    as_: Some(CompilerType::Gcc),
+                    as_: Some(CompilerType::compiler("gcc")),
                     ignore: false,
                 },
                 Compiler { path: PathBuf::from("/usr/bin/cc"), as_: None, ignore: true },
@@ -432,7 +432,7 @@ mod test {
             ConfigError::ParseError { source, .. } => {
                 // Verify we got a parse error for invalid compiler type
                 let error_msg = source.to_string();
-                assert!(error_msg.contains("unknown variant"));
+                assert!(error_msg.contains("unknown compiler id"));
                 assert!(error_msg.contains("invalid_compiler_type"));
             }
             other => panic!("Expected ParseError for invalid compiler type, got: {:?}", other),
@@ -441,43 +441,28 @@ mod test {
 
     #[test]
     fn test_compiler_type_serialization() {
-        fn assert_compiler_type_deserializes(json_str: &str, expected: CompilerType) {
-            use serde_json;
+        // Every canonical id deserializes to its own compiler family. The set
+        // is generated (KNOWN_IDS); no id is hand-listed here, so a new family
+        // is covered automatically.
+        for &id in KNOWN_IDS {
+            let sut = serde_json::from_str::<CompilerType>(&format!("\"{id}\"")).unwrap();
 
-            let result = serde_json::from_str::<CompilerType>(json_str).unwrap();
-            assert_eq!(result, expected);
+            assert_eq!(sut, CompilerType::compiler(id), "id: {id}");
         }
 
-        // Test canonical names (verbatim YAML `compiler.id` spellings)
-        assert_compiler_type_deserializes("\"gcc\"", CompilerType::Gcc);
-        assert_compiler_type_deserializes("\"clang\"", CompilerType::Clang);
-        assert_compiler_type_deserializes("\"flang\"", CompilerType::Flang);
-        assert_compiler_type_deserializes("\"intel_fortran\"", CompilerType::IntelFortran);
-        assert_compiler_type_deserializes("\"cray_fortran\"", CompilerType::CrayFortran);
-        assert_compiler_type_deserializes("\"cuda\"", CompilerType::Cuda);
-        assert_compiler_type_deserializes("\"msvc\"", CompilerType::Msvc);
-        assert_compiler_type_deserializes("\"clang_cl\"", CompilerType::ClangCl);
-        assert_compiler_type_deserializes("\"intel_cc\"", CompilerType::IntelCc);
-        assert_compiler_type_deserializes("\"nvidia_hpc\"", CompilerType::NvidiaHpc);
-        assert_compiler_type_deserializes("\"armclang\"", CompilerType::Armclang);
-        assert_compiler_type_deserializes("\"ibm_xl\"", CompilerType::IbmXl);
-        assert_compiler_type_deserializes("\"vala\"", CompilerType::Vala);
-        assert_compiler_type_deserializes("\"mpi\"", CompilerType::Mpi);
-        assert_compiler_type_deserializes("\"cray_cc\"", CompilerType::CrayCc);
-        assert_compiler_type_deserializes("\"qnx\"", CompilerType::Qnx);
-        assert_compiler_type_deserializes("\"nasm\"", CompilerType::Nasm);
-        assert_compiler_type_deserializes("\"fasm\"", CompilerType::Fasm);
-        assert_compiler_type_deserializes("\"swift\"", CompilerType::Swift);
+        // The wrapper kind: "wrapper" plus every launcher basename resolve to
+        // the one runtime CompilerType::Wrapper (see compiler-as-no-aliases).
+        for spelling in std::iter::once("wrapper").chain(WRAPPER_AS_NAMES.iter().copied()) {
+            let sut = serde_json::from_str::<CompilerType>(&format!("\"{spelling}\"")).unwrap();
 
-        // Test compiler launchers (wrappers) - Wrapper keeps its hand-coded aliases
-        assert_compiler_type_deserializes("\"ccache\"", CompilerType::Wrapper);
-        assert_compiler_type_deserializes("\"distcc\"", CompilerType::Wrapper);
-        assert_compiler_type_deserializes("\"sccache\"", CompilerType::Wrapper);
-        assert_compiler_type_deserializes("\"icecc\"", CompilerType::Wrapper);
+            assert_eq!(sut, CompilerType::Wrapper, "spelling: {spelling}");
+        }
     }
 
     #[test]
     fn test_compiler_type_rejects_dropped_aliases() {
+        // Every spelling that used to be an accepted alias now fails: one id,
+        // one spelling, verbatim.
         let dropped_spellings = ["clangcl", "llvm", "intel-cc", "craycc"];
 
         for spelling in dropped_spellings {
@@ -489,7 +474,7 @@ mod test {
                 Err(error) => {
                     let message = error.to_string();
                     assert!(
-                        message.contains("unknown variant"),
+                        message.contains("unknown compiler id"),
                         "case: {spelling}, unexpected error message: {message}"
                     );
                 }
@@ -562,26 +547,20 @@ mod test {
         assert_eq!(config.compilers.len(), 5);
 
         // Verify compiler type hints are correctly parsed
-        assert_eq!(config.compilers[0].as_, Some(CompilerType::Gcc));
-        assert_eq!(config.compilers[1].as_, Some(CompilerType::Clang));
-        assert_eq!(config.compilers[2].as_, Some(CompilerType::Flang));
-        assert_eq!(config.compilers[3].as_, Some(CompilerType::IntelFortran));
-        assert_eq!(config.compilers[4].as_, Some(CompilerType::CrayFortran));
+        assert_eq!(config.compilers[0].as_, Some(CompilerType::compiler("gcc")));
+        assert_eq!(config.compilers[1].as_, Some(CompilerType::compiler("clang")));
+        assert_eq!(config.compilers[2].as_, Some(CompilerType::compiler("flang")));
+        assert_eq!(config.compilers[3].as_, Some(CompilerType::compiler("intel_fortran")));
+        assert_eq!(config.compilers[4].as_, Some(CompilerType::compiler("cray_fortran")));
     }
 
     #[test]
-    fn test_compiler_type_display() {
-        assert_eq!(CompilerType::Gcc.to_string(), "GCC");
-        assert_eq!(CompilerType::Clang.to_string(), "Clang");
-        assert_eq!(CompilerType::Flang.to_string(), "Flang");
-        assert_eq!(CompilerType::IntelFortran.to_string(), "Intel Fortran");
-        assert_eq!(CompilerType::CrayFortran.to_string(), "Cray Fortran");
-        assert_eq!(CompilerType::Msvc.to_string(), "MSVC");
-        assert_eq!(CompilerType::ClangCl.to_string(), "clang-cl");
-        assert_eq!(CompilerType::IntelCc.to_string(), "Intel C/C++");
-        assert_eq!(CompilerType::NvidiaHpc.to_string(), "NVIDIA HPC");
-        assert_eq!(CompilerType::Armclang.to_string(), "ARM Compiler");
-        assert_eq!(CompilerType::IbmXl.to_string(), "IBM Open XL");
-        assert_eq!(CompilerType::Vala.to_string(), "Vala");
+    fn test_compiler_type_display_is_the_id_verbatim() {
+        // Display prints the id, not a curated pretty name: one spelling
+        // everywhere (YAML, config `as:`, generated data, output).
+        assert_eq!(CompilerType::compiler("gcc").to_string(), "gcc");
+        assert_eq!(CompilerType::compiler("clang_cl").to_string(), "clang_cl");
+        assert_eq!(CompilerType::compiler("intel_fortran").to_string(), "intel_fortran");
+        assert_eq!(CompilerType::Wrapper.to_string(), "wrapper");
     }
 }

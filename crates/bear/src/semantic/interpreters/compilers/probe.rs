@@ -171,11 +171,11 @@ mod caching_tests {
 
     #[test]
     fn caches_successful_classification_per_path() {
-        let inner = CountingProbe::with_answer("cc", CompilerType::Clang);
+        let inner = CountingProbe::with_answer("cc", CompilerType::compiler("clang"));
         let cached = CachingProbe::new(inner);
 
         for _ in 0..100 {
-            assert_eq!(cached.probe(Path::new("cc")), Some(CompilerType::Clang));
+            assert_eq!(cached.probe(Path::new("cc")), Some(CompilerType::compiler("clang")));
         }
 
         // The inner CompilerProbe is moved into CachingProbe, so we have
@@ -200,16 +200,16 @@ mod caching_tests {
     #[test]
     fn distinct_paths_are_cached_independently() {
         let mut answers = HashMap::new();
-        answers.insert(PathBuf::from("/usr/bin/cc"), CompilerType::Gcc);
-        answers.insert(PathBuf::from("/usr/local/bin/cc"), CompilerType::Clang);
+        answers.insert(PathBuf::from("/usr/bin/cc"), CompilerType::compiler("gcc"));
+        answers.insert(PathBuf::from("/usr/local/bin/cc"), CompilerType::compiler("clang"));
         let inner = CountingProbe { answers, calls: Cell::new(0) };
         let cached = CachingProbe::new(inner);
 
-        assert_eq!(cached.probe(Path::new("/usr/bin/cc")), Some(CompilerType::Gcc));
-        assert_eq!(cached.probe(Path::new("/usr/local/bin/cc")), Some(CompilerType::Clang));
+        assert_eq!(cached.probe(Path::new("/usr/bin/cc")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(cached.probe(Path::new("/usr/local/bin/cc")), Some(CompilerType::compiler("clang")));
         // Repeat to confirm both entries are stable in the cache.
-        assert_eq!(cached.probe(Path::new("/usr/bin/cc")), Some(CompilerType::Gcc));
-        assert_eq!(cached.probe(Path::new("/usr/local/bin/cc")), Some(CompilerType::Clang));
+        assert_eq!(cached.probe(Path::new("/usr/bin/cc")), Some(CompilerType::compiler("gcc")));
+        assert_eq!(cached.probe(Path::new("/usr/local/bin/cc")), Some(CompilerType::compiler("clang")));
 
         assert_eq!(cached.inner.calls(), 2, "each distinct path triggers exactly one inner call");
     }
@@ -354,7 +354,7 @@ mod unix {
             // Apple clang prints "Apple clang version ...", upstream LLVM prints
             // "clang version ..."; both contain the substring "clang version".
             if haystack.contains("clang version") {
-                return Some(CompilerType::Clang);
+                return Some(CompilerType::compiler("clang"));
             }
             // GNU gcc prints a "Copyright (C) ... Free Software Foundation,
             // Inc." line in every build. The leading "(GCC)" vendor tag is
@@ -367,7 +367,7 @@ mod unix {
             // FSF copyright), so this does not misclassify clang as gcc. See
             // issue #711.
             if haystack.contains("Free Software Foundation") {
-                return Some(CompilerType::Gcc);
+                return Some(CompilerType::compiler("gcc"));
             }
         }
         None
@@ -388,13 +388,13 @@ mod unix {
         #[test]
         fn classifies_upstream_clang() {
             let stdout = "clang version 17.0.6\nTarget: x86_64-pc-linux-gnu\n";
-            assert_eq!(classify_version_output(stdout, ""), Some(CompilerType::Clang));
+            assert_eq!(classify_version_output(stdout, ""), Some(CompilerType::compiler("clang")));
         }
 
         #[test]
         fn classifies_apple_clang() {
             let stdout = "Apple clang version 15.0.0 (clang-1500.3.9.4)\n";
-            assert_eq!(classify_version_output(stdout, ""), Some(CompilerType::Clang));
+            assert_eq!(classify_version_output(stdout, ""), Some(CompilerType::compiler("clang")));
         }
 
         #[test]
@@ -424,7 +424,7 @@ mod unix {
             for stdout in cases {
                 assert_eq!(
                     classify_version_output(stdout, ""),
-                    Some(CompilerType::Gcc),
+                    Some(CompilerType::compiler("gcc")),
                     "expected GCC for output: {stdout:?}"
                 );
             }
@@ -435,7 +435,7 @@ mod unix {
             // Some toolchains print --version to stderr. Apple clang has done this
             // historically.
             let stderr = "Apple clang version 12.0.0\n";
-            assert_eq!(classify_version_output("", stderr), Some(CompilerType::Clang));
+            assert_eq!(classify_version_output("", stderr), Some(CompilerType::compiler("clang")));
         }
 
         #[test]
@@ -475,7 +475,7 @@ mod unix {
                     "#!/bin/sh\necho 'clang version 17.0.0 (Fedora 17.0.0-1)'\n",
                 );
 
-                assert_eq!(VersionProbe::new().probe(&script), Some(CompilerType::Clang));
+                assert_eq!(VersionProbe::new().probe(&script), Some(CompilerType::compiler("clang")));
             }
 
             #[test]
@@ -491,7 +491,7 @@ mod unix {
                      echo 'Copyright (C) 2025 Free Software Foundation, Inc.'\n",
                 );
 
-                assert_eq!(VersionProbe::new().probe(&script), Some(CompilerType::Gcc));
+                assert_eq!(VersionProbe::new().probe(&script), Some(CompilerType::compiler("gcc")));
             }
 
             #[test]
@@ -561,7 +561,7 @@ mod unix {
                 let sut = VersionProbe::new().probe(&path);
                 release.join().unwrap();
 
-                assert_eq!(sut, Some(CompilerType::Clang));
+                assert_eq!(sut, Some(CompilerType::compiler("clang")));
             }
 
             #[test]
@@ -584,7 +584,7 @@ mod unix {
                 // The script exits cleanly after reading EOF, prints the clang
                 // signature, exits 0. Probe should classify it as Clang well
                 // before the timeout.
-                assert_eq!(result, Some(CompilerType::Clang));
+                assert_eq!(result, Some(CompilerType::compiler("clang")));
                 assert!(
                     elapsed < std::time::Duration::from_secs(1),
                     "probe took {elapsed:?}; stdin was not closed"

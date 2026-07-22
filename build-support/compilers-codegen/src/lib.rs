@@ -15,7 +15,7 @@ use anyhow::{Context, Result, bail};
 
 use codegen::{pattern_to_rust, result_to_rust};
 use env_keys::generate_env_keys;
-use recognition::generate_recognition_patterns;
+use recognition::{generate_compiler_ids, generate_recognition_patterns};
 use resolve::{resolve_environment, resolve_flags, resolve_ignore_when, resolve_slash_prefix};
 use tables::{TABLES, TableConfig};
 use wrappers::generate_wrappers;
@@ -162,6 +162,11 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
     // Generate recognition patterns (compiler rows, then wrapper rows)
     let recognition = generate_recognition_patterns(&raw_tables, &file_to_id, &wrapper_tables)?;
     write_output(out_dir, "recognition.rs", recognition)?;
+
+    // Generate the compiler-id data the config module's `as:` deserializer
+    // validates against (KNOWN_IDS plus the wrapper launcher basenames).
+    let compiler_ids = generate_compiler_ids(&file_to_id, &wrapper_tables)?;
+    write_output(out_dir, "compiler_ids.rs", compiler_ids)?;
 
     // Generate each compiler's flag table
     for config in TABLES {
@@ -798,6 +803,31 @@ mod tests {
         assert!(wrappers_rs.contains("WRAPPER_OPTIONS"));
         assert!(wrappers_rs.contains("\"ccache\""));
         assert!(wrappers_rs.contains("\"distcc\""));
+        let compiler_ids_rs = std::fs::read_to_string(out_dir.path().join("compiler_ids.rs")).unwrap();
+        assert!(compiler_ids_rs.contains("KNOWN_IDS"));
+        assert!(compiler_ids_rs.contains("WRAPPER_AS_NAMES"));
+        assert!(compiler_ids_rs.contains("\"gcc\""));
+        assert!(compiler_ids_rs.contains("\"ccache\""));
+    }
+
+    #[test]
+    fn generate_compiler_ids_lists_every_family_and_launcher() {
+        let (_raw_tables, file_to_id) = load_and_index(&flags_dir(), false).unwrap();
+        let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
+
+        let sut = generate_compiler_ids(&file_to_id, &wrapper_tables).unwrap();
+
+        // Every TABLES id appears; the four launcher basenames appear as
+        // wrapper as-names; "wrapper" is the kind, never an id.
+        for config in TABLES {
+            let id = file_to_id[config.yaml_file].as_str();
+            assert!(sut.contains(&format!("\"{}\"", id)), "missing id {id}");
+        }
+        for launcher in ["ccache", "distcc", "icecc", "sccache"] {
+            assert!(sut.contains(&format!("\"{}\"", launcher)), "missing launcher {launcher}");
+        }
+        assert!(sut.contains("KNOWN_IDS"));
+        assert!(sut.contains("WRAPPER_AS_NAMES"));
     }
 
     // -- load_wrapper_tables tests --

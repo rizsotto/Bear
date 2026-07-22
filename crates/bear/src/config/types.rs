@@ -85,65 +85,111 @@ pub struct Compiler {
     pub ignore: bool,
 }
 
-/// Compiler types that we can recognize and configure
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
+// Generated compiler-id data (KNOWN_IDS, WRAPPER_AS_NAMES) from
+// compilers/*.yaml. These are the sole accepted config `as:` spellings; the
+// deserializer below validates against them instead of a hand-maintained
+// mirror of the family set. See compiler-as-no-aliases.
+include!(concat!(env!("OUT_DIR"), "/compiler_ids.rs"));
+
+/// A compiler family's identity: the `compiler.id` declared in its YAML
+/// definition, which is also its sole accepted config `as:` spelling.
+///
+/// Wraps a `&'static str` that is always one of the generated [`KNOWN_IDS`]:
+/// [`CompilerType`]'s `Deserialize` resolves user input to a canonical entry,
+/// and internal literals are drift-guarded against that list by a test.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct CompilerId(&'static str);
+
+impl CompilerId {
+    /// Construct from a compile-time-known id. The caller guarantees the id is
+    /// one of [`KNOWN_IDS`]; `compiler_id_literals_are_known` enforces this for
+    /// every internal literal.
+    pub(crate) const fn new(id: &'static str) -> Self {
+        CompilerId(id)
+    }
+
+    /// The canonical id string, verbatim.
+    pub fn as_str(&self) -> &'static str {
+        self.0
+    }
+}
+
+impl fmt::Display for CompilerId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+/// The kind of tool Bear recognizes: a real compiler family (carrying its
+/// [`CompilerId`]) or a compiler launcher (wrapper). Mirrors the YAML `type:`
+/// field; the family set lives in data ([`KNOWN_IDS`]), not in this enum.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CompilerType {
-    Gcc,
-    Clang,
-    Flang,
-    #[serde(rename = "intel_fortran")]
-    IntelFortran,
-    #[serde(rename = "cray_fortran")]
-    CrayFortran,
-    Cuda,
-    Msvc,
-    #[serde(rename = "clang_cl")]
-    ClangCl,
-    #[serde(rename = "intel_cc")]
-    IntelCc,
-    #[serde(rename = "nvidia_hpc")]
-    NvidiaHpc,
-    Armclang,
-    #[serde(rename = "ibm_xl")]
-    IbmXl,
-    Vala,
-    Mpi,
-    #[serde(rename = "cray_cc")]
-    CrayCc,
-    Qnx,
-    Nasm,
-    Fasm,
-    Swift,
-    #[serde(alias = "ccache", alias = "distcc", alias = "sccache", alias = "icecc")]
+    Compiler(CompilerId),
     Wrapper,
 }
 
-impl std::fmt::Display for CompilerType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = match self {
-            CompilerType::Gcc => "GCC",
-            CompilerType::Clang => "Clang",
-            CompilerType::Flang => "Flang",
-            CompilerType::IntelFortran => "Intel Fortran",
-            CompilerType::CrayFortran => "Cray Fortran",
-            CompilerType::Cuda => "CUDA",
-            CompilerType::Msvc => "MSVC",
-            CompilerType::ClangCl => "clang-cl",
-            CompilerType::IntelCc => "Intel C/C++",
-            CompilerType::NvidiaHpc => "NVIDIA HPC",
-            CompilerType::Armclang => "ARM Compiler",
-            CompilerType::IbmXl => "IBM Open XL",
-            CompilerType::Vala => "Vala",
-            CompilerType::Mpi => "MPI wrapper",
-            CompilerType::CrayCc => "Cray C/C++",
-            CompilerType::Qnx => "QNX qcc",
-            CompilerType::Nasm => "NASM",
-            CompilerType::Fasm => "flat assembler",
-            CompilerType::Swift => "Swift",
-            CompilerType::Wrapper => "Wrapper",
-        };
-        write!(f, "{}", name)
+impl CompilerType {
+    /// Construct a compiler-kind value from a compile-time-known id.
+    pub(crate) const fn compiler(id: &'static str) -> Self {
+        CompilerType::Compiler(CompilerId::new(id))
+    }
+
+    /// Map a generated `RECOGNITION_PATTERNS` id column to a value. The string
+    /// is trusted generated data: `"wrapper"` names the launcher kind, every
+    /// other value is a real compiler id.
+    pub(crate) fn from_recognized_id(id: &'static str) -> Self {
+        if id == "wrapper" { CompilerType::Wrapper } else { CompilerType::compiler(id) }
+    }
+}
+
+impl fmt::Display for CompilerType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CompilerType::Compiler(id) => fmt::Display::fmt(id, f),
+            CompilerType::Wrapper => f.write_str("wrapper"),
+        }
+    }
+}
+
+impl serde::Serialize for CompilerType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(match self {
+            CompilerType::Compiler(id) => id.as_str(),
+            CompilerType::Wrapper => "wrapper",
+        })
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CompilerType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let spelling = String::deserialize(deserializer)?;
+        // The four launchers share one runtime kind: "wrapper" plus each
+        // launcher basename all resolve to it (see compiler-as-no-aliases).
+        if spelling == "wrapper" || WRAPPER_AS_NAMES.contains(&spelling.as_str()) {
+            return Ok(CompilerType::Wrapper);
+        }
+        // A compiler family is its id, verbatim -- no aliases. Resolve to the
+        // canonical `&'static str` so the value is unconstructible unvalidated.
+        if let Some(&canonical) = KNOWN_IDS.iter().find(|&&id| id == spelling) {
+            return Ok(CompilerType::Compiler(CompilerId::new(canonical)));
+        }
+        // List every accepted `as:` value: the compiler ids plus the
+        // launcher spellings ("wrapper" and each basename). Omitting the
+        // launcher spellings would misdescribe a mistyped `ccache` as if only
+        // compiler ids were valid.
+        Err(D::Error::custom(format!(
+            "unknown compiler id {spelling:?}, expected one of: {}, wrapper, {}",
+            KNOWN_IDS.join(", "),
+            WRAPPER_AS_NAMES.join(", ")
+        )))
     }
 }
 
@@ -388,5 +434,48 @@ mod tests {
         let sut: Result<Headers, _> = serde_saphyr::from_str(yaml);
 
         assert!(sut.is_err(), "expected deserialization to fail for: {yaml}");
+    }
+
+    #[test]
+    fn compiler_id_literals_are_known() {
+        // Every compiler id spelled as a literal in production code (the
+        // probe verdicts, the recognition fallback, the response-file syntax
+        // match) must be one of the generated KNOWN_IDS. If a YAML rename
+        // ever drifts one of these, this fails instead of silently
+        // misclassifying at runtime.
+        //
+        // register_all's 19 registration literals are deliberately not
+        // listed here: they are guarded end-to-end by the dispatch test
+        // (every_recognition_pattern_row_is_dispatched_by_a_registered_interpreter),
+        // which fails if any registration string mismatches a recognized id.
+        // This test covers exactly the literal sites that have no such
+        // end-to-end guard.
+        for id in ["gcc", "clang", "msvc", "clang_cl"] {
+            assert!(KNOWN_IDS.contains(&id), "internal id literal {id:?} is not in KNOWN_IDS");
+        }
+    }
+
+    #[test]
+    fn unknown_as_value_error_lists_wrapper_and_a_real_id() {
+        // The "expected one of" list must name every accepted `as:` value,
+        // including the launcher spellings -- not just the compiler ids.
+        let sut = serde_json::from_str::<CompilerType>("\"nope\"").unwrap_err().to_string();
+
+        assert!(sut.contains("unknown compiler id"), "message: {sut}");
+        assert!(sut.contains(KNOWN_IDS[0]), "message should list a real id: {sut}");
+        assert!(sut.contains("wrapper"), "message should list the wrapper spelling: {sut}");
+        assert!(sut.contains(WRAPPER_AS_NAMES[0]), "message should list a launcher name: {sut}");
+    }
+
+    #[test]
+    fn compiler_type_round_trips_through_serde() {
+        // Serialize then deserialize yields the same value, for both kinds.
+        for sut in [CompilerType::compiler(KNOWN_IDS[0]), CompilerType::Wrapper] {
+            let json = serde_json::to_string(&sut).unwrap();
+
+            let back: CompilerType = serde_json::from_str(&json).unwrap();
+
+            assert_eq!(back, sut, "round-trip via {json}");
+        }
     }
 }

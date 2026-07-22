@@ -220,7 +220,7 @@ mod tests {
 
         assert_eq!(inner.working_dir, PathBuf::from("/custom/dir"));
         assert_eq!(inner.environment.get("CC"), Some(&"gcc".to_string()));
-        assert_eq!(ty, CompilerType::Gcc);
+        assert_eq!(ty, CompilerType::compiler("gcc"));
     }
 
     // Requirements: recognition-compiler-launchers

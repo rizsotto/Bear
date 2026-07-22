@@ -1,0 +1,8 @@
+---
+source: build-support/compilers-codegen/tests/snapshots.rs
+assertion_line: 159
+expression: "generate_compiler_ids(&file_to_id, &wrapper_tables).unwrap()"
+---
+// Generated from compilers/*.yaml -- DO NOT EDIT
+pub(crate) static KNOWN_IDS: &[&str] = &["gcc", "ibm_xl", "clang_cl", "clang", "flang", "cuda", "intel_fortran", "cray_fortran", "msvc", "intel_cc", "nvidia_hpc", "armclang", "vala", "mpi", "cray_cc", "qnx", "nasm", "fasm", "swift"];
+pub(crate) static WRAPPER_AS_NAMES: &[&str] = &["ccache", "distcc", "icecc", "sccache"];
