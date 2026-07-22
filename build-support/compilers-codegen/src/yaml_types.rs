@@ -43,6 +43,60 @@ pub struct FlagTable {
     pub flags: Vec<FlagEntry>,
     #[serde(default)]
     pub environment: Option<Vec<EnvEntry>>,
+    /// How this family's invocations map to database entries (post-parse).
+    /// Not inherited through `extends`; each family states its own.
+    #[serde(default)]
+    pub source_mode: SourceMode,
+    /// Response-file (`@file`) tokenization convention for this family.
+    /// Not inherited through `extends`; each family states its own.
+    #[serde(default)]
+    pub response_file_syntax: Syntax,
+}
+
+/// How a family's sources map to compilation-database entries. Closed enum;
+/// the parse-side twin of the `bear` crate's runtime `SourceMode`, which
+/// [`SourceMode::to_rust`] emits. Default `per-source-stripped` covers
+/// GCC/Clang and most families.
+#[derive(Deserialize, Clone, Copy, Default, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourceMode {
+    #[default]
+    PerSourceStripped,
+    PerSourceFull,
+    Combined,
+}
+
+impl SourceMode {
+    /// The generated `SourceMode` expression for this value.
+    pub fn to_rust(self) -> &'static str {
+        match self {
+            SourceMode::PerSourceStripped => "SourceMode::PerSourceStripped",
+            SourceMode::PerSourceFull => "SourceMode::PerSourceFull",
+            SourceMode::Combined => "SourceMode::Combined",
+        }
+    }
+}
+
+/// Response-file tokenization convention. Closed enum; the parse-side twin
+/// of the `bear` crate's runtime `Syntax`, which [`Syntax::to_rust`] emits.
+/// Default `gnu` covers every family except the MSVC-style ones (`msvc`,
+/// `clang-cl`).
+#[derive(Deserialize, Clone, Copy, Default, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Syntax {
+    #[default]
+    Gnu,
+    Msvc,
+}
+
+impl Syntax {
+    /// The generated `Syntax` expression for this value.
+    pub fn to_rust(self) -> &'static str {
+        match self {
+            Syntax::Gnu => "Syntax::GnuClang",
+            Syntax::Msvc => "Syntax::Msvc",
+        }
+    }
 }
 
 /// A compiler-launcher YAML file (`ccache.yaml`, `distcc.yaml`, ...):
@@ -180,7 +234,7 @@ impl FlagMatch {
 pub struct EnvEntry {
     pub variable: String,
     pub effect: String,
-    pub mapping: EnvMappingYaml,
+    pub mapping: EnvMapping,
     #[serde(default)]
     #[allow(dead_code)]
     pub note: Option<String>,
@@ -241,7 +295,7 @@ impl EnvEntry {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct EnvMappingYaml {
+pub struct EnvMapping {
     #[serde(default)]
     pub flag: Option<String>,
     #[serde(default)]
@@ -249,7 +303,7 @@ pub struct EnvMappingYaml {
     pub separator: String,
 }
 
-impl EnvMappingYaml {
+impl EnvMapping {
     /// Convert this mapping to a Rust `EnvMapping` expression string.
     pub fn to_rust(&self) -> Result<String> {
         if let Some(ref flag) = self.flag {

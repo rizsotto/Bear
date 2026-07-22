@@ -220,6 +220,24 @@ fn unknown_type_value_fails() {
     assert!(err.to_string().contains("bad_type.yaml"), "{}", err);
 }
 
+/// An unrecognized `source_mode:` value fails to parse (closed enum), and the
+/// error names the offending file.
+#[test]
+fn unknown_source_mode_value_fails() {
+    let yaml = format!("type: compiler\ncompiler:\n  id: x\nsource_mode: bogus\n{}", MINIMAL_FLAGS);
+    let err = parse_table("bad_source_mode.yaml", &yaml).err().unwrap();
+    assert!(err.to_string().contains("bad_source_mode.yaml"), "{}", err);
+}
+
+/// An unrecognized `response_file_syntax:` value fails to parse (closed enum),
+/// and the error names the offending file.
+#[test]
+fn unknown_response_file_syntax_value_fails() {
+    let yaml = format!("type: compiler\ncompiler:\n  id: x\nresponse_file_syntax: bogus\n{}", MINIMAL_FLAGS);
+    let err = parse_table("bad_syntax.yaml", &yaml).err().unwrap();
+    assert!(err.to_string().contains("bad_syntax.yaml"), "{}", err);
+}
+
 // -- Negative-case tests for `WrapperTable` --
 //
 // These exercise `WrapperTable::validate` against small inline YAML

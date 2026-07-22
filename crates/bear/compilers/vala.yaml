@@ -22,6 +22,8 @@ recognize:
     versioned: true           # valac-0.56, valac-0.48 (major.minor)
     cross_compilation: true   # Debian/Ubuntu ship x86_64-linux-gnu-valac
 slash_prefix: false
+# valac compiles all sources into one combined translation unit / output.
+source_mode: combined
 flags:
   # Output and driver stop points
   - match: {pattern: "-o{ }*"}

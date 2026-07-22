@@ -2,6 +2,7 @@
 
 pub mod codegen;
 pub mod env_keys;
+pub mod families;
 pub mod recognition;
 pub mod resolve;
 pub mod tables;
@@ -15,6 +16,7 @@ use anyhow::{Context, Result, bail};
 
 use codegen::{pattern_to_rust, result_to_rust};
 use env_keys::generate_env_keys;
+use families::generate_families;
 use recognition::{generate_compiler_ids, generate_recognition_patterns};
 use resolve::{resolve_environment, resolve_flags, resolve_ignore_when, resolve_slash_prefix};
 use tables::{CompilerFile, TableNames};
@@ -173,6 +175,11 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
         let resolved = ResolvedTable::new(compiler_file, &raw_tables)?;
         write_output(out_dir, &compiler_file.names().output_file, resolved.generate()?)?;
     }
+
+    // Generate the family registry the semantic layer loops over to register
+    // one interpreter per family (includes the flag tables above).
+    let families = generate_families(&compiler_files, &raw_tables);
+    write_output(out_dir, "families.rs", families)?;
 
     // Generate combined environment variable keys
     let env_keys = generate_env_keys(&raw_tables);
@@ -439,7 +446,9 @@ pub fn load_compiler_files() -> Result<Vec<CompilerFile>> {
 mod tests {
     use super::*;
     use crate::codegen::pattern_to_rust;
-    use crate::yaml_types::{CompilerIdentity, EnvEntry, EnvMappingYaml, FlagMatch, Kind, RecognizeEntry};
+    use crate::yaml_types::{
+        CompilerIdentity, EnvEntry, EnvMapping, FlagMatch, Kind, RecognizeEntry, SourceMode, Syntax,
+    };
 
     // -- pattern_to_rust tests --
 
@@ -568,6 +577,8 @@ mod tests {
                 slash_prefix: None,
                 flags: vec![],
                 environment: Some(vec![make_test_env_entry("VAR_A")]),
+                source_mode: SourceMode::default(),
+                response_file_syntax: Syntax::default(),
             },
         );
         tables.insert(
@@ -580,6 +591,8 @@ mod tests {
                 slash_prefix: None,
                 flags: vec![],
                 environment: Some(vec![make_test_env_entry("VAR_B")]),
+                source_mode: SourceMode::default(),
+                response_file_syntax: Syntax::default(),
             },
         );
         assert_eq!(resolve_environment("a", &tables).len(), 2);
@@ -820,11 +833,11 @@ mod tests {
         assert!(err.to_string().contains("unknown separator"), "{}", err);
     }
 
-    // -- EnvMappingYaml::to_rust tests --
+    // -- EnvMapping::to_rust tests --
 
     #[test]
     fn env_mapping_to_rust_no_flag_no_expand_is_err() {
-        let mapping = EnvMappingYaml { flag: None, expand: None, separator: "path".to_string() };
+        let mapping = EnvMapping { flag: None, expand: None, separator: "path".to_string() };
         let err = mapping.to_rust().unwrap_err();
         assert!(err.to_string().contains("neither 'flag' nor 'expand'"), "{}", err);
     }
@@ -832,7 +845,7 @@ mod tests {
     #[test]
     fn env_mapping_to_rust_unknown_expand_is_err() {
         let mapping =
-            EnvMappingYaml { flag: None, expand: Some("middle".to_string()), separator: "path".to_string() };
+            EnvMapping { flag: None, expand: Some("middle".to_string()), separator: "path".to_string() };
         let err = mapping.to_rust().unwrap_err();
         assert!(err.to_string().contains("unknown expand position"), "{}", err);
     }
@@ -932,6 +945,8 @@ mod tests {
                     slash_prefix: None,
                     flags: vec![],
                     environment: None,
+                    source_mode: SourceMode::default(),
+                    response_file_syntax: Syntax::default(),
                 },
             );
         }
@@ -979,6 +994,8 @@ mod tests {
             slash_prefix: None,
             flags: vec![],
             environment: None,
+            source_mode: SourceMode::default(),
+            response_file_syntax: Syntax::default(),
         }
     }
 
@@ -993,11 +1010,7 @@ mod tests {
         EnvEntry {
             variable: var.to_string(),
             effect: "configures_compiling".to_string(),
-            mapping: EnvMappingYaml {
-                flag: Some("-I".to_string()),
-                expand: None,
-                separator: "path".to_string(),
-            },
+            mapping: EnvMapping { flag: Some("-I".to_string()), expand: None, separator: "path".to_string() },
             note: None,
         }
     }

@@ -1,0 +1,46 @@
+---
+source: build-support/compilers-codegen/tests/snapshots.rs
+assertion_line: 155
+expression: "generate_families(&compiler_files, &raw_tables)"
+---
+// Generated from compilers/*.yaml -- DO NOT EDIT
+include!(concat!(env!("OUT_DIR"), "/flags_armclang.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_intel_cc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_clang.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_clang_cl.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_cuda.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_flang.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_mpi.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_qnx.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_fasm.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_gcc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_intel_fortran.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_msvc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_nasm.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_nvidia_hpc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_swift.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
+pub(super) static FAMILIES: &[FamilyDef] = &[
+    FamilyDef { id: "armclang", flags: &ARMCLANG_FLAGS, ignore_executables: &ARMCLANG_IGNORE_EXECUTABLES, ignore_flags: &ARMCLANG_IGNORE_FLAGS, slash_prefix: ARMCLANG_SLASH_PREFIX, env_rules: &ARMCLANG_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "cray_cc", flags: &CRAY_CC_FLAGS, ignore_executables: &CRAY_CC_IGNORE_EXECUTABLES, ignore_flags: &CRAY_CC_IGNORE_FLAGS, slash_prefix: CRAY_CC_SLASH_PREFIX, env_rules: &CRAY_CC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "ibm_xl", flags: &IBM_XL_FLAGS, ignore_executables: &IBM_XL_IGNORE_EXECUTABLES, ignore_flags: &IBM_XL_IGNORE_FLAGS, slash_prefix: IBM_XL_SLASH_PREFIX, env_rules: &IBM_XL_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "intel_cc", flags: &INTEL_CC_FLAGS, ignore_executables: &INTEL_CC_IGNORE_EXECUTABLES, ignore_flags: &INTEL_CC_IGNORE_FLAGS, slash_prefix: INTEL_CC_SLASH_PREFIX, env_rules: &INTEL_CC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "clang", flags: &CLANG_FLAGS, ignore_executables: &CLANG_IGNORE_EXECUTABLES, ignore_flags: &CLANG_IGNORE_FLAGS, slash_prefix: CLANG_SLASH_PREFIX, env_rules: &CLANG_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "clang_cl", flags: &CLANG_CL_FLAGS, ignore_executables: &CLANG_CL_IGNORE_EXECUTABLES, ignore_flags: &CLANG_CL_IGNORE_FLAGS, slash_prefix: CLANG_CL_SLASH_PREFIX, env_rules: &CLANG_CL_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::Msvc },
+    FamilyDef { id: "cuda", flags: &CUDA_FLAGS, ignore_executables: &CUDA_IGNORE_EXECUTABLES, ignore_flags: &CUDA_IGNORE_FLAGS, slash_prefix: CUDA_SLASH_PREFIX, env_rules: &CUDA_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "flang", flags: &FLANG_FLAGS, ignore_executables: &FLANG_IGNORE_EXECUTABLES, ignore_flags: &FLANG_IGNORE_FLAGS, slash_prefix: FLANG_SLASH_PREFIX, env_rules: &FLANG_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "mpi", flags: &MPI_FLAGS, ignore_executables: &MPI_IGNORE_EXECUTABLES, ignore_flags: &MPI_IGNORE_FLAGS, slash_prefix: MPI_SLASH_PREFIX, env_rules: &MPI_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "qnx", flags: &QNX_FLAGS, ignore_executables: &QNX_IGNORE_EXECUTABLES, ignore_flags: &QNX_IGNORE_FLAGS, slash_prefix: QNX_SLASH_PREFIX, env_rules: &QNX_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "cray_fortran", flags: &CRAY_FORTRAN_FLAGS, ignore_executables: &CRAY_FORTRAN_IGNORE_EXECUTABLES, ignore_flags: &CRAY_FORTRAN_IGNORE_FLAGS, slash_prefix: CRAY_FORTRAN_SLASH_PREFIX, env_rules: &CRAY_FORTRAN_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "fasm", flags: &FASM_FLAGS, ignore_executables: &FASM_IGNORE_EXECUTABLES, ignore_flags: &FASM_IGNORE_FLAGS, slash_prefix: FASM_SLASH_PREFIX, env_rules: &FASM_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "gcc", flags: &GCC_FLAGS, ignore_executables: &GCC_IGNORE_EXECUTABLES, ignore_flags: &GCC_IGNORE_FLAGS, slash_prefix: GCC_SLASH_PREFIX, env_rules: &GCC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "intel_fortran", flags: &INTEL_FORTRAN_FLAGS, ignore_executables: &INTEL_FORTRAN_IGNORE_EXECUTABLES, ignore_flags: &INTEL_FORTRAN_IGNORE_FLAGS, slash_prefix: INTEL_FORTRAN_SLASH_PREFIX, env_rules: &INTEL_FORTRAN_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "msvc", flags: &MSVC_FLAGS, ignore_executables: &MSVC_IGNORE_EXECUTABLES, ignore_flags: &MSVC_IGNORE_FLAGS, slash_prefix: MSVC_SLASH_PREFIX, env_rules: &MSVC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::Msvc },
+    FamilyDef { id: "nasm", flags: &NASM_FLAGS, ignore_executables: &NASM_IGNORE_EXECUTABLES, ignore_flags: &NASM_IGNORE_FLAGS, slash_prefix: NASM_SLASH_PREFIX, env_rules: &NASM_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "nvidia_hpc", flags: &NVIDIA_HPC_FLAGS, ignore_executables: &NVIDIA_HPC_IGNORE_EXECUTABLES, ignore_flags: &NVIDIA_HPC_IGNORE_FLAGS, slash_prefix: NVIDIA_HPC_SLASH_PREFIX, env_rules: &NVIDIA_HPC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "swift", flags: &SWIFT_FLAGS, ignore_executables: &SWIFT_IGNORE_EXECUTABLES, ignore_flags: &SWIFT_IGNORE_FLAGS, slash_prefix: SWIFT_SLASH_PREFIX, env_rules: &SWIFT_ENV_RULES, source_mode: SourceMode::PerSourceFull, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "vala", flags: &VALA_FLAGS, ignore_executables: &VALA_IGNORE_EXECUTABLES, ignore_flags: &VALA_IGNORE_FLAGS, slash_prefix: VALA_SLASH_PREFIX, env_rules: &VALA_ENV_RULES, source_mode: SourceMode::Combined, response_file_syntax: Syntax::GnuClang },
+];

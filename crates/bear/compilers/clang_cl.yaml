@@ -10,6 +10,7 @@ recognize:
     versioned: true
     cross_compilation: false
 slash_prefix: true
+response_file_syntax: msvc
 flags:
   # Pass arg to clang frontend
   - match: {pattern: "-Xclang", count: 1}

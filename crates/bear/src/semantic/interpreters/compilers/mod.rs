@@ -57,28 +57,14 @@ impl CompilerInterpreter {
         Self::new_with_format(compilers, &crate::config::ArgumentsFormat::default())
     }
 
-    /// Registers every supported compiler type, threading `from_environment`
-    /// into each per-family interpreter.
+    /// Registers every supported compiler family from the generated
+    /// [`flag_based::FAMILIES`] registry, threading `from_environment` into
+    /// each per-family interpreter. Adding a family is a YAML edit; nothing
+    /// here changes.
     fn register_all(&mut self, from_environment: bool) {
-        self.register(CompilerType::compiler("gcc"), flag_based::gcc(from_environment));
-        self.register(CompilerType::compiler("clang"), flag_based::clang(from_environment));
-        self.register(CompilerType::compiler("flang"), flag_based::flang(from_environment));
-        self.register(CompilerType::compiler("intel_fortran"), flag_based::intel_fortran(from_environment));
-        self.register(CompilerType::compiler("cray_fortran"), flag_based::cray_fortran(from_environment));
-        self.register(CompilerType::compiler("cuda"), flag_based::cuda(from_environment));
-        self.register(CompilerType::compiler("msvc"), flag_based::msvc(from_environment));
-        self.register(CompilerType::compiler("clang_cl"), flag_based::clang_cl(from_environment));
-        self.register(CompilerType::compiler("intel_cc"), flag_based::intel_cc(from_environment));
-        self.register(CompilerType::compiler("nvidia_hpc"), flag_based::nvidia_hpc(from_environment));
-        self.register(CompilerType::compiler("armclang"), flag_based::armclang(from_environment));
-        self.register(CompilerType::compiler("ibm_xl"), flag_based::ibm_xl(from_environment));
-        self.register(CompilerType::compiler("vala"), flag_based::vala(from_environment));
-        self.register(CompilerType::compiler("mpi"), flag_based::mpi(from_environment));
-        self.register(CompilerType::compiler("cray_cc"), flag_based::cray_cc(from_environment));
-        self.register(CompilerType::compiler("qnx"), flag_based::qnx(from_environment));
-        self.register(CompilerType::compiler("nasm"), flag_based::nasm(from_environment));
-        self.register(CompilerType::compiler("fasm"), flag_based::fasm(from_environment));
-        self.register(CompilerType::compiler("swift"), flag_based::swift(from_environment));
+        for def in flag_based::FAMILIES {
+            self.register(CompilerType::compiler(def.id), flag_based::interpreter(def, from_environment));
+        }
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it

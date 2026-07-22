@@ -7,6 +7,7 @@
 //! logic is caught as a snapshot diff.
 
 use compilers_codegen::env_keys::generate_env_keys;
+use compilers_codegen::families::generate_families;
 use compilers_codegen::recognition::{generate_compiler_ids, generate_recognition_patterns};
 use compilers_codegen::{ResolvedTable, load_compiler_files, load_tables, load_wrapper_tables};
 
@@ -145,4 +146,11 @@ fn snapshot_compiler_ids() {
     let compiler_files = load_compiler_files().unwrap();
     let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
     insta::assert_snapshot!(generate_compiler_ids(&compiler_files, &wrapper_tables).unwrap());
+}
+
+#[test]
+fn snapshot_families() {
+    let raw_tables = load_tables().unwrap();
+    let compiler_files = load_compiler_files().unwrap();
+    insta::assert_snapshot!(generate_families(&compiler_files, &raw_tables));
 }

@@ -31,6 +31,8 @@ ignore_when:
   executables: ["swift-frontend"]
   flags: ["-frontend"]
 slash_prefix: false
+# swiftc whole-module: one entry per source, each keeping the full invocation.
+source_mode: per-source-full
 flags:
   # --- Output ---
   - match: {pattern: "-o{ }*"}

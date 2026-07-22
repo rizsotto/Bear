@@ -33,11 +33,18 @@ pub(super) enum Syntax {
     Msvc,
 }
 
-/// Selects the tokenization syntax for the compiler family Bear identified.
+/// Selects the tokenization syntax for the compiler family Bear identified,
+/// reading the family's `response_file_syntax` from the generated
+/// [`super::flag_based::FAMILIES`] registry. A wrapper (no family id) and any
+/// id absent from the registry default to GNU/Clang syntax.
 pub(super) fn syntax_for(compiler_type: CompilerType) -> Syntax {
     match compiler_type {
-        CompilerType::Compiler(id) if matches!(id.as_str(), "msvc" | "clang_cl") => Syntax::Msvc,
-        _ => Syntax::GnuClang,
+        CompilerType::Compiler(id) => super::flag_based::FAMILIES
+            .iter()
+            .find(|def| def.id == id.as_str())
+            .map(|def| def.response_file_syntax)
+            .unwrap_or(Syntax::GnuClang),
+        CompilerType::Wrapper => Syntax::GnuClang,
     }
 }
 

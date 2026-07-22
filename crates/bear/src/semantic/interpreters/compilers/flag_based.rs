@@ -10,6 +10,7 @@
 use super::super::matchers::{
     EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule,
 };
+use super::response_file::Syntax;
 use crate::semantic::{
     Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, PassEffect, RecognizeResult,
     SourceMode,
@@ -31,9 +32,9 @@ struct FlagBasedInterpreter {
     /// recognized arguments (`format.arguments.from_environment`).
     from_environment: bool,
     /// How this family's invocations map to compilation database entries.
-    /// See [`SourceMode`]. Set in the factory, not in the compiler-flag YAML,
-    /// because it is consumed at the converter (post-parse), not at parse
-    /// time.
+    /// See [`SourceMode`]. Comes from the family's YAML `source_mode:` (via the
+    /// generated [`FamilyDef`]); it is a per-family datum, consumed at the
+    /// converter (post-parse).
     source_mode: SourceMode,
 }
 
@@ -252,258 +253,39 @@ fn split_env_value(value: &str, separator: EnvSeparator) -> Vec<String> {
     }
 }
 
-// Flag tables and ignore arrays. Generated at build time from flags/*.yaml.
-include!(concat!(env!("OUT_DIR"), "/flags_gcc.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_clang.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_flang.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_cuda.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_intel_fortran.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_msvc.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_clang_cl.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_intel_cc.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_nvidia_hpc.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_armclang.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_mpi.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_qnx.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_nasm.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_fasm.rs"));
-include!(concat!(env!("OUT_DIR"), "/flags_swift.rs"));
+// Flag tables and the family registry, generated at build time from
+// compilers/*.yaml. families.rs include!s each per-family flag-table file
+// (bringing that family's X_FLAGS / X_IGNORE_* / X_SLASH_PREFIX / X_ENV_RULES
+// statics into scope) and then defines FAMILIES, one row per family in
+// recognition order.
+include!(concat!(env!("OUT_DIR"), "/families.rs"));
 
-/// Factory functions returning opaque interpreters so callers never see concrete types.
-pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &GCC_FLAGS,
-        &GCC_IGNORE_EXECUTABLES,
-        &GCC_IGNORE_FLAGS,
-        GCC_SLASH_PREFIX,
-        &GCC_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
+/// One compiler family's generated data: references to its flag-table statics
+/// plus the two per-family behavior selectors. The generated `FAMILIES` array
+/// is a slice of these; `register_all` (in the parent module) loops over it,
+/// and `response_file::syntax_for` reads `response_file_syntax` back out.
+pub(super) struct FamilyDef {
+    pub(super) id: &'static str,
+    pub(super) flags: &'static [FlagRule],
+    pub(super) ignore_executables: &'static [&'static str],
+    pub(super) ignore_flags: &'static [&'static str],
+    pub(super) slash_prefix: bool,
+    pub(super) env_rules: &'static [EnvRule],
+    pub(super) source_mode: SourceMode,
+    pub(super) response_file_syntax: Syntax,
 }
 
-pub(super) fn clang(from_environment: bool) -> impl Interpreter {
+/// Build the interpreter for one family, returning an opaque `impl Interpreter`
+/// so callers never see the concrete `FlagBasedInterpreter`.
+pub(super) fn interpreter(def: &FamilyDef, from_environment: bool) -> impl Interpreter {
     FlagBasedInterpreter::new(
-        &CLANG_FLAGS,
-        &CLANG_IGNORE_EXECUTABLES,
-        &CLANG_IGNORE_FLAGS,
-        CLANG_SLASH_PREFIX,
-        &CLANG_ENV_RULES,
+        def.flags,
+        def.ignore_executables,
+        def.ignore_flags,
+        def.slash_prefix,
+        def.env_rules,
         from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn flang(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &FLANG_FLAGS,
-        &FLANG_IGNORE_EXECUTABLES,
-        &FLANG_IGNORE_FLAGS,
-        FLANG_SLASH_PREFIX,
-        &FLANG_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn cuda(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &CUDA_FLAGS,
-        &CUDA_IGNORE_EXECUTABLES,
-        &CUDA_IGNORE_FLAGS,
-        CUDA_SLASH_PREFIX,
-        &CUDA_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn intel_fortran(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &INTEL_FORTRAN_FLAGS,
-        &INTEL_FORTRAN_IGNORE_EXECUTABLES,
-        &INTEL_FORTRAN_IGNORE_FLAGS,
-        INTEL_FORTRAN_SLASH_PREFIX,
-        &INTEL_FORTRAN_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn cray_fortran(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &CRAY_FORTRAN_FLAGS,
-        &CRAY_FORTRAN_IGNORE_EXECUTABLES,
-        &CRAY_FORTRAN_IGNORE_FLAGS,
-        CRAY_FORTRAN_SLASH_PREFIX,
-        &CRAY_FORTRAN_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn msvc(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &MSVC_FLAGS,
-        &MSVC_IGNORE_EXECUTABLES,
-        &MSVC_IGNORE_FLAGS,
-        MSVC_SLASH_PREFIX,
-        &MSVC_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn clang_cl(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &CLANG_CL_FLAGS,
-        &CLANG_CL_IGNORE_EXECUTABLES,
-        &CLANG_CL_IGNORE_FLAGS,
-        CLANG_CL_SLASH_PREFIX,
-        &CLANG_CL_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn intel_cc(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &INTEL_CC_FLAGS,
-        &INTEL_CC_IGNORE_EXECUTABLES,
-        &INTEL_CC_IGNORE_FLAGS,
-        INTEL_CC_SLASH_PREFIX,
-        &INTEL_CC_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn nvidia_hpc(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &NVIDIA_HPC_FLAGS,
-        &NVIDIA_HPC_IGNORE_EXECUTABLES,
-        &NVIDIA_HPC_IGNORE_FLAGS,
-        NVIDIA_HPC_SLASH_PREFIX,
-        &NVIDIA_HPC_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn armclang(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &ARMCLANG_FLAGS,
-        &ARMCLANG_IGNORE_EXECUTABLES,
-        &ARMCLANG_IGNORE_FLAGS,
-        ARMCLANG_SLASH_PREFIX,
-        &ARMCLANG_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn ibm_xl(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &IBM_XL_FLAGS,
-        &IBM_XL_IGNORE_EXECUTABLES,
-        &IBM_XL_IGNORE_FLAGS,
-        IBM_XL_SLASH_PREFIX,
-        &IBM_XL_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn vala(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &VALA_FLAGS,
-        &VALA_IGNORE_EXECUTABLES,
-        &VALA_IGNORE_FLAGS,
-        VALA_SLASH_PREFIX,
-        &VALA_ENV_RULES,
-        from_environment,
-        // valac compiles all sources of a target as one translation unit, so a
-        // single invocation yields one combined entry, not one per source.
-        SourceMode::Combined,
-    )
-}
-
-pub(super) fn mpi(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &MPI_FLAGS,
-        &MPI_IGNORE_EXECUTABLES,
-        &MPI_IGNORE_FLAGS,
-        MPI_SLASH_PREFIX,
-        &MPI_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn cray_cc(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &CRAY_CC_FLAGS,
-        &CRAY_CC_IGNORE_EXECUTABLES,
-        &CRAY_CC_IGNORE_FLAGS,
-        CRAY_CC_SLASH_PREFIX,
-        &CRAY_CC_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn qnx(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &QNX_FLAGS,
-        &QNX_IGNORE_EXECUTABLES,
-        &QNX_IGNORE_FLAGS,
-        QNX_SLASH_PREFIX,
-        &QNX_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn nasm(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &NASM_FLAGS,
-        &NASM_IGNORE_EXECUTABLES,
-        &NASM_IGNORE_FLAGS,
-        NASM_SLASH_PREFIX,
-        &NASM_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn fasm(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &FASM_FLAGS,
-        &FASM_IGNORE_EXECUTABLES,
-        &FASM_IGNORE_FLAGS,
-        FASM_SLASH_PREFIX,
-        &FASM_ENV_RULES,
-        from_environment,
-        SourceMode::PerSourceStripped,
-    )
-}
-
-pub(super) fn swift(from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        &SWIFT_FLAGS,
-        &SWIFT_IGNORE_EXECUTABLES,
-        &SWIFT_IGNORE_FLAGS,
-        SWIFT_SLASH_PREFIX,
-        &SWIFT_ENV_RULES,
-        from_environment,
-        // swiftc's whole-module compilation analyzes every named source
-        // together, but SourceKit-LSP looks up a compile command per file:
-        // one entry per source, each keeping the full invocation.
-        SourceMode::PerSourceFull,
+        def.source_mode,
     )
 }
 

@@ -11,6 +11,7 @@ recognize:
 ignore_when:
   executables: ["c1", "c1xx", "c2"]
 slash_prefix: true
+response_file_syntax: msvc
 flags:
   # --- Info and exit ---
   - match: {pattern: "/help"}
