@@ -324,16 +324,16 @@ mod tests {
         /// `CompilerInterpreter` (recognizer + wrapper-unwrap + registered
         /// interpreter), not just the recognizer.
         ///
-        /// Why this matters: adding a compiler family is a multi-step recipe
-        /// (YAML `recognize:` entry, `CompilerType` variant, a `flag_based.rs`
-        /// constructor, and a `register_all` entry -- see
-        /// `crates/bear/compilers/CLAUDE.md`). Forgetting the last step still
-        /// makes every recognition unit test pass (the regex matches and
+        /// Why this matters: recognition and registration are generated from
+        /// the same compiler-definition data, but through separate paths (the
+        /// `RECOGNITION_PATTERNS` table and the `FAMILIES` registry). If those
+        /// two ever disagree -- a recognized id with no registry row -- every
+        /// recognition unit test still passes (the regex matches and
         /// `recognize()` returns `Some(type)`), but `CompilerInterpreter` has no
-        /// interpreter registered for that type, so every real execution of the
-        /// family silently falls through to `NotRecognized` -- the same failure
-        /// mode as not recognizing the compiler at all, just discovered later
-        /// and more confusingly. This test catches that gap for every family
+        /// interpreter for that type, so every real execution of the family
+        /// silently falls through to `NotRecognized` -- the same failure mode
+        /// as not recognizing the compiler at all, just discovered later and
+        /// more confusingly. This test catches that gap for every family
         /// automatically, current and future, without needing a new test per
         /// family.
         ///
@@ -372,7 +372,8 @@ mod tests {
                 assert!(
                     !matches!(result, RecognizeResult::NotRecognized(_)),
                     "family '{}' (executable '{}') matched the recognizer but was not dispatched \
-                     by any registered interpreter -- check register_all() in mod.rs for a missing entry",
+                     by any registered interpreter -- its id is in RECOGNITION_PATTERNS but not in \
+                     the generated FAMILIES registry",
                     type_str,
                     name
                 );

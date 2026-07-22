@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::tables::CompilerFile;
 use crate::yaml_types::{FlagTable, WrapperTable};
@@ -132,6 +132,25 @@ pub fn generate_compiler_ids(
         .collect();
     wrapper_names.sort_unstable();
     wrapper_names.dedup();
+
+    // A compiler id must not collide with a wrapper `as:` spelling. The config
+    // deserializer resolves "wrapper" and every launcher basename to the
+    // wrapper kind BEFORE consulting KNOWN_IDS, so a colliding compiler id
+    // would be silently shadowed -- `as: <id>` would resolve to the launcher.
+    // Reject it at codegen with a clear message.
+    for &id in &ids {
+        if id == "wrapper" {
+            bail!("compiler id 'wrapper' is reserved for the launcher kind; rename the family");
+        }
+        if wrapper_names.contains(&id) {
+            bail!(
+                "compiler id '{}' collides with a wrapper launcher basename; `as: {}` would resolve \
+                 to the launcher, shadowing the compiler -- rename one of them",
+                id,
+                id
+            );
+        }
+    }
 
     let mut out = String::new();
     out.push_str("// Generated from compilers/*.yaml -- DO NOT EDIT\n");

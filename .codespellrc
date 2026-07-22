@@ -8,4 +8,5 @@ quiet-level = 3
 # Fo -> MSVC output flag /Fo
 # Ot -> MSVC optimization flag /Ot
 # gir -> GObject-Introspection .gir binding files (Vala)
-ignore-words-list = ser,abd,exect,Fo,Ot,gir
+# statics -> plural of the Rust `static` item
+ignore-words-list = ser,abd,exect,Fo,Ot,gir,statics

@@ -244,6 +244,14 @@ pub fn insert_by_id(
 /// need a table by id use the map.
 type LoadedTables = (HashMap<String, FlagTable>, Vec<CompilerFile>);
 
+/// True if `s` is a valid Rust identifier fragment: non-empty, first char an
+/// ASCII letter or `_`, the rest ASCII alphanumeric or `_`.
+fn is_ident(s: &str) -> bool {
+    let mut chars = s.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 /// Discover and load every compiler-kind YAML file in `flags_dir`, keyed by
 /// id, validated, and ordered for recognition.
 ///
@@ -288,6 +296,18 @@ fn load_and_index(flags_dir: &Path, print_rerun: bool) -> Result<LoadedTables> {
         }
 
         let stem = yaml_file.strip_suffix(".yaml").expect("filtered to .yaml above").to_string();
+        // The stem becomes an identifier fragment in generated names
+        // (`gcc` -> `GCC_FLAGS`), so it must be a valid Rust identifier.
+        // Catch a bad file name here with a clear message instead of a
+        // cryptic rustc error in the consuming crate.
+        if !is_ident(&stem) {
+            bail!(
+                "compiler file '{}' has an invalid stem '{}': the stem becomes part of a generated \
+                 identifier, so it must be ASCII letters, digits, and underscores, not starting with a digit",
+                yaml_file,
+                stem
+            );
+        }
         let table = parse_table(&yaml_file, &content)?;
         let id = insert_by_id(&mut raw_tables, &yaml_file, table)?;
         // Depth is filled in below, once every table is loaded and extends
@@ -954,6 +974,56 @@ mod tests {
         let err = extends_depth(&tables, "a").unwrap_err();
 
         assert!(err.to_string().contains("cycle"), "{}", err);
+    }
+
+    #[test]
+    fn invalid_stem_fails_codegen() {
+        // A file whose stem is not a valid identifier fails codegen with a
+        // clear message, not a cryptic rustc error in the consuming crate.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("my-compiler.yaml"),
+            "type: compiler\ncompiler:\n  id: mycompiler\nflags: []\n",
+        )
+        .unwrap();
+
+        let err = load_and_index(dir.path(), false).err().unwrap();
+
+        assert!(err.to_string().contains("my-compiler"), "{}", err);
+        assert!(err.to_string().contains("invalid stem"), "{}", err);
+    }
+
+    #[test]
+    fn compiler_id_reserved_wrapper_fails() {
+        let compiler_files = vec![CompilerFile { stem: "wrapper".into(), id: "wrapper".into(), depth: 0 }];
+
+        let err = generate_compiler_ids(&compiler_files, &[]).unwrap_err();
+
+        assert!(err.to_string().contains("reserved"), "{}", err);
+    }
+
+    #[test]
+    fn compiler_id_colliding_with_a_launcher_fails() {
+        let compiler_files = vec![CompilerFile { stem: "ccache".into(), id: "ccache".into(), depth: 0 }];
+        let wrapper_tables = vec![(
+            "ccache.yaml".to_string(),
+            WrapperTable {
+                type_: Kind::Wrapper,
+                recognize: vec![RecognizeEntry {
+                    description: "Compiler cache".into(),
+                    references: vec!["https://ccache.dev/".into()],
+                    executables: vec!["ccache".into()],
+                    versioned: false,
+                    cross_compilation: false,
+                }],
+                options: vec![],
+            },
+        )];
+
+        let err = generate_compiler_ids(&compiler_files, &wrapper_tables).unwrap_err();
+
+        assert!(err.to_string().contains("ccache"), "{}", err);
+        assert!(err.to_string().contains("collides"), "{}", err);
     }
 
     // -- load_wrapper_tables tests --

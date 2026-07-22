@@ -36,6 +36,14 @@ its stem, and emits the recognition row, the `KNOWN_IDS` entry (so
 2. No Rust change needed: codegen discovers it by kind, the unwrap logic is generic over generated data, and the basename is emitted into `WRAPPER_AS_NAMES` so `as: mywrapper` is accepted -- see `README.md`
 3. Run `cargo build && cargo test`, then accept the snapshot diff
 
+## Removing a compiler
+
+Delete the YAML file, then delete its now-orphaned per-family flag snapshot
+(`build-support/compilers-codegen/tests/snapshots/snapshots__snapshot_flags_<stem>.snap`)
+by hand: the looped snapshot test names snapshots per discovered stem, so a
+removed family's stored snapshot is simply no longer referenced, not
+reported as stale.
+
 ## `recognize:` entries must be documented and cited
 
 Every `recognize:` entry is mandatory `description` (a short human label,

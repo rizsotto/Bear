@@ -438,19 +438,18 @@ mod tests {
 
     #[test]
     fn compiler_id_literals_are_known() {
-        // Every compiler id spelled as a literal in production code (the
-        // probe verdicts, the recognition fallback, the response-file syntax
-        // match) must be one of the generated KNOWN_IDS. If a YAML rename
-        // ever drifts one of these, this fails instead of silently
-        // misclassifying at runtime.
+        // Every compiler id hand-written as a literal in production code must
+        // be one of the generated KNOWN_IDS. If a YAML rename ever drifts one
+        // of these, this fails instead of silently misclassifying at runtime.
         //
-        // register_all's 19 registration literals are deliberately not
-        // listed here: they are guarded end-to-end by the dispatch test
-        // (every_recognition_pattern_row_is_dispatched_by_a_registered_interpreter),
-        // which fails if any registration string mismatches a recognized id.
-        // This test covers exactly the literal sites that have no such
-        // end-to-end guard.
-        for id in ["gcc", "clang", "msvc", "clang_cl"] {
+        // These are the only such literals: the ambiguous-name probe's two
+        // verdicts and the recognition fallback (all `gcc`/`clang`). Family
+        // registration and response-file syntax are driven entirely by
+        // generated data (the FAMILIES registry), so they carry no id
+        // literals to guard here; the dispatch test
+        // (every_recognition_pattern_row_is_dispatched_by_a_registered_interpreter)
+        // covers that path end to end.
+        for id in ["gcc", "clang"] {
             assert!(KNOWN_IDS.contains(&id), "internal id literal {id:?} is not in KNOWN_IDS");
         }
     }
