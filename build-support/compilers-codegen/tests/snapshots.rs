@@ -11,105 +11,17 @@ use compilers_codegen::families::generate_families;
 use compilers_codegen::recognition::{generate_compiler_ids, generate_recognition_patterns};
 use compilers_codegen::{ResolvedTable, load_compiler_files, load_tables, load_wrapper_tables};
 
-fn generate_flag_file(yaml_stem: &str) -> String {
+/// One snapshot per discovered compiler flag table, named
+/// `snapshot_flags_<stem>` so it lands in the same file the former
+/// hand-written per-family `snapshot_flags_*` functions produced. A new
+/// compiler YAML auto-gains a snapshot on the next run; accept the diff.
+#[test]
+fn snapshot_flags() {
     let raw_tables = load_tables().unwrap();
-    let compiler_file = load_compiler_files().unwrap().into_iter().find(|c| c.stem == yaml_stem).unwrap();
-    ResolvedTable::new(&compiler_file, &raw_tables).unwrap().generate().unwrap()
-}
-
-#[test]
-fn snapshot_flags_gcc() {
-    insta::assert_snapshot!(generate_flag_file("gcc"));
-}
-
-#[test]
-fn snapshot_flags_clang() {
-    insta::assert_snapshot!(generate_flag_file("clang"));
-}
-
-#[test]
-fn snapshot_flags_clang_cl() {
-    insta::assert_snapshot!(generate_flag_file("clang_cl"));
-}
-
-#[test]
-fn snapshot_flags_ibm_xl() {
-    insta::assert_snapshot!(generate_flag_file("ibm_xl"));
-}
-
-#[test]
-fn snapshot_flags_flang() {
-    insta::assert_snapshot!(generate_flag_file("flang"));
-}
-
-#[test]
-fn snapshot_flags_cuda() {
-    insta::assert_snapshot!(generate_flag_file("cuda"));
-}
-
-#[test]
-fn snapshot_flags_intel_fortran() {
-    insta::assert_snapshot!(generate_flag_file("intel_fortran"));
-}
-
-#[test]
-fn snapshot_flags_cray_fortran() {
-    insta::assert_snapshot!(generate_flag_file("cray_fortran"));
-}
-
-#[test]
-fn snapshot_flags_msvc() {
-    insta::assert_snapshot!(generate_flag_file("msvc"));
-}
-
-#[test]
-fn snapshot_flags_intel_cc() {
-    insta::assert_snapshot!(generate_flag_file("intel_cc"));
-}
-
-#[test]
-fn snapshot_flags_nvidia_hpc() {
-    insta::assert_snapshot!(generate_flag_file("nvidia_hpc"));
-}
-
-#[test]
-fn snapshot_flags_armclang() {
-    insta::assert_snapshot!(generate_flag_file("armclang"));
-}
-
-#[test]
-fn snapshot_flags_vala() {
-    insta::assert_snapshot!(generate_flag_file("vala"));
-}
-
-#[test]
-fn snapshot_flags_mpi() {
-    insta::assert_snapshot!(generate_flag_file("mpi"));
-}
-
-#[test]
-fn snapshot_flags_cray_cc() {
-    insta::assert_snapshot!(generate_flag_file("cray_cc"));
-}
-
-#[test]
-fn snapshot_flags_qnx() {
-    insta::assert_snapshot!(generate_flag_file("qnx"));
-}
-
-#[test]
-fn snapshot_flags_nasm() {
-    insta::assert_snapshot!(generate_flag_file("nasm"));
-}
-
-#[test]
-fn snapshot_flags_fasm() {
-    insta::assert_snapshot!(generate_flag_file("fasm"));
-}
-
-#[test]
-fn snapshot_flags_swift() {
-    insta::assert_snapshot!(generate_flag_file("swift"));
+    for compiler_file in load_compiler_files().unwrap() {
+        let generated = ResolvedTable::new(&compiler_file, &raw_tables).unwrap().generate().unwrap();
+        insta::assert_snapshot!(format!("snapshot_flags_{}", compiler_file.stem), generated);
+    }
 }
 
 #[test]
