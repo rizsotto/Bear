@@ -211,3 +211,7 @@ Given an event file with a `fasm hello.asm output.bin` execution:
 - [Swift whole-module entries](../rationale/swift-whole-module-entries.md) -
   why Swift needs one entry per source with the full invocation's
   arguments.
+- [Compiler family definition](../rationale/compiler-family-definition.md) -
+  why the recognized set and each family's semantics are defined solely
+  in the compiler-definition data, with the code holding no per-family
+  enumeration.

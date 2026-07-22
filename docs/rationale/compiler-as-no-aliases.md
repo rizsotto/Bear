@@ -30,22 +30,21 @@ ideas were drafted in full and then reversed on 2026-07-20:
 
 ## Decision
 
-Each `CompilerType` variant accepts exactly one config `as:` spelling:
-its YAML `compiler.id`, verbatim, everywhere that spelling appears
-(the YAML file, the generated recognition data, `--print-compilers`
-output, and config parsing). No aliases, no re-spelling. `CompilerType`
-keeps a plain `#[serde(rename = "...")]` only where the derive's
-default `rename_all = "lowercase"` spelling would otherwise diverge
-from the id (seven of the nineteen compiler variants; the other
-twelve already match by construction).
+Each compiler family accepts exactly one config `as:` spelling: its YAML
+`compiler.id`, verbatim, everywhere that spelling appears (the YAML file,
+the generated recognition data, `--print-compilers` output, and config
+parsing). No aliases, no re-spelling. The config deserializer validates
+an `as:` value against the generated set of ids and rejects anything
+else, naming the accepted values; there is no alias map and no
+per-family spelling to hand-maintain (see `compiler-family-definition`
+for how the family set became generated data).
 
-`CompilerType::Wrapper` is the one exception: wrapper YAML files
-(`crates/bear/compilers/{ccache,distcc,icecc,sccache}.yaml`) carry no
-`compiler.id` to draw a canonical spelling from, since dispatch for
-every launcher is uniform and a launcher file declares no family
-identity. It keeps a small hand-coded set of accepted `as:` spellings
-(`ccache`, `distcc`, `sccache`, `icecc`) as the sole surviving
-per-launcher wiring.
+Compiler launchers are the one exception: a launcher file (`ccache`,
+`distcc`, `sccache`, `icecc`) declares no family identity -- dispatch is
+uniform -- so it has no `compiler.id` to draw a canonical spelling from.
+Its launcher basename is still an accepted `as:` value (all four resolve
+to the one wrapper kind), drawn from the same generated data as every
+other spelling; no launcher spelling is hand-wired.
 
 ## Consequences
 

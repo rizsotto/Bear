@@ -6,11 +6,11 @@ result values, inheritance, environment variables).
 ## Two schemas live side by side here
 
 `type:` is a closed kind enum. Compiler files (`type: compiler`) declare a
-family identity in a nested `compiler:` block (`id:`, optional `extends:`)
-and need a `TABLES` entry in `build-support/compilers-codegen/src/tables.rs`.
+family identity in a nested `compiler:` block (`id:`, optional `extends:`).
 Wrapper files (`type: wrapper` -- the four compiler launchers: ccache,
-distcc, sccache, icecc) carry no identity block and need no `TABLES` entry;
-codegen discovers them by kind. See `README.md` for the full schema of both.
+distcc, sccache, icecc) carry no identity block. Codegen discovers both
+kinds by scanning this directory and peeking `type:` -- there is no
+hand-maintained file list. See `README.md` for the full schema of both.
 
 ## Rules for modifying YAML files
 
@@ -21,18 +21,20 @@ codegen discovers them by kind. See `README.md` for the full schema of both.
 
 ## Adding a new compiler
 
+Adding a family is a YAML file plus accepting snapshots -- no Rust edit.
+The directory scan picks up the file, derives every generated name from
+its stem, and emits the recognition row, the `KNOWN_IDS` entry (so
+`as: <id>` is accepted), and the interpreter registration on its own.
+
 1. Create `mycompiler.yaml` in this directory
-2. Add `type: compiler`, a `compiler:` block (`id:`, optionally `extends:`), `recognize:`, `flags:` entries (optionally `ignore_when:`, `environment:`). `id:` must be unique across this directory (checked at codegen) and is the only accepted config `as:` spelling for this family -- no aliases.
-3. Add a `TableConfig` entry in `build-support/compilers-codegen/src/tables.rs`
-4. Add a `CompilerType` variant in `crates/bear/src/config/types.rs` and a mapping in `crates/bear/src/semantic/interpreters/compilers/compiler_recognition.rs::parse_compiler_type`
-5. Add a constructor in `flag_based.rs` and register it in `CompilerInterpreter::new_with_config` (`crates/bear/src/semantic/interpreters/compilers/mod.rs`)
-6. Run `cargo build && cargo test`
+2. Add `type: compiler`, a `compiler:` block (`id:`, optionally `extends:`), `recognize:`, `flags:` entries (optionally `ignore_when:`, `environment:`, `slash_prefix:`, `source_mode:`, `response_file_syntax:`). `id:` must be unique across this directory (checked at codegen) and is the only accepted config `as:` spelling for this family -- no aliases.
+3. Run `cargo build && cargo test`, then accept the snapshot diff (`cargo insta accept`)
 
 ## Adding a new wrapper
 
 1. Create `mywrapper.yaml` with `type: wrapper`, a `recognize:` entry, and optionally `options:` (exact-token launcher flags only)
-2. No `TABLES` entry, no `CompilerType` variant, no Rust change needed for recognition/unwrapping -- see `README.md` for the details
-3. Run `cargo build && cargo test`
+2. No Rust change needed: codegen discovers it by kind, the unwrap logic is generic over generated data, and the basename is emitted into `WRAPPER_AS_NAMES` so `as: mywrapper` is accepted -- see `README.md`
+3. Run `cargo build && cargo test`, then accept the snapshot diff
 
 ## `recognize:` entries must be documented and cited
 
@@ -51,19 +53,15 @@ non-http(s) entry. `description` is emitted into the generated
 3. `cargo build` regenerates tables automatically
 4. `cargo test` validates sorting and invariants
 
-## Properties set in the factory, not the YAML
+## Per-family selectors: source_mode and response_file_syntax
 
-A few per-interpreter properties are consumed at the converter (post-parse),
-not at parse time, so they are hard-coded in the factory functions in
-`flag_based.rs` rather than in these YAML files:
-
-- `source_mode` (`SourceMode`, default `PerSourceStripped`): controls how an
-  invocation's sources map to database entries. `PerSourceStripped` for most
-  families (one entry per source, siblings stripped); `Combined` for a
-  single-translation-unit compiler like `valac` (one combined entry per
-  invocation, all sources retained); `PerSourceFull` for a whole-module
-  compiler like `swiftc` (one entry per source, but every entry keeps every
-  source). See `README.md` for details.
+Two selectors are consumed outside the flag classifier (`source_mode` at
+the converter, `response_file_syntax` at response-file tokenization).
+Their semantics are code; the per-family choice is data -- optional
+top-level YAML keys, not inherited through `extends`. Defaults:
+`source_mode: per-source-stripped` (vala is `combined`, swift is
+`per-source-full`) and `response_file_syntax: gnu` (msvc and clang_cl are
+`msvc`). See `README.md` for the full description of each value.
 
 ## Common mistakes
 

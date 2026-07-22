@@ -50,6 +50,15 @@ recognize:
 # Inherited from base file via `extends` if not specified.
 slash_prefix: false
 
+# Optional: how this family's sources map to database entries (default:
+# per-source-stripped). See "Source mode and response-file syntax" below.
+# Not inherited via `extends`; each family states its own.
+source_mode: per-source-stripped
+
+# Optional: response-file (@file) tokenization convention (default: gnu;
+# msvc for MSVC-style families). Not inherited via `extends`.
+response_file_syntax: gnu
+
 # Optional: conditions under which a recognized invocation should be ignored
 ignore_when:
   # Ignore if the executable filename matches any of these
@@ -271,51 +280,57 @@ inherited ones matched by variable name.
 Compilers that do not read GCC variables (e.g., NVIDIA HPC SDK) must not
 extend GCC and will have an empty environment table.
 
-## Per-interpreter properties set outside the YAML
+## Source mode and response-file syntax
 
-Most compiler behaviour is data-driven from these YAML files, but a few
-properties are consumed *after* parsing (at the converter) rather than at
-parse time, so they live in the interpreter factory functions in
-`crates/bear/src/semantic/interpreters/compilers/flag_based.rs`, not in
-the YAML schema:
+Two per-family selectors are consumed outside the flag classifier -- one
+after parsing (at the converter), one before it (at response-file
+tokenization). Their *semantics* are code; the per-family *choice* is
+data, declared in these YAML files. Neither is inherited through
+`extends`: each family states its own (so `clang_cl` carries
+`response_file_syntax: msvc` itself, it does not inherit it from `msvc`).
 
-- `source_mode` (a `SourceMode` enum: `PerSourceStripped` / `PerSourceFull`
-  / `Combined`) -- how an invocation's sources map to compilation database
-  entries. `PerSourceStripped` (the default) is for GCC/Clang/etc.: each
+`source_mode` -- how an invocation's sources map to compilation database
+entries. Consumed at the converter (post-parse). Values:
+
+- `per-source-stripped` (default) -- for GCC/Clang and most families: each
   source is a separable translation unit, and the converter emits one
   entry per source, stripping sibling sources from each entry's arguments.
-  `Combined` is for a single-translation-unit compiler like `valac`, which
-  compiles all of a target's sources together and produces one output, so
-  the converter emits exactly one combined entry per invocation (`file` is
-  the first source, every source retained). `PerSourceFull` is for a
-  whole-module compiler like `swiftc`: every source is analyzed together,
-  but per-file consuming tooling (SourceKit-LSP) looks up a compile command
-  by file path, so the converter emits one entry per source while every
-  entry keeps the complete invocation (no sibling stripping). Promote this
-  to the YAML/codegen path only if a compiler needs a mode that varies by
-  configuration rather than being fixed per family.
+- `combined` -- for a single-translation-unit compiler like `valac`, which
+  compiles all of a target's sources together and produces one output: the
+  converter emits exactly one combined entry per invocation (`file` is the
+  first source, every source retained).
+- `per-source-full` -- for a whole-module compiler like `swiftc`: every
+  source is analyzed together, but per-file consuming tooling
+  (SourceKit-LSP) looks up a compile command by file path, so the
+  converter emits one entry per source while every entry keeps the
+  complete invocation (no sibling stripping).
+
+`response_file_syntax` -- how `@file` response files are tokenized before
+flag classification (only relevant with `format.arguments.from_response_files`).
+Values: `gnu` (default) for GCC/Clang whitespace-and-quote rules;
+`msvc` for the Windows `CommandLineToArgv` rules used by `msvc` and
+`clang-cl`.
 
 ## Adding a new compiler
 
-1. Create a new YAML file in this directory (e.g., `mycompiler.yaml`)
+Adding a compiler family is a YAML file plus accepting snapshots -- no
+Rust edit. Codegen discovers the file by scanning this directory and
+peeking its `type:`, derives every generated name from the file stem, and
+emits the recognition row, the `KNOWN_IDS` entry (so `as: <id>` is
+accepted), and the family's interpreter registration automatically.
+
+1. Create a new YAML file in this directory (e.g., `mycompiler.yaml`).
 2. Add `type: compiler`, a `compiler:` block (`id:`, and optionally
-   `extends:`), `recognize:`, and `flags:` entries, optionally
-   `ignore_when:`, `environment:`. `id:` must be unique across every YAML
-   file in this directory (checked at codegen); it is also the `extends:`
-   target and the ONLY accepted config `as:` spelling for this family --
-   there is no separate alias step.
-3. Add a `TableConfig` entry in `build-support/compilers-codegen/src/tables.rs`
-4. Add a `CompilerType` variant in `crates/bear/src/config/types.rs` and a mapping in
-   `crates/bear/src/semantic/interpreters/compilers/compiler_recognition.rs::parse_compiler_type`.
-   Add `#[serde(rename = "...")]` on the variant only if the derive's default
-   `rename_all = "lowercase"` spelling would not already match the id verbatim
-   (e.g. `Gcc` needs no attribute, since `gcc` already matches; `IntelFortran`
-   needs `#[serde(rename = "intel_fortran")]` because the derive default would
-   otherwise squash it to `intelfortran`).
-5. Add a constructor in `flag_based.rs` and register it in
-   `CompilerInterpreter::new_with_config`
-   (`crates/bear/src/semantic/interpreters/compilers/mod.rs`)
-6. Run `cargo build && cargo test`
+   `extends:`), `recognize:`, and `flags:` entries; optionally
+   `ignore_when:`, `environment:`, `slash_prefix:`, `source_mode:`,
+   `response_file_syntax:`. `id:` must be unique across every YAML file in
+   this directory (checked at codegen); it is also the `extends:` target
+   and the ONLY accepted config `as:` spelling for this family -- there is
+   no alias step.
+3. Run `cargo build`, then `cargo test`. The snapshot tests will show a
+   diff for the new family (its flag table, the recognition table, and the
+   family registry); run `cargo insta accept` (or update the snapshots) to
+   accept it.
 
 ## Adding a new wrapper
 
@@ -324,20 +339,12 @@ the YAML schema:
    `versioned`/`cross_compilation` false or omitted), and an optional
    `options:` list of exact-token flags the launcher accepts before its
    inner compiler.
-2. That is the whole YAML-side change for recognition and unwrapping.
-   Codegen discovers `type: wrapper` files by kind (`load_wrapper_tables`
-   in `build-support/compilers-codegen/src/lib.rs`), not by a registry:
-   no `TABLES` entry is needed. `wrapper.rs`'s unwrap logic
-   (`extract_real_compiler`) is fully generic over the generated
-   `WRAPPER_NAMES`/`WRAPPER_OPTIONS` data, so a new launcher basename
-   needs no wrapper-specific Rust code to be recognized and unwrapped.
-3. The one surviving hand-wired spot: if a user config's `as:` field
-   should accept the new basename explicitly (`as: mywrapper`), add it to
-   `CompilerType::Wrapper`'s `#[serde(alias = ...)]` list in
-   `crates/bear/src/config/types.rs`. Wrapper files carry no `id`, so
-   there is no generated spelling to draw an accepted `as:` value from --
-   this is the one place still hand-maintained per launcher.
-4. Run `cargo build && cargo test`
+2. Run `cargo build && cargo test`, and accept the snapshots. That is the
+   whole change: codegen discovers `type: wrapper` files by kind
+   (`load_wrapper_tables`), the unwrap logic (`extract_real_compiler`) is
+   generic over the generated `WRAPPER_NAMES`/`WRAPPER_OPTIONS`, and the
+   launcher basename is emitted into `WRAPPER_AS_NAMES` so `as: mywrapper`
+   is accepted -- no wrapper-specific Rust code.
 
 ## Adding a new flag
 
