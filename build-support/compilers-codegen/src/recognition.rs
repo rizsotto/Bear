@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 
-use crate::tables::TABLES;
-use crate::yaml_types::{FlagTable, Kind, WrapperTable};
+use crate::tables::CompilerFile;
+use crate::yaml_types::{FlagTable, WrapperTable};
 
 /// Generate a static array of recognition pattern data from all YAML files.
 ///
@@ -17,10 +17,10 @@ use crate::yaml_types::{FlagTable, Kind, WrapperTable};
 /// recognition entries with `(false, false)` so the recognizer can route them
 /// to the right compiler id (where the interpreter will then ignore them).
 ///
-/// `file_to_id` maps each `TableConfig::yaml_file` to the `compiler.id` the
-/// file declared, so this can walk `TABLES` (which fixes output order) while
-/// looking `raw_tables` (keyed by id) up correctly, without assuming a file's
-/// stem equals its id.
+/// `compiler_files` lists the discovered compiler-kind files in
+/// generated-output order (`(extends depth desc, stem)`); this walks them to emit the
+/// recognition rows in that order, looking `raw_tables` (keyed by id) up by
+/// each file's declared id.
 ///
 /// `wrapper_tables` supplies the compiler-launcher (`type: wrapper`) files;
 /// their `recognize` rows are appended after every compiler row, sorted by
@@ -28,7 +28,7 @@ use crate::yaml_types::{FlagTable, Kind, WrapperTable};
 /// `cross_compilation`/`versioned` forced to `false`.
 pub fn generate_recognition_patterns(
     raw_tables: &HashMap<String, FlagTable>,
-    file_to_id: &HashMap<&'static str, String>,
+    compiler_files: &[CompilerFile],
     wrapper_tables: &[(String, WrapperTable)],
 ) -> Result<String> {
     let mut out = String::new();
@@ -38,25 +38,19 @@ pub fn generate_recognition_patterns(
     out.push_str("#[allow(clippy::type_complexity)]\n");
     out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = &[\n");
 
-    // Collect entries in a deterministic order (by TABLES order)
-    for config in TABLES {
-        let id = file_to_id
-            .get(config.yaml_file)
-            .with_context(|| format!("no table loaded for {}", config.yaml_file))?;
-        let table = &raw_tables[id.as_str()];
-
-        // This loop only ever walks TABLES, which lists compiler-kind files;
-        // wrapper-kind rows are emitted separately below from
-        // `wrapper_tables`. The guard stays as a defensive check.
-        if !matches!(table.type_, Kind::Compiler) {
-            continue;
-        }
+    // Emit compiler rows in discovery order: specializations (higher extends
+    // depth) before the family they extend, so the base's broad pattern never
+    // captures a specialized name first.
+    for compiler_file in compiler_files {
+        let table = &raw_tables[compiler_file.id.as_str()];
         let id_str = table.compiler.id.as_str();
 
         // Emit explicit recognize entries
         if let Some(ref recognize_entries) = table.recognize {
             for entry in recognize_entries {
-                entry.validate().with_context(|| format!("recognize entry in {}", config.yaml_file))?;
+                entry
+                    .validate()
+                    .with_context(|| format!("recognize entry in {}", compiler_file.yaml_file()))?;
 
                 let names_str: Vec<String> = entry.executables.iter().map(|n| format!("\"{}\"", n)).collect();
                 out.push_str(&format!(
@@ -118,7 +112,7 @@ fn escape(s: &str) -> String {
 
 /// Generate the compiler-id data the config module needs to resolve the
 /// `as:` field: `KNOWN_IDS` (every real compiler family's `compiler.id`, in
-/// `TABLES` order) and `WRAPPER_AS_NAMES` (the launcher basenames that also
+/// discovery order) and `WRAPPER_AS_NAMES` (the launcher basenames that also
 /// resolve to the one wrapper kind). Both are the sole accepted `as:`
 /// spellings; there are no aliases (see `compiler-as-no-aliases`).
 ///
@@ -126,18 +120,10 @@ fn escape(s: &str) -> String {
 /// its config module, so `CompilerType`'s hand-written deserializer validates
 /// against generated data instead of a hand-maintained mirror of the ids.
 pub fn generate_compiler_ids(
-    file_to_id: &HashMap<&'static str, String>,
+    compiler_files: &[CompilerFile],
     wrapper_tables: &[(String, WrapperTable)],
 ) -> Result<String> {
-    let ids: Vec<&str> = TABLES
-        .iter()
-        .map(|config| {
-            file_to_id
-                .get(config.yaml_file)
-                .map(String::as_str)
-                .with_context(|| format!("no table loaded for {}", config.yaml_file))
-        })
-        .collect::<Result<_>>()?;
+    let ids: Vec<&str> = compiler_files.iter().map(|cf| cf.id.as_str()).collect();
 
     let mut wrapper_names: Vec<&str> = wrapper_tables
         .iter()

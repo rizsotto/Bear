@@ -8,13 +8,12 @@
 
 use compilers_codegen::env_keys::generate_env_keys;
 use compilers_codegen::recognition::{generate_compiler_ids, generate_recognition_patterns};
-use compilers_codegen::tables::TABLES;
-use compilers_codegen::{ResolvedTable, load_tables, load_wrapper_tables};
+use compilers_codegen::{ResolvedTable, load_compiler_files, load_tables, load_wrapper_tables};
 
 fn generate_flag_file(yaml_stem: &str) -> String {
     let raw_tables = load_tables().unwrap();
-    let config = TABLES.iter().find(|c| c.yaml_file == format!("{}.yaml", yaml_stem)).unwrap();
-    ResolvedTable::new(yaml_stem, config, &raw_tables).unwrap().generate().unwrap()
+    let compiler_file = load_compiler_files().unwrap().into_iter().find(|c| c.stem == yaml_stem).unwrap();
+    ResolvedTable::new(&compiler_file, &raw_tables).unwrap().generate().unwrap()
 }
 
 #[test]
@@ -115,17 +114,10 @@ fn snapshot_flags_swift() {
 #[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
-    // load_tables() keys by compiler.id; every real YAML file's id equals
-    // its stem (see the migration table in the schema-split commit), so
-    // rebuilding that mapping here reproduces the real yaml_file -> id
-    // index generate() builds from the same load loop.
-    let file_to_id: std::collections::HashMap<&'static str, String> = TABLES
-        .iter()
-        .map(|c| (c.yaml_file, c.yaml_file.strip_suffix(".yaml").unwrap().to_string()))
-        .collect();
+    let compiler_files = load_compiler_files().unwrap();
     let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
     insta::assert_snapshot!(
-        generate_recognition_patterns(&raw_tables, &file_to_id, &wrapper_tables).unwrap()
+        generate_recognition_patterns(&raw_tables, &compiler_files, &wrapper_tables).unwrap()
     );
 }
 
@@ -150,11 +142,7 @@ fn snapshot_env_keys() {
 
 #[test]
 fn snapshot_compiler_ids() {
-    // Mirror generate()'s yaml_file -> id index (see snapshot_recognition).
-    let file_to_id: std::collections::HashMap<&'static str, String> = TABLES
-        .iter()
-        .map(|c| (c.yaml_file, c.yaml_file.strip_suffix(".yaml").unwrap().to_string()))
-        .collect();
+    let compiler_files = load_compiler_files().unwrap();
     let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
-    insta::assert_snapshot!(generate_compiler_ids(&file_to_id, &wrapper_tables).unwrap());
+    insta::assert_snapshot!(generate_compiler_ids(&compiler_files, &wrapper_tables).unwrap());
 }

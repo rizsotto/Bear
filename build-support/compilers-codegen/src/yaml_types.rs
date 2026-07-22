@@ -4,8 +4,9 @@ use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
 /// Which schema a YAML file follows. Closed: `compiler` is a compiler
-/// family (`FlagTable`, registered in `TABLES`); `wrapper` is a compiler
-/// launcher (`WrapperTable`, discovered by kind, no `TABLES` entry).
+/// family (`FlagTable`); `wrapper` is a compiler launcher (`WrapperTable`).
+/// Both kinds are discovered by scanning the directory and peeking this
+/// field; neither needs a hand-maintained file list.
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
@@ -16,6 +17,12 @@ pub enum Kind {
 /// The family identity of a compiler table: a unique `id` (the `extends:`
 /// target, emitted into `RECOGNITION_PATTERNS`, and mirrors the config
 /// `as:` value) and an optional `extends:` reference to another table's id.
+///
+/// `extends` also fixes recognition order: a table that extends another is a
+/// specialization of it, so it is recognized first (see `load_and_index`).
+/// A new vendor variant of clang/gcc therefore gets correct ordering for
+/// free from the `extends` it needs for flag inheritance anyway -- there is
+/// no separate priority to set.
 #[derive(Deserialize, Clone)]
 pub struct CompilerIdentity {
     pub id: String,

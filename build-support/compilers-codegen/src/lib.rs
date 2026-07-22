@@ -17,13 +17,13 @@ use codegen::{pattern_to_rust, result_to_rust};
 use env_keys::generate_env_keys;
 use recognition::{generate_compiler_ids, generate_recognition_patterns};
 use resolve::{resolve_environment, resolve_flags, resolve_ignore_when, resolve_slash_prefix};
-use tables::{TABLES, TableConfig};
+use tables::{CompilerFile, TableNames};
 use wrappers::generate_wrappers;
 use yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen, Kind, WrapperTable};
 
 /// A compiler flag table with all inheritance resolved and ready for code generation.
 pub struct ResolvedTable {
-    pub config: &'static TableConfig,
+    pub names: TableNames,
     pub flags: Vec<FlagEntry>,
     pub ignore_when: IgnoreWhen,
     pub slash_prefix: bool,
@@ -32,22 +32,21 @@ pub struct ResolvedTable {
 
 impl ResolvedTable {
     /// Resolve a single compiler table by merging inherited flags, ignore_when,
-    /// slash_prefix, and environment entries from the extends chain.
-    pub fn new(
-        key: &str,
-        config: &'static TableConfig,
-        raw_tables: &HashMap<String, FlagTable>,
-    ) -> Result<Self> {
+    /// slash_prefix, and environment entries from the extends chain. Flags are
+    /// resolved by the file's `compiler.id`; the generated names come from its
+    /// stem.
+    pub fn new(compiler_file: &CompilerFile, raw_tables: &HashMap<String, FlagTable>) -> Result<Self> {
+        let key = compiler_file.id.as_str();
         if !raw_tables.contains_key(key) {
             bail!("no table found for '{}'", key);
         }
 
         let mut flags = resolve_flags(key, raw_tables)
-            .with_context(|| format!("resolving flags for {}", config.yaml_file))?;
+            .with_context(|| format!("resolving flags for {}", compiler_file.yaml_file()))?;
         flags.sort_by_key(|b| std::cmp::Reverse(b.match_.name_len()));
 
         Ok(ResolvedTable {
-            config,
+            names: compiler_file.names(),
             flags,
             ignore_when: resolve_ignore_when(key, raw_tables),
             slash_prefix: resolve_slash_prefix(key, raw_tables),
@@ -61,22 +60,22 @@ impl ResolvedTable {
         out.push_str(
             &self
                 .generate_flag_array()
-                .with_context(|| format!("generating flags for {}", self.config.yaml_file))?,
+                .with_context(|| format!("generating flags for {}", self.names.yaml_file))?,
         );
         out.push_str(&self.generate_ignore_arrays());
-        out.push_str(&format!("static {}: bool = {};\n", self.config.slash_prefix_name, self.slash_prefix));
+        out.push_str(&format!("static {}: bool = {};\n", self.names.slash_prefix_name, self.slash_prefix));
         out.push_str(
             &self
                 .generate_env_array()
-                .with_context(|| format!("generating env rules for {}", self.config.yaml_file))?,
+                .with_context(|| format!("generating env rules for {}", self.names.yaml_file))?,
         );
         Ok(out)
     }
 
     fn generate_flag_array(&self) -> Result<String> {
         let mut out = String::new();
-        out.push_str(&format!("// Generated from compilers/{} -- DO NOT EDIT\n", self.config.yaml_file));
-        out.push_str(&format!("static {}: [FlagRule; {}] = [\n", self.config.static_name, self.flags.len()));
+        out.push_str(&format!("// Generated from compilers/{} -- DO NOT EDIT\n", self.names.yaml_file));
+        out.push_str(&format!("static {}: [FlagRule; {}] = [\n", self.names.static_name, self.flags.len()));
         for entry in &self.flags {
             let pattern_rust = pattern_to_rust(&entry.match_.pattern, entry.match_.count);
             let result_rust =
@@ -91,7 +90,7 @@ impl ResolvedTable {
         let mut out = String::new();
         out.push_str(&format!(
             "static {}: [&str; {}] = [",
-            self.config.ignore_executables_name,
+            self.names.ignore_executables_name,
             self.ignore_when.executables.len()
         ));
         for exe in &self.ignore_when.executables {
@@ -101,7 +100,7 @@ impl ResolvedTable {
 
         out.push_str(&format!(
             "static {}: [&str; {}] = [",
-            self.config.ignore_flags_name,
+            self.names.ignore_flags_name,
             self.ignore_when.flags.len()
         ));
         for flag in &self.ignore_when.flags {
@@ -115,18 +114,18 @@ impl ResolvedTable {
         let active: Vec<&EnvEntry> = self.env_entries.iter().filter(|e| e.effect != "none").collect();
 
         for entry in &active {
-            entry.validate().with_context(|| format!("environment entry in {}", self.config.yaml_file))?;
+            entry.validate().with_context(|| format!("environment entry in {}", self.names.yaml_file))?;
         }
 
         let mut out = String::new();
-        out.push_str(&format!("static {}: [EnvRule; {}] = [\n", self.config.env_rules_name, active.len()));
+        out.push_str(&format!("static {}: [EnvRule; {}] = [\n", self.names.env_rules_name, active.len()));
         for entry in &active {
             let mapping_rust = entry
                 .mapping
                 .to_rust()
-                .with_context(|| format!("variable '{}' in {}", entry.variable, self.config.yaml_file))?;
+                .with_context(|| format!("variable '{}' in {}", entry.variable, self.names.yaml_file))?;
             let effect_rust = result_to_rust(&entry.effect)
-                .with_context(|| format!("variable '{}' in {}", entry.variable, self.config.yaml_file))?;
+                .with_context(|| format!("variable '{}' in {}", entry.variable, self.names.yaml_file))?;
             out.push_str(&format!(
                 "    EnvRule::new(\"{}\", {}, {}),\n",
                 entry.variable, mapping_rust, effect_rust
@@ -153,28 +152,26 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
     // directory so a new (or removed) file is never silently missed.
     println!("cargo:rerun-if-changed={}", flags_dir.display());
 
-    let (raw_tables, file_to_id) = load_tables_from(flags_dir)?;
+    let (raw_tables, compiler_files) = load_tables_from(flags_dir)?;
 
     // Load compiler-launcher (wrapper) tables first: both the recognition
     // patterns and the wrapper tables output need the same loaded value.
     let wrapper_tables = load_wrapper_tables(flags_dir, true)?;
 
-    // Generate recognition patterns (compiler rows, then wrapper rows)
-    let recognition = generate_recognition_patterns(&raw_tables, &file_to_id, &wrapper_tables)?;
+    // Generate recognition patterns (compiler rows in discovery order --
+    // specializations before their base -- then wrapper rows)
+    let recognition = generate_recognition_patterns(&raw_tables, &compiler_files, &wrapper_tables)?;
     write_output(out_dir, "recognition.rs", recognition)?;
 
     // Generate the compiler-id data the config module's `as:` deserializer
     // validates against (KNOWN_IDS plus the wrapper launcher basenames).
-    let compiler_ids = generate_compiler_ids(&file_to_id, &wrapper_tables)?;
+    let compiler_ids = generate_compiler_ids(&compiler_files, &wrapper_tables)?;
     write_output(out_dir, "compiler_ids.rs", compiler_ids)?;
 
     // Generate each compiler's flag table
-    for config in TABLES {
-        let id = file_to_id
-            .get(config.yaml_file)
-            .with_context(|| format!("no table loaded for {}", config.yaml_file))?;
-        let resolved = ResolvedTable::new(id, config, &raw_tables)?;
-        write_output(out_dir, config.output_file, resolved.generate()?)?;
+    for compiler_file in &compiler_files {
+        let resolved = ResolvedTable::new(compiler_file, &raw_tables)?;
+        write_output(out_dir, &compiler_file.names().output_file, resolved.generate()?)?;
     }
 
     // Generate combined environment variable keys
@@ -197,7 +194,7 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) -> Result<()> {
 ///
 /// Prints `cargo:rerun-if-changed` lines to stdout (for build.rs integration).
 pub fn generate_env_keys_only(flags_dir: &Path, out_dir: &Path) -> Result<()> {
-    let (raw_tables, _file_to_id) = load_tables_from(flags_dir)?;
+    let (raw_tables, _compiler_files) = load_tables_from(flags_dir)?;
     let env_keys = generate_env_keys(&raw_tables);
     write_output(out_dir, "env_keys.rs", env_keys)?;
     Ok(())
@@ -234,34 +231,97 @@ pub fn insert_by_id(
     Ok(id)
 }
 
-/// Tables keyed by `compiler.id`, plus a side index mapping each `TABLES`
-/// entry's `yaml_file` to the id it declared -- callers that iterate
-/// `TABLES` (for output order) use the index to find the right table
-/// without assuming a file's stem equals its id.
-type LoadedTables = (HashMap<String, FlagTable>, HashMap<&'static str, String>);
+/// Tables keyed by `compiler.id`, plus the discovered compiler files in
+/// generated-output order (`(extends depth desc, stem)`). Callers that need output
+/// order (recognition rows, flag files) iterate the `Vec`; callers that only
+/// need a table by id use the map.
+type LoadedTables = (HashMap<String, FlagTable>, Vec<CompilerFile>);
 
-/// Load YAML flag tables from `flags_dir`, keyed by id, validated.
+/// Discover and load every compiler-kind YAML file in `flags_dir`, keyed by
+/// id, validated, and ordered for recognition.
+///
+/// Files are found by scanning the directory and peeking each file's `type:`
+/// kind; wrapper-kind files are skipped here (they are loaded separately by
+/// [`load_wrapper_tables`]). There is no hand-maintained file list: a new
+/// compiler is picked up by the scan alone.
+///
+/// Order is `(extends depth descending, stem ascending)`: a table that
+/// `extends` another is a specialization of it (its executable names may be
+/// caught by the base's broadened cross-compilation pattern), so it must be
+/// recognized first. Depth encodes exactly that -- a child's depth is always
+/// greater than its parent's -- so the "recognize specific before general"
+/// invariant falls out of the `extends` graph with no per-file annotation.
 ///
 /// `print_rerun` controls whether `cargo:rerun-if-changed` lines are
 /// printed (only meaningful when called from a `build.rs`).
 fn load_and_index(flags_dir: &Path, print_rerun: bool) -> Result<LoadedTables> {
+    let mut yaml_files: Vec<String> = std::fs::read_dir(flags_dir)
+        .with_context(|| format!("reading directory {}", flags_dir.display()))?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.ends_with(".yaml"))
+        .collect();
+    yaml_files.sort();
+
     let mut raw_tables = HashMap::new();
-    let mut file_to_id = HashMap::new();
-    for config in TABLES {
-        let yaml_path = flags_dir.join(config.yaml_file);
+    let mut compiler_files = Vec::new();
+    for yaml_file in yaml_files {
+        let yaml_path = flags_dir.join(&yaml_file);
         if print_rerun {
             println!("cargo:rerun-if-changed={}", yaml_path.display());
         }
 
         let content = std::fs::read_to_string(&yaml_path)
             .with_context(|| format!("reading {}", yaml_path.display()))?;
-        let table = parse_table(config.yaml_file, &content)?;
+        let peek: KindPeek =
+            serde_saphyr::from_str(&content).with_context(|| format!("parsing {}", yaml_file))?;
+        // Wrapper-kind files are loaded by load_wrapper_tables, not here.
+        if peek.type_ != Kind::Compiler {
+            continue;
+        }
 
-        let id = insert_by_id(&mut raw_tables, config.yaml_file, table)?;
-        file_to_id.insert(config.yaml_file, id);
+        let stem = yaml_file.strip_suffix(".yaml").expect("filtered to .yaml above").to_string();
+        let table = parse_table(&yaml_file, &content)?;
+        let id = insert_by_id(&mut raw_tables, &yaml_file, table)?;
+        // Depth is filled in below, once every table is loaded and extends
+        // targets can be resolved.
+        compiler_files.push(CompilerFile { stem, id, depth: 0 });
     }
-    validate_extends(&raw_tables, &file_to_id)?;
-    Ok((raw_tables, file_to_id))
+
+    validate_extends(&raw_tables, &compiler_files)?;
+
+    // Recognition order: specializations (higher extends depth) first, then
+    // stem. See the doc comment above; this replaces the old hand-ordered
+    // TABLES array with an order derived from the extends graph.
+    for compiler_file in &mut compiler_files {
+        compiler_file.depth = extends_depth(&raw_tables, &compiler_file.id)?;
+    }
+    compiler_files.sort_by(|a, b| b.depth.cmp(&a.depth).then_with(|| a.stem.cmp(&b.stem)));
+
+    Ok((raw_tables, compiler_files))
+}
+
+/// The `extends` depth of `id`: 0 for a root, one more than its parent
+/// otherwise. Walks the extends chain, which `validate_extends` has already
+/// proven leads only to existing tables; bails on a cycle so codegen (not
+/// just a test) rejects one.
+fn extends_depth(raw_tables: &HashMap<String, FlagTable>, id: &str) -> Result<usize> {
+    let mut seen: Vec<&str> = Vec::new();
+    let mut cursor = id;
+    while let Some(parent) = raw_tables
+        .get(cursor)
+        .expect("extends targets exist after validate_extends")
+        .compiler
+        .extends
+        .as_deref()
+    {
+        if seen.contains(&cursor) {
+            bail!("extends cycle detected at '{}'", cursor);
+        }
+        seen.push(cursor);
+        cursor = parent;
+    }
+    Ok(seen.len())
 }
 
 /// Validate that every table's `compiler.extends` (if set) names an id
@@ -269,14 +329,14 @@ fn load_and_index(flags_dir: &Path, print_rerun: bool) -> Result<LoadedTables> {
 /// file so a dangling `extends:` target fails codegen, not just a test.
 pub fn validate_extends(
     raw_tables: &HashMap<String, FlagTable>,
-    file_to_id: &HashMap<&'static str, String>,
+    compiler_files: &[CompilerFile],
 ) -> Result<()> {
-    for (yaml_file, id) in file_to_id {
-        let table = &raw_tables[id];
+    for compiler_file in compiler_files {
+        let table = &raw_tables[&compiler_file.id];
         if let Some(ref base) = table.compiler.extends
             && !raw_tables.contains_key(base.as_str())
         {
-            bail!("{} extends '{}', which does not exist", yaml_file, base);
+            bail!("{} extends '{}', which does not exist", compiler_file.yaml_file(), base);
         }
     }
     Ok(())
@@ -296,26 +356,22 @@ struct KindPeek {
     type_: Kind,
 }
 
-/// Load every `type: wrapper` YAML file present in `flags_dir` that is not
-/// one of the `TABLES` compiler files, sorted by file name for
-/// deterministic generated output.
+/// Load every `type: wrapper` YAML file in `flags_dir`, sorted by file name
+/// for deterministic generated output.
 ///
-/// `TABLES`-driven compiler loading (`load_and_index`) is untouched by this
-/// second pass; this only discovers files it does not already know about.
-/// A discovered file that peeks as `type: compiler` is a compiler file
-/// missing from `TABLES` -- a codegen error, not a wrapper.
+/// Like [`load_and_index`], this scans the directory and peeks each file's
+/// kind; it collects the wrapper-kind files and skips the compiler-kind ones
+/// (which `load_and_index` loads). Kind is declared data, so nothing needs a
+/// hand-maintained list to tell the two apart.
 ///
 /// `print_rerun` controls whether `cargo:rerun-if-changed` lines are
 /// printed (only meaningful when called from a `build.rs`).
 pub fn load_wrapper_tables(flags_dir: &Path, print_rerun: bool) -> Result<Vec<(String, WrapperTable)>> {
-    let known: std::collections::HashSet<&str> = TABLES.iter().map(|c| c.yaml_file).collect();
-
     let mut yaml_files: Vec<String> = std::fs::read_dir(flags_dir)
         .with_context(|| format!("reading directory {}", flags_dir.display()))?
         .filter_map(|entry| entry.ok())
         .filter_map(|entry| entry.file_name().into_string().ok())
         .filter(|name| name.ends_with(".yaml"))
-        .filter(|name| !known.contains(name.as_str()))
         .collect();
     yaml_files.sort();
 
@@ -337,9 +393,8 @@ pub fn load_wrapper_tables(flags_dir: &Path, print_rerun: bool) -> Result<Vec<(S
                 table.validate(&yaml_file)?;
                 wrapper_tables.push((yaml_file, table));
             }
-            Kind::Compiler => {
-                bail!("{} is a compiler-kind YAML file not registered in TABLES", yaml_file);
-            }
+            // Compiler-kind files are loaded by load_and_index.
+            Kind::Compiler => continue,
         }
     }
     Ok(wrapper_tables)
@@ -365,10 +420,19 @@ pub(crate) fn flags_dir() -> std::path::PathBuf {
     workspace_root.join("crates/bear/compilers")
 }
 
-/// Load all YAML flag tables from the workspace compilers directory.
+/// Load all YAML flag tables from the workspace compilers directory, keyed
+/// by `compiler.id`.
 pub fn load_tables() -> Result<HashMap<String, FlagTable>> {
-    let (raw_tables, _file_to_id) = load_and_index(&flags_dir(), false)?;
+    let (raw_tables, _compiler_files) = load_and_index(&flags_dir(), false)?;
     Ok(raw_tables)
+}
+
+/// Discover the compiler-kind files in the workspace compilers directory, in
+/// generated-output order (`(extends depth desc, stem)`). Used by tests and codegen
+/// stages that need the ordered file list without the full flag tables.
+pub fn load_compiler_files() -> Result<Vec<CompilerFile>> {
+    let (_raw_tables, compiler_files) = load_and_index(&flags_dir(), false)?;
+    Ok(compiler_files)
 }
 
 #[cfg(test)]
@@ -639,9 +703,8 @@ mod tests {
     #[test]
     fn resolve_flags_real_no_conflicts() {
         let raw_tables = load_tables().unwrap();
-        for config in TABLES {
-            let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-            resolve_flags(key, &raw_tables).unwrap();
+        for compiler_file in load_compiler_files().unwrap() {
+            resolve_flags(&compiler_file.id, &raw_tables).unwrap();
         }
     }
 
@@ -781,12 +844,13 @@ mod tests {
         let out_dir = tempfile::tempdir().unwrap();
         generate(&flags_dir(), out_dir.path()).unwrap();
 
-        for config in TABLES {
-            let path = out_dir.path().join(config.output_file);
+        for compiler_file in load_compiler_files().unwrap() {
+            let names = compiler_file.names();
+            let path = out_dir.path().join(&names.output_file);
             let content = std::fs::read_to_string(&path)
-                .unwrap_or_else(|_| panic!("Missing output file: {}", config.output_file));
+                .unwrap_or_else(|_| panic!("Missing output file: {}", names.output_file));
             assert!(!content.is_empty());
-            assert!(content.contains(config.static_name));
+            assert!(content.contains(&names.static_name));
         }
         assert!(
             std::fs::read_to_string(out_dir.path().join("recognition.rs"))
@@ -812,22 +876,69 @@ mod tests {
 
     #[test]
     fn generate_compiler_ids_lists_every_family_and_launcher() {
-        let (_raw_tables, file_to_id) = load_and_index(&flags_dir(), false).unwrap();
+        let compiler_files = load_compiler_files().unwrap();
         let wrapper_tables = load_wrapper_tables(&flags_dir(), false).unwrap();
 
-        let sut = generate_compiler_ids(&file_to_id, &wrapper_tables).unwrap();
+        let sut = generate_compiler_ids(&compiler_files, &wrapper_tables).unwrap();
 
-        // Every TABLES id appears; the four launcher basenames appear as
-        // wrapper as-names; "wrapper" is the kind, never an id.
-        for config in TABLES {
-            let id = file_to_id[config.yaml_file].as_str();
-            assert!(sut.contains(&format!("\"{}\"", id)), "missing id {id}");
+        // Every discovered compiler id appears; the four launcher basenames
+        // appear as wrapper as-names; "wrapper" is the kind, never an id.
+        for compiler_file in &compiler_files {
+            assert!(sut.contains(&format!("\"{}\"", compiler_file.id)), "missing id {}", compiler_file.id);
         }
         for launcher in ["ccache", "distcc", "icecc", "sccache"] {
             assert!(sut.contains(&format!("\"{}\"", launcher)), "missing launcher {launcher}");
         }
         assert!(sut.contains("KNOWN_IDS"));
         assert!(sut.contains("WRAPPER_AS_NAMES"));
+    }
+
+    #[test]
+    fn discovery_orders_specializations_before_the_base() {
+        // A family that `extends` another is recognized before it: ibm_xl and
+        // clang_cl extend clang/msvc, so they precede their bases, and clang
+        // (extends gcc) precedes gcc. The real constraint this protects is
+        // ibm_xl before clang -- "ibm-clang" matches clang's cross-compilation
+        // pattern, so clang must not be tried first.
+        let compiler_files = load_compiler_files().unwrap();
+        let position = |id: &str| compiler_files.iter().position(|c| c.id == id).unwrap();
+
+        assert!(position("ibm_xl") < position("clang"), "ibm_xl must precede clang");
+        assert!(position("clang_cl") < position("msvc"), "clang_cl must precede msvc");
+        assert!(position("clang") < position("gcc"), "clang must precede gcc");
+    }
+
+    #[test]
+    fn extends_depth_of_a_chain_counts_hops() {
+        let raw_tables = load_tables().unwrap();
+
+        // gcc is a root (0); clang extends gcc (1); ibm_xl extends clang (2).
+        assert_eq!(extends_depth(&raw_tables, "gcc").unwrap(), 0);
+        assert_eq!(extends_depth(&raw_tables, "clang").unwrap(), 1);
+        assert_eq!(extends_depth(&raw_tables, "ibm_xl").unwrap(), 2);
+    }
+
+    #[test]
+    fn extends_depth_bails_on_a_cycle() {
+        let mut tables = HashMap::new();
+        for (id, parent) in [("a", "b"), ("b", "a")] {
+            tables.insert(
+                id.to_string(),
+                FlagTable {
+                    type_: Kind::Compiler,
+                    compiler: CompilerIdentity { id: id.to_string(), extends: Some(parent.to_string()) },
+                    recognize: None,
+                    ignore_when: None,
+                    slash_prefix: None,
+                    flags: vec![],
+                    environment: None,
+                },
+            );
+        }
+
+        let err = extends_depth(&tables, "a").unwrap_err();
+
+        assert!(err.to_string().contains("cycle"), "{}", err);
     }
 
     // -- load_wrapper_tables tests --
@@ -841,13 +952,20 @@ mod tests {
     }
 
     #[test]
-    fn load_wrapper_tables_rejects_an_unregistered_compiler_file() {
+    fn load_wrapper_tables_skips_compiler_kind_files() {
+        // A compiler-kind file is discovered by load_and_index, not the
+        // wrapper pass; the wrapper pass simply skips it (no error).
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("stray.yaml"), "type: compiler\ncompiler:\n  id: stray\nflags: []\n")
             .unwrap();
 
-        let err = load_wrapper_tables(dir.path(), false).err().unwrap();
-        assert!(err.to_string().contains("stray.yaml"), "{}", err);
+        let wrapper_tables = load_wrapper_tables(dir.path(), false).unwrap();
+
+        assert!(
+            wrapper_tables.is_empty(),
+            "compiler-kind file should be skipped, got {} rows",
+            wrapper_tables.len()
+        );
     }
 
     // -- helpers --

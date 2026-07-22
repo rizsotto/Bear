@@ -1,6 +1,8 @@
 type: compiler
 compiler:
   id: ibm_xl
+  # extends clang: also puts ibm_xl ahead of clang in recognition, so
+  # "ibm-clang" is not first captured by clang's cross-compilation pattern.
   extends: clang
 recognize:
   - description: "IBM Open XL C/C++"

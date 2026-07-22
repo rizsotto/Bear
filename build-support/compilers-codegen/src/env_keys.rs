@@ -3,18 +3,17 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::resolve::resolve_environment;
-use crate::tables::TABLES;
 use crate::yaml_types::FlagTable;
 
 /// Generate a static array of all compiler environment variable names.
 ///
-/// Returns the generated Rust source as a string.
+/// Returns the generated Rust source as a string. The output is sorted (a
+/// `BTreeSet`), so it does not depend on the order the tables are visited.
 pub fn generate_env_keys(raw_tables: &HashMap<String, FlagTable>) -> String {
     let mut all_vars = BTreeSet::new();
 
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let entries = resolve_environment(key, raw_tables);
+    for id in raw_tables.keys() {
+        let entries = resolve_environment(id, raw_tables);
         for entry in &entries {
             if entry.effect != "none" {
                 all_vars.insert(entry.variable.clone());

@@ -7,28 +7,33 @@
 
 use compilers_codegen::codegen::{pattern_to_rust, result_to_rust};
 use compilers_codegen::resolve::resolve_environment;
-use compilers_codegen::tables::TABLES;
-use compilers_codegen::{insert_by_id, load_tables, parse_table, parse_wrapper_table, validate_extends};
+use compilers_codegen::tables::CompilerFile;
+use compilers_codegen::{
+    insert_by_id, load_compiler_files, load_tables, parse_table, parse_wrapper_table, validate_extends,
+};
 
-/// Every YAML file parses successfully.
+/// Every discovered compiler-kind file loads and is keyed by its id.
 #[test]
 fn all_yaml_files_parse() {
     let tables = load_tables().unwrap();
-    assert_eq!(tables.len(), TABLES.len());
+    let compiler_files = load_compiler_files().unwrap();
+
+    assert!(!compiler_files.is_empty(), "no compiler files discovered");
+    for cf in &compiler_files {
+        assert!(tables.contains_key(&cf.id), "discovered {} but it did not load", cf.yaml_file());
+    }
 }
 
 /// Every `extends` reference points to an existing table.
 #[test]
 fn extends_references_are_valid() {
     let tables = load_tables().unwrap();
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let table = &tables[key];
+    for (id, table) in &tables {
         if let Some(ref base_name) = table.compiler.extends {
             assert!(
                 tables.contains_key(base_name.as_str()),
                 "{} extends '{}', which does not exist",
-                config.yaml_file,
+                id,
                 base_name
             );
         }
@@ -39,12 +44,10 @@ fn extends_references_are_valid() {
 #[test]
 fn all_flag_results_are_valid() {
     let tables = load_tables().unwrap();
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let table = &tables[key];
+    for (id, table) in &tables {
         for entry in &table.flags {
             result_to_rust(&entry.result)
-                .unwrap_or_else(|e| panic!("{}: flag '{}': {}", config.yaml_file, entry.match_.pattern, e));
+                .unwrap_or_else(|e| panic!("{}: flag '{}': {}", id, entry.match_.pattern, e));
         }
     }
 }
@@ -53,15 +56,13 @@ fn all_flag_results_are_valid() {
 #[test]
 fn all_flag_patterns_produce_valid_codegen() {
     let tables = load_tables().unwrap();
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let table = &tables[key];
+    for (id, table) in &tables {
         for entry in &table.flags {
             let output = pattern_to_rust(&entry.match_.pattern, entry.match_.count);
             assert!(
                 output.starts_with("FlagPattern::"),
                 "{}: pattern '{}' produced unexpected output: {}",
-                config.yaml_file,
+                id,
                 entry.match_.pattern,
                 output
             );
@@ -75,15 +76,14 @@ fn all_env_entries_are_valid() {
     let tables = load_tables().unwrap();
     let mut errors = Vec::new();
 
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let entries = resolve_environment(key, &tables);
+    for id in tables.keys() {
+        let entries = resolve_environment(id, &tables);
         for entry in &entries {
             if entry.effect == "none" {
                 continue;
             }
             if let Err(e) = entry.validate() {
-                errors.push(format!("{}: {}", config.yaml_file, e));
+                errors.push(format!("{}: {}", id, e));
             }
         }
     }
@@ -102,14 +102,13 @@ fn env_variable_names_are_c_identifiers() {
 
     let tables = load_tables().unwrap();
 
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        if let Some(ref env) = tables[key].environment {
+    for (id, table) in &tables {
+        if let Some(ref env) = table.environment {
             for entry in env {
                 assert!(
                     is_valid_var_name(&entry.variable),
                     "{}: '{}' is not a valid C identifier",
-                    config.yaml_file,
+                    id,
                     entry.variable
                 );
             }
@@ -121,17 +120,11 @@ fn env_variable_names_are_c_identifiers() {
 #[test]
 fn no_circular_extends() {
     let tables = load_tables().unwrap();
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
+    for start in tables.keys() {
         let mut visited = std::collections::HashSet::new();
-        let mut current = Some(key.to_string());
+        let mut current = Some(start.clone());
         while let Some(k) = current {
-            assert!(
-                visited.insert(k.clone()),
-                "{}: circular extends chain detected at '{}'",
-                config.yaml_file,
-                k
-            );
+            assert!(visited.insert(k.clone()), "{}: circular extends chain detected at '{}'", start, k);
             current = tables.get(k.as_str()).and_then(|t| t.compiler.extends.clone());
         }
     }
@@ -145,13 +138,11 @@ fn no_circular_extends() {
 #[test]
 fn typed_tables_have_recognition_entries() {
     let tables = load_tables().unwrap();
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let table = &tables[key];
+    for (id, table) in &tables {
         assert!(
             table.recognize.as_ref().is_some_and(|r| !r.is_empty()),
             "{}: has type but no recognize entries",
-            config.yaml_file
+            id
         );
     }
 }
@@ -160,9 +151,7 @@ fn typed_tables_have_recognition_entries() {
 #[test]
 fn all_tables_have_flags() {
     let tables = load_tables().unwrap();
-    for config in TABLES {
-        let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let table = &tables[key];
+    for (id, table) in &tables {
         let has_own = !table.flags.is_empty();
         let has_inherited = table
             .compiler
@@ -170,7 +159,7 @@ fn all_tables_have_flags() {
             .as_ref()
             .and_then(|base| tables.get(base.as_str()))
             .is_some_and(|base| !base.flags.is_empty());
-        assert!(has_own || has_inherited, "{}: no flags defined (own or inherited)", config.yaml_file);
+        assert!(has_own || has_inherited, "{}: no flags defined (own or inherited)", id);
     }
 }
 
@@ -205,11 +194,10 @@ fn dangling_extends_target_is_detected() {
     let table = parse_table("leaf.yaml", &yaml).unwrap();
 
     let mut tables = std::collections::HashMap::new();
-    let mut file_to_id = std::collections::HashMap::new();
     let id = insert_by_id(&mut tables, "leaf.yaml", table).unwrap();
-    file_to_id.insert("leaf.yaml", id);
+    let compiler_files = vec![CompilerFile { stem: "leaf".to_string(), id, depth: 0 }];
 
-    let err = validate_extends(&tables, &file_to_id).unwrap_err();
+    let err = validate_extends(&tables, &compiler_files).unwrap_err();
     assert!(err.to_string().contains("leaf.yaml"), "{}", err);
     assert!(err.to_string().contains("nonexistent"), "{}", err);
 }
