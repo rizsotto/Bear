@@ -434,9 +434,14 @@ regardless of the build command's status.
 # ENVIRONMENT
 
 **RUST_LOG**
-: Controls Bear's log level on standard error: `error`, `warn`, `info`,
-or `debug`, in increasing verbosity. Debug output is essential for
-troubleshooting; see TROUBLESHOOTING.
+: Selects the diagnostic format and verbosity on standard error. When
+unset, Bear uses the UNIX style, `bear: message` (and `wrapper:` or
+`preload:` from its helper processes), showing warnings and errors only.
+When set to a level (`error`, `warn`, `info`, or `debug`, in increasing
+verbosity), Bear switches to a developer format that tags every line with
+a timestamp, the level, the emitting process and its pid, and the source
+location. Debug output is essential for troubleshooting; see
+TROUBLESHOOTING.
 
 
 # FILES

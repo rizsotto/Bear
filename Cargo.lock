@@ -130,7 +130,7 @@ version = "4.2.0"
 dependencies = [
  "anyhow",
  "bear",
- "env_logger",
+ "intercept",
  "intercept-supervisor",
  "log",
 ]
@@ -152,7 +152,6 @@ name = "bear-wrapper"
 version = "4.2.0"
 dependencies = [
  "anyhow",
- "env_logger",
  "intercept",
  "intercept-supervisor",
  "log",
@@ -556,6 +555,7 @@ name = "intercept"
 version = "4.2.0"
 dependencies = [
  "compilers-codegen",
+ "env_logger",
  "libc",
  "log",
  "serde",
@@ -570,7 +570,6 @@ version = "4.2.0"
 dependencies = [
  "cc",
  "ctor",
- "env_logger",
  "errno",
  "intercept",
  "libc",

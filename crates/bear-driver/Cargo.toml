@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 bear = { path = "../bear" }
+intercept = { path = "../intercept" }
 intercept-supervisor = { path = "../intercept-supervisor" }
 anyhow.workspace = true
 log.workspace = true
-env_logger.workspace = true

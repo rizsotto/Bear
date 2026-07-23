@@ -152,6 +152,59 @@ fn parse_sh_default_log_level_reports_skips_without_rust_log() -> Result<()> {
     Ok(())
 }
 
+// Requirements: cli-diagnostic-format
+//
+// Without `RUST_LOG`, diagnostics use the UNIX user format: each line is
+// prefixed with the emitting process (`bear`) and warnings carry a
+// `warning:` qualifier. The developer tag `bear[<pid>]` must be absent, so
+// this pins the user view rather than merely "some text on stderr".
+#[test]
+fn parse_sh_user_format_prefixes_program_and_severity() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_user_format")?;
+
+    let script = b"(subshell command) >/dev/null\ngcc -c foo.c\n";
+    let result = env.run_bear_with_stdin_default_log(&["parse-sh"], script)?;
+    result.assert_success()?;
+
+    let stderr = result.stderr();
+    assert!(
+        stderr.contains("bear: warning:"),
+        "user format prefixes the process and qualifies the severity: {stderr}"
+    );
+    assert!(
+        !stderr.contains("bear["),
+        "the developer process[pid] tag must not appear without RUST_LOG: {stderr}"
+    );
+
+    Ok(())
+}
+
+// Requirements: cli-diagnostic-format
+//
+// With `RUST_LOG` set (the harness defaults it to `info`), diagnostics use
+// the developer format: every line carries the process identity and pid as
+// `bear[<pid>]`, distinguishing Bear's processes when they interleave.
+#[test]
+fn parse_sh_developer_format_tags_process_identity() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_developer_format")?;
+
+    let script = b"(subshell command) >/dev/null\ngcc -c foo.c\n";
+    let result = env.run_bear_with_stdin(&["parse-sh"], script)?;
+    result.assert_success()?;
+
+    let stderr = result.stderr();
+    assert!(
+        stderr.contains("bear["),
+        "developer format tags each line with the process identity and pid: {stderr}"
+    );
+    assert!(
+        !stderr.contains("bear: warning:"),
+        "the user-format prefix must not appear once RUST_LOG selects the developer view: {stderr}"
+    );
+
+    Ok(())
+}
+
 // Requirements: interception-events-from-shell-text
 //
 // When any line is skipped, a stderr summary reports both counts, and the

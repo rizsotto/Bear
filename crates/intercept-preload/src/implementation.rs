@@ -129,21 +129,7 @@ static REPORTER: OnceLock<ReporterOnTcp> = OnceLock::new();
 pub unsafe extern "C" fn rust_session_init(envp: *const *const c_char) {
     // Initialize logging first
     #[cfg(not(test))]
-    {
-        use std::io::Write;
-
-        let pid = std::process::id();
-        let _ = env_logger::Builder::from_default_env()
-            .format(move |buf, record| {
-                let now =
-                    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
-                let secs = now.as_secs();
-                let ms = now.subsec_millis();
-                let (h, m, s) = ((secs / 3600) % 24, (secs / 60) % 60, secs % 60);
-                writeln!(buf, "[{h:02}:{m:02}:{s:02}.{ms:03} preload/{pid}] {}", record.args())
-            })
-            .try_init();
-    }
+    intercept::logging::init("preload");
 
     // Initialize the session and get the destination for reporter setup
     let destination = unsafe { init_session_from_envp(envp) };

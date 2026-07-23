@@ -7,7 +7,9 @@
 //! processes.
 //!
 //! The module provides abstractions for the reporter and the collector. And it also defines
-//! the data structures that are used to represent the events.
+//! the data structures that are used to represent the events. It also hosts the shared
+//! logging initializer (`logging`) that every Bear binary uses for a consistent diagnostic
+//! format.
 //!
 //! # How the executable path is captured
 //!
@@ -45,6 +47,7 @@
 //! `output-json-compilation-database` requirement).
 
 pub mod environment;
+pub mod logging;
 pub mod reporter;
 pub mod state;
 pub mod tcp;

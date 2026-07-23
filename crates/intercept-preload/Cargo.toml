@@ -19,7 +19,6 @@ crate-type = ["rlib", "cdylib"]
 intercept = { path = "../intercept" }
 thiserror.workspace = true
 log.workspace = true
-env_logger.workspace = true
 ctor.workspace = true
 
 [target.'cfg(target_family = "unix")'.dependencies]
