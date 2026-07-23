@@ -372,7 +372,7 @@ pub enum HeaderStrategy {
     DependencyFiles,
 }
 
-pub(crate) const SUPPORTED_SCHEMA_VERSION: &str = "4.1";
+pub(crate) const SUPPORTED_SCHEMA_VERSION: &str = "4.2";
 
 fn default_enabled() -> bool {
     true

@@ -24,7 +24,7 @@ fn config(enabled: Option<bool>) -> String {
     };
     format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 intercept:
   mode: preload
   path: "{}"

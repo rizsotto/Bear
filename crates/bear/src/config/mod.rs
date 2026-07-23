@@ -17,7 +17,7 @@
 //! 5. The configuration directory of the application
 //!
 //! ```yaml
-//! schema: 4.1
+//! schema: 4.2
 //!
 //! intercept:
 //!   mode: wrapper
@@ -52,7 +52,7 @@
 //! ```
 //!
 //! ```yaml
-//! schema: 4.1
+//! schema: 4.2
 //!
 //! intercept:
 //!   mode: preload

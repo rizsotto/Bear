@@ -348,7 +348,7 @@ $CC -c test.c -o test.o
     // them via the CC env var and PATH scan (masquerade-aware, see
     // `interception-wrapper-recursion`).
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper
@@ -404,7 +404,7 @@ $CC -c test.c -o test.o
     let script = env.create_shell_script("build.sh", build)?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper
@@ -680,7 +680,7 @@ fn wrapper_mode_resolves_cc_bare_name_via_path() -> Result<()> {
     // Config forces wrapper mode. No `compilers:` entry -- Bear discovers the
     // compiler via CC (masquerade-aware resolution).
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper
@@ -759,7 +759,7 @@ $CC -c test.c -o test.o
     let script = env.create_shell_script("build.sh", build)?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper
@@ -819,7 +819,7 @@ fn wrapper_mode_handles_cc_with_trailing_flags() -> Result<()> {
     let script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper
@@ -899,7 +899,7 @@ fn wrapper_mode_survives_masquerade_wrapper_in_path() -> Result<()> {
     let script = env.create_shell_script("build.sh", &build)?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper
@@ -991,7 +991,7 @@ fn wrapper_mode_resolves_cc_without_exe_extension_on_windows() -> Result<()> {
     std::fs::write(&script_path, &build_commands)?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: wrapper

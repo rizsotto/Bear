@@ -21,7 +21,7 @@ const SRC: &str = "int main() { return 0; }";
 fn config(from_response_files: bool) -> String {
     format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 intercept:
   mode: preload
   path: "{}"

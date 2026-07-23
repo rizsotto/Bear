@@ -26,7 +26,7 @@ fn basic_config_loading() -> Result<()> {
     // Create basic valid config
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -94,7 +94,7 @@ fn compiler_ignore_config() -> Result<()> {
     // Create config that ignores the C++ compiler
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -162,7 +162,7 @@ fn source_file_filtering() -> Result<()> {
     // Config to include only existing source files
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -235,7 +235,7 @@ fn source_directory_filter_config() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -313,7 +313,7 @@ fn source_file_pattern_filter_config() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -378,7 +378,7 @@ fn source_file_pattern_filter_default_off() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -431,7 +431,7 @@ fn header_entries_siblings_config() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -502,7 +502,7 @@ fn header_entries_dependency_files_config() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -581,7 +581,7 @@ fn header_entries_direct_header_compile_yields_one_entry() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -655,7 +655,7 @@ fn header_entries_default_off() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -710,7 +710,7 @@ fn path_format_config() -> Result<()> {
     // Test absolute path format
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -788,7 +788,7 @@ fn canonical_path_format_resolves_symlinks() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -853,7 +853,7 @@ fn relative_file_format_is_relative_to_directory() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -918,7 +918,7 @@ fn output_field_follows_file_path_format() -> Result<()> {
     ])?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 format:
   paths:
@@ -984,7 +984,7 @@ fn canonical_file_format_falls_back_for_missing_source() -> Result<()> {
     env.create_source_files(&[("events.json", &event.to_string())])?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 format:
   paths:
@@ -1038,7 +1038,7 @@ fn relative_directory_format_does_not_break_pipeline() -> Result<()> {
     env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "int main() { return 0; }")])?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 format:
   paths:
@@ -1091,7 +1091,7 @@ fn relative_directory_alone_does_not_break_pipeline() -> Result<()> {
     env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "int main() { return 0; }")])?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 format:
   paths:
@@ -1307,7 +1307,7 @@ fn duplicate_filter_config() -> Result<()> {
     // Config with duplicate filtering
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload
@@ -1411,7 +1411,7 @@ fn duplicate_match_on_file_alone_collapses_flag_variants() -> Result<()> {
     env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 duplicates:
   match_on: [file]
@@ -1474,7 +1474,7 @@ fn duplicate_match_on_file_and_output_preserves_differing_outputs() -> Result<()
     env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 duplicates:
   match_on: [file, output]
@@ -1512,7 +1512,7 @@ fn duplicate_match_on_command_and_arguments_is_rejected() -> Result<()> {
     let env = TestEnvironment::new("dup_match_conflict")?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 duplicates:
   match_on: [command, arguments]
@@ -1541,7 +1541,7 @@ fn duplicate_match_on_empty_is_rejected() -> Result<()> {
     let env = TestEnvironment::new("dup_match_empty")?;
 
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 duplicates:
   match_on: []
@@ -1590,7 +1590,7 @@ fn duplicate_append_mode_newest_entry_wins() -> Result<()> {
 
     // match_on deliberately excludes arguments: same file+directory = duplicate.
     let config = r#"
-schema: "4.1"
+schema: "4.2"
 
 duplicates:
   match_on: [file, directory]
@@ -1746,7 +1746,7 @@ fn config_compiler_hint_matches_bare_spelled_name() -> Result<()> {
     // Windows temp path as escape sequences and fails to parse.
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 compilers:
   - path: '{dir}/toolchain/my-quirky-cc'

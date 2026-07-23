@@ -89,7 +89,7 @@ use anyhow::Result;
 
 /// Config to enforce preload mode (same as intercept_posix tests).
 const CONFIG: &str = concat!(
-    r#"schema: '4.1'
+    r#"schema: '4.2'
 
 intercept:
   mode: preload

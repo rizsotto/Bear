@@ -558,7 +558,7 @@ fn signal_tears_down_nested_wrapper_supervision() -> Result<()> {
     let build = format!("$CC -x c -c {fifo} -o out.o", fifo = fifo.display());
     let script = env.create_shell_script("build.sh", &build)?;
 
-    let config = "schema: \"4.1\"\n\nintercept:\n  mode: wrapper\n";
+    let config = "schema: \"4.2\"\n\nintercept:\n  mode: wrapper\n";
     let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 

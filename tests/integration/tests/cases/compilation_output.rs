@@ -867,7 +867,7 @@ fn output_field_is_recorded_when_enabled() -> Result<()> {
 
     let config = format!(
         r#"
-schema: "4.1"
+schema: "4.2"
 
 intercept:
   mode: preload

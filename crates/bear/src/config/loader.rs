@@ -160,7 +160,7 @@ mod test {
     #[test]
     fn test_wrapper_config() {
         let content: &[u8] = br#"
-            schema: 4.1
+            schema: 4.2
 
             intercept:
                 mode: wrapper
@@ -200,7 +200,7 @@ mod test {
         let result = Loader::from_reader(content).unwrap();
 
         let expected = Main {
-            schema: String::from("4.1"),
+            schema: String::from("4.2"),
             intercept: Intercept::Wrapper,
             compilers: vec![
                 Compiler {
@@ -243,7 +243,7 @@ mod test {
     #[test]
     fn test_incomplete_wrapper_config() {
         let content: &[u8] = br#"
-            schema: 4.1
+            schema: 4.2
 
             intercept:
               mode: wrapper
@@ -257,7 +257,7 @@ mod test {
         let result = Loader::from_reader(content).unwrap();
 
         let expected = Main {
-            schema: String::from("4.1"),
+            schema: String::from("4.2"),
             intercept: Intercept::Wrapper,
             compilers: vec![],
             sources: SourceFilter { directories: vec![], files: vec![] },
@@ -277,7 +277,7 @@ mod test {
     #[test]
     fn test_incomplete_preload_config() {
         let content: &[u8] = br#"
-            schema: 4.1
+            schema: 4.2
 
             intercept:
               mode: preload
@@ -290,7 +290,7 @@ mod test {
         let result = Loader::from_reader(content).unwrap();
 
         let expected = Main {
-            schema: String::from("4.1"),
+            schema: String::from("4.2"),
             intercept: Intercept::Preload,
             compilers: vec![],
             sources: SourceFilter { directories: vec![], files: vec![] },
@@ -310,7 +310,7 @@ mod test {
     #[test]
     fn test_header_entries_config_round_trips_through_loader() {
         let content: &[u8] = br#"
-            schema: 4.1
+            schema: 4.2
 
             intercept:
                 mode: wrapper
@@ -323,7 +323,7 @@ mod test {
         let result = Loader::from_reader(content).unwrap();
 
         let expected = Main {
-            schema: String::from("4.1"),
+            schema: String::from("4.2"),
             intercept: Intercept::Wrapper,
             compilers: vec![],
             sources: SourceFilter::default(),
@@ -340,7 +340,7 @@ mod test {
         let result = Main::default();
 
         let expected = Main {
-            schema: String::from("4.1"),
+            schema: String::from("4.2"),
             intercept: Intercept::default(),
             compilers: vec![],
             sources: SourceFilter::default(),
@@ -376,7 +376,7 @@ mod test {
 
         let message = result.unwrap_err().to_string();
         assert!(
-            message.contains("Unsupported schema version: 3.0. Expected: 4.1"),
+            message.contains("Unsupported schema version: 3.0. Expected: 4.2"),
             "unexpected error message: {message}"
         );
     }
@@ -407,7 +407,7 @@ mod test {
         let config_file = temp_dir.path().join("bear.yml");
 
         let invalid_config = r#"
-            schema: "4.1"
+            schema: "4.2"
 
             intercept:
                 mode: wrapper
@@ -509,7 +509,7 @@ mod test {
 
         let config_with_hints = format!(
             r#"
-                schema: "4.1"
+                schema: "4.2"
 
                 intercept:
                     mode: wrapper

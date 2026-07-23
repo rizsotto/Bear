@@ -16,7 +16,7 @@
 # entry-count cross-check a true "did Bear capture every compile?" gate against
 # the on-disk object count. This is the one target that exercises Bear's
 # duplicate-detection config surface in a real build.
-schema: "4.1"
+schema: "4.2"
 duplicates:
   match_on:
     - directory

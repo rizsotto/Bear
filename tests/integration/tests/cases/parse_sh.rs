@@ -86,7 +86,7 @@ fn parse_sh_all_skipped_input_exits_non_zero_with_no_events() -> Result<()> {
 #[test]
 fn parse_sh_rejects_config_option() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_rejects_config")?;
-    let config = env.create_config("schema: \"4.1\"\n")?;
+    let config = env.create_config("schema: \"4.2\"\n")?;
 
     let result =
         env.run_bear_with_stdin(&["--config", config.to_str().unwrap(), "parse-sh"], b"gcc -c foo.c\n")?;
@@ -573,7 +573,7 @@ fn parse_sh_zlib_make_n_w_capture_records_marker_directory() -> Result<()> {
 #[test]
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_zlib_capture_with_arguments_dedup_yields_all_compile_entries() -> Result<()> {
-    const CONFIG: &str = r#"schema: '4.1'
+    const CONFIG: &str = r#"schema: '4.2'
 
 duplicates:
   match_on:

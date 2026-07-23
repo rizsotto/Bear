@@ -17,7 +17,7 @@ use anyhow::Result;
 /// This might be the default mode on many platform, but that's not always the case.
 /// The preload might work on MacOS, but not set to default. Here we can enforce it.
 const CONFIG: &str = concat!(
-    r#"schema: '4.1'
+    r#"schema: '4.2'
 
 intercept:
   mode: preload

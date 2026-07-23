@@ -245,7 +245,7 @@ named with `--config`. Without one, built-in defaults apply. All
 sections are optional; the example below shows every one of them:
 
 ```yaml
-schema: "4.1"
+schema: "4.2"
 intercept:
   mode: wrapper
 compilers:
