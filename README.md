@@ -80,6 +80,15 @@ run and which interception method is available, and those affect the final
 output. The documentation describes the available options and each option's
 limitations.
 
+Acknowledgments
+---------------
+
+Bear is kept going by people who chip in. Thank you.
+
+- [@maflcko](https://github.com/maflcko) for regular sponsorship.
+- [Anthropic](https://claude.ai/) for a free Claude subscription, which
+  supported development work.
+
 Problem reports
 ---------------
 
