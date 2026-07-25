@@ -28,19 +28,19 @@ pub struct Context {
     pub environment: HashMap<String, String>,
 }
 
-/// One line that was not turned into an execution event, with the reason
-/// and the absolute physical line it started on.
-pub struct SkippedLine {
-    pub line: usize,
-    pub reason: SkipReason,
-}
-
 /// One streamed result of parsing: a recognized command, or a line that
 /// was loudly skipped. Both are ordinary items so the caller can forward
 /// executions and report skips in input order without buffering either.
 pub enum Event {
     Execution(intercept::Execution),
     Skipped(SkippedLine),
+}
+
+/// One line that was not turned into an execution event, with the reason
+/// and the absolute physical line it started on.
+pub struct SkippedLine {
+    pub line: usize,
+    pub reason: SkipReason,
 }
 
 /// Parses shell command text from `input`, starting from

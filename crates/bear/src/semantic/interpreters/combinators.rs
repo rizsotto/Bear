@@ -116,12 +116,14 @@ mod test {
     }
 
     fn command_fixture() -> RecognizeResult {
-        RecognizeResult::Recognized(Command::new(
-            PathBuf::new(),
-            PathBuf::new(),
-            vec![],
-            SourceMode::PerSourceStripped,
-        ))
+        RecognizeResult::Recognized({
+            Command {
+                working_dir: PathBuf::new(),
+                executable: PathBuf::new(),
+                arguments: vec![],
+                source_mode: SourceMode::PerSourceStripped,
+            }
+        })
     }
 
     #[test]

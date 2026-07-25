@@ -15,6 +15,7 @@ use crate::config;
 use combinators::{Any, InputLogger, OutputLogger};
 use compilers::CompilerInterpreter;
 use ignore::IgnoreByPath;
+
 /// Creates an interpreter to recognize the compiler calls.
 ///
 /// Using the configuration we can define which compilers to include and exclude.

@@ -58,14 +58,6 @@ pub enum Marker {
     Leaving,
 }
 
-/// A construct outside the supported subset, reported loudly per the
-/// contract: the physical line it starts on and the reason.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Skip {
-    pub line: usize,
-    pub reason: SkipReason,
-}
-
 /// The error half of a tokenizer item. Only `Io` ends the stream.
 #[derive(Debug)]
 pub enum TokenError {
@@ -74,6 +66,14 @@ pub enum TokenError {
     Skip(Skip),
     /// The reader failed; no further items follow.
     Io(io::Error),
+}
+
+/// A construct outside the supported subset, reported loudly per the
+/// contract: the physical line it starts on and the reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Skip {
+    pub line: usize,
+    pub reason: SkipReason,
 }
 
 /// Why a line was skipped instead of parsed.

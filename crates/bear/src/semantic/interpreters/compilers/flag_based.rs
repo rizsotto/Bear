@@ -100,7 +100,12 @@ impl Interpreter for FlagBasedInterpreter {
         all_args.extend(annotated_args);
         all_args.extend(append_args);
 
-        RecognizeResult::Recognized(Command::new(working_dir, executable, all_args, self.source_mode))
+        RecognizeResult::Recognized(Command {
+            working_dir,
+            executable,
+            arguments: all_args,
+            source_mode: self.source_mode,
+        })
     }
 }
 
