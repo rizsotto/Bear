@@ -747,7 +747,7 @@ mod tests {
         Err(Skip { line, reason })
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn assembles_words_across_quotes_and_escapes() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
@@ -767,7 +767,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn joins_line_continuations_and_numbers_physical_lines() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
@@ -782,7 +782,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     //
     // A build log saved on Windows (or fetched through a CRLF-translating
     // channel) carries `\r\n` line endings; the carriage return must not
@@ -803,7 +803,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     //
     // Documented deviation (see `next_logical_line`): continuations are
     // stripped textually regardless of quote context, so a backslash-newline
@@ -817,7 +817,7 @@ mod tests {
         assert_eq!(sut, vec![word("gcc", 1), word("-DX=ab", 1), word("foo.c", 1), nl()]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn emits_separators_for_the_command_operators() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
@@ -834,7 +834,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn comments_and_blank_lines_produce_only_newlines() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
@@ -850,7 +850,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn consumes_redirections_without_emitting_tokens() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
@@ -872,7 +872,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn an_unterminated_quote_in_a_redirect_target_is_a_loud_skip() {
         let sut = tokens("cmd > 'oops");
@@ -880,7 +880,7 @@ mod tests {
         assert_eq!(sut, vec![word("cmd", 1), skipped(1, SkipReason::UnterminatedQuote), nl()]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn substitution_in_a_discarded_redirect_target_is_not_a_skip() {
         let cases: Vec<&str> = vec![
@@ -898,7 +898,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn an_unterminated_substitution_in_a_redirect_target_is_a_loud_skip() {
         // The `$(` never closes on this line, so the line boundary is
@@ -908,7 +908,7 @@ mod tests {
         assert_eq!(sut, vec![word("cmd", 1), skipped(1, SkipReason::UnterminatedQuote), nl()]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn skips_unsupported_constructs_but_keeps_scanning_the_line() {
         let cases: Vec<(&str, Vec<Result<Token, Skip>>)> = vec![
@@ -932,7 +932,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_heredoc_is_a_skip_and_its_body_produces_no_tokens() {
         let sut = tokens("cat <<EOF\ngcc -c fake.c\nEOF\ngcc -c real.c\n");
@@ -951,7 +951,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_heredoc_inside_a_trailing_comment_is_not_detected() {
         let sut = tokens("gcc -c a.c # see <<EOF docs\ngcc -c b.c\n");
@@ -971,7 +971,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_heredoc_delimiter_ends_at_a_closing_parenthesis() {
         // `(cat <<EOF)`: the delimiter is `EOF`, not `EOF)`, so the body
@@ -994,7 +994,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn queues_every_heredoc_on_a_line_in_redirect_order() {
         let sut = tokens("cat <<A <<B\nbody a\nA\nbody b\nB\ngcc -c x.c\n");
@@ -1014,7 +1014,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_read_failure_is_the_last_item_of_the_stream() {
         struct FailingReader<'a>(&'a [u8]);
@@ -1040,7 +1040,7 @@ mod tests {
         assert!(sut.next().is_none(), "the stream must be over after a read error");
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn emits_markers_for_recursive_make_directory_lines() {
         let sut =

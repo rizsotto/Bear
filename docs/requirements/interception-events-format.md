@@ -69,10 +69,10 @@ environment.
   Whether a run succeeds or exits non-zero -- in particular, that
   non-empty input in which every line was rejected exits non-zero -- is
   the exit-code contract's concern; see
-  [`cli-exit-codes`](cli-exit-codes.md). (Any additional producer, such
-  as one parsing shell text, applies the same skip-and-continue rule to
-  its own input; see
-  [`interception-events-from-shell-text`](interception-events-from-shell-text.md).)
+  [`cli-exit-codes`](cli-exit-codes.md). (A mode that reconstructs
+  executions from other input - shell text parsing - applies the same
+  skip-and-continue rule to that input; see
+  [`interception-shell-text-parsing`](interception-shell-text-parsing.md).)
 - `bear semantic` reads the event stream from standard input by default
   (naming an input file is the explicit case), and any non-executing
   producer may write the stream to standard output, so the format is
@@ -161,11 +161,14 @@ Given `bear intercept` asked to write events to the standard stream:
 ## Notes
 
 - Issue #644 -- the demand signal for a documented interchange
-  contract. Bear ships one producer on this seam; see
-  [`interception-events-from-shell-text`](interception-events-from-shell-text.md).
+  contract. Bear's shell-text parsing
+  ([`interception-shell-text-parsing`](interception-shell-text-parsing.md))
+  reconstructs executions on the same execution model but produces the
+  compilation database directly and does not write this file; the events
+  file is the interchange surface for `bear intercept` and third-party
+  producers.
 - A build-log parser is out of scope *for this requirement* - it defines
-  only the interchange contract; a producer is a separate contract that
-  depends on this one.
+  only the interchange contract.
 
 ## Rationale
 

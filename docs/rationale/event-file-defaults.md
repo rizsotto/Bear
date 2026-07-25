@@ -65,11 +65,20 @@ soften the filter footguns: `semantic` prints a stderr notice when it
 is about to read events from a terminal, and warns when the event
 stream turned out empty.
 
+*Update (pre-4.2.0 release):* `parse-sh` later stopped emitting the
+event stream and produces the database directly
+([parse-sh-database-product](parse-sh-database-product.md)), so the
+parse-sh pipeline this entry cites no longer exists. The decision
+stands on its remaining grounds: the stale-rendezvous hazard, and
+`semantic` as the filter fed by `bear intercept` event files and
+third-party producers.
+
 ## Consequences
 
-- The parse-sh pipeline is flagless: `make -n | bear parse-sh | bear
-  semantic`. The confusing missing-file failure dissolves instead of
-  being papered over with a hint.
+- Piping a producer into `bear semantic` is flagless. The confusing
+  missing-file failure dissolves instead of being papered over with a
+  hint. (At the time of the decision the flagship pipe was
+  `bear parse-sh | bear semantic`; see the update note above.)
 - The stale-`events.json` hazard is gone; an event file is only ever
   read because the user named it.
 - The old two-step habit breaks loudly and early: `bear intercept`

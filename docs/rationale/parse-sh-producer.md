@@ -55,7 +55,7 @@ Ship a producer, but quarantine it. It is a `bear` subcommand,
 or file); everything downstream - compiler recognition, config, output,
 dedup - is the unchanged `semantic` stage. The parser lives behind the
 event seam and never touches the consumer half. Its contract,
-[`interception-events-from-shell-text`](../requirements/interception-events-from-shell-text.md),
+[`interception-shell-text-parsing`](../requirements/interception-shell-text-parsing.md),
 is explicitly best-effort: constructs outside the subset are skipped with
 a line number and reason, never guessed at, and the dry-run non-guarantees
 are written into both the requirement and the man page. Interception
@@ -72,6 +72,13 @@ unsupported because a child shell's state must not leak back out, and
 modeling a child shell is exactly the growth the skip path exists to
 avoid.
 
+*Update (pre-4.2.0 release):* the event stream later became internal to
+the mode. `parse-sh` now produces the compilation database directly and
+no longer serializes events; see
+[parse-sh-database-product](parse-sh-database-product.md). The
+quarantine itself - a parser isolated behind the execution seam, the
+semantic stage unchanged - stands.
+
 This narrowly revises the #644 rejection. What was rejected was a
 build-log parser wired into the core; what ships is a parser isolated to
 one producer whose only output is the public event format, leaving the
@@ -82,8 +89,10 @@ strace) on the same seam without change.
 
 - The recurring request is answered without compromising interception's
   honesty or the core's simplicity.
-- The event stream is validated as a real public seam by having a second
-  producer, which makes future producers cheap.
+- The event stream gained a second in-tree producer, validating the
+  seam for future producers. (Weakened by the later database-product
+  decision, which made the stream internal again; see
+  [parse-sh-database-product](parse-sh-database-product.md).)
 - Fidelity is bounded by dry-run text quality, permanently and by design.
   The best-effort framing must stay loud in user-facing docs, or users
   will read a partial database as a Bear bug rather than a dry-run limit.
@@ -95,7 +104,7 @@ strace) on the same seam without change.
 ## References
 
 - Requirements:
-  [`interception-events-from-shell-text`](../requirements/interception-events-from-shell-text.md)
+  [`interception-shell-text-parsing`](../requirements/interception-shell-text-parsing.md)
   (the producer contract) and
   [`interception-events-format`](../requirements/interception-events-format.md)
   (the seam it depends on).

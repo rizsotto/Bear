@@ -454,7 +454,7 @@ mod tests {
         words.iter().map(|w| w.to_string()).collect()
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn events_stream_in_input_order() {
         let input = "gcc -c a.c\ngcc $X b.c\ngcc -c c.c\n";
@@ -469,7 +469,7 @@ mod tests {
         assert!(matches!(&sut[2], Event::Execution(e) if e.arguments == args(&["gcc", "-c", "c.c"])));
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_read_failure_surfaces_as_the_last_event() {
         struct FailingReader;
@@ -487,7 +487,7 @@ mod tests {
         assert!(sut.next().is_none(), "the stream must be over after a read error");
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn emits_one_execution_per_simple_command() {
         let sut = interpret("mv objs/a.o a.lo", &context("/build", &[]));
@@ -496,7 +496,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn emits_execution_for_a_compile_command() {
         let sut = interpret("gcc -c -o foo.o foo.c", &context("/build", &[]));
@@ -507,7 +507,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn resolves_quotes_escapes_and_continuations_into_arguments() {
         let cases: Vec<(&str, Vec<Vec<String>>)> = vec![
@@ -545,7 +545,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn splits_commands_on_separators() {
         let cases: Vec<(&str, Vec<Vec<String>>)> = vec![
@@ -566,7 +566,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn strips_redirections_from_arguments() {
         let cases: Vec<(&str, Vec<Vec<String>>)> = vec![
@@ -584,7 +584,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn skips_unsupported_constructs_with_the_right_reason() {
         let cases: Vec<(&str, SkipReason)> = vec![
@@ -607,7 +607,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_line_with_several_unsupported_constructs_is_one_skip() {
         // Two keyword segments (`for ...; do`) and a `; done` would each
@@ -620,7 +620,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::Keyword);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_skip_poisons_the_whole_line_in_both_directions() {
         // The contract skips the whole line, so a supported command
@@ -636,7 +636,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     // `cd`/`..` resolution goes through `std::path`, so these POSIX
     // absolute-path assertions hold on Unix only; on Windows the same
     // input yields backslash-separated, drive-relative paths. parse-sh
@@ -650,7 +650,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn cd_persists_across_logical_lines() {
@@ -659,7 +659,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "foo.c"], "/build/sub", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn relative_cd_with_dotdot_normalizes_lexically() {
@@ -668,7 +668,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "x.c"], "/build/bar", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn cd_dotdot_stays_pinned_at_the_filesystem_root() {
@@ -690,7 +690,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn cd_dash_restores_the_previous_working_directory() {
@@ -704,7 +704,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn cd_dash_toggles_between_the_last_two_directories() {
@@ -713,7 +713,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "x.c"], "/build/sub", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn cd_dash_without_a_previous_directory_is_a_loud_skip() {
@@ -729,7 +729,7 @@ mod tests {
         assert_eq!(sut.skipped[0].line, 1);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn bare_cd_leaves_the_working_directory_unchanged() {
@@ -739,7 +739,7 @@ mod tests {
         assert!(sut.skipped.is_empty(), "a bare cd must not be a skip");
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn make_markers_push_and_pop_the_working_directory() {
         let input = "make[1]: Entering directory '/build/lib'\n\
@@ -759,7 +759,7 @@ mod tests {
         assert!(sut.skipped.is_empty(), "markers must not be reported as skips");
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn recognizes_entering_marker_without_job_number() {
         let input = "make: Entering directory `/build/lib'\ngcc -c a.c\n";
@@ -769,7 +769,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build/lib", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn leaving_marker_with_empty_stack_falls_back_to_initial_working_dir() {
         let input = "make[1]: Leaving directory '/build/lib'\ngcc -c a.c\n";
@@ -779,7 +779,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn nested_make_markers_pop_to_the_enclosing_directory() {
         let input = "make[1]: Entering directory '/a/b'\n\
@@ -800,7 +800,7 @@ mod tests {
         assert!(sut.skipped.is_empty(), "markers must not be reported as skips");
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn leaving_past_the_bottom_of_the_stack_falls_back_to_initial_working_dir() {
         let input = "make[1]: Entering directory '/a/b'\n\
@@ -813,7 +813,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/a", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     //
     // A recursive-make log saved on Windows carries `\r\n` line endings;
     // the marker must still parse and the directory must carry no `\r`.
@@ -826,7 +826,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "a.c"], "/build/lib", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn per_command_assignment_overlays_the_base_environment() {
         let sut = interpret("CC=gcc gcc -c foo.c", &context("/build", &[("PATH", "/usr/bin")]));
@@ -837,7 +837,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_plain_command_keeps_the_base_environment_unchanged() {
         let sut = interpret("gcc -c foo.c", &context("/build", &[("PATH", "/usr/bin")]));
@@ -848,7 +848,7 @@ mod tests {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn skips_propagate_with_the_absolute_physical_line() {
         let input = "gcc -c foo.c\n(ranlib libz.a || true) >/dev/null 2>&1\n";
@@ -864,7 +864,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::Subshell);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_quoted_value_split_by_a_real_newline_yields_no_fabricated_executions() {
         // `gcc 'a` / `b' foo.c` -- quote state never crosses a newline, so
@@ -881,7 +881,7 @@ mod tests {
         assert_eq!(sut.skipped[1].reason, SkipReason::UnterminatedQuote);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn an_unterminated_quote_in_a_redirect_target_is_a_loud_skip() {
         let sut = interpret("cmd > 'oops", &context("/build", &[]));
@@ -891,7 +891,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::UnterminatedQuote);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_quoted_redirect_target_spanning_a_newline_fabricates_nothing() {
         // The double-quoted target swallows the newline in real sh; here
@@ -909,7 +909,7 @@ mod tests {
         assert_eq!(sut.skipped[1].reason, SkipReason::UnterminatedQuote);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn substitution_in_a_discarded_redirect_target_is_not_a_skip() {
         // The redirect target never reaches the argv, so an unresolved
@@ -929,7 +929,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn an_unterminated_substitution_in_a_redirect_target_is_a_loud_skip() {
         let sut = interpret("cmd > $(oops\ngcc -c a.c\n", &context("/build", &[]));
@@ -940,7 +940,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::UnterminatedQuote);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn all_skipped_input_yields_no_executions() {
         let input = "(ranlib libz.a || true) >/dev/null 2>&1\ngcc $CFLAGS foo.c\n";
@@ -953,7 +953,7 @@ mod tests {
         assert_eq!(sut.skipped[1].reason, SkipReason::ParameterExpansion);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn heredoc_body_lines_are_swallowed_not_fabricated_into_commands() {
         let input = "cat <<EOF\nsome random text\nEOF\ngcc -c a.c\n";
@@ -965,7 +965,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::HereDoc);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn heredoc_with_quoted_delimiter_swallows_its_body() {
         let input = "cat <<'EOF'\n$notexpanded\nEOF\ngcc -c b.c\n";
@@ -975,7 +975,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "b.c"], "/build", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_space_indented_delimiter_line_is_body_not_terminator() {
         // Real sh ends a `<<EOF` body only at an undecorated delimiter
@@ -990,7 +990,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::HereDoc);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn dash_heredoc_matches_a_tab_indented_terminator() {
         let input = "cat <<-EOF\n\tbody\n\tEOF\ngcc -c c.c\n";
@@ -1000,7 +1000,7 @@ mod tests {
         assert_eq!(sut.executions, vec![execution("gcc", &["gcc", "-c", "c.c"], "/build", &[])]);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn herestring_is_not_mistaken_for_a_heredoc() {
         let sut = interpret("cmd <<< input\n", &context("/build", &[]));
@@ -1009,7 +1009,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn heredoc_inside_a_trailing_comment_swallows_nothing() {
         let input = "gcc -c a.c # see <<EOF docs\ngcc -c b.c\ngcc -c c.c\n";
@@ -1027,7 +1027,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn heredoc_inside_a_subshell_does_not_swallow_the_rest_of_the_input() {
         let input = "(cat <<EOF)\ngcc -c real.c\nEOF\ngcc -c after.c\n";
@@ -1043,7 +1043,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::Subshell);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn clobber_redirect_does_not_fabricate_an_execution() {
         let sut = interpret("cc -c x.c >| out.txt", &context("/build", &[]));
@@ -1052,7 +1052,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_brace_group_is_transparent_and_emits_its_inner_commands() {
         let cases: Vec<(&str, Vec<Vec<String>>)> = vec![
@@ -1071,7 +1071,7 @@ mod tests {
         }
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_brace_group_may_span_lines() {
         let input = "{\ngcc -c a.c\ngcc -c b.c\n}\ngcc -c c.c\n";
@@ -1089,7 +1089,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn nested_brace_groups_balance_by_depth() {
         let sut = interpret("{ { echo a; }; echo b; }", &context("/build", &[]));
@@ -1104,7 +1104,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[cfg(unix)]
     #[test]
     fn cd_inside_a_group_persists_after_the_closing_brace() {
@@ -1123,7 +1123,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_closing_brace_keeps_being_an_argument_when_not_in_command_position() {
         // `}` is a reserved word only in command position; after other
@@ -1135,7 +1135,7 @@ mod tests {
         assert!(sut.skipped.is_empty());
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn an_unmatched_closing_brace_skips_its_line_loudly() {
         let sut = interpret("echo a; }", &context("/build", &[]));
@@ -1145,7 +1145,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::UnbalancedBrace);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_skip_between_matching_braces_does_not_leak_a_phantom_open() {
         // The `{` opens before the `$X` skip poisons the line and the `}`
@@ -1159,7 +1159,7 @@ mod tests {
         assert_eq!(sut.skipped[0].reason, SkipReason::ParameterExpansion);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_phantom_open_does_not_mask_a_later_unmatched_brace() {
         // Line 1's braces balance despite its skip; the stray `}` on line
@@ -1175,7 +1175,7 @@ mod tests {
         assert_eq!(sut.skipped[1].line, 2);
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn a_group_left_open_at_end_of_input_is_reported_against_its_opening_line() {
         // The inner command is best-effort kept (it is very likely real),

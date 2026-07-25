@@ -476,7 +476,7 @@ mod test {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn test_parse_sh_defaults() {
         let execution = vec!["bear", "parse-sh"];
@@ -496,7 +496,7 @@ mod test {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn test_parse_sh_call() {
         let execution = vec!["bear", "parse-sh", "-i", "in.sh", "-o", "out.jsonl", "-C", "/build"];
@@ -516,7 +516,7 @@ mod test {
         );
     }
 
-    // Requirements: interception-events-from-shell-text
+    // Requirements: interception-shell-text-parsing
     #[test]
     fn test_parse_sh_rejects_config() {
         // arrange

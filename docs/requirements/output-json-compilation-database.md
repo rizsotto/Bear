@@ -62,7 +62,7 @@ What "observed" means depends on the interception mode:
   and the database shows that absolute path.
 - Shell-text parsing observes the command line as the build system wrote
   it, so the database shows exactly that spelling: a bare `gcc` in the
-  text stays `gcc` (see `interception-events-from-shell-text`). No
+  text stays `gcc` (see `interception-shell-text-parsing`). No
   command ran, so no resolved path exists to report.
 
 ## Acceptance criteria

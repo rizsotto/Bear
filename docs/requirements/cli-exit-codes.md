@@ -49,10 +49,11 @@ Standalone filter modes (`bear semantic`, `bear parse-sh`):
 - A run that understands its input and produces its output succeeds with
   `0`, even when the output is empty because the input yielded nothing
   (semantic: every candidate entry was dropped by validation; parse-sh: the
-  input named no commands).
+  input named no commands, or none it named was recognized as a compiler).
 - Non-empty input in which nothing could be understood exits non-zero
   (semantic: no conforming event was accepted; parse-sh: every line was
-  skipped). See [`interception-events-format`](interception-events-format.md)
+  skipped by the parser). See
+  [`interception-events-format`](interception-events-format.md)
   for the shared skip-and-continue rule.
 
 ## Known limitations
@@ -115,10 +116,16 @@ non-conforming:
 
 > When the user runs `bear semantic` on it, then `bear` exits non-zero.
 
-Given a `parse-sh` run over shell text with at least one recognizable
-command:
+Given a `parse-sh` run over shell text with at least one line inside the
+supported shell subset:
 
 > When the user runs `bear parse-sh` on it, then `bear` exits `0`.
+
+Given a `parse-sh` run over shell text that parses cleanly but names no
+recognized compiler (a lone `mv` line):
+
+> When the user runs `bear parse-sh` on it, then the database is written
+> empty and `bear` exits `0`.
 
 Given a `parse-sh` run over non-empty input in which every line is an
 unsupported construct:

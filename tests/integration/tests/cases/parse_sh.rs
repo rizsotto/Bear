@@ -4,7 +4,7 @@
 //! pure lex/interpret stages to real I/O (stdin/file input, stdout/file
 //! output, the `--directory` override, and the exit-code policy).
 //!
-//! See `docs/requirements/interception-events-from-shell-text.md` for the
+//! See `docs/requirements/interception-shell-text-parsing.md` for the
 //! contract; the crate-level unit tests in
 //! `crates/bear/src/parse_sh/interpreter.rs` cover the parsing rules
 //! themselves, so these tests focus on the mode's I/O behavior.
@@ -24,7 +24,7 @@ const ZLIB_SH: &str = include_str!("../fixtures/data/zlib.make-n.sh");
 /// and a trailing `make: Leaving directory '/tmp/build'` marker.
 const ZLIB_SH_W: &str = include_str!("../fixtures/data/zlib.make-n-w.sh");
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 #[test]
 fn parse_sh_stdin_default_emits_one_event_to_stdout() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_stdin_default")?;
@@ -45,7 +45,7 @@ fn parse_sh_stdin_default_emits_one_event_to_stdout() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 #[test]
 fn parse_sh_directory_flag_sets_event_working_dir() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_directory_flag")?;
@@ -61,7 +61,7 @@ fn parse_sh_directory_flag_sets_event_working_dir() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 #[test]
 fn parse_sh_all_skipped_input_exits_non_zero_with_no_events() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_all_skipped")?;
@@ -76,7 +76,7 @@ fn parse_sh_all_skipped_input_exits_non_zero_with_no_events() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 //
 // `--config` shapes semantic analysis, which parse-sh does not run: the mode
 // emits a raw event stream and never consults config. The invocation is
@@ -102,7 +102,7 @@ fn parse_sh_rejects_config_option() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 //
 // parse-sh consults no configuration, so a malformed config in a default
 // search location (`bear.yml` in the working directory) must not break it --
@@ -126,7 +126,7 @@ fn parse_sh_ignores_malformed_default_location_config() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 //
 // Skip reports must reach stderr by default, without the caller having to
 // opt in via `RUST_LOG`. Runs with `RUST_LOG` explicitly unset (the harness's
@@ -205,7 +205,7 @@ fn parse_sh_developer_format_tags_process_identity() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 //
 // When any line is skipped, a stderr summary reports both counts, and the
 // skip count is physical lines, not command segments: the `for` line below
@@ -230,7 +230,7 @@ fn parse_sh_skip_summary_counts_lines_not_segments() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, interception-events-format
+// Requirements: interception-shell-text-parsing, interception-events-format
 //
 // The event's environment is the mode's own environment overlaid with the
 // line's leading `VAR=value` assignments, then reduced by the shared
@@ -267,7 +267,7 @@ fn parse_sh_event_environment_is_overlaid_and_filtered() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 //
 // An assignment-only line sets shell state but executes nothing, so it is
 // neither an event nor a skip; input made only of such lines is the empty
@@ -293,7 +293,7 @@ fn parse_sh_assignment_only_input_exits_zero_as_no_commands() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 #[test]
 fn parse_sh_non_utf8_input_fails_with_clear_error() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_non_utf8")?;
@@ -306,7 +306,7 @@ fn parse_sh_non_utf8_input_fails_with_clear_error() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 #[test]
 fn parse_sh_missing_input_file_fails() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_missing_input")?;
@@ -323,7 +323,7 @@ fn parse_sh_missing_input_file_fails() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 #[test]
 fn parse_sh_unwritable_output_file_fails() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_unwritable_output")?;
@@ -341,7 +341,7 @@ fn parse_sh_unwritable_output_file_fails() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 //
 // The `run_bear_*` helpers buffer the child's whole stdout, which never
 // breaks the pipe, so this test drives the process manually: feed more
@@ -390,7 +390,7 @@ fn parse_sh_broken_stdout_pipe_exits_non_zero() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, cli-exit-codes
+// Requirements: interception-shell-text-parsing, cli-exit-codes
 #[test]
 fn parse_sh_empty_input_exits_zero_with_warning() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_empty_input")?;
@@ -407,7 +407,7 @@ fn parse_sh_empty_input_exits_zero_with_warning() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 #[test]
 fn parse_sh_file_input_and_output() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_file_io")?;
@@ -428,7 +428,7 @@ fn parse_sh_file_input_and_output() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 //
 // End-to-end pipeline: `bear parse-sh`'s event stream, fed into
 // `bear semantic --input -`, must yield a compilation database entry for
@@ -463,7 +463,7 @@ fn parse_sh_output_piped_into_semantic_yields_compilation_database() -> Result<(
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, interception-events-format
+// Requirements: interception-shell-text-parsing, interception-events-format
 //
 // Same pipeline as `parse_sh_output_piped_into_semantic_yields_compilation_database`,
 // but the consumer end also streams its output: `bear parse-sh | bear semantic
@@ -539,7 +539,7 @@ fn assert_all_entries_use_gcc(db: &CompilationDatabase) -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, interception-events-format
+// Requirements: interception-shell-text-parsing, interception-events-format
 //
 // End-to-end coverage over a REAL `make -n` capture (zlib 1.3.1): pipes
 // `bear parse-sh` into `bear semantic` with the default config, proving the
@@ -580,7 +580,7 @@ fn parse_sh_zlib_capture_piped_into_semantic_yields_default_deduped_database() -
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, interception-events-format
+// Requirements: interception-shell-text-parsing, interception-events-format
 //
 // Same real zlib capture as above, but recorded with `make -n -w`, which
 // wraps it in a top-level `make: Entering directory '/tmp/build'` /
@@ -615,7 +615,7 @@ fn parse_sh_zlib_make_n_w_capture_records_marker_directory() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text, interception-events-format
+// Requirements: interception-shell-text-parsing, interception-events-format
 //
 // Same real zlib capture as above, but with a config that adds `arguments`
 // to the duplicate key: the plain and `-fPIC` compiles of each source now
@@ -655,7 +655,7 @@ duplicates:
     Ok(())
 }
 
-// Requirements: interception-events-from-shell-text
+// Requirements: interception-shell-text-parsing
 //
 // Synthetic recursive-make directory tracking, end to end: `make[1]:
 // Entering directory` / `Leaving directory` markers must drive parse-sh's

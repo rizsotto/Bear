@@ -83,7 +83,7 @@ in-band as the stream's last item so the caller cannot lose them.
 ## References
 
 - Requirement:
-  [`interception-events-from-shell-text`](../requirements/interception-events-from-shell-text.md)
+  [`interception-shell-text-parsing`](../requirements/interception-shell-text-parsing.md)
   (the contract whose loud-skip clause drives the design).
 - Rationale: [parse-sh-producer](parse-sh-producer.md) (why the
   producer exists and stays quarantined; this entry governs only its

@@ -2,7 +2,7 @@
 
 //! Streaming shell-text parsing for the `parse-sh` producer mode.
 //!
-//! See `docs/requirements/interception-events-from-shell-text.md` for the
+//! See `docs/requirements/interception-shell-text-parsing.md` for the
 //! contract, and `docs/rationale/parse-sh-single-tokenizer.md` for the
 //! internal shape: a single streaming tokenizer owns every lexical rule
 //! (quotes, comments, redirections, here-documents, continuations, make
