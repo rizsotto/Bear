@@ -23,7 +23,7 @@ use std::sync::Arc;
 /// - **Intercept only**: Capture build commands and write them to a file for later analysis.
 /// - **Semantic only**: Read previously captured build commands from a file and analyze them.
 /// - **Combined**: Capture build commands and analyze them in real-time.
-/// - **Parse shell text**: Interpret shell command text and emit the event stream.
+/// - **Parse shell text**: Interpret shell command text and produce the compilation database.
 ///
 /// Internally, this enum distinguishes between:
 /// - `Intercept`: Modes that execute build commands while capturing events (intercept-only and combined)
@@ -45,31 +45,12 @@ impl Mode {
     /// For the modes that consume it, this loads the configuration (from
     /// `--config`, a default-location file, or built-in defaults), checks that
     /// the argument/configuration combination is valid, and builds the matching
-    /// mode instance -- returning a useful error otherwise. `parse-sh` consults
-    /// no configuration and therefore loads none.
+    /// mode instance -- returning a useful error otherwise.
     pub fn configure(context: context::Context, args: args::Arguments) -> Result<Self, ConfigurationError> {
         let args::Arguments { config: config_path, mode } = args;
 
-        // parse-sh is the one mode that runs without configuration: it emits a
-        // raw event stream and consults none, so it loads none -- a broken
-        // default-location config must not break it.
-        if let args::Mode::ParseSh { input, output } = mode {
-            log::debug!("Mode: parse shell text into events");
-
-            // When the caller left `--directory` unset, fall back to Bear's
-            // invocation directory so the producer always has a concrete
-            // path to interpret from.
-            let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
-            let producer = impls::ShellScriptReader::create(&input.path, directory, context.environment)?;
-            let consumer = impls::RawEventWriter::create_allowing_stdout(&output.path)
-                .map_err(ConfigurationError::ConsumerCreation)?;
-
-            let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
-            return Ok(Self::Replay(replayer));
-        }
-
-        // print-compilers, like parse-sh, runs without configuration: it only
-        // lists the built-in recognition tables, so it loads none either.
+        // print-compilers runs without configuration: it only lists the
+        // built-in recognition tables, so it loads none.
         if let args::Mode::PrintCompilers = mode {
             log::debug!("Mode: print recognized compilers");
             return Ok(Self::PrintCompilers);
@@ -118,6 +99,22 @@ impl Mode {
 
                 Ok(Self::Replay(replayer))
             }
+            args::Mode::ParseSh { input, output } => {
+                log::debug!("Mode: parse shell text and semantic analysis");
+
+                // When the caller left the directory override unset, fall
+                // back to Bear's invocation directory so the producer always
+                // has a concrete path to interpret from.
+                let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
+                let producer =
+                    impls::ShellScriptReader::create(&input.path, directory, context.environment.clone())?;
+                let consumer = impls::SemanticEventWriter::create(output, &config)
+                    .map_err(ConfigurationError::ConsumerCreation)?;
+
+                let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
+
+                Ok(Self::Replay(replayer))
+            }
             args::Mode::Combined { input, output } => {
                 log::debug!("Mode: intercept build and semantic analysis");
 
@@ -154,8 +151,6 @@ impl Mode {
 
                 Ok(Self::Intercept(intercept, input))
             }
-            // parse-sh is handled before configuration is loaded.
-            args::Mode::ParseSh { .. } => unreachable!("parse-sh handled above"),
             // print-compilers is handled above, before configuration loads.
             args::Mode::PrintCompilers => unreachable!("print-compilers handled above"),
         }
@@ -365,15 +360,16 @@ mod impls {
         ReadStdin(io::Error),
         #[error("failed to read shell text file {0}: {1}")]
         ReadFile(std::path::PathBuf, io::Error),
-        #[error("every non-empty line was skipped; no events emitted (see warnings above)")]
+        #[error("every non-empty line was skipped; no commands parsed (see warnings above)")]
         AllSkipped,
     }
 
-    /// Represents a shell text reader to be an event source.
+    /// Represents a shell text reader to be an execution source.
     ///
     /// Streams the `parse_sh` tokenizer/parser pipeline over shell command
     /// text (e.g. a `make -n` capture) and produces the recognized commands
-    /// as execution events, as if `bear intercept` had observed them.
+    /// as executions, as if `bear intercept` had observed them; the semantic
+    /// stage downstream turns them into the compilation database.
     pub(super) struct ShellScriptReader {
         path: std::path::PathBuf,
         working_dir: std::path::PathBuf,
@@ -454,9 +450,9 @@ mod impls {
             }
 
             if skipped > 0 {
-                log::warn!("parse-sh: {emitted} event(s) emitted, {skipped} line(s) skipped");
+                log::warn!("parse-sh: {emitted} command(s) parsed, {skipped} line(s) skipped");
             } else {
-                log::info!("parse-sh: {emitted} event(s) emitted, {skipped} line(s) skipped");
+                log::info!("parse-sh: {emitted} command(s) parsed, {skipped} line(s) skipped");
             }
 
             if emitted == 0 {
@@ -493,22 +489,6 @@ mod impls {
                      and would corrupt the stream; write to a file instead"
                         .to_string(),
                 ));
-            }
-
-            Self::create_file(path)
-        }
-
-        /// Create a raw event writer that maps the `-` sentinel to standard
-        /// output.
-        ///
-        /// parse-sh legitimately writes events to stdout (it runs no build,
-        /// so there is no build output to collide with), unlike `create`,
-        /// which rejects `-` for exactly the opposite reason.
-        pub(super) fn create_allowing_stdout(path: &std::path::Path) -> Result<Self, WriterCreationError> {
-            if super::is_stdio(path) {
-                // The unlocked handle: the consumer crosses a thread
-                // boundary, and `StdoutLock` is not `Send`.
-                return Ok(Self { path: path.to_path_buf(), destination: Box::new(io::stdout()) });
             }
 
             Self::create_file(path)

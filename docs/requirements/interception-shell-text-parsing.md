@@ -1,6 +1,6 @@
 ---
 title: Compilation database from shell command text
-status: accepted
+status: implemented
 ---
 
 ## Intent

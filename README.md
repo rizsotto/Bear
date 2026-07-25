@@ -64,7 +64,7 @@ the build command.
 If you cannot run the build - all you have is a CI log or the build system's
 dry-run output - Bear can reconstruct the database from that text instead:
 
-    make -n | bear parse-sh | bear semantic
+    make -n | bear parse-sh
 
 For more, run `bear --help` or read the man pages. The project [wiki][WIKI]
 talks about limitations, known issues, and platform-specific usage.

@@ -14,11 +14,12 @@ const MODE_INTERCEPT_SUBCOMMAND: &str = "intercept";
 const MODE_SEMANTIC_SUBCOMMAND: &str = "semantic";
 const MODE_PARSE_SH_SUBCOMMAND: &str = "parse-sh";
 const DEFAULT_OUTPUT_FILE: &str = "compile_commands.json";
-/// Default for `parse-sh`'s `--input`/`--output` and `semantic`'s `--input`:
-/// the `-` sentinel, meaning standard input or standard output respectively,
-/// so these non-executing modes are plain filters by default. `intercept` has
-/// no event-file default at all: it cannot fall back to standard output (the
-/// build owns that stream), so its destination must be named explicitly (see
+/// Default for `parse-sh`'s and `semantic`'s `--input`: the `-` sentinel,
+/// meaning standard input, so these non-executing modes read a pipe with no
+/// flags. Their output defaults to the compilation database name instead
+/// (`-` names standard output explicitly). `intercept` has no event-file
+/// default at all: it cannot fall back to standard output (the build owns
+/// that stream), so its destination must be named explicitly (see
 /// `docs/rationale/event-file-defaults.md`).
 const DEFAULT_STDIO: &str = "-";
 
@@ -43,7 +44,7 @@ pub enum Mode {
     Intercept { input: BuildCommand, output: BuildEvents },
     Semantic { input: BuildEvents, output: BuildSemantic },
     Combined { input: BuildCommand, output: BuildSemantic },
-    ParseSh { input: ShScript, output: BuildEvents },
+    ParseSh { input: ShScript, output: BuildSemantic },
     PrintCompilers,
 }
 
@@ -153,17 +154,11 @@ impl TryFrom<ArgMatches> for Arguments {
         let config = matches.get_one::<String>("config").map(String::to_string);
         let mode = Mode::try_from(matches)?;
 
-        // `parse-sh` emits a raw event stream and never consults the config,
-        // so accepting `--config` would silently ignore it. Reject it instead.
-        // `--print-compilers` is the same shape of problem: it only lists the
-        // compilers Bear recognizes from the static, built-in tables, and
-        // consults no config either.
-        if config.is_some() {
-            match mode {
-                Mode::ParseSh { .. } => return Err(ParseError::ConfigNotApplicableToParseSh),
-                Mode::PrintCompilers => return Err(ParseError::ConfigNotApplicableToPrintCompilers),
-                _ => {}
-            }
+        // `--print-compilers` only lists the compilers Bear recognizes from
+        // the static, built-in tables and consults no config, so accepting
+        // `--config` would silently ignore it. Reject it instead.
+        if config.is_some() && matches!(mode, Mode::PrintCompilers) {
+            return Err(ParseError::ConfigNotApplicableToPrintCompilers);
         }
 
         Ok(Arguments { config, mode })
@@ -202,13 +197,10 @@ impl TryFrom<ArgMatches> for Mode {
                     .get_one::<String>("input")
                     .map(std::path::PathBuf::from)
                     .expect("input is defaulted");
-                let path = parse_sh_matches
-                    .get_one::<String>("output")
-                    .map(std::path::PathBuf::from)
-                    .expect("output is defaulted");
                 let directory = parse_sh_matches.get_one::<String>("directory").map(std::path::PathBuf::from);
+                let output = BuildSemantic::try_from(parse_sh_matches)?;
 
-                Ok(Mode::ParseSh { input: ShScript { path: input, directory }, output: BuildEvents { path } })
+                Ok(Mode::ParseSh { input: ShScript { path: input, directory }, output })
             }
             None => {
                 let input = BuildCommand::try_from(&matches)?;
@@ -249,11 +241,6 @@ pub enum ParseError {
     UnrecognizedSubcommand,
     #[error("Missing build command")]
     MissingBuildCommand,
-    #[error(
-        "The --config option does not apply to parse-sh: it configures semantic analysis, \
-         while parse-sh only emits an event stream"
-    )]
-    ConfigNotApplicableToParseSh,
     #[error(
         "The --config option does not apply to semantic --print-compilers: it only lists the \
          compilers Bear recognizes from its built-in tables and consults no config"
@@ -308,27 +295,29 @@ pub fn cli() -> Command {
                 ])
                 .arg_required_else_help(false)
                 .after_help(
-                    "Reads the event stream that `bear intercept` or `bear parse-sh` produces \
-                     and writes the compilation database, e.g.:\n\n  \
-                     make -n | bear parse-sh | bear semantic",
+                    "Reads the event stream that `bear intercept` (or a third-party \
+                     producer) writes and produces the compilation database, e.g.:\n\n  \
+                     bear semantic --input events.json",
                 ),
         )
         .subcommand(
             Command::new(MODE_PARSE_SH_SUBCOMMAND)
-                .about("parses build-system dry-run text (e.g. `make -n` output) into events for `bear semantic`")
+                .about("produces the compilation database from build-system dry-run text (e.g. `make -n` output)")
                 .args(&[
                     arg!(-i --input <FILE> "Path of the shell text to parse")
                         .default_value(DEFAULT_STDIO)
                         .hide_default_value(false),
-                    arg!(-o --output <FILE> "Path of the event file to write")
-                        .default_value(DEFAULT_STDIO)
+                    arg!(-o --output <FILE> "Path of the result file")
+                        .default_value(DEFAULT_OUTPUT_FILE)
                         .hide_default_value(false),
+                    arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
                     arg!(-C --directory <DIR> "Initial working directory for the parsed commands"),
                 ])
                 .arg_required_else_help(false)
                 .after_help(
-                    "Feed the event stream to `bear semantic` to get a compilation database, e.g.:\n\n  \
-                     make -n | bear parse-sh | bear semantic",
+                    "Parses the text a build system prints in dry-run mode and writes the \
+                     compilation database, without running a build, e.g.:\n\n  \
+                     make -n | bear parse-sh",
                 ),
         )
         .args(&[
@@ -477,6 +466,10 @@ mod test {
     }
 
     // Requirements: interception-shell-text-parsing
+    //
+    // `parse-sh` reads shell text from standard input and writes the
+    // compilation database under its ecosystem-contracted name, so the
+    // headline usage is flag-free: `make -n | bear parse-sh`.
     #[test]
     fn test_parse_sh_defaults() {
         let execution = vec!["bear", "parse-sh"];
@@ -490,7 +483,7 @@ mod test {
                 config: None,
                 mode: Mode::ParseSh {
                     input: ShScript { path: "-".into(), directory: None },
-                    output: BuildEvents { path: "-".into() },
+                    output: BuildSemantic { path: "compile_commands.json".into(), append: false },
                 },
             }
         );
@@ -499,7 +492,7 @@ mod test {
     // Requirements: interception-shell-text-parsing
     #[test]
     fn test_parse_sh_call() {
-        let execution = vec!["bear", "parse-sh", "-i", "in.sh", "-o", "out.jsonl", "-C", "/build"];
+        let execution = vec!["bear", "parse-sh", "-i", "in.sh", "-o", "db.json", "-a", "-C", "/build"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
@@ -510,24 +503,33 @@ mod test {
                 config: None,
                 mode: Mode::ParseSh {
                     input: ShScript { path: "in.sh".into(), directory: Some("/build".into()) },
-                    output: BuildEvents { path: "out.jsonl".into() },
+                    output: BuildSemantic { path: "db.json".into(), append: true },
                 },
             }
         );
     }
 
     // Requirements: interception-shell-text-parsing
+    //
+    // Configuration shapes the semantic analysis parse-sh runs, exactly as
+    // in the other database-producing modes, so `--config` is accepted.
     #[test]
-    fn test_parse_sh_rejects_config() {
-        // arrange
+    fn test_parse_sh_accepts_config() {
         let execution = vec!["bear", "-c", "~/bear.yaml", "parse-sh"];
 
-        // act
         let matches = cli().get_matches_from(execution);
-        let sut = Arguments::try_from(matches);
+        let arguments = Arguments::try_from(matches).unwrap();
 
-        // assert
-        assert!(matches!(sut, Err(ParseError::ConfigNotApplicableToParseSh)));
+        assert_eq!(
+            arguments,
+            Arguments {
+                config: Some("~/bear.yaml".into()),
+                mode: Mode::ParseSh {
+                    input: ShScript { path: "-".into(), directory: None },
+                    output: BuildSemantic { path: "compile_commands.json".into(), append: false },
+                },
+            }
+        );
     }
 
     // Requirements: recognition-compiler-names

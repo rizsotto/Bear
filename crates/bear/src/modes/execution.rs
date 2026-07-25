@@ -211,17 +211,18 @@ impl Replayer {
             std::thread::spawn(move || consumer.consume(receiver))
         };
 
-        // Handle the source thread result
-        producer_thread
-            .join()
-            .map_err(|_| RuntimeError::Thread("Producer thread panicked"))?
-            .map_err(RuntimeError::Producer)?;
+        // Join both threads before propagating either error: returning on
+        // the producer's error alone would leave the consumer thread
+        // finalizing its output while the process exits, making the written
+        // file racy. The producer's error wins when both fail, since the
+        // consumer only saw a truncated stream of it.
+        let producer_result =
+            producer_thread.join().map_err(|_| RuntimeError::Thread("Producer thread panicked"));
+        let consumer_result =
+            consumer_thread.join().map_err(|_| RuntimeError::Thread("Consumer thread panicked"));
 
-        // Handle the consumer thread result
-        consumer_thread
-            .join()
-            .map_err(|_| RuntimeError::Thread("Consumer thread panicked"))?
-            .map_err(RuntimeError::Consumer)?;
+        producer_result?.map_err(RuntimeError::Producer)?;
+        consumer_result?.map_err(RuntimeError::Consumer)?;
 
         Ok(ExitCode::SUCCESS)
     }

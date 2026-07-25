@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% July 16, 2026
+% July 25, 2026
 <!-- to generate the final `bear.1` file, run `pandoc -s -t man bear.1.md -o bear.1` -->
 
 # NAME
@@ -49,12 +49,12 @@ try different output configurations.
 
 **Semantic mode**
 : `bear semantic` runs no build: it is a filter that reads an event
-stream (from `bear intercept` or `bear parse-sh`) and writes the
-compilation database. Combine it with intercept mode to re-generate the
-database without rebuilding.
+stream (from `bear intercept`, or any producer of the documented event
+format) and writes the compilation database. Combine it with intercept
+mode to re-generate the database without rebuilding.
 
 **Parse-sh mode**
-: `bear parse-sh` reconstructs the event stream from shell command
+: `bear parse-sh` produces the compilation database from shell command
 text, without executing anything. Typical input is a build system's dry
 run (`make -n`) or a saved build log. It is a text parser and inherently
 lower fidelity than interception; reach for it when the build cannot be
@@ -81,8 +81,7 @@ works on every platform, but the build has to pick the wrapper up: a
 : Path of the configuration file. It controls the interception method,
 compiler recognition, source filtering, duplicate handling, and output
 formatting (see CONFIGURATION). Given before a subcommand it applies to
-that subcommand too, except `bear parse-sh`, which rejects it: parse-sh
-only emits an event stream, so no configuration applies to it.
+that subcommand too.
 
 **-o, \-\-output** *FILE*
 : Path of the compilation database to write (default:
@@ -142,11 +141,11 @@ in the output file.
 
 ## bear parse-sh
 
-Parses shell command text into the same event stream `bear intercept`
-produces, without running anything. Typical input is a build system's
-dry-run output, such as `make -n`, or a saved build log:
+Produces the compilation database from shell command text, without
+running anything. Typical input is a build system's dry-run output, such
+as `make -n`, or a saved build log:
 
-    make -n | bear parse-sh | bear semantic
+    make -n | bear parse-sh
 
 **bear parse-sh** [*OPTIONS*]
 
@@ -154,12 +153,24 @@ dry-run output, such as `make -n`, or a saved build log:
 : Path of the shell text to parse (default: `-`, standard input).
 
 **-o, \-\-output** *FILE*
-: Path of the event file to write (default: `-`, standard output).
+: Path of the compilation database to write (default:
+`compile_commands.json`). Pass `-` to write to standard output; that
+write is neither atomic nor appendable, so `--output -` together with
+`--append` is rejected.
+
+**-a, \-\-append**
+: Same as in combined mode: place new entries before the existing ones
+in the output file.
 
 **-C, \-\-directory** *DIR*
 : Initial working directory for the parsed commands. Use it for input
 captured elsewhere (a CI log, a dry run from another checkout). Give an
 absolute path; the directory need not exist on this machine.
+
+The commands recognized in the text go through the same semantic
+analysis and output stage as an intercepted build, so the configuration
+applies exactly as in combined mode. Parsed commands that are not
+compiler invocations (`ar`, `mv`, `mkdir`) simply produce no entries.
 
 It understands a documented subset of POSIX shell syntax: word splitting
 and quoting; the `;`, `&&`, `||`, `&`, and `|` separators; comments;
@@ -173,7 +184,7 @@ is skipped and reported on standard error with its line number and
 reason. This covers subshells, command substitution, parameter
 expansion, globs in the executable position, here-documents,
 unterminated quotes, and shell keywords such as `if` or `for`. The run
-succeeds as long as at least one line produced an event.
+succeeds as long as at least one line parsed as a command.
 
 Interception remains the higher-fidelity default: it observes the
 `exec()` calls a build really makes, while `bear parse-sh` reconstructs
@@ -187,8 +198,8 @@ Prefer `bear -- <build command>` whenever the build can actually be run.
 The source files named in the parsed commands need not exist: entries
 are reconstructed from the text alone. The one exception is the
 `canonical` path format, which resolves symlinks on disk; when the
-sources are absent, configure `absolute` on the `bear semantic` step
-instead (see `format.paths` under CONFIGURATION).
+sources are absent, configure `absolute` instead (see `format.paths`
+under CONFIGURATION).
 
 
 # OUTPUT
@@ -422,10 +433,11 @@ code: 0 when the build succeeds, the same non-zero code when it fails.
 In semantic mode, Bear exits 0 on success and non-zero when the analysis
 fails.
 
-In parse-sh mode, Bear exits 0 when at least one line produced an event,
-and also on empty input (with a notice on standard error). It exits
-non-zero when every non-empty input line was skipped, so a run that
-emitted nothing cannot pass for a successful one.
+In parse-sh mode, Bear exits 0 when the input could be parsed - even
+when the database comes out empty because the text named no compiler
+invocations - and also on empty input (with a notice on standard
+error). It exits non-zero when every non-empty input line was skipped,
+so a run that understood nothing cannot pass for a successful one.
 
 If Bear itself encounters an internal error, it exits non-zero
 regardless of the build command's status.
@@ -491,13 +503,13 @@ configurations without rebuilding:
 
 Recover a database from a dry run, without building:
 
-    make -n | bear parse-sh | bear semantic
+    make -n | bear parse-sh
 
 For a recursive Make build, add `-w`. The top-level make then prints
 `Entering directory` markers too, and parse-sh resolves every command
 against the right directory:
 
-    make -nw | bear parse-sh | bear semantic
+    make -nw | bear parse-sh
 
 Update the database after rebuilding one part of the project:
 
