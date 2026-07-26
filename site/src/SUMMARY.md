@@ -12,7 +12,6 @@
 
 # Guides
 
-- [Configure Bear](configuration.md)
 - [Recipes](recipes/index.md)
   - [Generate compile_commands.json for a Makefile project](recipes/compile-commands-for-makefile.md)
   - [Generate compile_commands.json for a CMake project](recipes/cmake.md)
@@ -31,10 +30,17 @@
   - [Use Bear with Intel oneAPI compilers](recipes/intel-oneapi.md)
   - [Use Bear with Cray and NVIDIA HPC compilers](recipes/cray-hpc.md)
   - [Generate compile_commands.json for an MPI project](recipes/mpi.md)
-- [Supported compilers](supported-compilers.md)
 - [Troubleshooting](troubleshooting.md)
-- [Frequently asked questions](faq.md)
+
+# Reference
+
+- [Configure Bear](configuration.md)
+- [Supported compilers](supported-compilers.md)
+
+# Understanding Bear
+
 - [How Bear works](how-it-works.md)
+- [Frequently asked questions](faq.md)
 
 # Platform notes
 

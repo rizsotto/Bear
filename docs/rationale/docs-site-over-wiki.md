@@ -44,14 +44,20 @@ links still resolve.
 The four documentation types of [Diataxis](https://diataxis.fr/)
 (tutorial, how-to, reference, explanation) are adopted as a per-page
 authoring discipline: every source page declares exactly one type in an
-HTML comment at the top and stays inside it. They are rejected as a
-navigation scheme: the table of contents is organized by what a reader
-is trying to do, not by document type. One exception is deliberate. The
-tutorials sit under a "Tutorials" heading, because that is the one type
-name a reader applies to themselves rather than to a document: someone
-new to the tool is looking for a tutorial and knows it. "How-to guides",
-"Reference", and "Explanation" are labels for authors, and the sections
-they would create are shelved by task instead.
+HTML comment at the top and stays inside it.
+
+The table of contents separates those types too, but it does not use
+Diataxis's own names for them. The sections are "Tutorials", "Guides",
+"Reference", and "Understanding Bear", plus a topical "Platform notes"
+group that holds how-to pages shelved by operating system instead. The
+naming is the whole point: "Tutorials" and "Reference" are words readers
+already apply to themselves, while "How-to guides" and "Explanation"
+name kinds of document to their authors. A reader who wants to look
+something up recognizes "Reference"; nobody arrives wanting an
+"Explanation".
+
+Installing sits above the sections, ungrouped, because it precedes
+anything a reader can do with the tool.
 
 ## Consequences
 
@@ -84,16 +90,22 @@ Rejected alternatives:
 - **In-repo Markdown only, no site.** Free, and it does put the text
   under review, but `github.com/robots.txt` disallows `/*/tree/`, so it
   cannot be found by search at all.
-- **Diataxis as the full navigation scheme**, that is, `SUMMARY.md`
-  sections named "Tutorials", "How-to guides", "Reference",
-  "Explanation". Three of those four put authoring jargon in front of
-  readers who came looking for one answer, and some would hold a single
-  page. It also dilutes the query-shaped chapter names, because mdBook
-  renders a page title as "<chapter name> - <book title>", which makes
-  the chapter name the title element that search engines read. The
-  visible-taxonomy form of Diataxis is aimed at estates far larger than
-  this one. The discipline is kept, and of the shelving only the
-  "Tutorials" heading, for the reason given under Decision.
+- **Diataxis's own section names in the navigation**, that is,
+  `SUMMARY.md` sections headed "How-to guides" and "Explanation". The
+  types are what the sections separate, but two of the four names are
+  authoring vocabulary, so they are shelved under "Guides" and
+  "Understanding Bear" instead. Section names are also load-bearing for
+  search, because mdBook renders a page title as "<chapter name> - <book
+  title>".
+
+  This entry originally recorded the stronger decision that the four
+  types would not shape the navigation at all, and that the contents
+  would be organized purely by task. That did not survive contact with
+  the estate: as pages accumulated, a reference page sat in a section of
+  how-tos and an explanation page sat next to a recipe, and the mismatch
+  was visible to readers rather than only to authors. The types now
+  separate the sections, under the names above. What was rejected is the
+  vocabulary, not the taxonomy.
 
 ## References
 

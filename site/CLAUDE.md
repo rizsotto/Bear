@@ -127,14 +127,28 @@ page), `src/recipes/index.md`, and `src/404.md`. They are the only files
 allowed to declare `<!-- Diataxis type: landing (navigation page, not one
 of the four types) -->`. Do not add a fourth.
 
-## Navigation is organized by task, not by type
+## Navigation separates the types, without naming them Diataxis's way
 
-The four Diataxis types are an authoring discipline, not a shelving
-scheme. Do not restructure `SUMMARY.md` into "Tutorials / How-to guides
-/ Reference / Explanation" sections. That puts authoring jargon in front
-of readers, leaves sections holding a single page, and dilutes the
-query-shaped chapter names that rule 2 protects. The full reasoning,
-including what was rejected and why, is in
+`SUMMARY.md` has these sections, and a new page belongs in the one that
+matches its declared type:
+
+| Section | Holds |
+|---|---|
+| (ungrouped, first) | `installation.md`, which precedes anything a reader can do. |
+| Tutorials | The tutorial pages. |
+| Guides | How-to pages: the recipes, and troubleshooting. |
+| Reference | `configuration.md` and `supported-compilers.md`. |
+| Understanding Bear | The explanation pages. |
+| Platform notes | How-to pages shelved by operating system instead. |
+
+Do not rename "Guides" to "How-to guides" or "Understanding Bear" to
+"Explanation". Those two Diataxis names describe a document to its
+author; "Tutorials" and "Reference" are words a reader applies to
+themselves. Section names are also load-bearing for search, because
+mdBook renders a page title as "<chapter name> - <book title>". And do
+not leave a page in a section that does not match its type comment: a
+reference page among the how-tos is a mismatch a reader notices. The
+reasoning, including what this decision used to say, is in
 [`../docs/rationale/docs-site-over-wiki.md`](../docs/rationale/docs-site-over-wiki.md).
 
 ## The build-and-link check
