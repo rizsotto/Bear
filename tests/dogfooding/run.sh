@@ -249,8 +249,8 @@ fi
 
 # === STEP 2: BUILD BASE IMAGE (dogfood-run-containerized) =====================
 # Build Bear-under-test inside the base image from a 'git archive HEAD' context
-# (committed files ONLY; the dirty working tree, plan.md, target/ never reach
-# the image). A failure here is ERROR (harness / Bear build).
+# (committed files ONLY; the dirty working tree, uncommitted scratch, target/
+# never reach the image). A failure here is ERROR (harness / Bear build).
 
 ARCHIVE_DIR="$(mktemp -d)"
 cleanup_archive() { rm -rf "$ARCHIVE_DIR"; }
@@ -261,7 +261,7 @@ info "exporting committed tree (git archive HEAD) to $ARCHIVE_DIR"
 (cd "$REPO_ROOT" && git archive HEAD | tar -x -C "$ARCHIVE_DIR")
 
 # 'git archive HEAD' inherently carries only committed files (never the dirty
-# working tree, target/, or uncommitted scratch like plan.md). Assert positively
+# working tree, target/, or uncommitted scratch files). Assert positively
 # that the harness itself made it in, rather than blocklisting scratch names that
 # could one day be legitimately committed.
 [ -f "$ARCHIVE_DIR/tests/dogfooding/run.sh" ] || \
