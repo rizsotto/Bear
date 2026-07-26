@@ -32,8 +32,13 @@ compilation database for you:
   or a saved build log instead of running the build.
 
 If your project uses CMake or Meson, those tools can export a
-compilation database directly, and Bazel has third-party tooling that
-does. Use that when it is available.
+compilation database directly, and Bazel has it through Hedron's
+[bazel-compile-commands-extractor][hedron]. Use that when it is
+available; [Generate compile_commands.json for a CMake
+project](recipes/cmake.md) covers those exports and the cases where they
+are not enough.
+
+  [hedron]: https://github.com/hedronvision/bazel-compile-commands-extractor
 
 ## Where to go next
 

@@ -81,6 +81,24 @@ or, when the top-level driver is itself CMake:
 bear -- cmake --build .
 ```
 
+## If the project does not use CMake
+
+CMake is not the only build system that writes `compile_commands.json`
+itself. Check whether yours already does before reaching for Bear:
+
+- Ninja: `ninja -t compdb > compile_commands.json`
+- Qbs: `qbs generate --generator clangdb`
+- Waf: load the `clang_compilation_database` tool from `wscript`, then
+  run `waf clangdb`
+- Bazel: no native flag, but [Hedron's Compile Commands
+  Extractor](https://github.com/hedronvision/bazel-compile-commands-extractor)
+  does the same job as a third-party target
+- Clang itself: pass `-MJ <fragment>.json` to every invocation and
+  concatenate the fragments into a single JSON array
+
+Use your build system's own export when it has one. Reach for Bear when
+it does not, or when what it exports does not match what actually ran.
+
 ## clangd cannot find the file CMake wrote
 
 `compile_commands.json` living in the build directory rather than the

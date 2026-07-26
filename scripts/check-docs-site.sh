@@ -6,7 +6,7 @@
 # Run from anywhere:
 #     ./scripts/check-docs-site.sh
 #
-# The check has five parts:
+# The check has six parts:
 #   1. `mdbook build` must succeed AND print no WARN or ERROR line.
 #      Warnings are fatal on purpose: mdBook reports preprocessor and
 #      include failures that way, and they would otherwise ship silently.
@@ -42,16 +42,43 @@
 #      block, without re-running the generator. Uses only the local
 #      checkout (no network access) and never writes to the committed
 #      page.
+#   6. `site/src/configuration.md` must not name a configuration key
+#      that `man/bear.1.md` does not also mention. `man/bear.1.md` is
+#      the owner of configuration keys and defaults (see
+#      `site/CLAUDE.md`), so configuration.md is reference content that
+#      overlaps it by design; this is the drift check for that overlap,
+#      in place of a generator because there is no schema export to
+#      generate the page from. Extraction rule: every backticked,
+#      dot-separated, lowercase/underscore identifier of two or more
+#      segments in configuration.md (for example `format.paths.directory`)
+#      is a candidate key. For each one, its last segment (`directory`)
+#      must appear as a whole word somewhere in man/bear.1.md. This
+#      covers every key documented so far: man/bear.1.md always names a
+#      key's last segment, even where it does not spell out the full
+#      dotted path (compilers, sources, duplicates, and headers keys are
+#      written there under their own section heading, undotted). It does
+#      NOT cover a single-segment top-level key (`schema` is not
+#      dotted, so it is not extracted), and it does not verify a key's
+#      accepted values or default, only that the key name itself is not
+#      invented. A whole-word match is deliberately loose: it does not
+#      confirm the man page documents the key as configuration (a
+#      coincidental prose word would also pass), so this check only
+#      catches a key that man/bear.1.md never mentions at all, such as a
+#      typo or an invented key. That one-directional, name-only check is
+#      enough to catch the drift that matters here: a key added to the
+#      site page without ever being added to the man page.
 #
 # mdBook must be on PATH. Install the version pinned in
 # `.github/workflows/pages.yml`, which is the single source of truth for
 # it.
 #
 # Exit codes:
-#   0 - the site builds clean, every link and page checks out, and the
-#       generated compiler page is up to date
-#   1 - at least one build warning, broken link, unlisted page, or a
-#       stale generated page
+#   0 - the site builds clean, every link and page checks out, the
+#       generated compiler page is up to date, and every configuration
+#       key on configuration.md is also named in the man page
+#   1 - at least one build warning, broken link, unlisted page, a
+#       stale generated page, or a configuration key missing from the
+#       man page
 #   2 - invocation error (mdbook or python3 missing, site directory not
 #       found)
 
@@ -83,7 +110,8 @@ log="$(mktemp)"
 problems="$(mktemp)"
 toc="$(mktemp)"
 scratch="$(mktemp)"
-trap 'rm -f "${log}" "${problems}" "${toc}" "${scratch}"' EXIT
+keys="$(mktemp)"
+trap 'rm -f "${log}" "${problems}" "${toc}" "${scratch}" "${keys}"' EXIT
 
 # 1. Build, then treat any WARN or ERROR log line as a failure. mdBook
 #    0.5 prints the level as the first field of the line.
@@ -192,4 +220,45 @@ if ! diff -u "${src_dir}/supported-compilers.md" "${scratch}" >"${log}"; then
     exit 1
 fi
 
-echo "OK: site builds clean, links resolve, every page is in SUMMARY.md, and supported-compilers.md is up to date"
+# 6. configuration.md must not name a configuration key that
+#    man/bear.1.md never mentions. man/bear.1.md owns configuration keys
+#    and defaults (see site/CLAUDE.md), so configuration.md necessarily
+#    overlaps it; this is the drift check for that overlap, standing in
+#    for a generator since there is no schema export to generate the
+#    page from. Extraction: every backticked, dot-separated,
+#    lowercase/underscore identifier of two or more segments in
+#    configuration.md is a candidate key, for example
+#    `format.paths.directory`. Only the LAST segment (`directory`) is
+#    checked, as a whole word, against man/bear.1.md: that page always
+#    names a key's last segment, even for sections where it does not
+#    spell out the full dotted path (compilers, sources, duplicates, and
+#    headers keys are written there under their own section heading,
+#    undotted). See the header comment for what this rule does and does
+#    not cover.
+config_page="${src_dir}/configuration.md"
+man_page="${repo_root}/man/bear.1.md"
+if [ -f "${config_page}" ]; then
+    if [ ! -f "${man_page}" ]; then
+        echo "error: man page not found at ${man_page}" >&2
+        exit 2
+    fi
+    grep -oE '`[a-z][a-z0-9_]*(\.[a-z0-9_]+)+`' "${config_page}" |
+        sed -E 's/^`//; s/`$//' |
+        sort -u >"${keys}"
+    while read -r key; do
+        leaf="${key##*.}"
+        if ! grep -qw -F -- "${leaf}" "${man_page}"; then
+            echo "CONFIG KEY NOT IN MAN PAGE: configuration.md names" \
+                "'${key}' (checked as '${leaf}'), which man/bear.1.md" \
+                "never mentions" >>"${problems}"
+        fi
+    done <"${keys}"
+fi
+
+if [ -s "${problems}" ]; then
+    cat "${problems}" >&2
+    echo "FAILED: configuration.md names a key man/bear.1.md does not mention" >&2
+    exit 1
+fi
+
+echo "OK: site builds clean, links resolve, every page is in SUMMARY.md, supported-compilers.md is up to date, and every configuration.md key is in the man page"

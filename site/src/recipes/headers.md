@@ -96,6 +96,13 @@ sources that use them; reach for `dependency-files` when they do not, or
 when `siblings`'s approximate flags are visibly wrong, and the build
 already produces `.d` files.
 
+Bear's own synthesis is not the only way to reach this problem: the
+separate tool [`compdb`](https://github.com/Sarcasm/compdb)
+post-processes an existing `compile_commands.json` to add header entries
+rather than producing them while the build runs. It is a reasonable
+alternative when you already have a database from some other source and
+only need headers added to it.
+
 Related: [Bear produces an empty
 compile_commands.json](empty-compilation-database.md) for a database
 missing more than just header entries, [Generate compile_commands.json

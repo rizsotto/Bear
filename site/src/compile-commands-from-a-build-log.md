@@ -137,6 +137,24 @@ than intercepting a real build, in specific, permanent ways:
 - A dry run can omit commands entirely. Recursive `make` does not
   always propagate `-n` to sub-makes, and a command that compiles a
   not-yet-generated source never gets printed in the first place.
+
+  The sharpest case of this is a build that produces a tool and then
+  consults that tool to decide what to compile, for example `SRCS :=
+  $(shell ./tool)` in a makefile, or an equivalent generated-flags step.
+  `make -n` only prints the recipe that builds the tool; it never runs
+  it, so `$(shell ./tool)` has nothing to run and the compiles that
+  depend on its output never reach the log at all. On a project shaped
+  this way, `bear -- make` records every compile, the tool's own
+  included; `make -n` piped into `bear parse-sh` records only the
+  tool's compile - silently, with no warning, and exit status 0. A
+  generated makefile that is `include`d, by contrast, is not affected:
+  GNU make remakes an included makefile for real even under `-n`, so a
+  source list coming from an included `.mk` file survives the dry run.
+  It is specifically the `$(shell ...)`-at-parse-time shape that goes
+  missing. Nothing signals the gap, so notice it by comparing the entry
+  count against what you expect for the project; when you find one, run
+  the actual build under Bear (`bear -- make`) if it can be run at all.
+
 - A bare executable name in the log, like `gcc` above, resolves against
   the environment and `PATH` you run `parse-sh` in, not the original
   build's. If the build used a different compiler on `PATH`, the

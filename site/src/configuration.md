@@ -1,145 +1,158 @@
-<!-- Diataxis type: explanation -->
+<!-- Diataxis type: reference -->
 
 # Configure Bear
 
-Every mode Bear ships has a built-in default for every setting, so Bear
-runs with no configuration file at all. Reach for a `bear.yml` when a
-default does not fit your project: forcing an interception method,
-teaching Bear about a compiler at an unusual path, dropping generated
-sources from the database, or changing how paths and entries are
-written. This page explains what the file is for, how Bear finds it,
-and which section to reach for. The literal keys, their accepted
-values, and their defaults are enumerated in the [`bear(1)` man
-page][manpage], which stays the single reference; this page does not
-duplicate it.
+Bear reads an optional `bear.yml`. Every key is optional except `schema`,
+which is required once you write a file at all; every section below
+states its default, so a key you do not write keeps that value. The
+canonical source for every key, accepted value, and default is the
+[`bear(1)` man page][manpage] CONFIGURATION section; this page mirrors
+it, organized one section at a time, with the shape a user would
+actually write next to its default.
 
-## Finding the file
+## Where the file is found
 
-Without `--config`, Bear searches for `bear.yml` starting in the
-current working directory, then falls back to the platform's standard
-per-user configuration directory: the XDG locations on Linux, BSD, and
-macOS, and `%LOCALAPPDATA%` / `%APPDATA%` on Windows. The first file
-found wins; the rest are not consulted. Name a file explicitly to skip
-the search, for example to keep a strict configuration alongside a
-permissive default one and pick between them per invocation. The
-exhaustive, ordered list of paths is the man page's FILES section.
+Without `--config`, Bear searches for `bear.yml` in the current working
+directory first, then the platform's per-user configuration directory
+(the XDG locations on Linux and the BSDs, `%LOCALAPPDATA%` /
+`%APPDATA%` on Windows). The first file found is loaded; the rest are
+not consulted. The exhaustive, ordered list of paths is the man page's
+FILES section. Pass `-c`/`--config FILE` to load a specific file
+instead of searching.
 
-When no file is found anywhere, Bear runs on its built-in defaults: the
-interception method that fits the host platform, no source filtering,
-no duplicate collapsing beyond the built-in file-and-directory match,
-paths recorded as the build produced them, and no header synthesis.
-Nothing in the configuration file is required; every section below is
-optional, and an empty or absent file is a valid configuration.
-
-## Seeing the effective configuration
-
-Bear resolves the found file (or the built-in defaults, if none is
-found) into one configuration before it runs the build, and logs it as
-YAML when `RUST_LOG` is set to `info` or a more verbose level:
-
-    RUST_LOG=info bear -- true
-
-With no `bear.yml` on the search path, this prints Bear's complete
-built-in defaults:
+## schema
 
 ```yaml
 schema: "4.2"
+```
+
+Names the configuration format version this file is written for. It is
+the one key with no default: a file that omits it, or names a version
+this Bear release does not support, is rejected rather than partially
+applied.
+
+## intercept
+
+```yaml
 intercept:
-  mode: preload
-compilers: []
-sources: {}
+  mode: wrapper
+```
+
+- **`intercept.mode`**: `preload` or `wrapper`. Default: `preload` on
+  Linux and the BSDs, `wrapper` on macOS and Windows.
+
+## compilers
+
+```yaml
+compilers:
+  - path: /usr/bin/cc
+    as: gcc
+  - path: /usr/local/bin/gcc
+    ignore: true
+```
+
+Default: `[]` (no overrides; every compiler is recognized automatically).
+
+- **`compilers.path`**: Path of the compiler executable.
+- **`compilers.as`**: Compiler type hint. The accepted values are the
+  `as` names shown by `bear semantic --print-compilers`.
+- **`compilers.ignore`**: Exclude this executable's invocations from the
+  database. Default: `false`.
+
+## sources
+
+```yaml
+sources:
+  directories:
+    - path: /project/tests
+      action: exclude
+  files:
+    - pattern: "moc_*.cpp"
+      action: exclude
+```
+
+Default: `{}` (both lists empty; nothing is filtered out).
+
+- **`sources.directories.path`**, **`sources.directories.action`**: list
+  of directory rules; `action` is `include` or `exclude`.
+- **`sources.files.pattern`**, **`sources.files.action`**: list of
+  filename-glob rules; `action` is `include` or `exclude`.
+
+## duplicates
+
+```yaml
 duplicates:
   match_on:
-  - directory
-  - file
+    - file
+    - arguments
+```
+
+- **`duplicates.match_on`**: list of entry fields to compare: `file`,
+  `arguments`, `directory`, `command`, `output`. Two entries are
+  duplicates when all configured fields match; the first occurrence is
+  kept. Default: `[directory, file]`.
+
+## format
+
+```yaml
 format:
   paths:
-    directory: as-is
-    file: as-is
+    directory: canonical
+    file: canonical
   entries:
     use_array_format: true
     include_output_field: true
   arguments:
     from_response_files: false
     from_environment: true
-headers:
-  enabled: false
-  strategy: siblings
 ```
 
-This is the same log line whether the values came from a `bear.yml` or
-from defaults, so it is the way to check what a given file actually
-changed, rather than guessing from the sections below.
+### format.paths
 
-## What each section is for
+- **`format.paths.directory`**, **`format.paths.file`**: `as-is`,
+  `canonical`, `relative`, or `absolute`. Default: `as-is` for both.
 
-**intercept** chooses how Bear observes the build: preload (injecting a
-library into the build's processes) or wrapper (substituting compilers
-on `PATH`). The default is preload on Linux and the BSDs, wrapper on
-macOS and Windows. Reach for this section when the platform default is
-wrong for your case, for example forcing wrapper mode on Linux to work
-around a statically linked build tool, or forcing preload on a macOS
-host with System Integrity Protection disabled. The trade-offs between
-the two methods, and what each one cannot see, are explained in [How
-Bear works](how-it-works.md); this section only records the choice.
+### format.entries
 
-**compilers** gives Bear hints about specific executables: what
-compiler family a path is (`as`), or that its invocations should be
-dropped entirely (`ignore`). Reach for this section when a compiler at
-a non-standard path or name is not recognized, or is recognized as the
-wrong family; [Supported compilers](supported-compilers.md) explains
-how automatic recognition works and when it needs help.
+- **`format.entries.use_array_format`**: write the `arguments` array
+  instead of the `command` string. Default: `true`.
+- **`format.entries.include_output_field`**: include the `output` field.
+  Default: `true`.
 
-**sources** filters which entries make it into the database by the
-source file's directory or filename, independently of how the compiler
-was invoked. By default no rule is configured, so nothing is filtered
-out. Reach for this section to drop machine-generated code (Qt `moc`
-output, protobuf stubs) or a `tests/` tree you do not want a linter to
-see.
+### format.arguments
 
-**duplicates** controls which fields two entries must share to count as
-the same compilation, and therefore which one survives when a source is
-compiled more than once. The built-in default keeps one entry per
-source file per directory regardless of arguments; reach for this
-section when a build compiles the same file with different flags (for
-example once per target architecture) and you want an entry for each
-configuration.
+- **`format.arguments.from_response_files`**: expand `@file`
+  response-file references into their tokenized contents. Default:
+  `false`.
+- **`format.arguments.from_environment`**: fold compiler environment
+  variables (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
+  `OBJC_INCLUDE_PATH`, MSVC's `CL` / `_CL_`) into the recorded arguments.
+  Default: `true`.
 
-**format** controls how the JSON itself is written: whether paths are
-left as the build produced them or normalized, whether an entry carries
-the command as an argument array or a shell string, and whether
-environment variables that act as implicit flags (compiler include
-paths, MSVC's `CL`) are folded into the recorded arguments. By default
-paths are left as-is, entries use the arguments array with the output
-field included, and environment-variable folding is on while
-response-file expansion is off. Reach for this section when a specific
-consumer expects one particular shape, for example a tool that only
-reads the `command` string.
-
-**headers** synthesizes entries for header files by cloning a compiled
-source's flags, since headers are never compiled on their own but
-editors and linters need flags for them too. It is off by default;
-reach for it when clangd or a similar tool complains about a header
-that has no compile command.
-
-## A small example
-
-A configuration touches only the sections it needs to change; this is
-illustrative, not a template to copy wholesale:
+## headers
 
 ```yaml
-schema: "4.2"
-intercept:
-  mode: wrapper
-sources:
-  files:
-    - pattern: "moc_*.cpp"
-      action: exclude
+headers:
+  enabled: true
+  strategy: dependency-files
 ```
 
-The `schema` key names the configuration format version Bear expects;
-a file whose value does not match the version this Bear release
-supports is rejected rather than partially applied.
+- **`headers.enabled`**: turn header-entry synthesis on. Default:
+  `false`.
+- **`headers.strategy`**: `siblings` or `dependency-files`. Default:
+  `siblings`.
+
+## Checking what is actually in effect
+
+Bear logs its fully resolved configuration as YAML whenever `RUST_LOG`
+is set to `info` or a more verbose level:
+
+    RUST_LOG=info bear -- true
+
+This is the same line whether the values came from a `bear.yml` or from
+built-in defaults, so it is the way to check what a given file actually
+changed on this machine, rather than working it out from the sections
+above.
 
 See also: [How Bear works](how-it-works.md) for the interception and
 semantic-analysis mechanism this configuration shapes, [Supported

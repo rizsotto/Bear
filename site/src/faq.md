@@ -40,9 +40,11 @@ man page's CONFIGURATION section for the exact keys.
 
 No. CMake and Meson can export a compilation database natively
 (CMake's `CMAKE_EXPORT_COMPILE_COMMANDS`, for example) without
-observing the build at all, and Bazel has third-party tooling that
-does. Reach for Bear when the build system does not support this, or
-when what it exports does not match what actually ran.
+observing the build at all, and Bazel projects use the third-party
+[Hedron's Compile Commands
+Extractor](https://github.com/hedronvision/bazel-compile-commands-extractor)
+for the same result. Reach for Bear when the build system does not
+support this, or when what it exports does not match what actually ran.
 
 ## Can I use Bear with Docker?
 
