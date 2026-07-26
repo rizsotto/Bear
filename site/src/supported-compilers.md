@@ -4,8 +4,11 @@
 
 Bear decides whether an intercepted command is a compilation by
 matching the name of the executable the build ran against a table of
-known compiler names, and nothing else: it never probes an unknown
-program to guess what it is. Once a name matches, the command line is
+known compiler names. A name it does not know is not a compiler, and
+Bear does not run the program to guess otherwise. The one exception is a
+short list of names that are genuinely ambiguous across platforms, and
+[Ambiguous names](#ambiguous-names) below says which and why. Once a
+name matches, the command line is
 parsed with that family's own flag rules, since GCC, MSVC, and Swift
 (to pick three) do not agree on how to spell an include path or an
 output file. This page explains how that matching works and lists the
