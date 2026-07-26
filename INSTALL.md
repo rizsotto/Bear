@@ -166,8 +166,9 @@ If you are a package maintainer for a distribution:
   `PREFIX` - the entry script embeds `PREFIX` as a literal runtime path,
   so it must match the installed system, not the build chroot.
 
-- The preload library (`libexec.so`) is only built on Unix. Windows builds
-  only produce `bear-driver` and `bear-wrapper`. Consult
+- The preload library is only built on Unix: `libexec.so` on Linux and
+  the BSDs, `libexec.dylib` on macOS. Windows builds only produce
+  `bear-driver` and `bear-wrapper`. Consult
   `crates/intercept-preload/build.rs` for details.
 
 - `bear-driver` locates its siblings using relative paths:
@@ -177,33 +178,48 @@ If you are a package maintainer for a distribution:
 - The expected installation layout:
   ```
   $PREFIX/
-  ├── bin/
-  │   └── bear                              (shell script)
-  ├── libexec/
-  │   └── bear/
-  │       ├── bin/
-  │       │   ├── bear-driver
-  │       │   └── bear-wrapper
-  │       └── $INTERCEPT_LIBDIR/
-  │           └── libexec.so
-  └── share/
-      ├── bash-completion/
-      │   └── completions/
-      │       └── bear                      (optional)
-      ├── zsh/
-      │   └── site-functions/
-      │       └── _bear                     (optional)
-      ├── fish/
-      │   └── vendor_completions.d/
-      │       └── bear.fish                 (optional)
-      ├── elvish/
-      │   └── lib/
-      │       └── bear.elv                  (optional)
-      ├── doc/
-      │   └── bear/
-      │       ├── README.md
-      │       └── COPYING
-      └── man/
-          └── man1/
-              └── bear.1
+  |-- bin/
+  |   `-- bear                              (shell script)
+  |-- libexec/
+  |   `-- bear/
+  |       |-- bin/
+  |       |   |-- bear-driver
+  |       |   `-- bear-wrapper
+  |       `-- $INTERCEPT_LIBDIR/
+  |           `-- libexec.so
+  `-- share/
+      |-- bash-completion/
+      |   `-- completions/
+      |       `-- bear                      (optional)
+      |-- zsh/
+      |   `-- site-functions/
+      |       `-- _bear                     (optional)
+      |-- fish/
+      |   `-- vendor_completions.d/
+      |       `-- bear.fish                 (optional)
+      |-- elvish/
+      |   `-- lib/
+      |       `-- bear.elv                  (optional)
+      |-- doc/
+      |   `-- bear/
+      |       |-- README.md
+      |       `-- COPYING
+      `-- man/
+          `-- man1/
+              `-- bear.1
   ```
+
+- Common pitfalls:
+  - If `INTERCEPT_LIBDIR` differs between the build and the install step,
+    `bear-driver` looks for the preload library in the wrong place and
+    preload interception silently fails at runtime. Set the same value
+    for both, as shown above.
+  - Build sandboxes that block `LD_PRELOAD` injection (for example
+    Gentoo's Portage sandbox) will not observe anything under the
+    default preload method; configure `intercept.mode: wrapper` for
+    packages built or tested under such a sandbox (see `bear.yml` in
+    `man/bear.1.md`).
+  - After packaging, run the smoke test from step 5 above
+    (`bear --version` and `bear -- true`) against the installed
+    `$PREFIX/bin/bear`, not just the build directory, to confirm the
+    installed layout resolves correctly.
