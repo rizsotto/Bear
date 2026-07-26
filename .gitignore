@@ -9,6 +9,7 @@ cmake-build*/
 cmake-build-debug/
 Output/
 target/
+site/book/
 .DS_Store
 
 *~

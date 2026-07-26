@@ -20,6 +20,11 @@ its keys, defaults, and examples - is the man page
 tests. Literal config keys and flag names live there and in the code, not
 in a requirement body.
 
+The user-facing documentation site (the guide users read, published to
+GitHub Pages) is a separate role and lives at repo-root
+[`../site/`](../site/); its authoring rules are in
+[`../site/CLAUDE.md`](../site/CLAUDE.md).
+
 `docs/` holds reference documentation. Operational procedures (releasing,
 and similar) are invocable skills under
 [`../.claude/skills/`](../.claude/skills/), not files here.

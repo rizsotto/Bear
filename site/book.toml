@@ -1,0 +1,18 @@
+[book]
+title = "Bear"
+description = "Generate compile_commands.json for any C or C++ build."
+language = "en"
+src = "src"
+
+[build]
+# A chapter listed in SUMMARY.md whose file is missing must fail the
+# build. The default (true) silently creates an empty page instead.
+create-missing = false
+
+[output.html]
+# Root-relative path of the deployed site (https://rizsotto.github.io/Bear/).
+# mdBook wants the PATH here, not the full URL: a full URL breaks asset
+# links and the 404 page.
+site-url = "/Bear/"
+git-repository-url = "https://github.com/rizsotto/Bear"
+edit-url-template = "https://github.com/rizsotto/Bear/edit/master/site/{path}"

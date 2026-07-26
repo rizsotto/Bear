@@ -1,0 +1,31 @@
+name: docs site
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # This workflow is the single source of truth for the mdBook version
+  # used to build the documentation site. Never install unpinned.
+  MDBOOK_VERSION: 0.5.4
+
+jobs:
+  build:
+    name: Build Documentation Site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Install mdBook
+        run: cargo install mdbook --version ${{ env.MDBOOK_VERSION }} --locked
+      - name: Build and link check
+        # Builds site/ and fails on any mdbook warning or error line, on
+        # any broken intra-book link, and on any page missing from
+        # SUMMARY.md. The script is what contributors run locally, so CI
+        # and the local check cannot drift apart. The site uses no mdBook
+        # plugins, mdbook-linkcheck included; dependency minimalism
+        # applies to docs tooling too.
+        run: ./scripts/check-docs-site.sh

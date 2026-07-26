@@ -55,6 +55,7 @@ These files contain rules, context, and constraints specific to that area.
 | Write or modify integration tests | `tests/integration/CLAUDE.md` |
 | Edit the test-tooling comparator or normalization | `tests/tools/CLAUDE.md` (behavior in `tests/tools/SPEC.md`) |
 | Edit or regenerate the man page | `man/CLAUDE.md` |
+| Write or modify a docs site page | `site/CLAUDE.md` |
 | Find project documentation or how it is organized | `docs/CLAUDE.md` |
 | Add, modify, or review a requirement (contract) | `docs/requirements/CLAUDE.md` |
 | Record or look up a design decision, or a rejected option | `docs/rationale/CLAUDE.md` |
