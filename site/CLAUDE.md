@@ -19,6 +19,7 @@ not need to read any other document to use it.
 | `src/SUMMARY.md` | The table of contents. Every page must be listed. |
 | `src/*.md` | Top-level pages. |
 | `src/404.md` | The not-found page. Deliberately NOT in `SUMMARY.md`: mdBook renders it specially, and listing it would put it in the navigation. Its links are absolute (`/Bear/...`) because GitHub Pages serves it for any missing path, including deep ones, and relative links would resolve against that path. Keep them in step with `site-url` in `book.toml`. |
+| `src/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/bear/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
 | `src/recipes/` | Task pages plus `index.md`, the recipe index. |
 | `src/platforms/` | One page per operating system. |
 | `book/` | Build output. Generated, git-ignored, never edited. |
@@ -109,14 +110,15 @@ is for users.
 |---|---|---|
 | tutorial | The first successful run; learning by doing. | `getting-started.md` |
 | how-to | One task, for a reader who already knows what they want. | `recipes/*`, platform pages, troubleshooting |
-| reference | Enumeration; looked up, not read. | `man/bear.1.md` ONLY. The site does not duplicate it. |
+| reference | Enumeration; looked up, not read. | `man/bear.1.md` owns flags, configuration keys, and defaults, and the site does not duplicate it. `supported-compilers.md` is the site's one reference page: it enumerates recognized compilers, and it is generated from the compiler definitions rather than written, so it cannot drift from them. Do not add a hand-written reference page. |
 | explanation | Mechanism and design. No commands. | `how-it-works.md` |
 
 Pages outside that table: `installation.md` is a how-to;
-`configuration.md`, `supported-compilers.md`, and `faq.md` are
-explanation. `supported-compilers.md` may list recognized executable
-names taken from the recognition snapshot, but it explains recognition
-rather than enumerating flags; flag enumeration stays in the man page.
+`configuration.md` and `faq.md` are explanation. `configuration.md`
+explains what the sections are for and states each one's default, and
+sends the reader to the man page for the exact keys; stating a default is
+explanation, but a copy-paste configuration recipe is not, and does not
+belong there.
 An FAQ answer that grows into a task with commands moves to its own
 recipe.
 
@@ -143,7 +145,7 @@ Before committing any change under `site/`, run:
 ./scripts/check-docs-site.sh
 ```
 
-It must print `OK` and exit 0. The check has four parts:
+It must print `OK` and exit 0. The check has five parts:
 
 1. `mdbook build site` must succeed and print no `WARN` or `ERROR` log
    line. Warnings are fatal on purpose: mdBook reports preprocessor and
@@ -167,7 +169,13 @@ It must print `OK` and exit 0. The check has four parts:
    table above.
 4. Every absolute `/Bear/<page>.html` link in `404.md` must have a
    matching `<page>.md`. Part 2 only follows `.md` targets, so without
-   this the not-found page could ship a dead link. Commenting an entry out does not count as listing
+   this the not-found page could ship a dead link.
+5. `src/supported-compilers.md` must match what
+   `scripts/generate-supported-compilers.py` produces from the current
+   `crates/bear/compilers/*.yaml`. After changing a compiler YAML file,
+   or the generator, run `python3
+   scripts/generate-supported-compilers.py` and commit its output with
+   the YAML change. Commenting an entry out does not count as listing
    it, and `(./page.md)` counts the same as `(page.md)`.
 
 `.github/workflows/pages.yml` runs the same script on every push and

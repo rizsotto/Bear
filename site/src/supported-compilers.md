@@ -1,4 +1,4 @@
-<!-- Diataxis type: explanation -->
+<!-- Diataxis type: reference -->
 
 # Supported compilers
 
@@ -76,8 +76,8 @@ add an entry, since not every custom build of GCC or Clang answers
 `--version` in a way the probe recognizes.
 
 An `as` value is a family identifier, not a display name: it is the
-short, lower-case id in the `as:` column of the family tables below,
-spelled verbatim. There are no aliases, so `as: gcc` is accepted while
+short, lower-case id given as each family's "Configuration `as:` value"
+below, spelled verbatim. There are no aliases, so `as: gcc` is accepted while
 `as: GCC` is not, and several families share one id (`icx` and `icc`
 are both `intel_cc`). The complete accepted set is
 
@@ -94,88 +94,201 @@ installed.
 
 ## Recognized families
 
-Internal jobs that a driver spawns for itself (GCC's `cc1`, `cc1plus`,
-`collect2`; MSVC's `c1`, `c2`; Swift's `swift-frontend`) are recognized
-only so Bear can filter them back out: they are never user-facing
-invocations and never produce a database entry. They are omitted from
-the tables below; everything else Bear recognizes is expected to
-produce an entry when it compiles a source.
+Internal jobs that a driver spawns for itself are recognized only so
+Bear can filter them back out: they are never user-facing invocations
+and never produce a database entry. The tables below label each one as
+internal, separately from the family's real, user-facing names.
 
-### GCC and Clang family
+The four compiler launchers share one kind rather than a compiler
+family, so any of `wrapper`, `ccache`, `distcc`, `icecc`, and `sccache`
+selects it.
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `gcc`, `g++`, `gfortran`, `egfortran`, `f95` | GCC | `gcc` |
-| `clang`, `clang++` | Clang | `clang` |
-| `clang-cl` | Clang (MSVC mode) | `clang_cl` |
+<!-- BEGIN GENERATED: scripts/generate-supported-compilers.py -- DO NOT EDIT. Edits inside this block are lost the next time the script runs. -->
 
-### Vendor compilers built on GCC or Clang
+### Compiler families
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `armclang`, `armclang++` | Arm Compiler 6 | `armclang` |
-| `craycc`, `crayCC`, `craycxx` | Cray C/C++ | `cray_cc` |
-| `ibm-clang`, `ibm-clang++` | IBM Open XL C/C++ | `ibm_xl` |
-| `xlclang`, `xlclang++` | IBM XL C/C++ | `ibm_xl` |
-| `icx`, `icpx` | Intel oneAPI C/C++ | `intel_cc` |
-| `icc`, `icpc` | Intel C++ Compiler Classic | `intel_cc` |
-| `qcc`, `q++` | QNX qcc | `qnx` |
-| `amdclang`, `amdclang++`, `hipcc` | AMD ROCm Clang/HIP | `clang` |
-| `emcc`, `em++`, `emcc.py`, `em++.py` | Emscripten | `clang` |
-| `tiarmclang` | Texas Instruments Arm Clang | `clang` |
-| `xc8-cc`, `xc8` | Microchip XC8 | `gcc` |
+#### `armclang`
 
-### Fortran
+Configuration `as:` value: `armclang`.
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `crayftn`, `ftn` | Cray Fortran | `cray_fortran` |
-| `ifort`, `ifx` | Intel Fortran | `intel_fortran` |
-| `flang`, `flang-new` | Flang | `flang` |
-| `amdflang` | AMD ROCm Flang | `flang` |
-| `nvc`, `nvc++`, `nvfortran` | NVIDIA HPC SDK | `nvidia_hpc` |
-| `pgcc`, `pgc++`, `pgfortran` | PGI (legacy NVIDIA HPC) | `nvidia_hpc` |
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `armclang`, `armclang++` | Arm Compiler 6 | `armclang-12` | not recognized | [developer.arm.com](https://developer.arm.com/documentation/100748/latest/) |
 
-### CUDA and MSVC
+#### `clang`
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `nvcc` | NVIDIA CUDA | `cuda` |
-| `cl` | Microsoft Visual C++ | `msvc` |
+Configuration `as:` value: `clang`.
 
-### Assemblers
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `clang`, `clang++` | Clang | `clang-12` | `arm-linux-gnueabihf-clang` | [clang.llvm.org](https://clang.llvm.org/docs/ClangCommandLineReference.html) |
+| `amdclang`, `amdclang++`, `hipcc` | AMD ROCm Clang/HIP | not recognized | not recognized | [rocm.docs.amd.com](https://rocm.docs.amd.com/en/latest/) |
+| `emcc`, `em++`, `emcc.py`, `em++.py` | Emscripten | not recognized | not recognized | [emscripten.org](https://emscripten.org/docs/tools_reference/emcc.html) |
+| `tiarmclang` | Texas Instruments Arm Clang | not recognized | not recognized | [ti.com](https://www.ti.com/tool/ARM-CGT) |
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `nasm`, `yasm` | NASM / YASM assembler | `nasm` |
-| `fasm` | flat assembler | `fasm` |
+An invocation is also ignored when its arguments include `-cc1`: that is an internal frontend or codegen call, not a user-facing compile.
 
-### Swift and Vala
+#### `clang_cl`
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `swiftc` | Swift | `swift` |
-| `valac` | Vala | `vala` |
+Configuration `as:` value: `clang_cl`.
 
-### MPI compiler wrappers
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `clang-cl` | Clang (MSVC mode) | `clang-cl-12` | not recognized | [clang.llvm.org](https://clang.llvm.org/docs/UsersManual.html#clang-cl) |
 
-| Executable names | Recognized as | `as:` value |
-|---|---|---|
-| `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `mpifort`, `mpif77`, `mpif90` | MPI compiler wrapper | `mpi` |
-| `mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx` | Intel MPI C/C++ wrapper | `intel_cc` |
-| `mpiifort`, `mpiifx` | Intel Fortran MPI wrapper | `intel_fortran` |
+#### `cray_cc`
+
+Configuration `as:` value: `cray_cc`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `craycc`, `crayCC`, `craycxx` | Cray C/C++ | `craycc-12` | not recognized | [support.hpe.com](https://support.hpe.com/hpesc/public/docDisplay?docId=a00113893en_us&page=index.html) |
+
+#### `cray_fortran`
+
+Configuration `as:` value: `cray_fortran`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `crayftn`, `ftn` | Cray Fortran | `crayftn-12` | not recognized | [support.hpe.com](https://support.hpe.com/hpesc/public/docDisplay?docId=a00115296en_us&page=Fortran_Command-line_Options.html) |
+
+#### `cuda`
+
+Configuration `as:` value: `cuda`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `nvcc` | NVIDIA CUDA | `nvcc-12` | `arm-linux-gnueabihf-nvcc` | [docs.nvidia.com](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html) |
+
+#### `fasm`
+
+Configuration `as:` value: `fasm`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `fasm` | flat assembler | not recognized | not recognized | [flatassembler.net](https://flatassembler.net/docs.php) |
+
+#### `flang`
+
+Configuration `as:` value: `flang`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `flang`, `flang-new` | Flang | `flang-12` | `arm-linux-gnueabihf-flang` | [flang.llvm.org](https://flang.llvm.org/docs/FlangDriver.html) |
+| `amdflang` | AMD ROCm Flang | not recognized | not recognized | [rocm.docs.amd.com](https://rocm.docs.amd.com/en/latest/) |
+
+#### `gcc`
+
+Configuration `as:` value: `gcc`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `gcc`, `g++`, `gfortran`, `egfortran`, `f95` | GCC | `gcc-12` | `arm-linux-gnueabihf-gcc` | [gcc.gnu.org](https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html) |
+| `xc8-cc`, `xc8` | Microchip XC8 | not recognized | not recognized | [microchip.com](https://www.microchip.com/en-us/tools-resources/develop/mplab-xc-compilers) |
+
+Internal, not user-facing: `cc1`, `cc1plus`, `cc1obj`, `cc1objplus`, `f951`, `collect2`, `lto1`. Bear recognizes these only so it can filter them back out; they never produce a database entry.
+
+#### `ibm_xl`
+
+Configuration `as:` value: `ibm_xl`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `ibm-clang`, `ibm-clang++` | IBM Open XL C/C++ | `ibm-clang-12` | not recognized | [ibm.com](https://www.ibm.com/docs/en/openxl-c-and-cpp-aix) |
+| `xlclang`, `xlclang++` | IBM XL C/C++ | `xlclang-12` | not recognized | [ibm.com](https://www.ibm.com/docs/en/xl-c-and-cpp-aix) |
+
+#### `intel_cc`
+
+Configuration `as:` value: `intel_cc`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `icx`, `icpx` | Intel oneAPI C/C++ | `icx-12` | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) |
+| `icc`, `icpc` | Intel C++ Compiler Classic | `icc-12` | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) |
+| `mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx` | Intel MPI C/C++ wrapper | not recognized | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/mpi-library.html) |
+
+#### `intel_fortran`
+
+Configuration `as:` value: `intel_fortran`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `ifort`, `ifx` | Intel Fortran | `ifort-12` | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html) |
+| `mpiifort`, `mpiifx` | Intel Fortran MPI wrapper | not recognized | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/mpi-library.html) |
+
+#### `mpi`
+
+Configuration `as:` value: `mpi`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `mpifort`, `mpif77`, `mpif90` | MPI compiler wrapper | `mpicc-12` | not recognized | [open-mpi.org](https://www.open-mpi.org/doc/), [mpich.org](https://www.mpich.org/documentation/) |
+
+#### `msvc`
+
+Configuration `as:` value: `msvc`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `cl` | Microsoft Visual C++ | not recognized | not recognized | [learn.microsoft.com](https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options) |
+
+Internal, not user-facing: `c1`, `c1xx`, `c2`. Bear recognizes these only so it can filter them back out; they never produce a database entry.
+
+#### `nasm`
+
+Configuration `as:` value: `nasm`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `nasm`, `yasm` | NASM / YASM assembler | not recognized | not recognized | [nasm.us](https://www.nasm.us/doc/nasmdoc2.html), [github.com](https://github.com/yasm/yasm) |
+
+#### `nvidia_hpc`
+
+Configuration `as:` value: `nvidia_hpc`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `nvc`, `nvc++`, `nvfortran` | NVIDIA HPC SDK | `nvc-12` | not recognized | [docs.nvidia.com](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html) |
+| `pgcc`, `pgc++`, `pgfortran` | PGI (legacy NVIDIA HPC) | `pgcc-12` | not recognized | [docs.nvidia.com](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html) |
+
+#### `qnx`
+
+Configuration `as:` value: `qnx`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `qcc`, `q++` | QNX qcc | not recognized | not recognized | [qnx.com](https://www.qnx.com/developers/docs/) |
+
+#### `swift`
+
+Configuration `as:` value: `swift`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `swiftc` | Swift | not recognized | not recognized | [swift.org](https://www.swift.org/documentation/) |
+
+Internal, not user-facing: `swift-frontend`. Bear recognizes these only so it can filter them back out; they never produce a database entry.
+
+An invocation is also ignored when its arguments include `-frontend`: that is an internal frontend or codegen call, not a user-facing compile.
+
+#### `vala`
+
+Configuration `as:` value: `vala`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `valac` | Vala | `valac-12` | `arm-linux-gnueabihf-valac` | [vala.dev](https://vala.dev/) |
 
 ### Compiler launchers
 
-The four launchers share one kind rather than a compiler family, so any
-of `wrapper`, `ccache`, `distcc`, `icecc`, and `sccache` selects it.
+| Executable name | Recognized as | Configuration `as:` value | Documentation |
+|---|---|---|---|
+| `ccache` | Compiler cache | `ccache` | [ccache.dev](https://ccache.dev/manual/latest.html) |
+| `distcc` | Distributed compiler | `distcc` | [distcc.org](https://www.distcc.org/man/distcc_1.html) |
+| `icecc` | Distributed compiler | `icecc` | [github.com](https://github.com/icecc/icecream/blob/master/README.md) |
+| `sccache` | Compiler cache | `sccache` | [github.com](https://github.com/mozilla/sccache/blob/main/README.md) |
 
-| Executable names | Recognized as |
-|---|---|
-| `ccache` | Compiler cache |
-| `sccache` | Compiler cache |
-| `distcc` | Distributed compiler |
-| `icecc` | Distributed compiler |
+<!-- END GENERATED -->
 
 This list is kept in step with Bear's own compiler definitions, and grows
 by request as users bring toolchains that are not covered yet; it is

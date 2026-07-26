@@ -6,7 +6,7 @@
 # Run from anywhere:
 #     ./scripts/check-docs-site.sh
 #
-# The check has four parts:
+# The check has five parts:
 #   1. `mdbook build` must succeed AND print no WARN or ERROR line.
 #      Warnings are fatal on purpose: mdBook reports preprocessor and
 #      include failures that way, and they would otherwise ship silently.
@@ -34,15 +34,26 @@
 #   4. Every absolute `/Bear/<page>.html` link in 404.md must have a
 #      matching `<page>.md`. That page links absolutely because Pages
 #      serves it for any missing path, so part 2 cannot follow its links.
+#   5. `src/supported-compilers.md` is generated, in part, from
+#      `crates/bear/compilers/*.yaml` by
+#      `scripts/generate-supported-compilers.py`. Regenerate it into a
+#      scratch file and diff against the committed page: any difference
+#      means the YAML changed, or someone hand-edited the generated
+#      block, without re-running the generator. Uses only the local
+#      checkout (no network access) and never writes to the committed
+#      page.
 #
 # mdBook must be on PATH. Install the version pinned in
 # `.github/workflows/pages.yml`, which is the single source of truth for
 # it.
 #
 # Exit codes:
-#   0 - the site builds clean and every link and page checks out
-#   1 - at least one build warning, broken link, or unlisted page
-#   2 - invocation error (mdbook missing, site directory not found)
+#   0 - the site builds clean, every link and page checks out, and the
+#       generated compiler page is up to date
+#   1 - at least one build warning, broken link, unlisted page, or a
+#       stale generated page
+#   2 - invocation error (mdbook or python3 missing, site directory not
+#       found)
 
 set -eu
 
@@ -63,10 +74,16 @@ if ! command -v mdbook >/dev/null 2>&1; then
     exit 2
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 not found on PATH" >&2
+    exit 2
+fi
+
 log="$(mktemp)"
 problems="$(mktemp)"
 toc="$(mktemp)"
-trap 'rm -f "${log}" "${problems}" "${toc}"' EXIT
+scratch="$(mktemp)"
+trap 'rm -f "${log}" "${problems}" "${toc}" "${scratch}"' EXIT
 
 # 1. Build, then treat any WARN or ERROR log line as a failure. mdBook
 #    0.5 prints the level as the first field of the line.
@@ -158,4 +175,21 @@ if [ -s "${problems}" ]; then
     exit 1
 fi
 
-echo "OK: site builds clean, links resolve, every page is in SUMMARY.md"
+# 5. supported-compilers.md must match what the generator produces from
+#    the current compiler YAML right now. Render into a scratch file
+#    (the generator's own template read comes from the committed page,
+#    so this never modifies it) and diff.
+if ! python3 "${script_dir}/generate-supported-compilers.py" "${scratch}" \
+        >"${log}" 2>&1; then
+    cat "${log}" >&2
+    echo "FAILED: generate-supported-compilers.py could not run" >&2
+    exit 1
+fi
+if ! diff -u "${src_dir}/supported-compilers.md" "${scratch}" >"${log}"; then
+    cat "${log}" >&2
+    echo "FAILED: supported-compilers.md is stale" >&2
+    echo "fix: python3 scripts/generate-supported-compilers.py" >&2
+    exit 1
+fi
+
+echo "OK: site builds clean, links resolve, every page is in SUMMARY.md, and supported-compilers.md is up to date"

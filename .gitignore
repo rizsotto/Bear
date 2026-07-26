@@ -14,3 +14,7 @@ site/book/
 
 *~
 *.profraw
+
+# Python bytecode from the docs-site generator scripts
+__pycache__/
+*.pyc
