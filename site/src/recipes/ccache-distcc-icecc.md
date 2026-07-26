@@ -25,14 +25,14 @@ produces this entry in `compile_commands.json`:
 The `ccache` token is gone. `arguments` holds the real compiler invocation,
 `gcc -c main.c -o main.o`, exactly as it appeared after the launcher's own
 name. distcc and icecc are dropped from the recorded command the same
-way. This is what the reader actually needs to know: the database never
-contains an entry whose command is the launcher itself.
+way. The database never contains an entry whose command is the launcher
+itself.
 
 ## What lands in `arguments`
 
 Bear records the real compiler's argv, taken verbatim from whatever
 followed the launcher's name on the command line, not a resolved or
-canonicalized path. Three cases, all run against a debug build:
+canonicalized path:
 
 ```
 bear -- ccache gcc -c main.c -o main.o           # -> "gcc", ...
@@ -40,9 +40,9 @@ bear -- ccache cc -c main.c -o main.o            # -> "cc", ...
 bear -- ccache /usr/bin/gcc -c main.c -o main.o  # -> "/usr/bin/gcc", ...
 ```
 
-Each produced an `arguments` array starting with exactly the token shown
-in the comment. Bear does not chase the name further; if the build wrote
-a bare `cc`, that is what ends up in the database.
+In each case `arguments` starts with exactly the token shown in the
+comment. Bear does not chase the name further; if the build wrote a bare
+`cc`, that is what ends up in the database.
 
 ## The ccache masquerade case
 
@@ -83,8 +83,8 @@ on `PATH`, Bear logs
 resolve: masquerade wrapper at /usr/lib64/ccache/gcc; re-resolving 'gcc' past /usr/lib64/ccache
 ```
 
-and the entry records `/usr/sbin/gcc` (this host's real compiler path),
-never the masquerade symlink and never Bear's own `.bear/` wrapper. See
+and the entry records the real compiler the masquerade pointed at, never
+the masquerade symlink and never Bear's own `.bear/` wrapper. See
 "The recursion hazard" below for why this step exists.
 
 ## distcc specifics
@@ -119,12 +119,12 @@ and recorded, never the masquerade link or Bear's own wrapper. Detection
 is a filesystem check (does the resolved path's target look like a known
 launcher binary), not a subprocess probe, and it only changes what Bear
 resolves, not the build's own child environment: a build that actually
-wants ccache's caching behavior for other invocations still gets it. See
-[Wrapper recursion: why filter Bear's lookup PATH, not the
-alternatives](../../../docs/rationale/wrapper-recursion-ccache-alternatives.md)
-for the full reasoning and the rejected alternatives (setting
-`CCACHE_COMPILER`, `CCACHE_PATH`, or stripping the masquerade directory
-from the child's `PATH`).
+wants ccache's caching behavior for other invocations still gets it.
+Setting `CCACHE_COMPILER` or `CCACHE_PATH`, or stripping the masquerade
+directory from the build's own `PATH`, were all considered and rejected,
+because each changes the build's behaviour rather than only Bear's
+lookup; the reasoning is recorded with the source, under
+`docs/rationale/`.
 
 ## What does not work
 

@@ -93,7 +93,21 @@ find "${src_dir}" -name '*.md' | while read -r page; do
             if [ ! -e "${page_dir}/${target}" ]; then
                 echo "BROKEN LINK: ${page#"${repo_root}"/} -> ${target}" \
                     >>"${problems}"
+                continue
             fi
+            # A link that resolves OUTSIDE src/ exists on disk but not in
+            # the built book: mdBook rewrites it to a sibling .html that
+            # was never rendered, and on the deployed site it escapes the
+            # book root entirely. Repo files must be linked by URL.
+            resolved="$(cd "${page_dir}" && cd "$(dirname "${target}")" \
+                && pwd)/$(basename "${target}")"
+            case "${resolved}" in
+                "${src_dir}"/*) ;;
+                *)
+                    echo "LINK ESCAPES src/: ${page#"${repo_root}"/} -> ${target}" \
+                        >>"${problems}"
+                    ;;
+            esac
         done
 done
 

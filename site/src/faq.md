@@ -22,10 +22,9 @@ covers the remaining causes in order.
 
 A large set of GCC- and Clang-compatible drivers, MSVC, several vendor
 and embedded toolchains, and the common compiler launchers, each
-matched by executable filename. The full, generated list lives on
-[Supported compilers](supported-compilers.md) rather than here, since
-that list is produced from the compiler definitions and would drift if
-copied into two places.
+matched by executable filename. The full list lives on [Supported
+compilers](supported-compilers.md) rather than here, so that there is
+only one copy of it to keep correct.
 
 ## Why does Bear not recognize my compiler?
 

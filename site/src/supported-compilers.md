@@ -177,7 +177,7 @@ of `wrapper`, `ccache`, `distcc`, `icecc`, and `sccache` selects it.
 | `distcc` | Distributed compiler |
 | `icecc` | Distributed compiler |
 
-This list is generated from Bear's own compiler definitions and grows
+This list is kept in step with Bear's own compiler definitions, and grows
 by request as users bring toolchains that are not covered yet; it is
 not a fixed set.
 
