@@ -5,9 +5,9 @@
 What to do when Bear runs but the result is not what you expected: an
 empty or short `compile_commands.json`, entries with the wrong flags, or
 a build that behaves differently under Bear than without it. If the
-database is completely empty, start with [Why is
-`compile_commands.json` empty?](faq.md) in the FAQ; this page collects
-the rest.
+database is completely empty, start with [Bear produces an empty
+`compile_commands.json`](recipes/empty-compilation-database.md), which
+works through the causes one by one; this page collects the rest.
 
 ## Enable debug logging
 

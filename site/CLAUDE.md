@@ -73,7 +73,13 @@ is for users.
    `LD_PRELOAD`.
 4. **Every shell command shown must be verified.** Run it against a
    debug build, or cite the integration test that exercises it. An
-   unverified command does not ship.
+   unverified command does not ship. Verification is a precondition for
+   writing a claim, never a thing the page tells the reader about: no
+   "Verified:", no "tested against", and no note about what could not be
+   checked while writing. State the behaviour as fact, or leave it out.
+   A page that hedges its own commands teaches the reader to distrust
+   all of them. Put the evidence in the commit message or the pull
+   request, where it belongs.
 5. **Wiki-migrated text is a source, not a truth.** Verify each claim
    against current 4.x behaviour before it lands. The wiki carries
    3.x-era statements that are simply wrong now.

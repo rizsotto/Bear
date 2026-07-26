@@ -151,9 +151,18 @@ now have working "go to definition", completion, and diagnostics for
 
 ## Next steps
 
+- [Generate compile_commands.json for a Makefile
+  project](recipes/compile-commands-for-makefile.md) for the real-project
+  version of what you just did: autotools, incremental and parallel
+  builds, recursive Makefiles.
+- [Set up clangd for a project without
+  CMake](recipes/clangd-setup.md) if the editor side needs more than the
+  default lookup.
 - [Recipes](recipes/index.md), the index of task pages for build
   systems and situations beyond a plain Makefile.
-- [Troubleshooting](troubleshooting.md) if a real project's database
-  comes out empty or short.
+- [Bear produces an empty
+  `compile_commands.json`](recipes/empty-compilation-database.md) if a
+  real project's database comes out empty, and
+  [Troubleshooting](troubleshooting.md) if it comes out wrong.
 - [How Bear works](how-it-works.md) for the interception mechanism
   behind this page.

@@ -13,8 +13,10 @@ The most common cause is that the build executed no compiler at all -
 an incremental build with everything already up to date runs nothing,
 and Bear only records commands the build actually executes. Run a clean
 build (`make clean` first, or build into an empty directory). If the
-build did compile and the file is still empty, work through
-[Troubleshooting](troubleshooting.md).
+build did compile and the file is still empty, work through [Bear
+produces an empty
+`compile_commands.json`](recipes/empty-compilation-database.md), which
+covers the remaining causes in order.
 
 ## Which compilers does Bear recognize?
 
