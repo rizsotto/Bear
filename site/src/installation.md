@@ -27,6 +27,11 @@ Then confirm it is on your `PATH`:
 bear --version
 ```
 
+Compare that version against the [latest release][latest-release].
+Distribution packages often lag several releases behind, so a problem
+you hit may already be fixed upstream; build the current release from
+source before reporting a bug.
+
 For the full list of distributions that carry a Bear package, see the
 [Repology page][repology]. Repology tracks the version each distribution
 ships; if yours lags behind, or does not package Bear at all, build it
@@ -59,3 +64,4 @@ or jump straight to a [recipe](recipes/index.md) for your build system.
 
   [repology]: https://repology.org/project/bear-clang/versions
   [install]: https://github.com/rizsotto/Bear/blob/master/INSTALL.md
+  [latest-release]: https://github.com/rizsotto/Bear/releases/latest

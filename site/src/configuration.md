@@ -31,16 +31,57 @@ paths recorded as the build produced them, and no header synthesis.
 Nothing in the configuration file is required; every section below is
 optional, and an empty or absent file is a valid configuration.
 
+## Seeing the effective configuration
+
+Bear resolves the found file (or the built-in defaults, if none is
+found) into one configuration before it runs the build, and logs it as
+YAML when `RUST_LOG` is set to `info` or a more verbose level:
+
+    RUST_LOG=info bear -- true
+
+With no `bear.yml` on the search path, this prints Bear's complete
+built-in defaults:
+
+```yaml
+schema: "4.2"
+intercept:
+  mode: preload
+compilers: []
+sources: {}
+duplicates:
+  match_on:
+  - directory
+  - file
+format:
+  paths:
+    directory: as-is
+    file: as-is
+  entries:
+    use_array_format: true
+    include_output_field: true
+  arguments:
+    from_response_files: false
+    from_environment: true
+headers:
+  enabled: false
+  strategy: siblings
+```
+
+This is the same log line whether the values came from a `bear.yml` or
+from defaults, so it is the way to check what a given file actually
+changed, rather than guessing from the sections below.
+
 ## What each section is for
 
 **intercept** chooses how Bear observes the build: preload (injecting a
 library into the build's processes) or wrapper (substituting compilers
-on `PATH`). Reach for this section when the platform default is wrong
-for your case, for example forcing wrapper mode on Linux to work around
-a statically linked build tool, or forcing preload on a macOS host with
-System Integrity Protection disabled. The trade-offs between the two
-methods, and what each one cannot see, are explained in [How Bear
-works](how-it-works.md); this section only records the choice.
+on `PATH`). The default is preload on Linux and the BSDs, wrapper on
+macOS and Windows. Reach for this section when the platform default is
+wrong for your case, for example forcing wrapper mode on Linux to work
+around a statically linked build tool, or forcing preload on a macOS
+host with System Integrity Protection disabled. The trade-offs between
+the two methods, and what each one cannot see, are explained in [How
+Bear works](how-it-works.md); this section only records the choice.
 
 **compilers** gives Bear hints about specific executables: what
 compiler family a path is (`as`), or that its invocations should be
@@ -51,9 +92,10 @@ how automatic recognition works and when it needs help.
 
 **sources** filters which entries make it into the database by the
 source file's directory or filename, independently of how the compiler
-was invoked. Reach for this section to drop machine-generated code (Qt
-`moc` output, protobuf stubs) or a `tests/` tree you do not want a
-linter to see.
+was invoked. By default no rule is configured, so nothing is filtered
+out. Reach for this section to drop machine-generated code (Qt `moc`
+output, protobuf stubs) or a `tests/` tree you do not want a linter to
+see.
 
 **duplicates** controls which fields two entries must share to count as
 the same compilation, and therefore which one survives when a source is
@@ -67,9 +109,12 @@ configuration.
 left as the build produced them or normalized, whether an entry carries
 the command as an argument array or a shell string, and whether
 environment variables that act as implicit flags (compiler include
-paths, MSVC's `CL`) are folded into the recorded arguments. Reach for
-this section when a specific consumer expects one particular shape, for
-example a tool that only reads the `command` string.
+paths, MSVC's `CL`) are folded into the recorded arguments. By default
+paths are left as-is, entries use the arguments array with the output
+field included, and environment-variable folding is on while
+response-file expansion is off. Reach for this section when a specific
+consumer expects one particular shape, for example a tool that only
+reads the `command` string.
 
 **headers** synthesizes entries for header files by cloning a compiled
 source's flags, since headers are never compiled on their own but

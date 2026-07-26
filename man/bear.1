@@ -270,7 +270,7 @@ All sections are optional; the example below shows every one of them:
 .EX
 schema\f[B]:\f[R] \(dq4.2\(dq
 intercept\f[B]:\f[R]
-  mode\f[B]:\f[R] wrapper
+  mode\f[B]:\f[R] wrapper\f[I]              # default: preload on Linux and the BSDs\f[R]
 compilers\f[B]:\f[R]
   \f[B]\-\f[R] path\f[B]:\f[R] /usr/bin/cc
     as\f[B]:\f[R] gcc
@@ -286,13 +286,13 @@ sources\f[B]:\f[R]
     \f[B]\-\f[R] pattern\f[B]:\f[R] \(dq*.pb.cc\(dq
       action\f[B]:\f[R] exclude
 duplicates\f[B]:\f[R]
-  match_on\f[B]:\f[R]
+  match_on\f[B]:\f[R]\f[I]                  # default: directory, file\f[R]
     \f[B]\-\f[R] file
     \f[B]\-\f[R] arguments
 format\f[B]:\f[R]
   paths\f[B]:\f[R]
-    directory\f[B]:\f[R] canonical
-    file\f[B]:\f[R] canonical
+    directory\f[B]:\f[R] canonical\f[I]     # default: as\-is\f[R]
+    file\f[B]:\f[R] canonical\f[I]          # default: as\-is\f[R]
   entries\f[B]:\f[R]
     use_array_format\f[B]:\f[R] true
     include_output_field\f[B]:\f[R] true
@@ -300,9 +300,13 @@ format\f[B]:\f[R]
     from_response_files\f[B]:\f[R] false
     from_environment\f[B]:\f[R] true
 headers\f[B]:\f[R]
-  enabled\f[B]:\f[R] true
+  enabled\f[B]:\f[R] true\f[I]               # default: false\f[R]
   strategy\f[B]:\f[R] siblings
 .EE
+.PP
+Every value above is illustrative; the non\-default ones are annotated
+inline.
+Each section below states its actual defaults.
 .SS intercept
 Controls the interception method (see DESCRIPTION for the trade\-offs):
 .IP \(bu 2

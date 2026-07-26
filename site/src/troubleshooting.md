@@ -42,26 +42,61 @@ New entries are placed before the existing ones, so a later rebuild's
 entry for a given file takes precedence over the stale one (see the
 `duplicates` section below).
 
-## The output has duplicate entries
+### A file you know is compiled twice shows up once
 
-Duplicates happen when a build compiles the same source file more than
-once - a debug and a release pass, or a file rebuilt with different
-flags. Bear's default duplicate rule keeps one entry per `directory`
-and `file`, regardless of arguments, so the first-seen invocation wins
-and later ones for the same file are dropped. To also keep separate
-entries when only the arguments differ, match on `arguments` too:
+If a project compiles the same source file more than once - once for a
+static library and once for a shared one, for example - and the
+database has only one entry for it, this is not `--append`: it is the
+default duplicate match dropping the second invocation. Building zlib
+1.3.1 shows the effect directly. `./configure && bear -- make` produces
+17 entries, one per source file, even though zlib compiles every one of
+its 17 sources twice in the same directory: once for the static build,
+and once with `-fPIC -DPIC` for the shared one. The two invocations
+recorded for `adler32.c`:
+
+    gcc -O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -c -o adler32.o adler32.c
+    gcc -O3 -fPIC -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -DPIC -c -o objs/adler32.o adler32.c
+
+Bear's default `duplicates.match_on` compares only `directory` and
+`file` (see [Configure Bear](configuration.md)), and both invocations
+share both, so only the first is kept. Add `arguments` to the default
+match, keeping `directory` and `file` in it:
 
 ```yaml
 schema: "4.2"
 duplicates:
   match_on:
+    - directory
     - file
     - arguments
 ```
 
-Two entries are duplicates only when every field listed in `match_on`
-matches. The [`bear(1)` man page][manpage] enumerates the fields the key
-accepts.
+Rebuilding zlib with this configuration produces all 34 entries, two
+per source file. Keep `directory` in the list: a project with a `util.c`
+in two subdirectories, compiled with the same flags in each, would
+otherwise have one of them treated as a duplicate of the other and
+dropped. This is a trade-off, not a strict improvement: one
+entry per file per directory is what most Clang tooling wants, and
+matching on `arguments` too gives you every invocation at the cost of a
+larger database in which clangd (and most other consumers) still picks
+only one entry per file.
+
+## The output has duplicate entries
+
+Two entries are duplicates only when every field listed in
+`duplicates.match_on` matches, and of a set of duplicates Bear keeps the
+first. Which invocation that is depends on how the entries got there:
+within a single run it is the one the build ran first, while across
+`--append` runs it is the newest, because an appended run places its new
+entries ahead of the existing ones. That is why `--append` refreshes a
+stale entry rather than being ignored.
+
+The default match is `directory` and `file`, so one entry survives per
+source file per directory whatever its arguments were. If that is
+dropping invocations you wanted to keep, see [A file you know is
+compiled twice shows up once](#a-file-you-know-is-compiled-twice-shows-up-once)
+above for the fix and its trade-off. The [`bear(1)` man page][manpage]
+enumerates the fields `match_on` accepts.
 
 ## The output has extra entries
 
@@ -176,11 +211,15 @@ mismatch entirely.
 
 ## Getting help
 
-1. Run with `RUST_LOG=debug` and read the output.
-2. Search [existing
+1. Check `bear --version` against the [latest
+   release](https://github.com/rizsotto/Bear/releases/latest);
+   distribution packages are often old, see [Install
+   Bear](installation.md).
+2. Run with `RUST_LOG=debug` and read the output.
+3. Search [existing
    issues](https://github.com/rizsotto/Bear/issues?q=is%3Aissue).
-3. Check the [FAQ](faq.md).
-4. Open a new issue with the debug log and your platform (OS, Bear
+4. Check the [FAQ](faq.md).
+5. Open a new issue with the debug log and your platform (OS, Bear
    version from `bear --version`, and build system).
 
 Related: the [FAQ](faq.md) for the empty-database case, the

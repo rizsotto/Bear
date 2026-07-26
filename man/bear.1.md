@@ -259,7 +259,7 @@ sections are optional; the example below shows every one of them:
 ```yaml
 schema: "4.2"
 intercept:
-  mode: wrapper
+  mode: wrapper              # default: preload on Linux and the BSDs
 compilers:
   - path: /usr/bin/cc
     as: gcc
@@ -275,13 +275,13 @@ sources:
     - pattern: "*.pb.cc"
       action: exclude
 duplicates:
-  match_on:
+  match_on:                  # default: directory, file
     - file
     - arguments
 format:
   paths:
-    directory: canonical
-    file: canonical
+    directory: canonical     # default: as-is
+    file: canonical          # default: as-is
   entries:
     use_array_format: true
     include_output_field: true
@@ -289,9 +289,12 @@ format:
     from_response_files: false
     from_environment: true
 headers:
-  enabled: true
+  enabled: true               # default: false
   strategy: siblings
 ```
+
+Every value above is illustrative; the non-default ones are annotated
+inline. Each section below states its actual defaults.
 
 ## intercept
 
