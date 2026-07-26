@@ -29,3 +29,36 @@ jobs:
         # plugins, mdbook-linkcheck included; dependency minimalism
         # applies to docs tooling too.
         run: ./scripts/check-docs-site.sh
+
+  deploy:
+    name: Deploy Documentation Site
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Install mdBook
+        run: cargo install mdbook --version ${{ env.MDBOOK_VERSION }} --locked
+      - name: Build and link check
+        run: ./scripts/check-docs-site.sh
+      - name: Post-process for search and AI-assistant discovery
+        # Adds sitemap.xml, robots.txt, canonical links, and JSON-LD to
+        # the already-checked build output. See the script header for
+        # why this cannot be done through mdBook's theme/head.hbs.
+        run: ./scripts/postprocess-docs-site.sh
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/book
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -6,7 +6,7 @@
 # Run from anywhere:
 #     ./scripts/check-docs-site.sh
 #
-# The check has three parts:
+# The check has four parts:
 #   1. `mdbook build` must succeed AND print no WARN or ERROR line.
 #      Warnings are fatal on purpose: mdBook reports preprocessor and
 #      include failures that way, and they would otherwise ship silently.
@@ -28,7 +28,12 @@
 #   3. Every page under `site/src/` must be listed in SUMMARY.md. mdBook
 #      ignores files that are not, so such a page would never be served.
 #      A commented-out SUMMARY entry does not count as listed, and a
-#      `./page.md` entry counts the same as `page.md`.
+#      `./page.md` entry counts the same as `page.md`. 404.md is exempt:
+#      mdBook renders it as the not-found page, and listing it would put
+#      it in the navigation.
+#   4. Every absolute `/Bear/<page>.html` link in 404.md must have a
+#      matching `<page>.md`. That page links absolutely because Pages
+#      serves it for any missing path, so part 2 cannot follow its links.
 #
 # mdBook must be on PATH. Install the version pinned in
 # `.github/workflows/pages.yml`, which is the single source of truth for
@@ -107,13 +112,31 @@ sed -e 's/<!--.*-->//g' -e '/<!--/,/-->/d' "${summary}" |
 
 find "${src_dir}" -name '*.md' | while read -r page; do
     relative="${page#"${src_dir}"/}"
-    if [ "${relative}" = "SUMMARY.md" ]; then
+    # SUMMARY.md is the table of contents itself. 404.md is rendered by
+    # mdBook as the not-found page and must NOT be listed, or it would
+    # appear in the navigation as a chapter.
+    if [ "${relative}" = "SUMMARY.md" ] || [ "${relative}" = "404.md" ]; then
         continue
     fi
     if ! grep -qxF "${relative}" "${toc}"; then
         echo "NOT IN SUMMARY.md: ${relative}" >>"${problems}"
     fi
 done
+
+# 4. The not-found page links with absolute `/Bear/...` URLs, because it
+#    is served for any missing path and relative links would resolve
+#    against that path. Part 2 cannot check those, so check them here:
+#    every `/Bear/<path>.html` must have a `<path>.md` under src/.
+if [ -f "${src_dir}/404.md" ]; then
+    grep -oE '\(/Bear/[^)]*\.html\)' "${src_dir}/404.md" 2>/dev/null |
+        sed -E 's|^\(/Bear/||; s|\.html\)$||' |
+        while read -r target; do
+            if [ ! -e "${src_dir}/${target}.md" ]; then
+                echo "BROKEN 404 LINK: /Bear/${target}.html has no ${target}.md" \
+                    >>"${problems}"
+            fi
+        done
+fi
 
 if [ -s "${problems}" ]; then
     cat "${problems}" >&2

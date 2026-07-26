@@ -5,8 +5,8 @@ This directory is Bear's user-facing documentation site: an
 GitHub Pages at `https://rizsotto.github.io/Bear/`. It is the canonical
 user documentation and it replaces the project wiki, whose pages are
 being reduced to one-line pointers here. CI checks the build on every
-push from the start; the deploy job is added once the content is ready,
-and it runs from `master` only.
+push and pull request; the deploy job runs from `master` only, so
+nothing goes live from a topic branch.
 
 This file is the complete set of rules for writing pages here. You do
 not need to read any other document to use it.
@@ -18,6 +18,7 @@ not need to read any other document to use it.
 | `book.toml` | Book configuration. Title "Bear"; `site-url = "/Bear/"`. |
 | `src/SUMMARY.md` | The table of contents. Every page must be listed. |
 | `src/*.md` | Top-level pages. |
+| `src/404.md` | The not-found page. Deliberately NOT in `SUMMARY.md`: mdBook renders it specially, and listing it would put it in the navigation. Its links are absolute (`/Bear/...`) because GitHub Pages serves it for any missing path, including deep ones, and relative links would resolve against that path. Keep them in step with `site-url` in `book.toml`. |
 | `src/recipes/` | Task pages plus `index.md`, the recipe index. |
 | `src/platforms/` | One page per operating system. |
 | `book/` | Build output. Generated, git-ignored, never edited. |
@@ -119,10 +120,10 @@ rather than enumerating flags; flag enumeration stays in the man page.
 An FAQ answer that grows into a task with commands moves to its own
 recipe.
 
-Two pages are navigation rather than content: `src/index.md` (the home
-page) and `src/recipes/index.md`. They are the only files allowed to
-declare `<!-- Diataxis type: landing (navigation page, not one of the
-four types) -->`. Do not add a third.
+Three pages are navigation rather than content: `src/index.md` (the home
+page), `src/recipes/index.md`, and `src/404.md`. They are the only files
+allowed to declare `<!-- Diataxis type: landing (navigation page, not one
+of the four types) -->`. Do not add a fourth.
 
 ## Navigation is organized by task, not by type
 
@@ -142,7 +143,7 @@ Before committing any change under `site/`, run:
 ./scripts/check-docs-site.sh
 ```
 
-It must print `OK` and exit 0. The check has three parts:
+It must print `OK` and exit 0. The check has four parts:
 
 1. `mdbook build site` must succeed and print no `WARN` or `ERROR` log
    line. Warnings are fatal on purpose: mdBook reports preprocessor and
@@ -162,7 +163,11 @@ It must print `OK` and exit 0. The check has three parts:
    example.
 3. Every page under `src/` must be listed in `SUMMARY.md`. mdBook
    silently ignores files that are not listed, so such a page would
-   never be served. Commenting an entry out does not count as listing
+   never be served. `404.md` is the one exception, for the reason in the
+   table above.
+4. Every absolute `/Bear/<page>.html` link in `404.md` must have a
+   matching `<page>.md`. Part 2 only follows `.md` targets, so without
+   this the not-found page could ship a dead link. Commenting an entry out does not count as listing
    it, and `(./page.md)` counts the same as `(page.md)`.
 
 `.github/workflows/pages.yml` runs the same script on every push and
