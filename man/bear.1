@@ -63,15 +63,15 @@ See its limitations under COMMANDS.
 .SS Interception methods
 Interception itself has two methods, selectable in the configuration
 file.
-\f[B]Preload\f[R] (the default on Linux and macOS) injects a small
+\f[B]Preload\f[R] (the default on Linux and the BSDs) injects a small
 library into every process the build starts and observes its
 \f[CR]exec()\f[R] calls.
-\f[B]Wrapper\f[R] substitutes the known compilers with a reporting
-wrapper executable.
+\f[B]Wrapper\f[R] (the default on macOS and Windows) substitutes the
+known compilers with a reporting wrapper executable.
 Preload is transparent to the build but cannot observe statically linked
-executables, and macOS System Integrity Protection blocks it for
-Apple\-signed binaries (such as Xcode\(cqs compilers); Bear falls back
-to the wrapper for those.
+executables, and it is unavailable on Windows and on macOS while System
+Integrity Protection is enabled; forcing it there is a startup error
+that names wrapper mode, not a silent fallback.
 Wrapper mode works on every platform, but the build has to pick the
 wrapper up: a \(lqconfigure\(rq step that discovers compilers must
 itself run under Bear (see TROUBLESHOOTING).
@@ -306,8 +306,8 @@ headers\f[B]:\f[R]
 .SS intercept
 Controls the interception method (see DESCRIPTION for the trade\-offs):
 .IP \(bu 2
-\f[B]mode\f[R]: \f[CR]preload\f[R] (default; Linux and macOS) or
-\f[CR]wrapper\f[R] (cross\-platform).
+\f[B]mode\f[R]: \f[CR]preload\f[R] (default on Linux and the BSDs) or
+\f[CR]wrapper\f[R] (default on macOS and Windows; works everywhere).
 .SS compilers
 Hints for compiler recognition.
 Bear recognizes GCC\- and Clang\-compatible drivers (including

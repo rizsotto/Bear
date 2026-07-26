@@ -64,13 +64,14 @@ limitations under COMMANDS.
 ## Interception methods
 
 Interception itself has two methods, selectable in the configuration
-file. **Preload** (the default on Linux and macOS) injects a small
+file. **Preload** (the default on Linux and the BSDs) injects a small
 library into every process the build starts and observes its `exec()`
-calls. **Wrapper** substitutes the known compilers with a reporting
-wrapper executable. Preload is transparent to the build but cannot
-observe statically linked executables, and macOS System Integrity
-Protection blocks it for Apple-signed binaries (such as Xcode's
-compilers); Bear falls back to the wrapper for those. Wrapper mode
+calls. **Wrapper** (the default on macOS and Windows) substitutes the
+known compilers with a reporting wrapper executable. Preload is
+transparent to the build but cannot observe statically linked
+executables, and it is unavailable on Windows and on macOS while
+System Integrity Protection is enabled; forcing it there is a startup
+error that names wrapper mode, not a silent fallback. Wrapper mode
 works on every platform, but the build has to pick the wrapper up: a
 "configure" step that discovers compilers must itself run under Bear
 (see TROUBLESHOOTING).
@@ -296,8 +297,8 @@ headers:
 
 Controls the interception method (see DESCRIPTION for the trade-offs):
 
-- **mode**: `preload` (default; Linux and macOS) or `wrapper`
-(cross-platform).
+- **mode**: `preload` (default on Linux and the BSDs) or `wrapper`
+(default on macOS and Windows; works everywhere).
 
 ## compilers
 
