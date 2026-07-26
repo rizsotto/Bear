@@ -155,9 +155,10 @@ compilers:
 
 With this override, `my-ccache gcc -c main.c -o main.o` records the same
 single entry, compiler `gcc`, as a plain `ccache` invocation would.
-`as` also accepts `distcc`, `icecc`, and `sccache` for the equivalent
-case with those tools; the accepted values are listed in the `bear(1)`
-man page's CONFIGURATION section. The full recognized name table (which
+`as` accepts each of these launchers' own names for the equivalent case
+with those tools, and `wrapper` as the generic spelling for any of them;
+[Supported compilers](../supported-compilers.md) lists them, generated
+from Bear's own definitions. The full recognized name table (which
 executables count as `gcc`, `clang`, and so on for the compiler a
 launcher wraps) lives on [Supported
 compilers](../supported-compilers.md); this page does not repeat it.

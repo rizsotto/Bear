@@ -72,11 +72,10 @@ same way, outside Bear. Only `make` runs under Bear. Preload
 interception, the default on Linux, watches every process the build
 spawns, so it does not matter that `configure` ran unsupervised earlier:
 Bear only needs to be watching for the commands it must record, and
-those are the compiler invocations `make` issues. See [Generate
-compile_commands.json for a Makefile
-project](recipes/compile-commands-for-makefile.md) for the wrapper-mode
-case, where the configure step does need to run under Bear, and for why
-combining `configure` and `make` into one Bear invocation is a mistake.
+those are the compiler invocations `make` issues. "Build it again, in
+wrapper mode" below builds this same project a second time under the
+other interception method, where the configure step does need to run
+under Bear.
 
 ## Look at the result
 
@@ -186,14 +185,64 @@ clangd pulled the same flags straight out of `compile_commands.json`,
 directory and all. See [Set up clangd for a project without
 CMake](recipes/clangd-setup.md) for the editor side of this hand-off.
 
+## Build it again, in wrapper mode
+
+Preload interception, used above, watches every process the build
+spawns, so it never mattered that `./configure` ran outside Bear: the
+commands Bear needed to see were `make`'s. Wrapper mode works
+differently: it puts wrapper executables on `PATH` in place of the real
+compilers, so a step that discovers and records the compiler has to see
+the wrapper while it does so, or the build later invokes the real
+compiler directly and Bear observes nothing. For libtasn1, that step is
+`./configure`. See [How Bear works](how-it-works.md) for the mechanism
+behind both interception methods.
+
+That makes this project's `configure` step the one place on this site
+where running under Bear is required, not just harmless. Write a
+`bear.yml` next to the source tree:
+
+```yaml
+schema: "4.2"
+intercept:
+  mode: wrapper
+```
+
+Bear finds `bear.yml` in the current working directory on its own, so no
+flag is needed; naming it explicitly with `--config bear.yml` works the
+same way. This same file selects wrapper mode as the interception method
+on every platform, including Linux and the BSDs, where preload is
+otherwise the default. [Configure Bear](configuration.md) covers the
+rest of the file's keys and the other places Bear looks for it.
+
+From a clean tree, run `configure` and `make` as two separate Bear
+invocations, in order:
+
+```sh
+make distclean
+bear --config bear.yml -- ./configure
+bear --config bear.yml -- make
+```
+
+The first command writes a database of its own: six entries, all of them
+`configure`'s own throwaway compiler probes (`conftest.c` and similar,
+plus a libtool probe under a temporary directory), not libtasn1's
+sources. The second command writes the same 34 entries, across the same
+six directories, as the preload build above, with no `conftest` entry
+among them. Bear overwrites the output file on every run by default, so
+the second command's database simply replaces the first's; the probes
+are not merged in and do not need to be filtered out. Do not add
+`--append` to either command here, since that flag places new entries
+alongside the old ones instead of replacing them, which would let the
+probes survive into the final database.
+
 ## Next steps
 
 - [Generate compile_commands.json for a Makefile
   project](recipes/compile-commands-for-makefile.md) for the autotools
-  variations this page skipped: wrapper mode, the `conftest.c` probe
-  caveat, incremental and parallel builds.
+  variations this page skipped: the general `conftest.c` probe caveat,
+  incremental and parallel builds.
 - [Recover compile_commands.json from a build
   log](compile-commands-from-a-build-log.md) if you cannot run the build
   yourself, only read its log.
 - [How Bear works](how-it-works.md) for the interception mechanism
-  behind both builds on this page.
+  behind every build on this page.

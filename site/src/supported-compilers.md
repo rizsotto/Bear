@@ -79,18 +79,13 @@ An `as` value is a family identifier, not a display name: it is the
 short, lower-case id given as each family's "Configuration `as:` value"
 below, spelled verbatim. There are no aliases, so `as: gcc` is accepted while
 `as: GCC` is not, and several families share one id (`icx` and `icc`
-are both `intel_cc`). The complete accepted set is
-
-    armclang, cray_cc, ibm_xl, intel_cc, clang, clang_cl, cuda, flang,
-    mpi, qnx, cray_fortran, fasm, gcc, intel_fortran, msvc, nasm,
-    nvidia_hpc, swift, vala
-
-plus the compiler-launcher spellings `wrapper`, `ccache`, `distcc`,
-`icecc`, and `sccache`, which all select the one launcher kind. An
-unaccepted value is rejected when the configuration loads, with an
-error listing every value that would have worked. `bear semantic
---print-compilers` prints the same mapping for the version you have
-installed.
+are both `intel_cc`). The accepted ids are the ones in the family tables
+below, which are generated from the compiler definitions, plus `wrapper`
+for a compiler launcher. This page does not repeat them here as a list:
+the tables are the copy that cannot drift. An unaccepted value is
+rejected when the configuration loads, with an error listing every value
+that would have worked, and `bear semantic --print-compilers` prints the
+same mapping for the version you have installed.
 
 ## Recognized families
 
@@ -99,8 +94,8 @@ Bear can filter them back out: they are never user-facing invocations
 and never produce a database entry. The tables below label each one as
 internal, separately from the family's real, user-facing names.
 
-The four compiler launchers share one kind rather than a compiler
-family, so any of `wrapper`, `ccache`, `distcc`, `icecc`, and `sccache`
+The compiler launchers share one kind rather than a compiler family, so
+`wrapper`, or any launcher's own name from the launcher table below,
 selects it.
 
 <!-- BEGIN GENERATED: scripts/generate-supported-compilers.py -- DO NOT EDIT. Edits inside this block are lost the next time the script runs. -->

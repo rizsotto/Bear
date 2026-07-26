@@ -96,12 +96,12 @@ sources that use them; reach for `dependency-files` when they do not, or
 when `siblings`'s approximate flags are visibly wrong, and the build
 already produces `.d` files.
 
-Bear's own synthesis is not the only way to reach this problem: the
-separate tool [`compdb`](https://github.com/Sarcasm/compdb)
-post-processes an existing `compile_commands.json` to add header entries
-rather than producing them while the build runs. It is a reasonable
-alternative when you already have a database from some other source and
-only need headers added to it.
+A third strategy is conceivable: post-process an existing compilation
+database and determine, for each translation unit, which header files it
+actually used. That would be more accurate than cloning a neighbor's
+flags, and would not require the build to have emitted dependency files.
+Bear does not implement this strategy yet; external tools exist that do
+this kind of post-processing.
 
 Related: [Bear produces an empty
 compile_commands.json](empty-compilation-database.md) for a database

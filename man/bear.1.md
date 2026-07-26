@@ -253,8 +253,9 @@ consequences).
 # CONFIGURATION
 
 Bear reads a YAML configuration file, found by search (see FILES) or
-named with `--config`. Without one, built-in defaults apply. All
-sections are optional; the example below shows every one of them:
+named with `--config`. Without one, built-in defaults apply. A file that
+is written at all must name `schema`; every section below it is
+optional. The example below shows every section:
 
 ```yaml
 schema: "4.2"
@@ -325,10 +326,14 @@ never appear as an entry's `file`.
 Use this section when a compiler at a given path is not recognized, or
 is recognized wrongly:
 
-- **path**: Path of the compiler executable.
-- **as**: Compiler type hint for semantic analysis. The accepted values
-are the `as` names shown by `bear semantic --print-compilers`.
+- **path**: Path of the compiler executable. Required.
+- **as**: Compiler type hint for semantic analysis. Optional; when
+omitted, Bear guesses the family from the executable's filename and
+falls back to `gcc` when nothing matches. The accepted values are the
+`as` names shown by `bear semantic --print-compilers`, plus `wrapper`
+for a compiler launcher.
 - **ignore**: Exclude this executable's invocations from the database.
+Optional, default `false`.
 
 The generic names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` are
 classified by probing the executable's `--version` output, since the

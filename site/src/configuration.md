@@ -53,11 +53,22 @@ compilers:
 
 Default: `[]` (no overrides; every compiler is recognized automatically).
 
-- **`compilers.path`**: Path of the compiler executable.
-- **`compilers.as`**: Compiler type hint. The accepted values are the
-  `as` names shown by `bear semantic --print-compilers`.
+- **`compilers.path`**: Path of the compiler executable. Required. A
+  `path` on its own, with no other key, is already enough to make an
+  otherwise unrecognized executable be treated as a compiler.
+- **`compilers.as`**: Compiler type hint. Optional. The accepted values
+  are the family ids listed on [Supported
+  compilers](supported-compilers.md), which is generated from Bear's own
+  compiler definitions, plus `wrapper` for a compiler launcher (see [Use
+  Bear with ccache, distcc, or icecc](recipes/ccache-distcc-icecc.md)).
+  `bear semantic --print-compilers` prints the same set for the version
+  you have installed. When `as` is omitted, Bear guesses the family from the executable's filename
+  using its normal recognition patterns, falling back to `gcc` when no
+  pattern matches; an MSVC-style or otherwise unusual compiler whose
+  name matches nothing is then parsed with GCC's flag rules unless `as`
+  is set explicitly.
 - **`compilers.ignore`**: Exclude this executable's invocations from the
-  database. Default: `false`.
+  database. Optional. Default: `false`.
 
 ## sources
 

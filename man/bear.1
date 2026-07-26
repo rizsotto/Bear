@@ -265,7 +265,9 @@ clangd consequences).
 Bear reads a YAML configuration file, found by search (see FILES) or
 named with \f[CR]\-\-config\f[R].
 Without one, built\-in defaults apply.
-All sections are optional; the example below shows every one of them:
+A file that is written at all must name \f[CR]schema\f[R]; every section
+below it is optional.
+The example below shows every section:
 .IP
 .EX
 schema\f[B]:\f[R] \(dq4.2\(dq
@@ -338,13 +340,18 @@ Use this section when a compiler at a given path is not recognized, or
 is recognized wrongly:
 .IP \(bu 2
 \f[B]path\f[R]: Path of the compiler executable.
+Required.
 .IP \(bu 2
 \f[B]as\f[R]: Compiler type hint for semantic analysis.
+Optional; when omitted, Bear guesses the family from the executable\(cqs
+filename and falls back to \f[CR]gcc\f[R] when nothing matches.
 The accepted values are the \f[CR]as\f[R] names shown by
-\f[CR]bear semantic \-\-print\-compilers\f[R].
+\f[CR]bear semantic \-\-print\-compilers\f[R], plus \f[CR]wrapper\f[R]
+for a compiler launcher.
 .IP \(bu 2
 \f[B]ignore\f[R]: Exclude this executable\(cqs invocations from the
 database.
+Optional, default \f[CR]false\f[R].
 .PP
 The generic names \f[CR]cc\f[R], \f[CR]c++\f[R], and the HPE Cray PrgEnv
 wrapper \f[CR]CC\f[R] are classified by probing the executable\(cqs
