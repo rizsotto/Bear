@@ -46,7 +46,12 @@ The four documentation types of [Diataxis](https://diataxis.fr/)
 authoring discipline: every source page declares exactly one type in an
 HTML comment at the top and stays inside it. They are rejected as a
 navigation scheme: the table of contents is organized by what a reader
-is trying to do, not by document type.
+is trying to do, not by document type. One exception is deliberate. The
+tutorials sit under a "Tutorials" heading, because that is the one type
+name a reader applies to themselves rather than to a document: someone
+new to the tool is looking for a tutorial and knows it. "How-to guides",
+"Reference", and "Explanation" are labels for authors, and the sections
+they would create are shelved by task instead.
 
 ## Consequences
 
@@ -79,15 +84,16 @@ Rejected alternatives:
 - **In-repo Markdown only, no site.** Free, and it does put the text
   under review, but `github.com/robots.txt` disallows `/*/tree/`, so it
   cannot be found by search at all.
-- **Diataxis as the navigation scheme**, that is, `SUMMARY.md` sections
-  named "Tutorials", "How-to guides", "Reference", "Explanation". It
-  puts authoring jargon in front of readers who came looking for one
-  answer; several sections would hold a single page; and it dilutes the
-  query-shaped chapter names, because mdBook renders a page title as
-  "<chapter name> - <book title>", which makes the chapter name the
-  title element that search engines read. The visible-taxonomy form of
-  Diataxis is aimed at estates far larger than this one. The discipline
-  is kept, the shelving is not.
+- **Diataxis as the full navigation scheme**, that is, `SUMMARY.md`
+  sections named "Tutorials", "How-to guides", "Reference",
+  "Explanation". Three of those four put authoring jargon in front of
+  readers who came looking for one answer, and some would hold a single
+  page. It also dilutes the query-shaped chapter names, because mdBook
+  renders a page title as "<chapter name> - <book title>", which makes
+  the chapter name the title element that search engines read. The
+  visible-taxonomy form of Diataxis is aimed at estates far larger than
+  this one. The discipline is kept, and of the shelving only the
+  "Tutorials" heading, for the reason given under Decision.
 
 ## References
 

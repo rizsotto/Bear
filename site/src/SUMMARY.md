@@ -2,9 +2,16 @@
 
 [Generate compile_commands.json for any C or C++ build](index.md)
 
-- [Getting started with Bear](getting-started.md)
-- [Recover compile_commands.json from a build log](compile-commands-from-a-build-log.md)
 - [Install Bear](installation.md)
+
+# Tutorials
+
+- [Getting started with Bear](getting-started.md)
+- [Build an autotools project under Bear](autotools-tutorial.md)
+- [Recover compile_commands.json from a build log](compile-commands-from-a-build-log.md)
+
+# Guides
+
 - [Configure Bear](configuration.md)
 - [Recipes](recipes/index.md)
   - [Generate compile_commands.json for a Makefile project](recipes/compile-commands-for-makefile.md)
