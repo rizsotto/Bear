@@ -599,19 +599,22 @@ Diagnostics:
 
 ## Getting help
 
-Consult the project wiki for known problems and search existing issues
-before opening a new report. Follow the bug report template, and always
-include the `RUST_LOG=debug` output.
+Consult the documentation site for known problems and search existing
+issues before opening a new report. Follow the bug report template, and
+always include the `RUST_LOG=debug` output.
 
 
 # SEE ALSO
 
 **clangd**(1), **clang-tidy**(1), **make**(1)
 
+Documentation site, with task pages for build systems, platforms, and
+toolchains: <https://rizsotto.github.io/Bear/>
+
 The Clang JSON Compilation Database specification:
 <https://clang.llvm.org/docs/JSONCompilationDatabase.html>
 
-Project homepage, wiki, and issue tracker:
+Project homepage and issue tracker:
 <https://github.com/rizsotto/Bear>
 
 # COPYRIGHT

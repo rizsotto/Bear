@@ -14,6 +14,9 @@ with `bear --` and it produces the `compile_commands.json` file that
 Clang tooling (clangd, clang-tidy, and friends) needs to understand your
 code.
 
+**[Documentation][DOCS]** - task pages for build systems, platforms, and
+toolchains.
+
 The [JSON compilation database][JSONCDB] describes how each translation unit
 is compiled. Bear captures the compiler invocations while your build runs
 and writes the database for you - no changes to your build system required.
@@ -66,8 +69,9 @@ dry-run output - Bear can reconstruct the database from that text instead:
 
     make -n | bear parse-sh
 
-For more, run `bear --help` or read the man pages. The project [wiki][WIKI]
-talks about limitations, known issues, and platform-specific usage.
+For more, run `bear --help` or read the man page. The
+[documentation site][DOCS] covers limitations, known issues, and
+platform- and toolchain-specific usage.
 
 Limitations
 -----------
@@ -77,8 +81,8 @@ and Windows.
 
 Each operating system and build system imposes constraints on how Bear can
 run and which interception method is available, and those affect the final
-output. The documentation describes the available options and each option's
-limitations.
+output. The [documentation site][DOCS] describes the available options and
+each option's limitations.
 
 Acknowledgments
 ---------------
@@ -106,7 +110,7 @@ request.
 Please follow the [contribution guide][GUIDE] when you do.
 
   [ISSUES]: https://github.com/rizsotto/Bear/issues
-  [WIKI]: https://github.com/rizsotto/Bear/wiki
+  [DOCS]: https://rizsotto.github.io/Bear/
   [CHAT]: https://gitter.im/rizsotto/Bear/discussions
   [GUIDE]: https://github.com/rizsotto/Bear/blob/master/CONTRIBUTING.md
   [REPOLOGY]: https://repology.org/project/bear-clang/versions
