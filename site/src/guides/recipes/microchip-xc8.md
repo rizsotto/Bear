@@ -34,6 +34,6 @@ page builds on.
 
 - [Generate compile_commands.json when cross-compiling](cross-compilation.md)
   for how cross-prefixed GCC names are recognized in general.
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table and the `compilers:` override.
 - [Recipes](index.md) for the rest of the task pages.

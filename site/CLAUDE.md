@@ -17,11 +17,20 @@ not need to read any other document to use it.
 |---|---|
 | `book.toml` | Book configuration. Title "Bear"; `site-url = "/Bear/"`. |
 | `src/SUMMARY.md` | The table of contents. Every page must be listed. |
-| `src/*.md` | Top-level pages. |
-| `src/404.md` | The not-found page. Deliberately NOT in `SUMMARY.md`: mdBook renders it specially, and listing it would put it in the navigation. Its links are absolute (`/Bear/...`) because GitHub Pages serves it for any missing path, including deep ones, and relative links would resolve against that path. Keep them in step with `site-url` in `book.toml`. |
-| `src/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/bear/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
-| `src/recipes/` | Task pages plus `index.md`, the recipe index. |
+| `src/index.md`, `src/installation.md` | The only pages at the root: the home page, and installing, which sits above the sections. |
+| `src/404.md` | The not-found page. Deliberately NOT in `SUMMARY.md`: mdBook renders it specially, and listing it would put it in the navigation. Its links are absolute (`/Bear/...`) because GitHub Pages serves it for any missing path, including deep ones, and relative links would resolve against that path. Keep them in step with `site-url` in `book.toml`, and with the directories below. |
+| `src/tutorials/` | The tutorial pages. |
+| `src/guides/` | `troubleshooting.md`, plus `recipes/` below it. |
+| `src/guides/recipes/` | Task pages plus `index.md`, the recipe index. |
+| `src/reference/` | `configuration.md` and `supported-compilers.md`. |
+| `src/reference/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/bear/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
+| `src/understanding/` | The explanation pages. |
 | `src/platforms/` | One page per operating system. |
+
+The directory layout mirrors the `SUMMARY.md` sections, so a page's
+folder tells you which section it belongs to and therefore which Diataxis
+type it must declare. A new page goes in the folder for its type; moving
+a page between sections means moving its file too.
 | `book/` | Build output. Generated, git-ignored, never edited. |
 
 The site does not overlap with `docs/`, which holds requirements
@@ -103,6 +112,30 @@ is for users.
    mechanism; it links to `how-it-works.md`. An explanation page carries
    no commands to copy; it links to the recipe. This rule is what keeps
    rule 3 honest.
+
+## Code-block tags
+
+mdBook 0.5.4's bundled highlight.js resolves a fence's tag to a specific
+grammar, so the tag is a functional choice, not decoration. Three cases:
+
+1. **Commands with no output shown** are tagged ```` ```sh ````. It is the
+   Bash grammar: it highlights quoted strings, variables, comments, and
+   builtins, and it carries no `$` prompt, so the block stays copyable as
+   a unit. This is the common case: one or more commands the reader runs,
+   nothing else.
+2. **A command together with the output it produced** is a transcript,
+   not something to copy-paste, so it becomes a SINGLE fence tagged
+   ```` ```shell ````, the "Shell Session" grammar. Its only rule
+   highlights a leading `$`, `#`, `>`, or `%` prompt, so prefix every
+   command line with `$ ` and leave the output lines that follow it
+   unprefixed. Do not use `shell` on a block with no prompt in it.
+3. **Output alone, or a file's contents, with no command** stays a bare
+   fence: a JSON entry, a log excerpt, an error message shown as a
+   symptom. No language means no highlighting, which is correct here
+   since there is nothing to highlight.
+
+`yaml`, `json`, `dockerfile`, and similar are unaffected by this; they
+name their own grammar already.
 
 ## The page-type map
 

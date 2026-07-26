@@ -26,7 +26,7 @@ kept in `arguments` verbatim:
 ]
 ```
 
-See [Supported compilers](../supported-compilers.md) for the full
+See [Supported compilers](../../reference/supported-compilers.md) for the full
 recognized-name table and how prefix/suffix recognition works in general.
 
 ## clangd and clang-tidy do not speak the same nvcc dialect
@@ -93,7 +93,7 @@ runs from its own temporary directory.
 
 ## Related pages
 
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table and the `compilers:` override for a path Bear
   gets wrong.
 - [Generate compile_commands.json for a Makefile

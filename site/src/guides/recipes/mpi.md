@@ -96,6 +96,6 @@ without the `=`), are recognized as driver options that take a value, so
   `intel_cc`/`intel_fortran` families the Intel MPI wrappers reuse.
 - [Use Bear with ccache, distcc, or icecc](ccache-distcc-icecc.md) for
   the launcher case this page contrasts with.
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table.
 - [Recipes](index.md) for the rest of the task pages.

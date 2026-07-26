@@ -28,7 +28,7 @@ similar, one per target architecture). These are recognized too, but as
 name ending in `-gcc`, and QNX's target names happen to fit that shape.
 A Makefile that calls one of these directly, rather than through `qcc`,
 still gets an entry, parsed with GCC's own flag rules rather than QNX's.
-See [Supported compilers](../supported-compilers.md) for the full name
+See [Supported compilers](../../reference/supported-compilers.md) for the full name
 table and how prefix and suffix recognition work in general.
 
 ## The `-V` variant selector
@@ -54,7 +54,7 @@ general recursion behavior this relies on.
 
 ## Related pages
 
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table and the `compilers:` override for a path Bear
   gets wrong.
 - [Generate compile_commands.json for a Makefile

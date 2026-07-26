@@ -2,7 +2,9 @@
 
 # Bear on BSD
 
-    bear -- make
+```sh
+bear -- make
+```
 
 Bear runs on FreeBSD, OpenBSD, NetBSD, and DragonFly BSD, with the same
 interception methods as Linux and the same default, preload. What
@@ -32,14 +34,16 @@ compilers:
 
 FreeBSD ships Bear as a package:
 
-    pkg install bear
+```sh
+pkg install bear
+```
 
 On OpenBSD, NetBSD, and DragonFly BSD, build from source with `cargo
 build --release` and `./scripts/install.sh` as described in
 [`INSTALL.md`](https://github.com/rizsotto/Bear/blob/master/INSTALL.md);
 check your ports/pkgsrc tree for a Bear package before doing so.
 
-Related: [how Bear works](../how-it-works.md) for the preload
-mechanism, [Troubleshooting](../troubleshooting.md) for output that
-comes out wrong, and the [Recipes](../recipes/index.md) index for other
+Related: [how Bear works](../understanding/how-it-works.md) for the preload
+mechanism, [Troubleshooting](../guides/troubleshooting.md) for output that
+comes out wrong, and the [Recipes](../guides/recipes/index.md) index for other
 tasks.

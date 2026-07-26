@@ -5,7 +5,7 @@
 In the common case Bear needs no configuration for a launcher in front of
 a compiler. Run the build exactly as you already do, launcher and all:
 
-```
+```sh
 bear -- ccache gcc -c main.c -o main.o
 ```
 
@@ -34,7 +34,7 @@ Bear records the real compiler's argv, taken verbatim from whatever
 followed the launcher's name on the command line, not a resolved or
 canonicalized path:
 
-```
+```sh
 bear -- ccache gcc -c main.c -o main.o           # -> "gcc", ...
 bear -- ccache cc -c main.c -o main.o            # -> "cc", ...
 bear -- ccache /usr/bin/gcc -c main.c -o main.o  # -> "/usr/bin/gcc", ...
@@ -53,7 +53,7 @@ different from the case above: there is no launcher token for Bear to
 drop, because the build's command line never named one. On a host where
 `/usr/lib64/ccache/cc` is a symlink to `ccache`:
 
-```
+```sh
 bear -- cc -c main.c -o main.o
 ```
 
@@ -62,7 +62,7 @@ symlink and not rewritten to `gcc`. Bear classifies the ambiguous `cc`
 name by probing `--version` (ccache passes that probe through to the real
 compiler), so the entry parses with the right flag family, but the
 recorded name stays what the build actually ran. This matches the
-contract in [Supported compilers](../supported-compilers.md) for
+contract in [Supported compilers](../../reference/supported-compilers.md) for
 ambiguous names.
 
 ## Preload mode versus wrapper mode
@@ -157,13 +157,13 @@ With this override, `my-ccache gcc -c main.c -o main.o` records the same
 single entry, compiler `gcc`, as a plain `ccache` invocation would.
 `as` accepts each of these launchers' own names for the equivalent case
 with those tools, and `wrapper` as the generic spelling for any of them;
-[Supported compilers](../supported-compilers.md) lists them, generated
+[Supported compilers](../../reference/supported-compilers.md) lists them, generated
 from Bear's own definitions. The full recognized name table (which
 executables count as `gcc`, `clang`, and so on for the compiler a
 launcher wraps) lives on [Supported
-compilers](../supported-compilers.md); this page does not repeat it.
+compilers](../../reference/supported-compilers.md); this page does not repeat it.
 
-Related: [Supported compilers](../supported-compilers.md) for the
+Related: [Supported compilers](../../reference/supported-compilers.md) for the
 recognized launcher and compiler names, [Troubleshooting](../troubleshooting.md)
 for a database that comes out wrong, and the [Recipes](index.md) index
 for other tasks.

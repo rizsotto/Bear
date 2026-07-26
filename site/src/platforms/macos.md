@@ -2,7 +2,9 @@
 
 # Bear on macOS
 
-    bear -- make
+```sh
+bear -- make
+```
 
 Wrapper interception is the default on macOS: Bear puts wrapper
 executables ahead of the real compilers on `PATH`, so the build has to
@@ -51,9 +53,11 @@ compilers:
 
 Bear itself is also available through Homebrew:
 
-    brew install bear
+```sh
+brew install bear
+```
 
-Related: [how Bear works](../how-it-works.md) for the preload/wrapper
-mechanism, [Troubleshooting](../troubleshooting.md) for output that
-comes out wrong, and the [Recipes](../recipes/index.md) index for other
+Related: [how Bear works](../understanding/how-it-works.md) for the preload/wrapper
+mechanism, [Troubleshooting](../guides/troubleshooting.md) for output that
+comes out wrong, and the [Recipes](../guides/recipes/index.md) index for other
 tasks.

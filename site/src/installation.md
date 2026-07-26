@@ -59,8 +59,8 @@ intercepts a build:
 ## Next steps
 
 Once `bear --version` works, follow
-[Getting started with Bear](getting-started.md) for the first real run,
-or jump straight to a [recipe](recipes/index.md) for your build system.
+[Getting started with Bear](tutorials/getting-started.md) for the first real run,
+or jump straight to a [recipe](guides/recipes/index.md) for your build system.
 
   [repology]: https://repology.org/project/bear-clang/versions
   [install]: https://github.com/rizsotto/Bear/blob/master/INSTALL.md

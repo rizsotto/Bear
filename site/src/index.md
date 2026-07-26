@@ -35,20 +35,20 @@ If your project uses CMake or Meson, those tools can export a
 compilation database directly, and Bazel has it through Hedron's
 [bazel-compile-commands-extractor][hedron]. Use that when it is
 available; [Generate compile_commands.json for a CMake
-project](recipes/cmake.md) covers those exports and the cases where they
+project](guides/recipes/cmake.md) covers those exports and the cases where they
 are not enough.
 
   [hedron]: https://github.com/hedronvision/bazel-compile-commands-extractor
 
 ## Where to go next
 
-- [Getting started with Bear](getting-started.md) - the first successful
+- [Getting started with Bear](tutorials/getting-started.md) - the first successful
   run, start to finish.
 - [Install Bear](installation.md) - packages and building from source.
-- [Recipes](recipes/index.md) - one page per task.
-- [Troubleshooting](troubleshooting.md) - when the database is empty or
+- [Recipes](guides/recipes/index.md) - one page per task.
+- [Troubleshooting](guides/troubleshooting.md) - when the database is empty or
   incomplete.
-- [How Bear works](how-it-works.md) - the mechanism behind the results.
+- [How Bear works](understanding/how-it-works.md) - the mechanism behind the results.
 
 The complete reference for command-line options, configuration keys, and
 their defaults is the [`bear(1)` man page][manpage], not this site.

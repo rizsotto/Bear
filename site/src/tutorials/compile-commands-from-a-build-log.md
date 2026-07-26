@@ -43,11 +43,8 @@ would have announced anyway.
 
 ## Turn the log into a database
 
-```sh
-bear parse-sh -i build.log
-```
-
-```
+```shell
+$ bear parse-sh -i build.log
 bear: warning: line 4: skipped (command substitution)
 bear: warning: line 5: skipped (command substitution)
 bear: warning: parse-sh: 40 command(s) parsed, 2 line(s) skipped
@@ -64,11 +61,8 @@ The run still exits 0, because most of the log did parse.
 `compile_commands.json` now holds one entry per source file `make`
 would have compiled:
 
-```sh
-grep -c '"file"' compile_commands.json
-```
-
-```
+```shell
+$ grep -c '"file"' compile_commands.json
 34
 ```
 
@@ -106,15 +100,12 @@ produce: someone hands you `build.log` from a build that ran elsewhere,
 or ran an hour ago on a machine that is gone now. Copy it somewhere
 that has never seen the Lua checkout, and parse it from there:
 
-```sh
-mkdir ~/handed-a-log
-cp lua-5.4.8/build.log ~/handed-a-log/
-cd ~/handed-a-log
-bear parse-sh -i build.log
-grep -m1 '"directory"' compile_commands.json
-```
-
-```
+```shell
+$ mkdir ~/handed-a-log
+$ cp lua-5.4.8/build.log ~/handed-a-log/
+$ cd ~/handed-a-log
+$ bear parse-sh -i build.log
+$ grep -m1 '"directory"' compile_commands.json
     "directory": "/home/you/lua-5.4.8/src",
 ```
 
@@ -125,7 +116,7 @@ you happen to run it; that is what makes a saved log portable. Capture
 with `-nw` as a habit: it costs nothing and guarantees the log names
 its own build root, including for a Makefile whose top level compiles
 directly instead of only delegating, which the
-[Makefile recipe](recipes/compile-commands-for-makefile.md) covers in
+[Makefile recipe](../guides/recipes/compile-commands-for-makefile.md) covers in
 more detail.
 
 ## Limits of reconstructing from text
@@ -170,7 +161,7 @@ than intercepting a real build, in specific, permanent ways:
 
 Prefer `bear -- make` (see [Getting started with
 Bear](getting-started.md) and the [Makefile
-recipe](recipes/compile-commands-for-makefile.md)) whenever you can
+recipe](../guides/recipes/compile-commands-for-makefile.md)) whenever you can
 actually run the build: it observes the real `exec()` calls, so it
 cannot miss a command or resolve a compiler name wrong. Reach for
 `parse-sh` only when running the build again is not an option.
@@ -180,10 +171,10 @@ cannot miss a command or resolve a compiler name wrong. Reach for
 - [Getting started with Bear](getting-started.md) for the tutorial that
   builds a project under Bear directly, instead of from a log.
 - [Generate compile_commands.json for a Makefile
-  project](recipes/compile-commands-for-makefile.md) for recursive
+  project](../guides/recipes/compile-commands-for-makefile.md) for recursive
   builds, incremental builds, and the rest of the Make-specific detail.
-- [Bear produces an empty compile_commands.json](recipes/empty-compilation-database.md)
+- [Bear produces an empty compile_commands.json](../guides/recipes/empty-compilation-database.md)
   if a database, from either path, comes out shorter than expected.
-- [Recipes](recipes/index.md) for the rest of the task pages.
+- [Recipes](../guides/recipes/index.md) for the rest of the task pages.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

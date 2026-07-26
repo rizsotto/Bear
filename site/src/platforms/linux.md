@@ -2,13 +2,15 @@
 
 # Bear on Linux, WSL2, and Docker
 
-    bear -- make -j$(nproc)
+```sh
+bear -- make -j$(nproc)
+```
 
 On Linux, Bear intercepts the build by preloading a small library
 (`libexec.so`) into every process the build starts; this preload method
 is the default there, and it is transparent to the build - no wrapper
 directory, no `PATH` changes. See [how Bear
-works](../how-it-works.md) for the mechanism, and force wrapper mode
+works](../understanding/how-it-works.md) for the mechanism, and force wrapper mode
 instead with `intercept.mode: wrapper` in the configuration file (see
 the [`bear(1)` man
 page](https://github.com/rizsotto/Bear/blob/master/man/bear.1.md)) if
@@ -32,7 +34,9 @@ setting:
 
 Then restart WSL2 for the change to take effect:
 
-    wsl --shutdown
+```sh
+wsl --shutdown
+```
 
 ## Docker
 
@@ -50,7 +54,9 @@ RUN bear -- make -j4
 
 or against an already-running container:
 
-    docker exec my-container sh -c "bear -- make -j4"
+```sh
+docker exec my-container sh -c "bear -- make -j4"
+```
 
 ## Installing the preload library to a non-standard lib directory
 
@@ -66,9 +72,9 @@ INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
 
 A mismatch here is the usual cause of an `ld.so` error naming
 `libexec.so` at startup; see
-[Troubleshooting](../troubleshooting.md) for that error and for the
+[Troubleshooting](../guides/troubleshooting.md) for that error and for the
 related glibc-version mismatch seen in cross-compilation.
 
-Related: [Troubleshooting](../troubleshooting.md) for output that comes
-out wrong, and the [Recipes](../recipes/index.md) index for other
+Related: [Troubleshooting](../guides/troubleshooting.md) for output that comes
+out wrong, and the [Recipes](../guides/recipes/index.md) index for other
 tasks.

@@ -23,7 +23,7 @@ as a separate "emscripten" id: Emscripten's driver is a wrapper around
 Clang, and its command line follows Clang's flag syntax closely enough
 that Bear parses it with Clang's own rules. There is no `emscripten` `as`
 value to write in a `compilers:` override; use `clang` if a nonstandard
-path needs a hint. See [Supported compilers](../supported-compilers.md)
+path needs a hint. See [Supported compilers](../../reference/supported-compilers.md)
 for the full recognized-name table.
 
 ## CMake projects: emcmake
@@ -70,7 +70,7 @@ getting the database itself into a place clangd finds it.
 
 ## Related pages
 
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table and the `compilers:` override for a path Bear
   gets wrong.
 - [Generate compile_commands.json for a Makefile

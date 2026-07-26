@@ -41,7 +41,7 @@ gets recorded when a build calls one of these wrappers instead of the
 driver directly.
 
 The full recognized-name table, including every other vendor built on
-GCC or Clang, is on [Supported compilers](../supported-compilers.md);
+GCC or Clang, is on [Supported compilers](../../reference/supported-compilers.md);
 this page only calls out the Intel-specific mappings.
 
 ## If a driver is not recognized
@@ -66,9 +66,9 @@ page][manpage] for the full key.
 
 - [Generate compile_commands.json for an MPI project](mpi.md) for the
   Intel MPI wrappers specifically.
-- [Supported compilers](../supported-compilers.md) for the complete
+- [Supported compilers](../../reference/supported-compilers.md) for the complete
   recognized-name table and the ambiguous-name rules.
-- [Configure Bear](../configuration.md) for the `compilers:` section.
+- [Configure Bear](../../reference/configuration.md) for the `compilers:` section.
 - [Recipes](index.md) for the rest of the task pages.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

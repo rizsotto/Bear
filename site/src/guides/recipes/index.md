@@ -46,7 +46,7 @@ the command that answers it.
 - [Generate compile_commands.json for an MPI project](mpi.md) - the
   `mpicc`-style wrappers.
 
-Related pages: [Getting started with Bear](../getting-started.md) for
+Related pages: [Getting started with Bear](../../tutorials/getting-started.md) for
 the first run, [Troubleshooting](../troubleshooting.md) for a database
-that came out wrong, and [How Bear works](../how-it-works.md) for the
+that came out wrong, and [How Bear works](../../understanding/how-it-works.md) for the
 mechanism.

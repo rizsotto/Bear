@@ -13,16 +13,16 @@ entries. Combined mode runs both in one process; `bear intercept` and
 and `bear parse-sh` replaces capture entirely by reconstructing events
 from text instead of running anything. This page explains the
 mechanism; for the commands themselves see [Getting started with
-Bear](getting-started.md) and the [Recipes](recipes/index.md).
+Bear](../tutorials/getting-started.md) and the [Recipes](../guides/recipes/index.md).
 
 ## Two ways to capture a real build
 
 Interception observes the build as it runs. Bear has two mechanisms for
 it, and uses exactly one per invocation, chosen before the build starts.
 Which one is the default on your system is on its platform page -
-[Linux](platforms/linux.md), [macOS](platforms/macos.md),
-[Windows](platforms/windows.md), [BSD](platforms/bsd.md) - and
-[Configure Bear](configuration.md) explains how to force the other one.
+[Linux](../platforms/linux.md), [macOS](../platforms/macos.md),
+[Windows](../platforms/windows.md), [BSD](../platforms/bsd.md) - and
+[Configure Bear](../reference/configuration.md) explains how to force the other one.
 
 **Preload** injects a small shared library into every process the build
 starts, using the dynamic linker's library-preloading facility
@@ -99,7 +99,7 @@ same. Each event's executable name is checked against Bear's compiler
 definitions, including cross-compiler prefixes, version suffixes, and
 compiler launchers such as ccache and distcc that carry the real
 compiler in their own arguments; see [Supported
-compilers](supported-compilers.md) for how that recognition works. An
+compilers](../reference/supported-compilers.md) for how that recognition works. An
 event that names no recognized compiler produces nothing.
 
 A recognized invocation is then turned into zero, one, or several
@@ -124,7 +124,7 @@ requests: dropping generated sources by directory or filename,
 collapsing duplicate entries, resolving or leaving paths as they are,
 choosing between an arguments array and a command string, and
 optionally synthesizing entries for header files. [Configure
-Bear](configuration.md) explains each of these.
+Bear](../reference/configuration.md) explains each of these.
 
 ## Output
 
@@ -133,9 +133,9 @@ The result is written as a JSON array of entries conforming to the
 specification][jsoncdb], the format clangd, clang-tidy, and similar
 tools read to know how each source file is compiled.
 
-See also: [Getting started with Bear](getting-started.md) for the
-first run, the [Recipes](recipes/index.md) for specific tasks, and
-[Troubleshooting](troubleshooting.md) for a database that came out
+See also: [Getting started with Bear](../tutorials/getting-started.md) for the
+first run, the [Recipes](../guides/recipes/index.md) for specific tasks, and
+[Troubleshooting](../guides/troubleshooting.md) for a database that came out
 empty or wrong.
 
   [jsoncdb]: https://clang.llvm.org/docs/JSONCompilationDatabase.html

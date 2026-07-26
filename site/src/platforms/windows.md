@@ -2,7 +2,9 @@
 
 # Bear on Windows
 
-    bear -- make
+```sh
+bear -- make
+```
 
 Wrapper interception is the default on Windows, and the only method
 available there: Bear puts wrapper executables ahead of the real
@@ -30,14 +32,14 @@ Copying the built executables into a `bin` directory by hand does not
 work: `bear-driver` finds `bear-wrapper` at a fixed path relative to
 itself, so the layout the script creates is load-bearing.
 
-```bash
+```sh
 DESTDIR="$pkgdir" PREFIX="$MINGW_PREFIX" ./scripts/install.sh
 ```
 
 Only `bear-driver` and `bear-wrapper` are installed in this
 configuration; there is no preload library to package.
 
-Related: [how Bear works](../how-it-works.md) for the wrapper
-mechanism, [Troubleshooting](../troubleshooting.md) for output that
-comes out wrong, and the [Recipes](../recipes/index.md) index for other
+Related: [how Bear works](../understanding/how-it-works.md) for the wrapper
+mechanism, [Troubleshooting](../guides/troubleshooting.md) for output that
+comes out wrong, and the [Recipes](../guides/recipes/index.md) index for other
 tasks.

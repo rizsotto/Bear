@@ -7,7 +7,7 @@ build with everything already up to date runs no compiler at all, and
 Bear only records commands the build actually executes. Rebuild from
 clean:
 
-```
+```sh
 make clean
 bear -- make
 ```
@@ -32,7 +32,7 @@ make: Nothing to be done for 'all'.
 
 **Fix**: clean first, or build into an empty directory:
 
-```
+```sh
 make clean
 bear -- make
 ```
@@ -51,10 +51,10 @@ that table produces no entry, even though the compiler ran and built
 your code successfully.
 
 **Confirm**: check whether your compiler's name is one Bear knows, on
-[Supported compilers](../supported-compilers.md), or ask the installed
+[Supported compilers](../../reference/supported-compilers.md), or ask the installed
 build directly:
 
-```
+```sh
 bear semantic --print-compilers
 ```
 
@@ -76,7 +76,7 @@ A Makefile rule invoking `./my-totally-custom-cc`, itself a plain copy
 of `gcc`, produces `[]` on its own, and a working entry once the hint
 above names its path. The
 accepted `as:` values are listed on [Supported
-compilers](../supported-compilers.md#as-and-ignore-hints).
+compilers](../../reference/supported-compilers.md#as-and-ignore-hints).
 
 ## Preload interception is blocked or unavailable
 
@@ -84,7 +84,7 @@ Bear has two interception methods, chosen once per invocation: preload
 (the default on Linux and the BSDs) injects a library into every process
 the build starts; wrapper (the default on macOS and Windows) substitutes
 the known compilers on `PATH` instead. See [How Bear
-works](../how-it-works.md) for the mechanism. A few situations keep
+works](../../understanding/how-it-works.md) for the mechanism. A few situations keep
 preload from seeing a compilation at all:
 
 **A statically linked build tool.** Preload works by hooking library
@@ -95,7 +95,7 @@ fundamental limit of the approach, not a bug.
 
 Confirm with:
 
-```
+```sh
 file "$(command -v your-build-tool)"
 ```
 
@@ -115,7 +115,7 @@ intercept:
 preload environment variable from protected executables before it can
 take effect, so preload cannot run there; it is wrapper mode's reason
 for being the macOS default in the first place. See [Bear on
-macOS](../platforms/macos.md) for the detail. Forcing preload mode
+macOS](../../platforms/macos.md) for the detail. Forcing preload mode
 where it is unavailable (SIP-protected macOS, or Windows, which has no
 preload library at all) is a startup error naming wrapper mode as the
 alternative - Bear does not silently fall back, and the build does not
@@ -150,7 +150,7 @@ from before the build ran under Bear.
 **Fix**: run the configure step under Bear too, discarding its output,
 then run the real build under Bear:
 
-```
+```sh
 bear --config bear.yml -- ./configure
 bear --config bear.yml -- make
 ```
@@ -213,7 +213,7 @@ syntax.
 
 Before anything else, re-run with logging turned on:
 
-```
+```sh
 RUST_LOG=info bear -- <build command>
 ```
 
@@ -250,11 +250,11 @@ exactly which invocation Bear saw and how it classified it. Without
 
 Related: [Troubleshooting](../troubleshooting.md) for a database that
 is short or wrong rather than empty, [Supported
-compilers](../supported-compilers.md) for the recognized names,
-[Frequently asked questions](../faq.md), [How Bear
-works](../how-it-works.md) for the interception and analysis mechanism,
+compilers](../../reference/supported-compilers.md) for the recognized names,
+[Frequently asked questions](../../understanding/faq.md), [How Bear
+works](../../understanding/how-it-works.md) for the interception and analysis mechanism,
 the [Recipes](index.md) index, and the platform notes for
-[Linux](../platforms/linux.md), [macOS](../platforms/macos.md),
-[Windows](../platforms/windows.md), and [BSD](../platforms/bsd.md).
+[Linux](../../platforms/linux.md), [macOS](../../platforms/macos.md),
+[Windows](../../platforms/windows.md), and [BSD](../../platforms/bsd.md).
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

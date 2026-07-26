@@ -14,7 +14,9 @@ works through the causes one by one; this page collects the rest.
 Before investigating anything else, re-run the build with debug
 logging on standard error:
 
-    RUST_LOG=debug bear -- <build command>
+```sh
+RUST_LOG=debug bear -- <build command>
+```
 
 Without `RUST_LOG` set, Bear prints only warnings and errors in a short
 `bear: message` form. Setting it to `debug` (or `info`/`warn`/`error`
@@ -33,7 +35,7 @@ cause is `--append`: each Bear run overwrites the output by default, so
 building incrementally without it discards the previous run's entries.
 Accumulate results across runs instead:
 
-```
+```sh
 bear --append -- make module_a
 bear --append -- make module_b
 ```
@@ -54,11 +56,13 @@ its 17 sources twice in the same directory: once for the static build,
 and once with `-fPIC -DPIC` for the shared one. The two invocations
 recorded for `adler32.c`:
 
-    gcc -O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -c -o adler32.o adler32.c
-    gcc -O3 -fPIC -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -DPIC -c -o objs/adler32.o adler32.c
+```
+gcc -O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -c -o adler32.o adler32.c
+gcc -O3 -fPIC -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -DPIC -c -o objs/adler32.o adler32.c
+```
 
 Bear's default `duplicates.match_on` compares only `directory` and
-`file` (see [Configure Bear](configuration.md)), and both invocations
+`file` (see [Configure Bear](../reference/configuration.md)), and both invocations
 share both, so only the first is kept. Add `arguments` to the default
 match, keeping `directory` and `file` in it:
 
@@ -107,7 +111,7 @@ invocations, including ones for files that no longer exist. Drop
 `--append` and rebuild from clean to get a database with only the
 current build's entries:
 
-```
+```sh
 make clean
 bear -- make -j4
 ```
@@ -123,7 +127,7 @@ configure phase's throwaway compiles (`conftest.c` and friends) in the
 same output as the real build. Split the two, so the build run's output
 is the one that survives:
 
-```
+```sh
 bear -- ./configure
 make clean
 bear -- make -j4
@@ -167,7 +171,7 @@ This means the dynamic linker could not find or load `libexec.so` at
 the path `bear-driver` expects, relative to its own location
 (`../$INTERCEPT_LIBDIR/libexec.so`, `lib` by default). Check that Bear
 was built and installed with the same `INTERCEPT_LIBDIR` value; see
-[Bear on Linux](platforms/linux.md) for the build/install commands.
+[Bear on Linux](../platforms/linux.md) for the build/install commands.
 
 ### glibc version errors in cross-compilation
 
@@ -214,18 +218,18 @@ mismatch entirely.
 1. Check `bear --version` against the [latest
    release](https://github.com/rizsotto/Bear/releases/latest);
    distribution packages are often old, see [Install
-   Bear](installation.md).
+   Bear](../installation.md).
 2. Run with `RUST_LOG=debug` and read the output.
 3. Search [existing
    issues](https://github.com/rizsotto/Bear/issues?q=is%3Aissue).
-4. Check the [FAQ](faq.md).
+4. Check the [FAQ](../understanding/faq.md).
 5. Open a new issue with the debug log and your platform (OS, Bear
    version from `bear --version`, and build system).
 
-Related: the [FAQ](faq.md) for the empty-database case, the
+Related: the [FAQ](../understanding/faq.md) for the empty-database case, the
 [Recipes](recipes/index.md) index for task-shaped pages, and the
-platform notes for [Linux](platforms/linux.md),
-[macOS](platforms/macos.md), [Windows](platforms/windows.md), and
-[BSD](platforms/bsd.md).
+platform notes for [Linux](../platforms/linux.md),
+[macOS](../platforms/macos.md), [Windows](../platforms/windows.md), and
+[BSD](../platforms/bsd.md).
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

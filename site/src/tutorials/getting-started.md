@@ -10,7 +10,7 @@ lint job would.
 ## Install Bear
 
 Install Bear with your platform's package manager; see
-[Install Bear](installation.md) for the commands. Then confirm it is on
+[Install Bear](../installation.md) for the commands. Then confirm it is on
 your `PATH`:
 
 ```sh
@@ -31,11 +31,8 @@ cd lua-5.4.8
 `lua.org`'s ftp directory does not change existing releases, so this
 download always matches this checksum:
 
-```sh
-sha256sum lua-5.4.8.tar.gz
-```
-
-```
+```shell
+$ sha256sum lua-5.4.8.tar.gz
 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae  lua-5.4.8.tar.gz
 ```
 
@@ -90,7 +87,7 @@ source and none for the headers Lua's sources include, such as
 `lapi.h`, because Bear only records commands the build actually ran,
 and the build never invokes the compiler on a header directly. For what
 Bear does and does not capture, and why, see
-[How Bear works](how-it-works.md).
+[How Bear works](../understanding/how-it-works.md).
 
 ## Use the database: clangd
 
@@ -98,18 +95,15 @@ Bear does and does not capture, and why, see
 read by people. Point clangd at one Lua source file and it logs the
 exact command it pulled from the database:
 
-```sh
-clangd --check=src/lapi.c
-```
-
-```
+```shell
+$ clangd --check=src/lapi.c
 I[...] Compile command from CDB is: [/home/you/lua-5.4.8/src] /usr/bin/gcc -std=gnu99 -O2 -Wall -Wextra -DLUA_COMPAT_5_3 -DLUA_USE_LINUX -c -o lapi.o -resource-dir=... -- /home/you/lua-5.4.8/src/lapi.c
 ```
 
 That is the whole hand-off: an editor with clangd support opened on
 this directory gets working "go to definition", completion, and
 diagnostics with no other setup. See [Set up clangd for a project
-without CMake](recipes/clangd-setup.md) for the editor side.
+without CMake](../guides/recipes/clangd-setup.md) for the editor side.
 
 ## Use the database: clang-tidy
 
@@ -117,11 +111,8 @@ clang-tidy reads the same file to know how to parse each source it
 lints. Run it against one Lua source file, restricted to a single check
 so the output stays short:
 
-```sh
-clang-tidy -p . -checks='-*,clang-analyzer-deadcode.DeadStores' src/lfunc.c
-```
-
-```
+```shell
+$ clang-tidy -p . -checks='-*,clang-analyzer-deadcode.DeadStores' src/lfunc.c
 1 warning generated.
 lfunc.c:196:42: warning: Although the value stored to 'upl' is used in the enclosing expression, the value is never actually read from 'upl' [clang-analyzer-deadcode.DeadStores]
   196 |   while ((uv = L->openupval) != NULL && (upl = uplevel(uv)) >= level) {
@@ -136,18 +127,18 @@ refactoring tools, takes it from there.
 ## Next steps
 
 - [Generate compile_commands.json for a Makefile
-  project](recipes/compile-commands-for-makefile.md) for variations on
+  project](../guides/recipes/compile-commands-for-makefile.md) for variations on
   what you just did: autotools, incremental and parallel builds,
   recursive Makefiles.
 - [Set up clangd for a project without
-  CMake](recipes/clangd-setup.md) if the editor side needs more than the
+  CMake](../guides/recipes/clangd-setup.md) if the editor side needs more than the
   default lookup.
 - [Recover compile_commands.json from a build
   log](compile-commands-from-a-build-log.md) if you cannot run the build
   yourself, only read its log.
 - [Bear produces an empty
-  `compile_commands.json`](recipes/empty-compilation-database.md) if a
+  `compile_commands.json`](../guides/recipes/empty-compilation-database.md) if a
   real project's database comes out empty, and
-  [Troubleshooting](troubleshooting.md) if it comes out wrong.
-- [How Bear works](how-it-works.md) for the interception mechanism
+  [Troubleshooting](../guides/troubleshooting.md) if it comes out wrong.
+- [How Bear works](../understanding/how-it-works.md) for the interception mechanism
   behind this page.

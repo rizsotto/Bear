@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generate the enumerated tables on site/src/supported-compilers.md from
+# Generate the enumerated tables on site/src/reference/supported-compilers.md
 # crates/bear/compilers/*.yaml, the actual source of truth for compiler
 # recognition. Those YAML files already drive `bear semantic
 # --print-compilers` and the codegen recognition table; this script keeps
@@ -10,7 +10,7 @@
 #     python3 scripts/generate-supported-compilers.py
 #
 # Only the region between the BEGIN/END markers in
-# site/src/supported-compilers.md is replaced; everything outside it (the
+# site/src/reference/supported-compilers.md is replaced; everything outside it
 # page's hand-written explanatory prose) is read from the current file
 # and carried through unchanged. An optional argument overrides the
 # output path (used by scripts/check-docs-site.sh to render into a
@@ -262,7 +262,7 @@ def render_generated_block(compilers: list[dict], wrappers: list[dict]) -> str:
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     compilers_dir = repo_root / "crates" / "bear" / "compilers"
-    template_path = repo_root / "site" / "src" / "supported-compilers.md"
+    template_path = repo_root / "site" / "src" / "reference" / "supported-compilers.md"
 
     if not compilers_dir.is_dir():
         print(f"error: no compilers directory at {compilers_dir}", file=sys.stderr)

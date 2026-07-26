@@ -2,7 +2,7 @@
 
 # Set up clangd for a project without CMake
 
-```
+```sh
 bear -- make
 ```
 
@@ -37,7 +37,7 @@ Two situations fall outside that search:
 Pass `--compile-commands-dir` on clangd's own command line (consult your
 editor's clangd-integration settings for where to add this):
 
-```
+```sh
 clangd --compile-commands-dir=/path/to/build
 ```
 
@@ -63,15 +63,11 @@ database for a file under `src/`.
 
 ## Confirming clangd actually loaded it
 
-Ask clangd to parse a single file outside of your editor:
+Ask clangd to parse a single file outside of your editor, and look at
+the lines it logs while loading:
 
-```
-clangd --check=path/to/file.c
-```
-
-Look at the lines it logs while loading:
-
-```
+```shell
+$ clangd --check=path/to/file.c
 Loaded compilation database from /path/to/build/compile_commands.json
 Compile command from CDB is: [...] /usr/bin/cc -o main ...
 ```

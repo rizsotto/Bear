@@ -62,6 +62,6 @@ once it exists.
 - [Generate compile_commands.json when cross-compiling](cross-compilation.md)
   for cross-prefix recognition and the preload/wrapper trade-off.
 - [Set up clangd for a project without CMake](clangd-setup.md).
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table.
 - [Recipes](index.md) for the rest of the task pages.

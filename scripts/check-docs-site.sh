@@ -34,7 +34,7 @@
 #   4. Every absolute `/Bear/<page>.html` link in 404.md must have a
 #      matching `<page>.md`. That page links absolutely because Pages
 #      serves it for any missing path, so part 2 cannot follow its links.
-#   5. `src/supported-compilers.md` is generated, in part, from
+#   5. `src/reference/supported-compilers.md` is generated, in part, from
 #      `crates/bear/compilers/*.yaml` by
 #      `scripts/generate-supported-compilers.py`. Regenerate it into a
 #      scratch file and diff against the committed page: any difference
@@ -42,7 +42,7 @@
 #      block, without re-running the generator. Uses only the local
 #      checkout (no network access) and never writes to the committed
 #      page.
-#   6. `site/src/configuration.md` must not name a configuration key
+#   6. `site/src/reference/configuration.md` must not name a config key
 #      that `man/bear.1.md` does not also mention. `man/bear.1.md` is
 #      the owner of configuration keys and defaults (see
 #      `site/CLAUDE.md`), so configuration.md is reference content that
@@ -203,7 +203,7 @@ if [ -s "${problems}" ]; then
     exit 1
 fi
 
-# 5. supported-compilers.md must match what the generator produces from
+# 5. reference/supported-compilers.md must match the generator's output from
 #    the current compiler YAML right now. Render into a scratch file
 #    (the generator's own template read comes from the committed page,
 #    so this never modifies it) and diff.
@@ -213,14 +213,14 @@ if ! python3 "${script_dir}/generate-supported-compilers.py" "${scratch}" \
     echo "FAILED: generate-supported-compilers.py could not run" >&2
     exit 1
 fi
-if ! diff -u "${src_dir}/supported-compilers.md" "${scratch}" >"${log}"; then
+if ! diff -u "${src_dir}/reference/supported-compilers.md" "${scratch}" >"${log}"; then
     cat "${log}" >&2
     echo "FAILED: supported-compilers.md is stale" >&2
     echo "fix: python3 scripts/generate-supported-compilers.py" >&2
     exit 1
 fi
 
-# 6. configuration.md must not name a configuration key that
+# 6. reference/configuration.md must not name a configuration key that
 #    man/bear.1.md never mentions. man/bear.1.md owns configuration keys
 #    and defaults (see site/CLAUDE.md), so configuration.md necessarily
 #    overlaps it; this is the drift check for that overlap, standing in
@@ -235,7 +235,7 @@ fi
 #    headers keys are written there under their own section heading,
 #    undotted). See the header comment for what this rule does and does
 #    not cover.
-config_page="${src_dir}/configuration.md"
+config_page="${src_dir}/reference/configuration.md"
 man_page="${repo_root}/man/bear.1.md"
 if [ -f "${config_page}" ]; then
     if [ ! -f "${man_page}" ]; then

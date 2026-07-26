@@ -32,9 +32,9 @@ Two ways forward:
 - Or file an issue against the project. A toolchain no `as:` value fits
   is a gap in Bear's compiler definitions rather than a configuration
   problem; see [Supported
-  compilers](../supported-compilers.md#what-is-not-recognized).
+  compilers](../../reference/supported-compilers.md#what-is-not-recognized).
 
-See [Supported compilers](../supported-compilers.md#as-and-ignore-hints)
+See [Supported compilers](../../reference/supported-compilers.md#as-and-ignore-hints)
 for the full `as`/`ignore` explanation and the complete list of accepted
 `as` values, and the `compilers` section of the [`bear(1)` man
 page][manpage] for the configuration key itself.
@@ -46,7 +46,7 @@ page][manpage] for the configuration key itself.
 - [Generate compile_commands.json for an STM32 or arm-none-eabi
   project](embedded-arm.md) for the other Arm bare-metal toolchains Bear
   recognizes.
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table.
 - [Recipes](index.md) for the rest of the task pages.
 

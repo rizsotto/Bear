@@ -27,7 +27,7 @@ name's own flag rules, so the recorded entry looks exactly like it would
 for the plain name. Arm Compiler 6 (`armclang`, `armclang++`) is
 recognized with a version suffix but not a target prefix. This support
 varies by family; it is not a blanket rule applied to every entry in [Supported
-compilers](../supported-compilers.md), which is the source of truth for
+compilers](../../reference/supported-compilers.md), which is the source of truth for
 the full name table - this page only covers the prefix/suffix behavior
 that cross builds rely on.
 
@@ -69,8 +69,8 @@ intercept:
 
 Wrapper mode needs the build to discover the wrapper as the compiler, so
 a "configure" step that detects compilers on its own has to run under
-Bear too; see [Configure Bear](../configuration.md) for how to set the
-mode and [How Bear works](../how-it-works.md#two-ways-to-capture-a-real-build)
+Bear too; see [Configure Bear](../../reference/configuration.md) for how to set the
+mode and [How Bear works](../../understanding/how-it-works.md#two-ways-to-capture-a-real-build)
 for what each method can and cannot reach.
 
 ## Related pages
@@ -80,7 +80,7 @@ for what each method can and cannot reach.
 - [Use Bear with Texas Instruments compilers](ti-compilers.md) and [Use
   Bear with Microchip XC8](microchip-xc8.md) for two specific vendor
   toolchains.
-- [Supported compilers](../supported-compilers.md) for the full name
+- [Supported compilers](../../reference/supported-compilers.md) for the full name
   table and the `compilers:` override.
 - [Generate compile_commands.json for a Makefile project](compile-commands-for-makefile.md)
   for the general Make workflow this page builds on.

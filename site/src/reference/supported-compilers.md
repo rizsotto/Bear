@@ -313,7 +313,7 @@ a gap in Bear's compiler definitions, not a configuration problem: it
 is worth filing as an issue against the project.
 
 See also: [Configure Bear](configuration.md) for the `compilers:`
-section in full, and [How Bear works](how-it-works.md) for where
+section in full, and [How Bear works](../understanding/how-it-works.md) for where
 recognition fits between interception and writing the database.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

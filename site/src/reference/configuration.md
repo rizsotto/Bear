@@ -60,7 +60,7 @@ Default: `[]` (no overrides; every compiler is recognized automatically).
   are the family ids listed on [Supported
   compilers](supported-compilers.md), which is generated from Bear's own
   compiler definitions, plus `wrapper` for a compiler launcher (see [Use
-  Bear with ccache, distcc, or icecc](recipes/ccache-distcc-icecc.md)).
+  Bear with ccache, distcc, or icecc](../guides/recipes/ccache-distcc-icecc.md)).
   `bear semantic --print-compilers` prints the same set for the version
   you have installed. When `as` is omitted, Bear guesses the family from the executable's filename
   using its normal recognition patterns, falling back to `gcc` when no
@@ -158,17 +158,19 @@ headers:
 Bear logs its fully resolved configuration as YAML whenever `RUST_LOG`
 is set to `info` or a more verbose level:
 
-    RUST_LOG=info bear -- true
+```sh
+RUST_LOG=info bear -- true
+```
 
 This is the same line whether the values came from a `bear.yml` or from
 built-in defaults, so it is the way to check what a given file actually
 changed on this machine, rather than working it out from the sections
 above.
 
-See also: [How Bear works](how-it-works.md) for the interception and
+See also: [How Bear works](../understanding/how-it-works.md) for the interception and
 semantic-analysis mechanism this configuration shapes, [Supported
 compilers](supported-compilers.md) for compiler recognition, and the
-[Recipes](recipes/index.md) for task-oriented uses of these sections
+[Recipes](../guides/recipes/index.md) for task-oriented uses of these sections
 (for example excluding generated sources).
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

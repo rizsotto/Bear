@@ -49,7 +49,7 @@ or `clang` only, never `cray_cc`, so add a `compilers:` entry when you
 need the family pinned exactly, and when the probe cannot identify the
 compiler at all. This is the same mechanism, and the same `CC` special
 case, documented on [Supported
-compilers](../supported-compilers.md#ambiguous-names).
+compilers](../../reference/supported-compilers.md#ambiguous-names).
 
 `ftn`, by contrast, is recognized directly as Cray Fortran (`as:
 cray_fortran`) regardless of which programming environment module is
@@ -66,10 +66,10 @@ compilers:
 
 ## Related pages
 
-- [Supported compilers](../supported-compilers.md) for the full
+- [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table and the ambiguous-name probe.
 - [Generate compile_commands.json for an MPI project](mpi.md) if the
   build also calls `mpicc`/`mpifort`-style wrappers directly instead of
   the `cc`/`CC`/`ftn` drivers.
-- [Configure Bear](../configuration.md) for the `compilers:` section.
+- [Configure Bear](../../reference/configuration.md) for the `compilers:` section.
 - [Recipes](index.md) for the rest of the task pages.

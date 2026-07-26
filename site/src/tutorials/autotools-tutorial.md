@@ -6,7 +6,7 @@ By the end of this page you will have built libtasn1 4.20.0 twice: once
 the ordinary way, once under Bear, and compared what each run leaves
 behind. This page assumes Bear is already installed; see [Getting
 started with Bear](getting-started.md) for a first run against a plain
-Makefile project, or [Install Bear](installation.md) for platform
+Makefile project, or [Install Bear](../installation.md) for platform
 packages.
 
 ## Get a real project
@@ -26,11 +26,8 @@ cd libtasn1-4.20.0
 GNU's release tarballs do not change after release, so this download
 always matches this checksum:
 
-```sh
-sha256sum libtasn1-4.20.0.tar.gz
-```
-
-```
+```shell
+$ sha256sum libtasn1-4.20.0.tar.gz
 92e0e3bd4c02d4aeee76036b2ddd83f0c732ba4cda5cb71d583272b23587a76c  libtasn1-4.20.0.tar.gz
 ```
 
@@ -45,11 +42,8 @@ This builds `libtasn1.so` under `lib/.libs/`, the same as it would for
 anyone packaging or installing this library. Look for a compilation
 database and there is none:
 
-```sh
-ls compile_commands.json
-```
-
-```
+```shell
+$ ls compile_commands.json
 ls: cannot access 'compile_commands.json': No such file or directory
 ```
 
@@ -79,11 +73,8 @@ under Bear.
 
 ## Look at the result
 
-```sh
-grep -c '"file":' compile_commands.json
-```
-
-```
+```shell
+$ grep -c '"file":' compile_commands.json
 34
 ```
 
@@ -173,17 +164,14 @@ everywhere.
 
 ## Use the database: clangd
 
-```sh
-clangd --check=lib/ASN1.c
-```
-
-```
+```shell
+$ clangd --check=lib/ASN1.c
 I[...] Compile command from CDB is: [/home/you/libtasn1-4.20.0/lib] /usr/bin/gcc -DHAVE_CONFIG_H -I. -I.. -I./gl -I./includes -DASN1_BUILDING -fanalyzer -Wall -Wextra ... -g -O2 -c -fPIC -o .libs/ASN1.o -resource-dir=... -- /home/you/libtasn1-4.20.0/lib/ASN1.c
 ```
 
 clangd pulled the same flags straight out of `compile_commands.json`,
 directory and all. See [Set up clangd for a project without
-CMake](recipes/clangd-setup.md) for the editor side of this hand-off.
+CMake](../guides/recipes/clangd-setup.md) for the editor side of this hand-off.
 
 ## Build it again, in wrapper mode
 
@@ -194,7 +182,7 @@ differently: it puts wrapper executables on `PATH` in place of the real
 compilers, so a step that discovers and records the compiler has to see
 the wrapper while it does so, or the build later invokes the real
 compiler directly and Bear observes nothing. For libtasn1, that step is
-`./configure`. See [How Bear works](how-it-works.md) for the mechanism
+`./configure`. See [How Bear works](../understanding/how-it-works.md) for the mechanism
 behind both interception methods.
 
 That makes this project's `configure` step the one place on this site
@@ -211,7 +199,7 @@ Bear finds `bear.yml` in the current working directory on its own, so no
 flag is needed; naming it explicitly with `--config bear.yml` works the
 same way. This same file selects wrapper mode as the interception method
 on every platform, including Linux and the BSDs, where preload is
-otherwise the default. [Configure Bear](configuration.md) covers the
+otherwise the default. [Configure Bear](../reference/configuration.md) covers the
 rest of the file's keys and the other places Bear looks for it.
 
 From a clean tree, run `configure` and `make` as two separate Bear
@@ -238,11 +226,11 @@ probes survive into the final database.
 ## Next steps
 
 - [Generate compile_commands.json for a Makefile
-  project](recipes/compile-commands-for-makefile.md) for the autotools
+  project](../guides/recipes/compile-commands-for-makefile.md) for the autotools
   variations this page skipped: the general `conftest.c` probe caveat,
   incremental and parallel builds.
 - [Recover compile_commands.json from a build
   log](compile-commands-from-a-build-log.md) if you cannot run the build
   yourself, only read its log.
-- [How Bear works](how-it-works.md) for the interception mechanism
+- [How Bear works](../understanding/how-it-works.md) for the interception mechanism
   behind every build on this page.

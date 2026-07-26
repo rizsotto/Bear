@@ -12,11 +12,11 @@ Bear runs `make` exactly as it would run on its own, watches every
 command it executes, and writes `compile_commands.json` next to it, one
 entry per compiled source file. Nothing about the Makefile changes.
 Make has no built-in way to export a compilation database (unlike CMake
-or Meson, which do; see [the home page](../index.md) if that is your
+or Meson, which do; see [the home page](../../index.md) if that is your
 build system instead), so intercepting the real build is the standard
 way to get one for a Make project. For the full walkthrough of a first
 run, including what the output looks like, see [Getting started with
-Bear](../getting-started.md); this page covers everything beyond that
+Bear](../../tutorials/getting-started.md); this page covers everything beyond that
 first run.
 
 ## Autotools: ./configure and make
@@ -36,7 +36,7 @@ watch.
 In wrapper mode (the default on macOS and Windows, or forced with
 `intercept.mode: wrapper` in a config file) a build step that discovers
 the compiler on its own has to run under Bear too, or it never sees the
-wrapper; see [Configure Bear](../configuration.md) for the setting.
+wrapper; see [Configure Bear](../../reference/configuration.md) for the setting.
 Practically, that means running the configure step under Bear as well,
 and discarding its output:
 
@@ -183,7 +183,7 @@ accept it.
   your Makefile invokes the compiler through a launcher.
 - [Run Bear inside a Docker container](docker.md) if the build itself
   runs in a container.
-- [How Bear works](../how-it-works.md) for the interception mechanism
+- [How Bear works](../../understanding/how-it-works.md) for the interception mechanism
   behind everything on this page.
 - [Recipes](index.md) for the rest of the task pages.
 

@@ -15,7 +15,7 @@ and Bear only records commands the build actually executes. Run a clean
 build (`make clean` first, or build into an empty directory). If the
 build did compile and the file is still empty, work through [Bear
 produces an empty
-`compile_commands.json`](recipes/empty-compilation-database.md), which
+`compile_commands.json`](../guides/recipes/empty-compilation-database.md), which
 covers the remaining causes in order.
 
 ## Which compilers does Bear recognize?
@@ -23,7 +23,7 @@ covers the remaining causes in order.
 A large set of GCC- and Clang-compatible drivers, MSVC, several vendor
 and embedded toolchains, and the common compiler launchers, each
 matched by executable filename. The full list lives on [Supported
-compilers](supported-compilers.md) rather than here, so that there is
+compilers](../reference/supported-compilers.md) rather than here, so that there is
 only one copy of it to keep correct.
 
 ## Why does Bear not recognize my compiler?
@@ -33,7 +33,7 @@ suffixes and cross-compilation prefixes for the families it knows. A
 compiler with a name outside those patterns, or a renamed copy of a
 known compiler, needs an explicit hint in the configuration file's
 `compilers` section, mapping its path to the compiler family it
-behaves like. See [Configure Bear](configuration.md) and the `bear(1)`
+behaves like. See [Configure Bear](../reference/configuration.md) and the `bear(1)`
 man page's CONFIGURATION section for the exact keys.
 
 ## Do I need Bear if I use CMake?
@@ -50,7 +50,7 @@ support this, or when what it exports does not match what actually ran.
 
 Yes, but Bear has to run **inside** the container, as part of the build
 it observes; running Bear against `docker exec` from the host does not
-work. See [Bear on Linux, WSL2, and Docker](platforms/linux.md) for why
+work. See [Bear on Linux, WSL2, and Docker](../platforms/linux.md) for why
 and for the correct invocation.
 
 ## Can I use Bear with ccache / distcc / sccache?
@@ -62,7 +62,7 @@ compiler invocation, not the launcher call.
 ## How do I get verbose output for debugging?
 
 Set the `RUST_LOG` environment variable to `debug` before running Bear.
-See [Troubleshooting](troubleshooting.md) for the exact invocation, what
+See [Troubleshooting](../guides/troubleshooting.md) for the exact invocation, what
 the output shows, and when to include it in a bug report.
 
 ## How do I switch between preload and wrapper mode?
@@ -70,7 +70,7 @@ the output shows, and when to include it in a bug report.
 Set `intercept.mode` to `preload` or `wrapper` in the configuration
 file; without it, Bear picks the platform default (preload on Linux and
 the BSDs, wrapper on macOS and Windows). See [Configure
-Bear](configuration.md) for where Bear looks for that file, and the
+Bear](../reference/configuration.md) for where Bear looks for that file, and the
 `bear(1)` man page for the key's exact effect and limits.
 
 ## Can I use Bear with a build system that does not use `CC`/`CXX`?
@@ -89,7 +89,7 @@ is enabled.
 
 Yes, with the `sources` section of the configuration file: rules by
 directory and by filename glob, each either including or excluding
-matching entries. See [Configure Bear](configuration.md) and the
+matching entries. See [Configure Bear](../reference/configuration.md) and the
 `bear(1)` man page's CONFIGURATION section.
 
 ## Can I get `command` instead of `arguments` in the output?
@@ -109,6 +109,6 @@ once the build finishes. In preload mode, Bear creates no such
 directory - the preload library is loaded directly from Bear's own
 installation.
 
-Related: [Troubleshooting](troubleshooting.md) for a database that came
-out wrong, [Configure Bear](configuration.md) for the configuration
-file, and the [Recipes](recipes/index.md) index for task-shaped pages.
+Related: [Troubleshooting](../guides/troubleshooting.md) for a database that came
+out wrong, [Configure Bear](../reference/configuration.md) for the configuration
+file, and the [Recipes](../guides/recipes/index.md) index for task-shaped pages.

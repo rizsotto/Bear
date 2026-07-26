@@ -11,7 +11,7 @@ RUN bear -- make -j4
 
 or against an already-running container:
 
-```
+```sh
 docker exec my-container sh -c "bear -- make -j4"
 ```
 
@@ -26,7 +26,7 @@ not the host's.
 
 Add Bear to the image the same way you would install it anywhere else:
 your distribution's package if it carries a current-enough one, or a
-source build otherwise. [Install Bear](../installation.md) covers both;
+source build otherwise. [Install Bear](../../installation.md) covers both;
 a source build inside a `Dockerfile` follows the same three commands as
 [`INSTALL.md`][install]:
 
@@ -50,7 +50,7 @@ describes for cross-compilation.
 hands the command to the Docker daemon, which runs it in the container's
 own process tree, one the host-side Bear process never sees, so it never
 observes the compiler invocations. This is explained in full in
-[Bear on Linux, WSL2, and Docker](../platforms/linux.md); this page
+[Bear on Linux, WSL2, and Docker](../../platforms/linux.md); this page
 takes it as the starting point, not something to reprove.
 
 ## What the container needs for preload interception
@@ -79,7 +79,7 @@ added capabilities. It does need:
 ## When to fall back to wrapper mode
 
 If the build tool inside the container is statically linked (a Go build
-using cgo is the common case; see [FAQ](../faq.md)), set wrapper mode in
+using cgo is the common case; see [FAQ](../../understanding/faq.md)), set wrapper mode in
 the configuration file the build reads:
 
 ```yaml
@@ -109,7 +109,7 @@ Three ways to deal with it, in order of how little they change:
   container as on the host**, so the recorded paths are already correct
   on both sides:
 
-  ```
+  ```sh
   docker run -v "$(pwd):$(pwd)" -w "$(pwd)" myimage bear -- make
   ```
 
@@ -124,7 +124,7 @@ Three ways to deal with it, in order of how little they change:
   dev-container setup), so nothing outside the container ever reads the
   database, and the mismatch does not arise.
 
-Related: [Bear on Linux, WSL2, and Docker](../platforms/linux.md) for
+Related: [Bear on Linux, WSL2, and Docker](../../platforms/linux.md) for
 the platform-level notes this page builds on,
 [Troubleshooting](../troubleshooting.md) for a database that comes out
 wrong, and the [Recipes](index.md) index for other tasks.
