@@ -12,32 +12,26 @@ Bear records the cross compiler the same way it records a native one: the
 executable path the build actually invoked, and every argument verbatim,
 including a cross-compilation target prefix in the name
 (`arm-none-eabi-gcc`, `aarch64-linux-gnu-g++`) and flags such as
-`--sysroot` or a target-specific `-I`. Nothing about the build changes; the
-two things worth knowing are how prefixed names get recognized, and one
-limitation of the default interception method that shows up specifically
-in cross builds.
+`--sysroot` or a target-specific `-I`. Bear does not interpret or rewrite
+argument values (only `@file` response-file expansion and a couple of
+environment-variable foldings are optional exceptions, see
+`format.arguments` in [Configure Bear](../../reference/configuration.md)),
+so a value like `--sysroot=/opt/arm-sdk/sysroot` lands in the entry's
+`arguments` exactly as the build passed it. Nothing about the build
+changes; what is worth knowing is which names get recognized as
+cross-compiled, and one limitation of the default interception method
+that shows up specifically in cross builds.
 
 ## Prefixed and version-suffixed names
 
 GCC, Clang, NVIDIA's `nvcc`, Flang, and Vala's `valac` are recognized
-under a target prefix (`arm-linux-gnueabihf-gcc`, `aarch64-linux-gnu-clang++`),
-a version suffix (`gcc-12`, `clang-15`), or both together
-(`arm-linux-gnueabi-gcc-12`); every such spelling is parsed with its base
-name's own flag rules, so the recorded entry looks exactly like it would
-for the plain name. Arm Compiler 6 (`armclang`, `armclang++`) is
-recognized with a version suffix but not a target prefix. This support
-varies by family; it is not a blanket rule applied to every entry in [Supported
-compilers](../../reference/supported-compilers.md), which is the source of truth for
-the full name table - this page only covers the prefix/suffix behavior
-that cross builds rely on.
-
-Sysroot and include flags are not specific to cross-compilation at all:
-Bear does not interpret or rewrite argument values (only `@file`
-response-file expansion and a couple of environment-variable foldings are
-optional exceptions, see `format.arguments` in the [`bear(1)` man
-page][manpage]), so `--sysroot=/opt/arm-sdk/sysroot` and
-`-I/opt/arm-sdk/sysroot/usr/include` land in the entry's `arguments`
-exactly as the build passed them.
+under a cross-compilation target prefix, a version suffix, or both
+together; every such spelling is parsed with its base name's own flag
+rules. This support varies by family - it is not a blanket rule applied
+to every entry - so [Cross-compiler prefixes and version
+suffixes](../../reference/supported-compilers.md#cross-compiler-prefixes-and-version-suffixes)
+is the source of truth for which families it covers and how the pattern
+works; this page only covers the cross-build-specific failure below.
 
 ## When preload cannot reach the compiler
 
@@ -77,13 +71,10 @@ for what each method can and cannot reach.
 
 - [Generate compile_commands.json for an STM32 or arm-none-eabi
   project](embedded-arm.md) for the Arm bare-metal case.
-- [Use Bear with Texas Instruments compilers](ti-compilers.md) and [Use
-  Bear with Microchip XC8](microchip-xc8.md) for two specific vendor
-  toolchains.
+- [Use Bear with a vendor embedded toolchain](vendor-embedded.md) for
+  QNX, Microchip XC8, and Texas Instruments.
 - [Supported compilers](../../reference/supported-compilers.md) for the full name
   table and the `compilers:` override.
 - [Generate compile_commands.json for a Makefile project](compile-commands-for-makefile.md)
   for the general Make workflow this page builds on.
 - [Recipes](index.md) for the rest of the task pages.
-
-  [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

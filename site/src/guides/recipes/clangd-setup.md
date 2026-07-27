@@ -26,9 +26,9 @@ usually all you need.
 Two situations fall outside that search:
 
 - the database was generated somewhere other than the project root, for
-  example a separate build directory Bear was pointed at with `bear
-  --output build/compile_commands.json` or `bear intercept`'s own
-  `--output`;
+  example a separate build directory named with
+  [`--output`](../../reference/command-line.md) (`bear --output
+  build/compile_commands.json`, or `bear intercept`'s own `--output`);
 - you are editing a source tree that clangd's search does not reach from
   the file's own location.
 

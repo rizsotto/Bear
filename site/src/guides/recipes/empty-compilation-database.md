@@ -30,18 +30,12 @@ example make's
 make: Nothing to be done for 'all'.
 ```
 
-**Fix**: clean first, or build into an empty directory:
-
-```sh
-make clean
-bear -- make
-```
-
-When you only rebuilt part of a larger project and want to keep the
-rest of a previous run's entries instead of doing a full clean, use
-`--append` (see the [`bear(1)` man page][manpage] for the exact
-semantics, and [Troubleshooting](../troubleshooting.md) for the
-duplicate-handling rules that apply when you do).
+**Fix**: clean first, or build into an empty directory, as shown above.
+When you only rebuilt part of a larger project and want to keep the rest
+of a previous run's entries instead of doing a full clean, use
+`--append` (see [Command-line options](../../reference/command-line.md)
+for its exact semantics, and [Troubleshooting](../troubleshooting.md)
+for the duplicate-handling rules that apply when you do).
 
 ## The compiler is not recognized
 
@@ -81,11 +75,12 @@ compilers](../../reference/supported-compilers.md#as-and-ignore-hints).
 ## Preload interception is blocked or unavailable
 
 Bear has two interception methods, chosen once per invocation: preload
-(the default on Linux and the BSDs) injects a library into every process
-the build starts; wrapper (the default on macOS and Windows) substitutes
-the known compilers on `PATH` instead. See [How Bear
-works](../../understanding/how-it-works.md) for the mechanism. A few situations keep
-preload from seeing a compilation at all:
+injects a library into every process the build starts; wrapper
+substitutes the known compilers on `PATH` instead. See [Configure
+Bear](../../reference/configuration.md#intercept) for which one is the
+default on your platform and how to force the other, and [How Bear
+works](../../understanding/how-it-works.md) for the mechanism. A few
+situations keep preload from seeing a compilation at all:
 
 **A statically linked build tool.** Preload works by hooking library
 calls inside the process that makes them; a statically linked executable
@@ -131,7 +126,29 @@ inside a Docker container](docker.md) for the correct invocation.
 
 In every one of these cases, wrapper mode is the general fallback, with
 one condition of its own: the build has to actually pick the wrapper up,
-covered next.
+covered below.
+
+## The preload library failed to load
+
+A missing or broken `libexec.so` install is not a failure the dynamic
+linker treats as fatal: it drops a preload target it cannot open, prints
+a warning on standard error, and lets the build run anyway. Only the
+top-level command Bear launched is observed directly; everything that
+command itself spawns runs unwatched, so a build whose compiler is
+invoked through `make` or a shell script comes back with an empty
+database, and Bear still exits `0` because the build succeeded. See
+[Exit status](../../reference/exit-status.md) for why success and an
+empty database are not mutually exclusive.
+
+**Confirm**: look for this line in the build's own standard error, not
+Bear's own log output:
+
+```
+ERROR: ld.so: object '.../libexec.so' from LD_PRELOAD cannot be preloaded: ignored.
+```
+
+**Fix**: see [Troubleshooting](../troubleshooting.md#ld_preload-errors)
+for the install-path check.
 
 ## Wrapper mode: the build never picks up the wrapper
 
@@ -176,8 +193,9 @@ Bear records the attempted command, not its outcome. An empty database
 from a failed build specifically means the failure happened before any
 compiler ran at all.
 
-**Confirm**: check the build's own error output and Bear's exit code;
-a non-zero exit with no compiler messages at all points here.
+**Confirm**: check the build's own error output and Bear's exit code
+(see [Exit status](../../reference/exit-status.md)); a non-zero exit
+with no compiler messages at all points here.
 
 **Fix**: fix whatever stops the build before it reaches a compile step,
 then rebuild under Bear.
@@ -205,9 +223,9 @@ sources:
       action: exclude
 ```
 
-produces `[]` for a project with only `.c` sources, by design. See the
-`bear(1)` man page's CONFIGURATION section for the full `sources:`
-syntax.
+produces `[]` for a project with only `.c` sources, by design. See
+[Configure Bear](../../reference/configuration.md#sources) for the full
+`sources:` syntax.
 
 ## Diagnostics
 

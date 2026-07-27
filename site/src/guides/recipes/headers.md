@@ -19,8 +19,8 @@ headers:
 This makes Bear write a real entry for the header itself, cloned from a
 compiled source's arguments with the source path swapped in for the
 header's and the output flag removed, instead of leaving clangd to infer
-one. The full set of `headers:` keys and their defaults is in the
-[`bear(1)` man page][manpage]'s CONFIGURATION section.
+one. The full set of `headers:` keys and their defaults is on [Configure
+Bear](../../reference/configuration.md#headers).
 
 ## Telling the situations apart
 
@@ -108,5 +108,3 @@ compile_commands.json](empty-compilation-database.md) for a database
 missing more than just header entries, [Generate compile_commands.json
 for a Makefile project](compile-commands-for-makefile.md), and the
 [Recipes](index.md) index.
-
-  [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

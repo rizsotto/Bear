@@ -18,22 +18,22 @@ logging on standard error:
 RUST_LOG=debug bear -- <build command>
 ```
 
-Without `RUST_LOG` set, Bear prints only warnings and errors in a short
-`bear: message` form. Setting it to `debug` (or `info`/`warn`/`error`
-for less detail) switches every helper process (`bear-driver`,
-`bear-wrapper`, the preload library) to a verbose format tagged with a
-timestamp, level, process name and pid, and source location - detailed
-enough to see which executables were intercepted, how each was
-classified, and why an entry was or was not written. Include this
-output when reporting a problem.
+Without `RUST_LOG` set, Bear prints only warnings and errors. Setting it
+to `debug` (or `info`/`warn`/`error` for less detail) switches every
+helper process (`bear-driver`, `bear-wrapper`, the preload library) to a
+verbose, timestamped format detailed enough to see which executables
+were intercepted, how each was classified, and why an entry was or was
+not written. Include this output when reporting a problem.
 
 ## The output is missing entries
 
 Same causes as an empty database, but partial - a compiler ran and was
 recognized, yet its entry did not survive to the file. The most common
-cause is `--append`: each Bear run overwrites the output by default, so
-building incrementally without it discards the previous run's entries.
-Accumulate results across runs instead:
+cause is `--append` (see [Command-line
+options](../reference/command-line.md#global-usage)): each Bear run
+overwrites the output by default, so building incrementally without it
+discards the previous run's entries. Accumulate results across runs
+instead:
 
 ```sh
 bear --append -- make module_a
@@ -62,9 +62,9 @@ gcc -O3 -fPIC -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -DPIC -c -o objs/adler32.o a
 ```
 
 Bear's default `duplicates.match_on` compares only `directory` and
-`file` (see [Configure Bear](../reference/configuration.md)), and both invocations
-share both, so only the first is kept. Add `arguments` to the default
-match, keeping `directory` and `file` in it:
+`file` (see [Configure Bear](../reference/configuration.md#duplicates)),
+and both invocations share both, so only the first is kept. Add
+`arguments` to the default match, keeping `directory` and `file` in it:
 
 ```yaml
 schema: "4.2"
@@ -88,19 +88,18 @@ only one entry per file.
 ## The output has duplicate entries
 
 Two entries are duplicates only when every field listed in
-`duplicates.match_on` matches, and of a set of duplicates Bear keeps the
-first. Which invocation that is depends on how the entries got there:
-within a single run it is the one the build ran first, while across
-`--append` runs it is the newest, because an appended run places its new
-entries ahead of the existing ones. That is why `--append` refreshes a
-stale entry rather than being ignored.
+`duplicates.match_on` matches; of a set of duplicates, Bear keeps the
+first one in the file - the build's first invocation within a single
+run, or (per the ordering described above) the newest one across
+`--append` runs.
 
 The default match is `directory` and `file`, so one entry survives per
 source file per directory whatever its arguments were. If that is
 dropping invocations you wanted to keep, see [A file you know is
 compiled twice shows up once](#a-file-you-know-is-compiled-twice-shows-up-once)
-above for the fix and its trade-off. The [`bear(1)` man page][manpage]
-enumerates the fields `match_on` accepts.
+above for the fix and its trade-off. [Configure
+Bear](../reference/configuration.md#duplicates) enumerates the fields
+`match_on` accepts.
 
 ## The output has extra entries
 
@@ -172,6 +171,10 @@ the path `bear-driver` expects, relative to its own location
 (`../$INTERCEPT_LIBDIR/libexec.so`, `lib` by default). Check that Bear
 was built and installed with the same `INTERCEPT_LIBDIR` value; see
 [Bear on Linux](../platforms/linux.md) for the build/install commands.
+The warning does not stop the build or fail Bear: see [Bear produces an
+empty compile_commands.json](recipes/empty-compilation-database.md#the-preload-library-failed-to-load)
+for why this is a silent cause of a database missing exactly the entries
+a subprocess would have reported.
 
 ### glibc version errors in cross-compilation
 
@@ -226,10 +229,10 @@ mismatch entirely.
 5. Open a new issue with the debug log and your platform (OS, Bear
    version from `bear --version`, and build system).
 
-Related: the [FAQ](../understanding/faq.md) for the empty-database case, the
-[Recipes](recipes/index.md) index for task-shaped pages, and the
-platform notes for [Linux](../platforms/linux.md),
+Related: [Command-line options](../reference/command-line.md) and
+[Configure Bear](../reference/configuration.md) for the flags and keys
+named above, the [FAQ](../understanding/faq.md) for the empty-database
+case, the [Recipes](recipes/index.md) index for task-shaped pages, and
+the platform notes for [Linux](../platforms/linux.md),
 [macOS](../platforms/macos.md), [Windows](../platforms/windows.md), and
 [BSD](../platforms/bsd.md).
-
-  [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

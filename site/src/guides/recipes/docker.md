@@ -55,10 +55,10 @@ takes it as the starting point, not something to reprove.
 
 ## What the container needs for preload interception
 
-Preload mode (the Linux default) works inside a container with no extra
-privileges: `LD_PRELOAD` is a plain dynamic-linker feature, not a
-ptrace-based interception, so it needs no `--privileged` flag and no
-added capabilities. It does need:
+[Preload mode](../../reference/configuration.md#intercept) works inside
+a container with no extra privileges: `LD_PRELOAD` is a plain
+dynamic-linker feature, not a ptrace-based interception, so it needs no
+`--privileged` flag and no added capabilities. It does need:
 
 - a dynamic linker in the image. A `scratch` or fully static final image
   has none, so a build that runs in such an image cannot use preload
@@ -90,16 +90,17 @@ intercept:
 
 As on any platform, a "configure" step that discovers compilers before
 the real build runs must itself run under Bear so it discovers the
-wrapper (see [`bear(1)`][manpage], TROUBLESHOOTING, "Empty output").
+wrapper; see [Bear produces an empty
+compile_commands.json](empty-compilation-database.md#wrapper-mode-the-build-never-picks-up-the-wrapper).
 
 ## The path-mapping problem
 
-By default Bear records `directory` and `file` exactly as the build
-used them, with no transformation (`format.paths` in the configuration,
-see [`bear(1)`][manpage], CONFIGURATION). Inside a container that is
-almost always an absolute path under the container's own filesystem
-root, for example `/src/main.c`. clangd, clang-tidy, and similar tools
-normally run on the host, where `/src` does not exist; a
+By default Bear records `directory` and `file` exactly as the build used
+them, with no transformation
+([`format.paths`](../../reference/configuration.md#formatpaths)). Inside
+a container that path is almost always absolute under the container's
+own filesystem root, for example `/src/main.c`. clangd, clang-tidy, and
+similar tools normally run on the host, where `/src` does not exist; a
 `compile_commands.json` copied out of the container as-is points at
 files the host-side tool cannot find.
 
@@ -130,4 +131,3 @@ the platform-level notes this page builds on,
 wrong, and the [Recipes](index.md) index for other tasks.
 
   [install]: https://github.com/rizsotto/Bear/blob/master/INSTALL.md
-  [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

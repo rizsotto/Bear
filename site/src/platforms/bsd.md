@@ -2,13 +2,14 @@
 
 # Bear on BSD
 
-```sh
-bear -- make
-```
-
 Bear runs on FreeBSD, OpenBSD, NetBSD, and DragonFly BSD, with the same
-interception methods as Linux and the same default, preload. What
-differs is the packaging and the default compiler and linker names a
+interception methods as Linux and the same default, preload: Bear
+injects a small library into every process the build starts, and it
+cannot see into a statically linked build tool for the same reason as
+on Linux. See [how Bear works](../understanding/how-it-works.md) for
+the mechanism, and force wrapper mode instead with [`intercept.mode:
+wrapper`](../reference/configuration.md#intercept). What differs from
+Linux here is the packaging and the default compiler and linker names a
 build is likely to use.
 
 ## `cc` and `c++` mean Clang here
@@ -21,7 +22,8 @@ system's `cc`/`c++` is Clang, while on most Linux distributions the
 same names are GCC. No configuration is needed for the common case;
 the probe classifies it automatically. Override the classification only
 when the probe cannot - for example a locally built compiler with a
-banner it does not recognize:
+banner it does not recognize - with a `compilers:` entry (see
+[Supported compilers](../reference/supported-compilers.md#ambiguous-names)):
 
 ```yaml
 schema: "4.2"

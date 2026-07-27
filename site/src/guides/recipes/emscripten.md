@@ -15,16 +15,14 @@ happen inside the tree Bear is already watching. Bear has to be the
 outermost command for that to hold, so `bear -- emmake make` is the order
 to use.
 
-## What is recognized
-
-`emcc`, `em++`, and the `.py`-suffixed spellings some installs expose
-(`emcc.py`, `em++.py`) are all recognized, but as the `clang` family, not
-as a separate "emscripten" id: Emscripten's driver is a wrapper around
-Clang, and its command line follows Clang's flag syntax closely enough
-that Bear parses it with Clang's own rules. There is no `emscripten` `as`
-value to write in a `compilers:` override; use `clang` if a nonstandard
-path needs a hint. See [Supported compilers](../../reference/supported-compilers.md)
-for the full recognized-name table.
+`emcc`, `em++`, and their `.py`-suffixed spellings are recognized under
+the `clang` family, not a separate `emscripten` id, since Emscripten's
+driver is a Clang wrapper whose command line follows Clang's flag syntax
+closely enough for Bear's Clang rules to parse it correctly. There is no
+`emscripten` `as` value to write in a `compilers:` override; use `clang`
+if a nonstandard `emcc` path needs a hint. See [Supported
+compilers](../../reference/supported-compilers.md) for the full
+recognized-name table.
 
 ## CMake projects: emcmake
 

@@ -29,15 +29,17 @@ Generators. It is ignored on other generators." The Visual Studio and
 Xcode generators fall into "other generators": setting the variable with
 either of those has no effect, and no `compile_commands.json` appears no
 matter how the project builds. Reach for Bear instead, pointed at
-whatever actually invokes the compiler:
+whatever actually invokes the compiler (see [Command-line
+options](../../reference/command-line.md) for the `--` split between
+Bear's own flags and the build command):
 
 ```sh
 bear -- cmake --build build
 ```
 
-This works regardless of which generator produced the build files,
-because Bear watches the compiler invocations the build makes rather
-than asking the generator to export them.
+This works regardless of which generator produced the build files; see
+[How Bear works](../../understanding/how-it-works.md) for why watching
+the build succeeds where the generator's own export does not.
 
 ## When the export does not match what actually ran
 
@@ -103,13 +105,11 @@ it does not, or when what it exports does not match what actually ran.
 
 `compile_commands.json` living in the build directory rather than the
 project root is the usual reason clangd does not pick it up
-automatically: clangd's search starts from the edited file and walks
-upward through `build/` subdirectories, which finds a build directory
-named `build` at the project root but not one with another name or
-nested deeper. See [Set up clangd for a project without
-CMake](clangd-setup.md) for pointing clangd at the exact directory, and
-[Bear produces an empty compile_commands.json](empty-compilation-database.md)
-if the file exists but is missing entries rather than missing entirely.
+automatically. See [Set up clangd for a project without
+CMake](clangd-setup.md) for how clangd searches and for pointing it at
+the exact directory, and [Bear produces an empty
+compile_commands.json](empty-compilation-database.md) if the file exists
+but is missing entries rather than missing entirely.
 
 Related: [Generate compile_commands.json for a Makefile
 project](compile-commands-for-makefile.md) for the equivalent Bear-only

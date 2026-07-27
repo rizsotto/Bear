@@ -20,35 +20,24 @@ running `make` never had the oneAPI drivers on `PATH` to begin with, so
 
 ## Which family each driver is recognized as
 
-Bear recognizes the oneAPI and Classic C/C++ drivers under one family
-id, `intel_cc`:
+`icx`/`icpx` (current oneAPI) and `icc`/`icpc` (the older Classic
+drivers) share one family id, `intel_cc`, and one Intel-specific flag
+table (`-qopenmp`, `-ipo`, `-fp-model`, and the rest). The Fortran
+drivers, `ifort` and `ifx`, are a separate family, `intel_fortran`. See
+[Supported compilers](../../reference/supported-compilers.md) for the
+full recognized-name table; `bear semantic --print-compilers` prints the
+same mapping for the version you have installed.
 
-- `icx`, `icpx` (the current oneAPI drivers)
-- `icc`, `icpc` (the older Classic drivers)
-
-Both parse with the same Intel-specific flag table (things like
-`-qopenmp`, `-ipo`, and `-fp-model`), and `bear semantic
---print-compilers` lists both pairs as `as: intel_cc`.
-
-The Fortran drivers, `ifort` and `ifx`, are a separate family,
-`intel_fortran`.
-
-Intel's MPI wrappers (`mpiicc`, `mpiifx`, and the rest) are recognized
-too, and they reuse these same two families rather than the generic MPI
-wrapper id. See [Generate compile_commands.json for an MPI
-project](mpi.md) for the full mapping, why the split exists, and what
-gets recorded when a build calls one of these wrappers instead of the
-driver directly.
-
-The full recognized-name table, including every other vendor built on
-GCC or Clang, is on [Supported compilers](../../reference/supported-compilers.md);
-this page only calls out the Intel-specific mappings.
+Intel's MPI wrappers (`mpiicc`, `mpiifx`, and the rest) reuse these same
+two families rather than a generic MPI wrapper id. See [Generate
+compile_commands.json for an MPI project](mpi.md) for that mapping and
+why the split exists.
 
 ## If a driver is not recognized
 
 A build that calls the compiler through a renamed copy or a nonstandard
-path (a custom install, a CI image that symlinks `icx` to something
-else) needs a hint in the configuration file:
+path (a custom install, a CI image that symlinks `icx` to something else)
+needs a `compilers:` hint:
 
 ```yaml
 schema: "4.2"
@@ -57,10 +46,10 @@ compilers:
     as: intel_cc
 ```
 
-Use `as: intel_fortran` for a renamed Fortran driver. The accepted `as`
-values are exactly the family ids `bear semantic --print-compilers`
-shows; see the `compilers` section of the [`bear(1)` man
-page][manpage] for the full key.
+Use `as: intel_fortran` for a renamed Fortran driver. See [`as` and
+`ignore` hints](../../reference/supported-compilers.md#as-and-ignore-hints)
+for the accepted values, and the `compilers` section of [Configure
+Bear](../../reference/configuration.md) for the key itself.
 
 ## Related pages
 
@@ -70,5 +59,3 @@ page][manpage] for the full key.
   recognized-name table and the ambiguous-name rules.
 - [Configure Bear](../../reference/configuration.md) for the `compilers:` section.
 - [Recipes](index.md) for the rest of the task pages.
-
-  [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

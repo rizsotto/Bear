@@ -29,12 +29,8 @@ the command that answers it.
   a target-prefixed GCC or Clang.
 - [Generate compile_commands.json for an STM32 or arm-none-eabi
   project](embedded-arm.md) - the bare-metal Arm GCC toolchain.
-- [Use Bear with Texas Instruments compilers](ti-compilers.md) - the
-  Clang-based TI Arm toolchain.
-- [Use Bear with Microchip XC8](microchip-xc8.md) - the 8-bit PIC
-  toolchain.
-- [Use Bear with the QNX qcc compiler](qnx.md) - QNX's `qcc`/`q++`
-  drivers.
+- [Use Bear with a vendor embedded toolchain](vendor-embedded.md) - QNX,
+  Microchip XC8 / MPLAB X, and Texas Instruments.
 - [Generate compile_commands.json for an Emscripten project](emscripten.md) -
   compiling to WebAssembly with `emcc`/`em++`.
 - [Generate compile_commands.json for a CUDA project](cuda.md) - `nvcc`

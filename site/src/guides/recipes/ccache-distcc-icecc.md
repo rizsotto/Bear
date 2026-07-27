@@ -22,17 +22,11 @@ produces this entry in `compile_commands.json`:
 ]
 ```
 
-The `ccache` token is gone. `arguments` holds the real compiler invocation,
-`gcc -c main.c -o main.o`, exactly as it appeared after the launcher's own
-name. distcc and icecc are dropped from the recorded command the same
-way. The database never contains an entry whose command is the launcher
-itself.
-
-## What lands in `arguments`
-
-Bear records the real compiler's argv, taken verbatim from whatever
-followed the launcher's name on the command line, not a resolved or
-canonicalized path:
+The `ccache` token is gone: `arguments` holds the real compiler's argv,
+taken verbatim from whatever followed the launcher's name, not a
+resolved or canonicalized path. distcc and icecc drop out the same way;
+the database never contains an entry whose command is the launcher
+itself:
 
 ```sh
 bear -- ccache gcc -c main.c -o main.o           # -> "gcc", ...
@@ -69,8 +63,9 @@ ambiguous names.
 
 Both interception modes handle an explicit launcher the same way: a
 build command of `ccache gcc -c main.c -o main.o` produces the identical
-single entry (compiler `gcc`, `ccache` dropped) whether `intercept.mode`
-is `preload` (the Linux default) or `wrapper`.
+single entry (compiler `gcc`, `ccache` dropped) whether
+[`intercept.mode`](../../reference/configuration.md#intercept) is
+`preload` or `wrapper`.
 
 Wrapper mode has one behavior preload mode does not need: when a build
 discovers its compiler through `PATH` or a `CC` variable and that lookup
@@ -154,14 +149,13 @@ compilers:
 ```
 
 With this override, `my-ccache gcc -c main.c -o main.o` records the same
-single entry, compiler `gcc`, as a plain `ccache` invocation would.
-`as` accepts each of these launchers' own names for the equivalent case
-with those tools, and `wrapper` as the generic spelling for any of them;
-[Supported compilers](../../reference/supported-compilers.md) lists them, generated
-from Bear's own definitions. The full recognized name table (which
-executables count as `gcc`, `clang`, and so on for the compiler a
-launcher wraps) lives on [Supported
-compilers](../../reference/supported-compilers.md); this page does not repeat it.
+single entry, compiler `gcc`, as a plain `ccache` invocation would. `as`
+accepts each launcher's own name for the equivalent case with those
+tools, and `wrapper` as the generic spelling for any of them; see
+[Configure Bear](../../reference/configuration.md#compilers) for the
+`compilers:` key in full, and [Supported
+compilers](../../reference/supported-compilers.md) for the accepted
+names, generated from Bear's own definitions.
 
 Related: [Supported compilers](../../reference/supported-compilers.md) for the
 recognized launcher and compiler names, [Troubleshooting](../troubleshooting.md)

@@ -2,42 +2,45 @@
 
 # Bear on macOS
 
-```sh
-bear -- make
-```
+Wrapper interception is the default on macOS, and Apple's own toolchain
+is why: Xcode's compilers are Apple-signed, and System Integrity
+Protection strips `DYLD_INSERT_LIBRARIES` from Apple-signed executables
+before it can take effect - Bear's compiler recognition calls this out
+explicitly for `swiftc` - so preload cannot observe them. Bear puts
+wrapper executables ahead of the real compilers on `PATH` instead, so
+the build has to pick them up: a configure step that discovers
+compilers must itself run under Bear, or the rest of the build records
+nothing.
 
-Wrapper interception is the default on macOS: Bear puts wrapper
-executables ahead of the real compilers on `PATH`, so the build has to
-pick them up. A configure step that discovers compilers must itself run
-under Bear, or the rest of the build records nothing.
+Preload can be forced instead with [`intercept.mode:
+preload`](../reference/configuration.md#intercept), but it only works
+with SIP disabled; see [how Bear works](../understanding/how-it-works.md)
+for the injection mechanism SIP blocks. With SIP enabled, forcing
+preload is a startup error that names wrapper mode as the alternative:
+Bear does not silently switch modes, and it does not run the build.
 
-Preload interception can be forced in the configuration file, but it
-works only with System Integrity Protection disabled, because SIP blocks
-the library injection it relies on. With SIP enabled, forcing preload is
-a startup error that names wrapper mode as the alternative: Bear does
-not silently switch modes, and it does not run the build.
+## Building through Xcode or `xcodebuild`
 
-## What SIP blocks
-
-System Integrity Protection is what makes wrapper mode the macOS
-default in the first place: SIP strips `DYLD_INSERT_LIBRARIES` from
-SIP-protected executables, and that is exactly the injection preload
-mode depends on, so preload cannot intercept those executables while
-SIP is enabled. Wrapper mode has no such restriction, because it
-substitutes an executable on `PATH` instead of injecting into one.
+Xcode routes many flags through a response file it passes to the
+compiler with `@file` syntax, and Bear's default recording keeps that
+`@file` argument literal instead of the flags behind it. Turn on
+[`format.arguments.from_response_files`](../reference/configuration.md#formatarguments)
+so an entry built through `xcodebuild` carries the actual flags rather
+than a reference a downstream tool like clangd cannot follow.
 
 ## Where the wrapper directory lives
 
-In wrapper mode Bear creates a `.bear/` directory in the build's current
-working directory (not a system or per-user temporary directory), wipes
-it at the start of each run, and removes it again once the build
-finishes. If the build cannot find its compiler after Bear starts,
-check that the working directory Bear ran from is the one the build
-actually searches `PATH` from.
+Wrapper mode's `.bear/` directory (see [FAQ: where does Bear store
+temporary files?](../understanding/faq.md#where-does-bear-store-temporary-files))
+sits in the build's current working directory here, since wrapper is
+the default on this platform. If the build cannot find its compiler
+after Bear starts, check that the working directory Bear ran from is
+the one the build actually searches `PATH` from.
 
 ## Homebrew-installed compilers
 
-Bear recognizes GCC and Clang drivers by filename, including versioned
+Bear recognizes GCC and Clang drivers by filename (see [Supported
+compilers](../reference/supported-compilers.md)), including versioned
 names such as `gcc-14` or `g++-13`. Homebrew's GCC formula installs
 only versioned binaries (`gcc-14`, not `gcc`), and Bear picks those up
 automatically; no configuration is needed for the common case. If a

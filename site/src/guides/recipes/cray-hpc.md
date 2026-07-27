@@ -18,38 +18,29 @@ whatever the build executes, the same as anywhere else. The same applies
 to an NVIDIA HPC SDK module (`module load nvhpc`) on a cluster that
 provides one.
 
-## Cray compiler drivers
+## Recognized drivers
 
-Bear recognizes the Cray Compiling Environment's own executable names
-directly:
-
-- `craycc`, `crayCC`, `craycxx` are Cray C/C++, family id `cray_cc`
-  (built on Clang, so it parses with Clang's flag table plus a few
-  Cray-specific extensions such as `-fcray-*`).
-- `crayftn`, and also the generic `ftn` name, are Cray Fortran, family
-  id `cray_fortran`.
-
-## NVIDIA HPC SDK, including the legacy PGI names
-
-`nvc`, `nvc++`, and `nvfortran` are the current NVIDIA HPC SDK drivers,
-family id `nvidia_hpc`. The older PGI names, `pgcc`, `pgc++`, and
-`pgfortran`, map to the same `nvidia_hpc` family: they take the same
-flag table (`-Mvect`, `-acc`, `-gpu`, and the rest of the `-M*`/`-gpu`
-surface), since the PGI compiler became the NVIDIA HPC SDK.
+Cray's own compiler drivers - `craycc`, `crayCC`, `craycxx` (`cray_cc`,
+built on Clang, with a few Cray-specific extensions such as `-fcray-*`)
+and `crayftn`/`ftn` (`cray_fortran`) - and the NVIDIA HPC SDK's `nvc`,
+`nvc++`, `nvfortran` (`nvidia_hpc`) are all recognized directly. The
+legacy PGI names, `pgcc`, `pgc++`, `pgfortran`, map to the same
+`nvidia_hpc` family and its flag table (`-Mvect`, `-acc`, `-gpu`, and the
+rest), since the PGI compiler became the NVIDIA HPC SDK. See [Supported
+compilers](../../reference/supported-compilers.md) for the full name
+table.
 
 ## `cc`, `CC`, and `ftn`: the PrgEnv wrapper names
 
-The generic Cray PrgEnv wrapper names are not all handled the same way.
-`cc` and `CC` are ambiguous: on a Cray system either one can front CCE,
-GCC, or another vendor's compiler depending on the loaded programming
-environment module, so neither name is in Bear's static recognition
-table at all. Bear classifies an invocation of `cc` or `CC` by running
-it once with `--version` and caching the result. The probe answers `gcc`
-or `clang` only, never `cray_cc`, so add a `compilers:` entry when you
-need the family pinned exactly, and when the probe cannot identify the
-compiler at all. This is the same mechanism, and the same `CC` special
-case, documented on [Supported
-compilers](../../reference/supported-compilers.md#ambiguous-names).
+`cc` and `CC` are ambiguous on a Cray system - either can front CCE, GCC,
+or another vendor's compiler depending on the loaded programming
+environment module - so neither is in Bear's static table; Bear
+classifies them by probing `--version` once and caching the result, the
+mechanism [Supported
+compilers](../../reference/supported-compilers.md#ambiguous-names)
+documents in general. The probe answers `gcc` or `clang` only, never
+`cray_cc`, so add a `compilers:` entry when you need the family pinned
+exactly, or when the probe cannot identify the compiler at all.
 
 `ftn`, by contrast, is recognized directly as Cray Fortran (`as:
 cray_fortran`) regardless of which programming environment module is

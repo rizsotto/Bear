@@ -28,17 +28,16 @@ Run `configure` on its own, then build under Bear:
 bear -- make
 ```
 
-This is enough whenever preload is the active interception method,
-which is the default on Linux and the BSDs: `configure` only needs to
-run so it can write a Makefile, and `make` is the command Bear needs to
-watch.
+This is enough whenever preload is the active interception method:
+`configure` only needs to run so it can write a Makefile, and `make` is
+the command Bear needs to watch.
 
-In wrapper mode (the default on macOS and Windows, or forced with
-`intercept.mode: wrapper` in a config file) a build step that discovers
-the compiler on its own has to run under Bear too, or it never sees the
-wrapper; see [Configure Bear](../../reference/configuration.md) for the setting.
-Practically, that means running the configure step under Bear as well,
-and discarding its output:
+In wrapper mode a build step that discovers the compiler on its own has
+to run under Bear too, or it never sees the wrapper. See [Configure
+Bear](../../reference/configuration.md#intercept) for which mode is the
+default on your platform and how to force one or the other. Practically,
+the wrapper-mode requirement means running the configure step under Bear
+as well, and discarding its output:
 
 ```sh
 bear -- ./configure
@@ -48,19 +47,14 @@ bear -- make
 
 Do not combine `./configure` and `make` into a single Bear run (for
 example `bear -- sh -c './configure && make'`, or a Makefile target that
-re-runs `configure` itself). `configure` compiles small throwaway
-programs to probe the toolchain (`conftest.c` and similar), and a single
-combined run records those probes alongside the real build: a `conftest.c`
-entry next to your own sources, and more of them the more `configure`
-checks (libtool adds probes of its own, in their own directories). Run as
-two separate Bear invocations, `configure` then `make`, the same project
-yields only its real sources. Two
-separate runs work because the second one overwrites the first's output
-by default: `bear -- ./configure` followed by `bear -- make` leaves
-nothing behind from the configure run, as
-[Troubleshooting](../troubleshooting.md) explains under "The output has
-extra entries" (that page also covers excluding probe files by pattern
-instead, if you would rather keep one combined run).
+re-runs `configure` itself): `configure`'s throwaway toolchain probes
+(`conftest.c` and similar) end up recorded alongside the real build. Run
+`configure` and `make` as two separate Bear invocations instead, as
+above; the second run's output overwrites the first's, so nothing from
+the probe phase survives. See
+[Troubleshooting](../troubleshooting.md#the-output-has-extra-entries) for
+the mechanics, and for excluding probe files by pattern instead, if you
+would rather keep one combined run.
 
 ## Incremental builds
 
@@ -87,10 +81,10 @@ bear --append -- make greet.o
 
 After the first call the database holds one entry (`main.c`); after the
 second it holds two, with the newest entry first. On the first call
-there is nothing to append to, so Bear warns and ignores the option.
-If a file is later rebuilt with different flags, its
-newest entry wins by default (duplicates are matched on `directory` and
-`file`); see [Bear produces an empty
+there is nothing to append to, so Bear warns and ignores the option. If
+a file is later rebuilt with different flags, its newest entry wins by
+default; see [Configure Bear](../../reference/configuration.md#duplicates)
+for the matching rule, and [Bear produces an empty
 compile_commands.json](empty-compilation-database.md) if entries still
 seem to go missing.
 
@@ -162,7 +156,9 @@ it understands.
 ## Where the output goes, and how to change it
 
 By default Bear writes `compile_commands.json` in the directory it was
-started from. Use `-o`/`--output` to write it somewhere else:
+started from. Use `-o`/`--output` (see [Command-line
+options](../../reference/command-line.md#global-usage)) to write it
+somewhere else:
 
 ```sh
 bear -o build/compile_commands.json -- make
@@ -185,6 +181,9 @@ accept it.
   runs in a container.
 - [How Bear works](../../understanding/how-it-works.md) for the interception mechanism
   behind everything on this page.
+- [Command-line options](../../reference/command-line.md) and [Configure
+  Bear](../../reference/configuration.md) for the flags and keys named
+  above.
 - [Recipes](index.md) for the rest of the task pages.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

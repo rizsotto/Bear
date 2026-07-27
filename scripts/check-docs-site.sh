@@ -6,7 +6,7 @@
 # Run from anywhere:
 #     ./scripts/check-docs-site.sh
 #
-# The check has seven parts:
+# The check has eight parts:
 #   1. `mdbook build` must succeed AND print no WARN or ERROR line.
 #      Warnings are fatal on purpose: mdBook reports preprocessor and
 #      include failures that way, and they would otherwise ship silently.
@@ -67,6 +67,10 @@
 #      typo or an invented key. That one-directional, name-only check is
 #      enough to catch the drift that matters here: a key added to the
 #      site page without ever being added to the man page.
+#   8. Every `page.md#anchor` link must resolve to a heading that exists
+#      in the rendered HTML. mdBook does not check anchors and part 2
+#      strips them, so a renamed heading otherwise ships a link that
+#      lands on the right page at the wrong place.
 #   7. `src/reference/command-line.md` is generated, in part, from the
 #      installed `bear` binary's own `--help` output by
 #      `scripts/generate-command-line-reference.py`. Same shape as part
@@ -313,6 +317,41 @@ else
         exit 1
     fi
     command_line_status="up to date"
+fi
+
+# 8. Every `page.md#anchor` link must point at a heading that exists.
+#    mdBook does not check anchors, and part 2 strips them before looking
+#    the file up, so a renamed heading leaves a link that lands on the
+#    right page at the wrong place. The rendered HTML is the only honest
+#    source of anchor ids, because mdBook slugifies headings, drops
+#    inline code markup, and de-duplicates repeats; part 1 has just
+#    produced it.
+anchors="$(mktemp)"
+trap 'rm -f "${log}" "${problems}" "${toc}" "${keys}" "${scratch}" "${anchors}"' EXIT
+python3 - "${src_dir}" "${site_dir}/book" >"${anchors}" <<'PYEOF'
+import os, re, sys, pathlib
+
+src, book = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+ids = {}
+for html in book.rglob("*.html"):
+    text = html.read_text(encoding="utf-8", errors="replace")
+    ids[str(html.relative_to(book))] = set(re.findall(r'id="([^"]+)"', text))
+for page in sorted(src.rglob("*.md")):
+    for match in re.finditer(r"\]\(([^)\s]+\.md)#([^)\s]+)\)", page.read_text()):
+        target, anchor = match.group(1), match.group(2)
+        rendered = os.path.normpath(
+            os.path.join(page.parent.relative_to(src), target)
+        ).replace(".md", ".html")
+        where = f"{page.relative_to(src)} -> {target}#{anchor}"
+        if rendered not in ids:
+            print(f"BROKEN ANCHOR: {where} (no such page)")
+        elif anchor not in ids[rendered]:
+            print(f"BROKEN ANCHOR: {where} (no such heading)")
+PYEOF
+if [ -s "${anchors}" ]; then
+    cat "${anchors}" >&2
+    echo "FAILED: a link points at a heading that does not exist" >&2
+    exit 1
 fi
 
 echo "OK: site builds clean, links resolve, every page is in SUMMARY.md, supported-compilers.md is up to date, command-line.md is ${command_line_status}, and every configuration.md key is in the man page"

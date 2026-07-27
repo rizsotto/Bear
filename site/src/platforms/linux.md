@@ -2,20 +2,14 @@
 
 # Bear on Linux, WSL2, and Docker
 
-```sh
-bear -- make -j$(nproc)
-```
-
-On Linux, Bear intercepts the build by preloading a small library
-(`libexec.so`) into every process the build starts; this preload method
-is the default there, and it is transparent to the build - no wrapper
-directory, no `PATH` changes. See [how Bear
-works](../understanding/how-it-works.md) for the mechanism, and force wrapper mode
-instead with `intercept.mode: wrapper` in the configuration file (see
-the [`bear(1)` man
-page](https://github.com/rizsotto/Bear/blob/master/man/bear.1.md)) if
-the build tool is statically linked, since a static binary's `exec()`
-calls are invisible to `LD_PRELOAD`.
+Preload is the default interception method on Linux: Bear injects a
+small library (`libexec.so`) into every process the build starts, and
+it is transparent to the build - no wrapper directory, no `PATH`
+changes. See [how Bear works](../understanding/how-it-works.md) for the
+mechanism. It cannot see into a statically linked build tool, because a
+static binary's `exec()` calls never reach the dynamic linker; force
+wrapper mode instead with `intercept.mode: wrapper` (see [Configure
+Bear](../reference/configuration.md#intercept)).
 
 ## WSL2
 
@@ -70,10 +64,15 @@ INTERCEPT_LIBDIR=lib64 cargo build --release
 INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
 ```
 
-A mismatch here is the usual cause of an `ld.so` error naming
-`libexec.so` at startup; see
-[Troubleshooting](../guides/troubleshooting.md) for that error and for the
-related glibc-version mismatch seen in cross-compilation.
+A mismatch here does not fail the build or even print an error most
+people notice: the dynamic linker just skips a preload target it cannot
+open, prints its own warning, and lets the build run, so the usual
+symptom is an `ld.so` error naming `libexec.so` at startup followed by a
+database that is empty or short despite Bear itself exiting `0` - see
+[Exit status](../reference/exit-status.md#notes) for why that counts as
+success. [Troubleshooting](../guides/troubleshooting.md) covers that
+error and the related glibc-version mismatch seen in
+cross-compilation.
 
 Related: [Troubleshooting](../guides/troubleshooting.md) for output that comes
 out wrong, and the [Recipes](../guides/recipes/index.md) index for other
