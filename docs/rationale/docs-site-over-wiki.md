@@ -75,9 +75,11 @@ anything a reader can do with the tool.
 - The one-page-per-type discipline forces splits that a single wiki page
   used to absorb. The old Usage page was a tutorial, several how-tos,
   and a flag reference in one document, and it becomes several pages.
-- The reference type has no page on the site at all: `man/bear.1.md`
-  owns flags, configuration keys, and defaults, and the site links to it
-  rather than restating it.
+- The reference section is generated wherever it can be: the
+  command-line page from the binary's own help output, the compiler list
+  from the compiler definitions. That is the only way a second copy of a
+  contract stays true, and it is why the site is willing to hold one at
+  all. `man/bear.1.md` remains the offline copy of the same material.
 
 Rejected alternatives:
 

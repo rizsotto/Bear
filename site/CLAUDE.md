@@ -81,7 +81,12 @@ is for users.
    command to run. Background, caveats, and mechanism come after. This
    is what earns search snippets and citations from AI assistants, and
    it is the rule most easily lost by opening with two paragraphs about
-   `LD_PRELOAD`.
+   `LD_PRELOAD`. It is also mechanized, not just good practice:
+   `scripts/postprocess-docs-site.sh` lifts this exact paragraph, tags
+   stripped, as the page's `<meta name="description">`, truncated to
+   about 155 characters on a word boundary. Keep it a real,
+   self-contained sentence, since one that only makes sense after the
+   heading reads as a broken snippet in search results.
 4. **Every shell command shown must be verified.** Run it against a
    debug build, or cite the integration test that exercises it. An
    unverified command does not ship. Verification is a precondition for

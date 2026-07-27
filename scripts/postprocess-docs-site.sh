@@ -1,8 +1,8 @@
 #!/bin/sh
 # Post-process the built documentation site under `site/book/` for search
-# and AI-assistant discovery: generate a sitemap and robots.txt, and
-# inject a canonical link plus JSON-LD structured data into every
-# rendered page's <head>.
+# and AI-assistant discovery: generate a sitemap and robots.txt, give
+# each page its own meta description, and inject a canonical link plus
+# JSON-LD structured data into every rendered page's <head>.
 #
 # Run after `mdbook build site` (the same build that
 # `./scripts/check-docs-site.sh` performs):
@@ -30,7 +30,27 @@
 #      indexed" report waiting to happen.
 #   2. Writes `site/book/robots.txt`, allowing all crawlers and pointing
 #      them at the sitemap.
-#   3. Injects, into every rendered page's <head>, a
+#   3. Rewrites every rendered page's `<meta name="description">` (mdBook
+#      stamps the single book.toml description onto all of them) with a
+#      description built from that page's OWN prose, read out of `<main>`
+#      in document order: `<p>` elements are collected (skipping anything
+#      nested inside `<pre>`, `<table>`, `<ul>`, `<ol>`, or `<blockquote>`,
+#      none of which is prose) and joined with a single space until the
+#      joined text reaches roughly 120 characters or the page runs out of
+#      paragraphs, because this site's answer-first authoring rule means
+#      a lone first paragraph is often just a lead-in clause ending in
+#      `:` ("Run this from the directory holding the Makefile:"), too
+#      thin on its own to work as a search snippet. Tags are stripped and
+#      entities decoded as the paragraphs are read, and the joined text
+#      is truncated to about 155 characters on a word boundary. See
+#      compute_description below for the exact rule, including the
+#      trailing-colon guard, and its fallback to the book-level
+#      description (used for the home page, and any page with no usable
+#      paragraph at all, such as 404.html). A page with no `<meta
+#      name="description">` element at all (the sidebar-iframe fragment
+#      toc.html) is left untouched rather than gaining one, since
+#      nothing else in the pipeline expects it to carry meta tags.
+#   4. Injects, into every rendered page's <head>, a
 #      `<link rel="canonical">` to that page's own live URL, plus
 #      JSON-LD in a `<script type="application/ld+json">` block: a
 #      `BreadcrumbList`, and, on the home page only, a
@@ -52,9 +72,10 @@
 # output.
 #
 # Exit codes:
-#   0 - sitemap, robots.txt, and per-page injection all succeeded
-#   2 - invocation error: `site/book` is missing, or a rendered page has
-#       no `<head>` element to inject into
+#   0 - sitemap, robots.txt, and per-page rewrite all succeeded
+#   2 - invocation error: `site/book` is missing, `awk` or `python3` is
+#       not on PATH, or a rendered page has no `<head>` element to
+#       inject into
 
 set -eu
 
@@ -64,6 +85,12 @@ book_dir="${repo_root}/site/book"
 
 base_url="https://rizsotto.github.io/Bear/"
 marker="<!-- postprocess-docs-site: generated, do not edit by hand -->"
+# The single description book.toml stamps onto every page (see
+# site/book.toml). Used verbatim for the home page and the
+# SoftwareApplication JSON-LD, and as the fallback for any other page
+# whose first paragraph cannot be turned into a description (see
+# compute_description below).
+book_description="Generate compile_commands.json for any C or C++ build."
 
 if [ ! -d "${book_dir}" ]; then
     echo "error: no book directory found at ${book_dir}" >&2
@@ -73,6 +100,11 @@ fi
 
 if ! command -v awk >/dev/null 2>&1; then
     echo "error: awk not found on PATH" >&2
+    exit 2
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 not found on PATH" >&2
     exit 2
 fi
 
@@ -124,7 +156,174 @@ mv "${tmp_sitemap}" "${book_dir}/sitemap.xml"
     printf 'Sitemap: %ssitemap.xml\n' "${base_url}"
 } >"${book_dir}/robots.txt"
 
-# --- 3. per-page <head> injection ---------------------------------------
+# --- 3. per-page <head> rewrite: description, canonical, JSON-LD -------
+
+# Derives a page's own meta description from its own prose. This site's
+# answer-first rule (site/CLAUDE.md content rule 3) means a page's FIRST
+# paragraph is often just a lead-in clause to a code block ("Run this
+# from the directory holding the Makefile:"), too thin on its own to
+# read as a search snippet, so paragraphs are collected in document
+# order and joined with a single space until the joined text reaches
+# about 120 characters or the page runs out of paragraphs. Only <p>
+# elements directly inside <main> count as prose: anything nested inside
+# <pre> (a code block), <table>, <ul>/<ol> (list items, including a
+# "loose" list whose items render as inner <p> tags), or <blockquote> (an
+# admonition) is skipped, and the leading Diataxis-type comment and the
+# <h1> page header are skipped too, since neither is a <p>. Tags are
+# stripped and entities decoded per paragraph as they are read (Python's
+# HTMLParser with convert_charrefs=True does both), and the final joined
+# text is truncated to about 155 characters on a word boundary (an ASCII
+# "..." marks a truncation; text already at or under the limit is left
+# alone). A joined text that still ends with ":" means the loop ran out
+# of paragraphs before completing a real sentence; rather than ship a
+# dangling lead-in clause, it is cut back to the end of the last full
+# sentence, or dropped entirely if there is no earlier sentence to cut
+# back to. The final text is escaped for an HTML attribute (& and " at
+# minimum). Prints nothing, rather than a bad description, whenever none
+# of this yields usable text (no <main>, no <p> inside it, or a
+# trailing-colon page with no earlier sentence); the caller then falls
+# back to the book-level description. That fallback is also what covers
+# 404.html (its first paragraph reads fine in isolation, but a page
+# that is deliberately excluded from the sitemap as "not meant to be
+# indexed" should not get bespoke SERP copy either).
+#   $1 = absolute path to the page's rendered HTML file
+compute_description() {
+    page_file="$1"
+    python3 - "${page_file}" <<'PYEOF'
+import sys
+from html.parser import HTMLParser
+
+
+class ProseExtractor(HTMLParser):
+    """Collects the text of every <p> directly inside <main>, in document
+    order, skipping anything nested inside a code block, table, list, or
+    admonition (see compute_description's shell comment for why)."""
+
+    SKIP_TAGS = ("pre", "table", "ul", "ol", "blockquote")
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.main_depth = 0
+        self.skip_depth = 0
+        self.in_p = False
+        self.buf = []
+        self.paragraphs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "main":
+            self.main_depth += 1
+            return
+        if self.main_depth == 0:
+            return
+        if tag in self.SKIP_TAGS:
+            self.skip_depth += 1
+            return
+        if self.skip_depth == 0 and tag == "p":
+            self.in_p = True
+            self.buf = []
+
+    def handle_endtag(self, tag):
+        if tag == "main":
+            self.main_depth = max(0, self.main_depth - 1)
+            return
+        if self.main_depth == 0:
+            return
+        if tag in self.SKIP_TAGS:
+            self.skip_depth = max(0, self.skip_depth - 1)
+            return
+        if self.skip_depth == 0 and tag == "p" and self.in_p:
+            text = " ".join("".join(self.buf).split())
+            if text:
+                self.paragraphs.append(text)
+            self.in_p = False
+            self.buf = []
+
+    def handle_data(self, data):
+        if self.in_p and self.skip_depth == 0:
+            self.buf.append(data)
+
+
+def cut_dangling_colon(joined):
+    """joined ends with ":" (a lead-in with nothing after it in the
+    collected text yet). Cuts back to the end of the last complete
+    sentence inside it, or returns "" if there is no earlier sentence to
+    cut back to."""
+    cut_at = max(joined.rfind(". "), joined.rfind("! "), joined.rfind("? "))
+    return joined[: cut_at + 1] if cut_at != -1 else ""
+
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    source = f.read()
+
+parser = ProseExtractor()
+parser.feed(source)
+paragraphs = parser.paragraphs
+if not paragraphs:
+    sys.exit(0)
+
+# A paragraph both SHORT and colon-terminated is a bare lead-in to
+# whatever code block follows it ("Then confirm it is on your PATH:"),
+# not free-standing prose, so a LATER one (the page's own first
+# paragraph is always kept regardless, see below) is dropped rather than
+# appended: installation.html has three such paragraphs in a row before
+# its first real sentence, and joining all three reads as three
+# disconnected instructions, not "one or two whole sentences". A LONG
+# paragraph that happens to end in ":" (introducing a JSON example, say)
+# is still real content and is kept; if it is the last thing collected,
+# the dangling-colon handling below trims it back to its last complete
+# sentence instead.
+lead_in_limit = 80
+target = 120
+eligible = paragraphs[:1] + [
+    p
+    for p in paragraphs[1:]
+    if not (p.endswith(":") and len(p) < lead_in_limit)
+]
+
+text = ""
+collected = []
+for paragraph in eligible:
+    collected.append(paragraph)
+    joined = " ".join(collected)
+    if len(joined) < target:
+        continue
+    if joined.endswith(":"):
+        resolved = cut_dangling_colon(joined)
+        if not resolved:
+            # The target length was reached only by way of a dangling
+            # lead-in with no earlier sentence anywhere in it yet (e.g.
+            # a single long compound clause: "Source the environment
+            # script, then run the build exactly as you would for any
+            # other compiler:"). Keep pulling paragraphs instead of
+            # settling for that.
+            continue
+        text = resolved
+    else:
+        text = joined
+    break
+else:
+    # Ran out of paragraphs without a clean stop; use whatever was
+    # collected, with the same dangling-colon cleanup as a last resort.
+    joined = " ".join(collected)
+    text = cut_dangling_colon(joined) if joined.endswith(":") else joined
+
+if not text:
+    sys.exit(0)
+
+limit = 155
+if len(text) > limit:
+    cut = text[:limit]
+    last_space = cut.rfind(" ")
+    if last_space > 0:
+        cut = cut[:last_space]
+    text = cut.rstrip(" .,;:-") + "..."
+
+# Escape for an HTML attribute. Order matters: escape "&" first, so the
+# "&quot;" the next line introduces is not itself re-escaped.
+escaped = text.replace("&", "&amp;").replace('"', "&quot;")
+print(escaped)
+PYEOF
+}
 
 # Capitalizes the first letter of each hyphen/underscore-separated word,
 # e.g. "getting-started" -> "Getting Started". Fallback only, used when a
@@ -284,6 +483,33 @@ while read -r page; do
         is_home=0
     fi
 
+    # The home page keeps the book-level description; it is already the
+    # right sentence for the site root. 404.html gets it too: part 1
+    # above excludes 404.html from the sitemap on the grounds that an
+    # error page is not meant to be indexed regardless of its content,
+    # and the same reasoning says it should not get bespoke SERP copy
+    # either. Every other page tries its own first paragraph first.
+    if [ "${is_home}" -eq 1 ] || [ "${relative}" = "404.html" ]; then
+        description="${book_description}"
+    else
+        description="$(compute_description "${page}")"
+        [ -z "${description}" ] && description="${book_description}"
+    fi
+
+    # A page with no <meta name="description"> element at all (the
+    # sidebar-iframe fragment toc.html) is left untouched: there is
+    # nothing to replace, and nothing downstream expects it to have one.
+    if grep -q '<meta name="description" content="' "${page}"; then
+        awk -v desc="${description}" '
+            /<meta name="description" content="/ {
+                print "        <meta name=\"description\" content=\"" desc "\">"
+                next
+            }
+            { print }
+        ' "${page}" >"${tmp_page}"
+        mv "${tmp_page}" "${page}"
+    fi
+
     breadcrumb_items="$(build_breadcrumb_items "${path_no_ext}" "${canonical}" "${page}")"
     breadcrumb_json=$(printf '{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[%s]}' \
         "${breadcrumb_items}")
@@ -295,7 +521,8 @@ while read -r page; do
         printf '%s\n' "${breadcrumb_json}"
         printf '</script>\n'
         if [ "${is_home}" -eq 1 ]; then
-            software_json='{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Bear","description":"Generate compile_commands.json for any C or C++ build.","url":"https://rizsotto.github.io/Bear/","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, FreeBSD, OpenBSD, NetBSD, DragonFly BSD, Windows","sameAs":"https://github.com/rizsotto/Bear"}'
+            software_json=$(printf '{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Bear","description":"%s","url":"https://rizsotto.github.io/Bear/","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, FreeBSD, OpenBSD, NetBSD, DragonFly BSD, Windows","sameAs":"https://github.com/rizsotto/Bear"}' \
+                "${book_description}")
             printf '<script type="application/ld+json">\n'
             printf '%s\n' "${software_json}"
             printf '</script>\n'

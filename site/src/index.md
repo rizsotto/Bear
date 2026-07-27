@@ -50,7 +50,9 @@ are not enough.
   incomplete.
 - [How Bear works](understanding/how-it-works.md) - the mechanism behind the results.
 
-The complete reference for command-line options, configuration keys, and
-their defaults is the [`bear(1)` man page][manpage], not this site.
-
-  [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md
+Looking something up rather than reading? [Command-line
+options](reference/command-line.md) and [Configure
+Bear](reference/configuration.md) are generated from Bear itself, so they
+match the version you have; [Supported
+compilers](reference/supported-compilers.md) lists every executable Bear
+recognizes.
