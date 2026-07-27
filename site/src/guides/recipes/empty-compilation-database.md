@@ -269,7 +269,7 @@ exactly which invocation Bear saw and how it classified it. Without
 Related: [Troubleshooting](../troubleshooting.md) for a database that
 is short or wrong rather than empty, [Supported
 compilers](../../reference/supported-compilers.md) for the recognized names,
-[Frequently asked questions](../../understanding/faq.md), [How Bear
+[How Bear
 works](../../understanding/how-it-works.md) for the interception and analysis mechanism,
 the [Recipes](index.md) index, and the platform notes for
 [Linux](../../platforms/linux.md), [macOS](../../platforms/macos.md),

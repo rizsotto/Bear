@@ -225,13 +225,15 @@ mismatch entirely.
 2. Run with `RUST_LOG=debug` and read the output.
 3. Search [existing
    issues](https://github.com/rizsotto/Bear/issues?q=is%3Aissue).
-4. Check the [FAQ](../understanding/faq.md).
+4. Check [How Bear works](../understanding/how-it-works.md) if the
+   behaviour itself is the surprise.
 5. Open a new issue with the debug log and your platform (OS, Bear
    version from `bear --version`, and build system).
 
 Related: [Command-line options](../reference/command-line.md) and
 [Configure Bear](../reference/configuration.md) for the flags and keys
-named above, the [FAQ](../understanding/faq.md) for the empty-database
+named above, [Bear produces an empty
+compile_commands.json](recipes/empty-compilation-database.md) for that
 case, the [Recipes](recipes/index.md) index for task-shaped pages, and
 the platform notes for [Linux](../platforms/linux.md),
 [macOS](../platforms/macos.md), [Windows](../platforms/windows.md), and

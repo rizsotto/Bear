@@ -21,6 +21,7 @@
   - [Use Bear with ccache, distcc, or icecc](guides/recipes/ccache-distcc-icecc.md)
   - [Run Bear inside a Docker container](guides/recipes/docker.md)
   - [Generate compile_commands.json when cross-compiling](guides/recipes/cross-compilation.md)
+  - [Intercept a 32-bit build on a 64-bit host](guides/recipes/multilib.md)
   - [Generate compile_commands.json for an STM32 or arm-none-eabi project](guides/recipes/embedded-arm.md)
   - [Use Bear with a vendor embedded toolchain](guides/recipes/vendor-embedded.md)
   - [Generate compile_commands.json for an Emscripten project](guides/recipes/emscripten.md)
@@ -40,7 +41,6 @@
 # Understanding Bear
 
 - [How Bear works](understanding/how-it-works.md)
-- [Frequently asked questions](understanding/faq.md)
 
 # Platform notes
 

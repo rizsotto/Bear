@@ -79,7 +79,8 @@ dynamic-linker feature, not a ptrace-based interception, so it needs no
 ## When to fall back to wrapper mode
 
 If the build tool inside the container is statically linked (a Go build
-using cgo is the common case; see [FAQ](../../understanding/faq.md)), set wrapper mode in
+using cgo is the common case; see [How Bear
+works](../../understanding/how-it-works.md)), set wrapper mode in
 the configuration file the build reads:
 
 ```yaml
