@@ -139,24 +139,49 @@ name their own grammar already.
 
 ## The page-type map
 
-| Type | Purpose | Pages |
+| Type | Purpose | Where |
 |---|---|---|
-| tutorial | The first successful run; learning by doing. | `getting-started.md` |
-| how-to | One task, for a reader who already knows what they want. | `recipes/*`, platform pages, troubleshooting |
-| reference | Enumeration; looked up, not read. | `man/bear.1.md` owns flags, configuration keys, and defaults, and the site does not duplicate it. `supported-compilers.md` is the site's one reference page: it enumerates recognized compilers, and it is generated from the compiler definitions rather than written, so it cannot drift from them. Do not add a hand-written reference page. |
-| explanation | Mechanism and design. No commands. | `how-it-works.md` |
+| tutorial | One narrow path from start to finish, for a first-timer. Expensive to read and to write, so there are few. | `src/tutorials/` |
+| how-to | The paths a reader can take through a task, dwelling only where attention is needed. | `src/guides/`, `src/platforms/` |
+| reference | Enumeration, looked up rather than read. Must be exactly correct. | `src/reference/` |
+| explanation | Mechanism and design. No commands. | `src/understanding/` |
 
-Pages outside that table: `installation.md` is a how-to;
-`configuration.md` and `faq.md` are explanation. `configuration.md`
-explains what the sections are for and states each one's default, and
-sends the reader to the man page for the exact keys; stating a default is
-explanation, but a copy-paste configuration recipe is not, and does not
-belong there.
-An FAQ answer that grows into a task with commands moves to its own
-recipe.
+Reference is the cornerstone: everything else points at it. Two of its
+pages are generated from the thing they describe, so they cannot drift;
+prefer generating a new reference page over writing one. `man/bear.1.md`
+remains the offline copy of the same contract, and on-site pages link the
+site's reference rather than the man page.
+
+## What a how-to owes the reader
+
+A how-to is not a tutorial with the narrative removed, and it is not a
+reference with prose around it. The distinction is what earns its length:
+
+- **Cover the paths, not one path.** A tutorial walks a single route
+  because the reader has none of their own. A how-to reader arrives with a
+  situation, so the page has to admit the branches that situation can
+  take, and say which one they are on.
+- **Dwell only where attention is needed.** The parts of a task that just
+  work need a sentence, not a section. Spend the page on the step that
+  fails, surprises, or has to be decided. A page that narrates the easy
+  parts at the same length as the hard one gives the reader no way to
+  judge what matters.
+- **Point at reference, constantly.** Every flag, configuration key,
+  compiler name, and exit status has exactly one correct home under
+  `src/reference/`. Name it and link it; do not restate it. Restating is
+  how the page grows long, and how it goes stale when the reference
+  changes.
+- **Do not send the reader to the FAQ or troubleshooting instead.** Those
+  are for a reader who already has a symptom. They are not where a fact
+  lives, and linking them in place of reference is the habit this rule
+  exists to break.
+
+A how-to that, stripped of everything the reference already says, has
+nothing left is not a how-to. Merge it into a sibling, or give it the
+failure mode that justifies it.
 
 Three pages are navigation rather than content: `src/index.md` (the home
-page), `src/recipes/index.md`, and `src/404.md`. They are the only files
+page), `src/guides/recipes/index.md`, and `src/404.md`. They are the only files
 allowed to declare `<!-- Diataxis type: landing (navigation page, not one
 of the four types) -->`. Do not add a fourth.
 
@@ -192,7 +217,7 @@ Before committing any change under `site/`, run:
 ./scripts/check-docs-site.sh
 ```
 
-It must print `OK` and exit 0. The check has five parts:
+It must print `OK` and exit 0. The check has seven parts:
 
 1. `mdbook build site` must succeed and print no `WARN` or `ERROR` log
    line. Warnings are fatal on purpose: mdBook reports preprocessor and
@@ -217,13 +242,21 @@ It must print `OK` and exit 0. The check has five parts:
 4. Every absolute `/Bear/<page>.html` link in `404.md` must have a
    matching `<page>.md`. Part 2 only follows `.md` targets, so without
    this the not-found page could ship a dead link.
-5. `src/supported-compilers.md` must match what
+5. `src/reference/supported-compilers.md` must match what
    `scripts/generate-supported-compilers.py` produces from the current
    `crates/bear/compilers/*.yaml`. After changing a compiler YAML file,
-   or the generator, run `python3
-   scripts/generate-supported-compilers.py` and commit its output with
-   the YAML change. Commenting an entry out does not count as listing
-   it, and `(./page.md)` counts the same as `(page.md)`.
+   or the generator, run it and commit its output with the YAML change.
+6. No configuration key named on `src/reference/configuration.md` may be
+   absent from `man/bear.1.md`, which owns the configuration contract.
+   The check compares a key's last segment only; see the script header
+   for what that does and does not catch.
+7. `src/reference/command-line.md` must match what
+   `scripts/generate-command-line-reference.py` produces from the
+   installed binary. Unlike part 5, this one needs a built and installed
+   `bear`, which CI and a contributor may not have, so it SKIPS with a
+   notice when no binary is found rather than failing. After changing
+   `crates/bear/src/args.rs`, build, install to a throwaway prefix, run
+   the generator, and commit its output with the code change.
 
 `.github/workflows/pages.yml` runs the same script on every push and
 pull request, and it is the single source of truth for the pinned mdBook

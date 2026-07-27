@@ -34,8 +34,10 @@
 
 # Reference
 
+- [Command-line options](reference/command-line.md)
 - [Configure Bear](reference/configuration.md)
 - [Supported compilers](reference/supported-compilers.md)
+- [Exit status](reference/exit-status.md)
 
 # Understanding Bear
 

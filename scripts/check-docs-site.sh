@@ -6,7 +6,7 @@
 # Run from anywhere:
 #     ./scripts/check-docs-site.sh
 #
-# The check has six parts:
+# The check has seven parts:
 #   1. `mdbook build` must succeed AND print no WARN or ERROR line.
 #      Warnings are fatal on purpose: mdBook reports preprocessor and
 #      include failures that way, and they would otherwise ship silently.
@@ -67,6 +67,27 @@
 #      typo or an invented key. That one-directional, name-only check is
 #      enough to catch the drift that matters here: a key added to the
 #      site page without ever being added to the man page.
+#   7. `src/reference/command-line.md` is generated, in part, from the
+#      installed `bear` binary's own `--help` output by
+#      `scripts/generate-command-line-reference.py`. Same shape as part
+#      5: regenerate into a scratch file and diff against the committed
+#      page. CRITICAL DIFFERENCE from part 5: that generator only reads
+#      the checkout, but this one needs a BUILT AND INSTALLED `bear`
+#      binary (see site/CLAUDE.md, "Authoritative sources"), which CI
+#      may not have staged at the point this script runs, and a
+#      contributor may not have built at all. So this part does not
+#      treat a missing binary as failure: the generator itself exits 2
+#      when it finds no usable binary (checking $BEAR_BIN, then the
+#      throwaway-install default), and this script treats exactly that
+#      exit code as "SKIPPED", printing a notice, rather than failing the
+#      whole check. Any other non-zero exit (malformed --help output, a
+#      missing template, ...) is a real problem and still fails part 7.
+#      This makes the script's own exit status depend on whether a
+#      binary happens to be present, which is unusual for this file, but
+#      the alternative (always failing without a binary) would make
+#      ./scripts/check-docs-site.sh unusable for anyone who has not
+#      just run a full build, including most CI stages other than the
+#      one that builds bear itself.
 #
 # mdBook must be on PATH. Install the version pinned in
 # `.github/workflows/pages.yml`, which is the single source of truth for
@@ -74,8 +95,10 @@
 #
 # Exit codes:
 #   0 - the site builds clean, every link and page checks out, the
-#       generated compiler page is up to date, and every configuration
-#       key on configuration.md is also named in the man page
+#       generated compiler and command-line pages are up to date (or
+#       part 7 was skipped for lack of a binary), and every
+#       configuration key on configuration.md is also named in the man
+#       page
 #   1 - at least one build warning, broken link, unlisted page, a
 #       stale generated page, or a configuration key missing from the
 #       man page
@@ -261,4 +284,35 @@ if [ -s "${problems}" ]; then
     exit 1
 fi
 
-echo "OK: site builds clean, links resolve, every page is in SUMMARY.md, supported-compilers.md is up to date, and every configuration.md key is in the man page"
+# 7. reference/command-line.md must match the generator's output from the
+#    currently installed bear binary. Unlike part 5, a binary is not
+#    guaranteed to exist here (see header comment), so a missing binary
+#    is not a failure: the generator signals that case with exit code 2,
+#    and this part turns exactly that into a skip, with a notice, rather
+#    than failing the whole script. Only a present binary is compared.
+command_line_status="SKIPPED (no bear binary)"
+set +e
+python3 "${script_dir}/generate-command-line-reference.py" "${scratch}" \
+    >"${log}" 2>&1
+gen_exit=$?
+set -e
+if [ "${gen_exit}" -eq 2 ]; then
+    echo "SKIPPED: command-line.md staleness check, no bear binary found:"
+    sed 's/^/  /' "${log}"
+elif [ "${gen_exit}" -ne 0 ]; then
+    cat "${log}" >&2
+    echo "FAILED: generate-command-line-reference.py could not run" >&2
+    exit 1
+else
+    if ! diff -u "${src_dir}/reference/command-line.md" "${scratch}" >"${log}"; then
+        cat "${log}" >&2
+        echo "FAILED: command-line.md is stale" >&2
+        echo "fix: python3 scripts/generate-command-line-reference.py" \
+            "(after building and installing bear to a throwaway prefix," \
+            "or pointing BEAR_BIN at one; see the script's header comment)" >&2
+        exit 1
+    fi
+    command_line_status="up to date"
+fi
+
+echo "OK: site builds clean, links resolve, every page is in SUMMARY.md, supported-compilers.md is up to date, command-line.md is ${command_line_status}, and every configuration.md key is in the man page"
