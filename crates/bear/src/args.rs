@@ -257,9 +257,13 @@ pub enum ParseError {
 pub fn cli() -> Command {
     // The binary is `bear-driver` but users invoke it as `bear` via a
     // shell wrapper, so we hardcode the user-facing name instead of
-    // letting `command!()` pick up CARGO_BIN_NAME.
+    // letting `command!()` pick up CARGO_BIN_NAME. `bin_name` has to be
+    // set as well: `name` labels the command, while usage and error
+    // messages are rendered from `bin_name`, which clap otherwise takes
+    // from argv[0] and would print as `bear-driver`.
     command!()
         .name("bear")
+        .bin_name("bear")
         .subcommand_required(false)
         .subcommand_negates_reqs(true)
         .subcommand_precedence_over_arg(true)
