@@ -104,6 +104,41 @@ mv '$LIB/libexec.so' lib64/libexec.so
 rmdir '$LIB'
 ```
 
+The result differs from the ordinary layout in exactly one place: the
+single `$INTERCEPT_LIBDIR` directory becomes two, one per ELF class, and
+no directory named `$LIB` is left behind.
+
+```
+$PREFIX/
+|-- bin/
+|   `-- bear                              (shell script)
+|-- libexec/
+|   `-- bear/
+|       |-- bin/
+|       |   |-- bear-driver
+|       |   `-- bear-wrapper
+|       |-- lib/
+|       |   `-- libexec.so                (ELF 32-bit)
+|       `-- lib64/
+|           `-- libexec.so                (ELF 64-bit)
+`-- share/                                (unchanged)
+```
+
+Check the two libraries really are different ELF classes, and that the
+32-bit one is the one under `lib`:
+
+```shell
+$ file <prefix>/libexec/bear/lib/libexec.so <prefix>/libexec/bear/lib64/libexec.so
+libexec/bear/lib/libexec.so:   ELF 32-bit LSB shared object
+libexec/bear/lib64/libexec.so: ELF 64-bit LSB shared object
+```
+
+Swapping them produces the same silent, short database as having no
+32-bit library at all: a 32-bit process looks only in `lib`, finds an
+object of the wrong class, and skips it. That output is worth including
+in any report about a multilib install. The rest of the tree, and what
+`PREFIX` and `DESTDIR` mean, is in [Install Bear](../../installation.md).
+
 ## Confirm it worked
 
 Run the build under `bear -- <build>` as usual. If it drives any 32-bit
