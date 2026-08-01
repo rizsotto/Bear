@@ -14,9 +14,6 @@ with `bear --` and it produces the `compile_commands.json` file that
 Clang tooling (clangd, clang-tidy, and friends) needs to understand your
 code.
 
-**[Documentation][DOCS]** - task pages for build systems, platforms, and
-toolchains.
-
 The [JSON compilation database][JSONCDB] describes how each translation unit
 is compiled. Bear captures the compiler invocations while your build runs
 and writes the database for you - no changes to your build system required.
