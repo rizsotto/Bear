@@ -92,10 +92,7 @@ fn main() {
 
 fn find_intercept_artifacts() -> (String, String, String) {
     let out_dir = std::env::var("OUT_DIR").unwrap();
-    let target_dir = std::path::Path::new(&out_dir)
-        .ancestors()
-        .nth(3) // Go up from out_dir to target/debug or target/release
-        .unwrap();
+    let target_dir = profile_dir_of(std::path::Path::new(&out_dir));
 
     let driver_path = target_dir.join(DRIVER_NAME);
     let wrapper_path = target_dir.join(WRAPPER_NAME);
@@ -106,6 +103,21 @@ fn find_intercept_artifacts() -> (String, String, String) {
         format!("{}", wrapper_path.display()),
         format!("{}", preload_path.display()),
     )
+}
+
+/// Climb from a build script's `OUT_DIR` to the profile directory that holds
+/// the linked binaries (`target/debug` or `target/release`).
+///
+/// Counting components is not safe here: cargo has shipped two `OUT_DIR`
+/// layouts, `<profile>/build/<pkg>-<hash>/out` and, on newer toolchains,
+/// `<profile>/build/<pkg>/<hash>/out`. Both put exactly one `build` component
+/// under the profile directory, so anchor on that instead of on a depth.
+fn profile_dir_of(out_dir: &std::path::Path) -> &std::path::Path {
+    out_dir
+        .ancestors()
+        .find(|a| a.file_name().and_then(|n| n.to_str()) == Some("build"))
+        .and_then(|build| build.parent())
+        .unwrap_or_else(|| panic!("no 'build' component in OUT_DIR: {}", out_dir.display()))
 }
 
 fn check_executable_exists(executable: &str) {
