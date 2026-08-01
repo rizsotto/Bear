@@ -26,12 +26,13 @@ not need to read any other document to use it.
 | `src/reference/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/bear/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
 | `src/understanding/` | The explanation pages. |
 | `src/platforms/` | One page per operating system. |
+| `theme/head.hbs` | Site-wide, static `<head>` content, injected by mdBook into every page. It holds the Google Search Console ownership token and nothing else; removing the tag un-verifies the property. Per-page `<head>` content does not go here (see the file's own comment). |
+| `book/` | Build output. Generated, git-ignored, never edited. |
 
 The directory layout mirrors the `SUMMARY.md` sections, so a page's
 folder tells you which section it belongs to and therefore which Diataxis
 type it must declare. A new page goes in the folder for its type; moving
 a page between sections means moving its file too.
-| `book/` | Build output. Generated, git-ignored, never edited. |
 
 The site does not overlap with `docs/`, which holds requirements
 (contracts) and rationale (decision records) for contributors. The site

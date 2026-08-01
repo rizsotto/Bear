@@ -1,0 +1,10 @@
+{{!-- mdBook injects this file into every page's <head>. It exists for
+     one reason: the Google Search Console ownership token for the
+     https://rizsotto.github.io/Bear/ property. Verification breaks if
+     the tag stops being served, so this stays for as long as the
+     property does. Only site-wide, static <head> content belongs here;
+     anything that varies per page (canonical link, meta description,
+     JSON-LD) is written by scripts/postprocess-docs-site.sh, because
+     mdBook exposes only the source .md path to this template and it
+     cannot be rewritten to the rendered .html URL. --}}
+<meta name="google-site-verification" content="2labVImYflOjLm3EBVp6_qQqda7h_DcIdZNZJV2iiyo" />
