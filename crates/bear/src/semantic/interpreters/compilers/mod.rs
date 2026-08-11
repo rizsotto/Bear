@@ -8,6 +8,7 @@
 
 pub mod compiler_recognition;
 mod flag_based;
+pub mod identity;
 mod print;
 mod probe;
 mod response_file;
@@ -17,8 +18,8 @@ pub use print::print_compilers;
 
 use super::super::{Interpreter, RecognizeResult};
 use super::combinators::OutputLogger;
-use crate::config::CompilerType;
-use compiler_recognition::CompilerRecognizer;
+use compiler_recognition::{CompilerHints, CompilerRecognizer};
+use identity::CompilerType;
 use intercept::Execution;
 use std::collections::HashMap;
 
@@ -35,26 +36,24 @@ pub struct CompilerInterpreter {
 
 impl CompilerInterpreter {
     /// Builds a fully configured compiler interpreter from the compiler hints
-    /// and the argument-formatting options (`format.arguments`): response-file
-    /// inlining and environment-flag folding. Registers every supported
-    /// compiler type exactly once.
-    pub fn new_with_format(
-        compilers: &[crate::config::Compiler],
-        arguments: &crate::config::ArgumentsFormat,
-    ) -> Self {
+    /// and the two argument-formatting switches: `from_response_files` inlines
+    /// `@file` references, `from_environment` folds compiler environment
+    /// variables into the arguments. Registers every supported compiler type
+    /// exactly once.
+    pub fn new_with_format(hints: CompilerHints, from_response_files: bool, from_environment: bool) -> Self {
         let mut result = Self {
-            recognizer: CompilerRecognizer::new_with_config(compilers),
+            recognizer: CompilerRecognizer::new_with_hints(hints),
             interpreters: HashMap::new(),
-            inline_response_files: arguments.from_response_files,
+            inline_response_files: from_response_files,
         };
-        result.register_all(arguments.from_environment);
+        result.register_all(from_environment);
         result
     }
 
     /// Convenience constructor with the default argument handling (response-file
     /// inlining off, environment-flag folding on). Used by [`Default`] and tests.
-    pub fn new_with_config(compilers: &[crate::config::Compiler]) -> Self {
-        Self::new_with_format(compilers, &crate::config::ArgumentsFormat::default())
+    pub fn new_with_hints(hints: CompilerHints) -> Self {
+        Self::new_with_format(hints, false, true)
     }
 
     /// Registers every supported compiler family from the generated
@@ -77,7 +76,7 @@ impl CompilerInterpreter {
 
 impl Default for CompilerInterpreter {
     fn default() -> Self {
-        Self::new_with_config(&[])
+        Self::new_with_hints(CompilerHints::new())
     }
 }
 
@@ -189,7 +188,7 @@ mod tests {
 
         #[test]
         fn gcc_recognition_and_delegation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("/usr/bin/gcc", vec!["/usr/bin/gcc", "-c", "test.c"], "/tmp");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)), "GCC command should be recognized");
@@ -203,7 +202,7 @@ mod tests {
 
         #[test]
         fn clang_recognition_and_delegation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("clang", vec!["clang", "-c", "main.c", "-o", "main.o"], "/tmp");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)), "Clang command should be recognized");
@@ -217,7 +216,7 @@ mod tests {
 
         #[test]
         fn unrecognized_compiler() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("unknown_compiler", vec!["unknown_compiler", "-c", "test.c"], "/tmp");
             assert!(
@@ -228,7 +227,7 @@ mod tests {
 
         #[test]
         fn delegation_preserves_execution_details() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let working_dir = PathBuf::from("/custom/working/dir");
             let mut environment = std::collections::HashMap::new();
             environment.insert("CC".to_string(), "gcc".to_string());
@@ -249,20 +248,11 @@ mod tests {
 
         #[test]
         fn end_to_end_config_based_compiler_hints() {
-            use crate::config::{Compiler, CompilerType};
-            let config = vec![
-                Compiler {
-                    path: "/custom/path/my-gcc".into(),
-                    as_: Some(CompilerType::compiler("gcc")),
-                    ignore: false,
-                },
-                Compiler {
-                    path: "/opt/clang/bin/clang++".into(),
-                    as_: Some(CompilerType::compiler("clang")),
-                    ignore: false,
-                },
-            ];
-            let sut = CompilerInterpreter::new_with_config(&config);
+            let mut hints = CompilerHints::new();
+            hints.add(Path::new("/custom/path/my-gcc"), Some("gcc")).unwrap();
+            hints.add(Path::new("/opt/clang/bin/clang++"), Some("clang")).unwrap();
+
+            let sut = CompilerInterpreter::new_with_hints(hints);
             let custom_gcc =
                 create_execution("/custom/path/my-gcc", vec!["/custom/path/my-gcc", "-c", "test.c"], "/tmp");
             assert!(
@@ -288,7 +278,7 @@ mod tests {
         // Requirements: recognition-compiler-launchers
         #[test]
         fn wrapper_recognition_and_delegation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let ccache_execution = create_execution("ccache", vec!["ccache", "gcc", "-c", "test.c"], "/tmp");
             let result = sut.recognize(ccache_execution);
             if let RecognizeResult::Recognized(cmd) = result {
@@ -303,7 +293,7 @@ mod tests {
 
         #[test]
         fn uniform_delegation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let executables = vec!["gcc", "clang", "nvcc", "gfortran", "ifort"];
             for executable in executables {
                 let execution = create_execution(executable, vec![executable, "-c", "test.c"], "/tmp");
@@ -343,7 +333,7 @@ mod tests {
         /// "not NotRecognized", not "Recognized".
         #[test]
         fn every_recognition_pattern_row_is_dispatched_by_a_registered_interpreter() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             for &(type_str, executables, _cross_compilation, _versioned, _description) in
                 compiler_recognition::RECOGNITION_PATTERNS
@@ -386,7 +376,7 @@ mod tests {
 
         #[test]
         fn simple_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project");
             assert_command(
                 sut.recognize(execution),
@@ -401,7 +391,7 @@ mod tests {
 
         #[test]
         fn combined_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec!["gcc", "-I/usr/include", "-DDEBUG=1", "-o", "main", "main.c"],
@@ -421,7 +411,7 @@ mod tests {
 
         #[test]
         fn separate_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec!["gcc", "-I", "/usr/include", "-D", "DEBUG=1", "main.c"],
@@ -440,7 +430,7 @@ mod tests {
 
         #[test]
         fn response_file() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("gcc", vec!["gcc", "@response.txt", "main.c"], "/project");
             assert_command(
                 sut.recognize(execution),
@@ -454,7 +444,7 @@ mod tests {
 
         #[test]
         fn warning_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("gcc", vec!["gcc", "-Wall", "-Wextra", "-Wno-unused", "main.c"], "/project");
             assert_command(
@@ -471,7 +461,7 @@ mod tests {
 
         #[test]
         fn std_flag_variations() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             for (args, expected_flag_args) in [
                 (vec!["gcc", "-std", "c99", "main.c"], vec!["-std", "c99"]),
@@ -488,7 +478,7 @@ mod tests {
 
         #[test]
         fn complex_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec![
@@ -527,7 +517,7 @@ mod tests {
 
         #[test]
         fn comprehensive_flag_coverage() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             // (flags, expected_kind) for prefix-matching flag groups
             let cases: Vec<(Vec<&str>, ArgumentKind)> = vec![
@@ -561,7 +551,7 @@ mod tests {
 
         #[test]
         fn linker_and_system_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             // Test linker flags
             let execution = create_execution(
@@ -609,7 +599,7 @@ mod tests {
 
         #[test]
         fn response_files_and_plugins() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec![
@@ -634,9 +624,7 @@ mod tests {
         /// Requirements: output-env-derived-flags
         #[test]
         fn environment_disabled_suppresses_injected_flags() {
-            let arguments =
-                crate::config::ArgumentsFormat { from_response_files: false, from_environment: false };
-            let sut = CompilerInterpreter::new_with_format(&[], &arguments);
+            let sut = CompilerInterpreter::new_with_format(CompilerHints::new(), false, false);
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
@@ -662,7 +650,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_cpath() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
@@ -689,7 +677,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_c_include_path() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let mut env = HashMap::new();
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
             let execution = create_execution_with_env(
@@ -714,7 +702,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_cplus_include_path() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let mut env = HashMap::new();
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
             let execution = create_execution_with_env(
@@ -739,7 +727,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_multiple() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
@@ -769,7 +757,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_objc_include_path() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let objc_include_path = create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
             let mut env = HashMap::new();
             env.insert("OBJC_INCLUDE_PATH", objc_include_path.as_str());
@@ -796,7 +784,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_all_types() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let mut env = HashMap::new();
             env.insert("CPATH", "/usr/include");
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
@@ -826,7 +814,7 @@ mod tests {
 
         #[test]
         fn environment_variables_empty_paths() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let c_include_path = create_path_string(&["", "", "", ""]);
             let mut env = HashMap::new();
             env.insert("CPATH", "");
@@ -847,7 +835,7 @@ mod tests {
 
         #[test]
         fn preprocessor_comprehensive_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec![
@@ -883,7 +871,7 @@ mod tests {
 
         #[test]
         fn internal_executables_are_ignored() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             let internal_cases = [
                 ("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1", vec!["cc1", "-quiet", "test.c"]),
@@ -910,7 +898,7 @@ mod tests {
 
         #[test]
         fn linker_command_with_object_files() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec!["gcc", "-o", "a.out", "source1.o", "source2.o", "-lx", "-L/usr/local/lib"],
@@ -931,7 +919,7 @@ mod tests {
 
         #[test]
         fn comprehensive_linker_scenarios() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             // Mixed compilation and linking
             let execution = create_execution(
@@ -1003,7 +991,7 @@ mod tests {
 
         #[test]
         fn arch_flag_preserves_argument() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "gcc",
                 vec!["gcc", "-arch", "arm64", "-Wall", "-O2", "-c", "hello.c"],
@@ -1030,7 +1018,7 @@ mod tests {
         // Requirements: recognition-cpp20-modules
         #[test]
         fn modules_ts_flag_recognizes_module_interface_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "g++",
                 vec!["g++", "-std=c++20", "-fmodules-ts", "-c", "mod.cppm"],
@@ -1054,7 +1042,7 @@ mod tests {
 
         #[test]
         fn simple_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("clang", vec!["clang", "-c", "-O2", "main.c"], "/project");
             assert_command(
                 sut.recognize(execution),
@@ -1069,7 +1057,7 @@ mod tests {
 
         #[test]
         fn specific_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang++",
                 vec![
@@ -1098,7 +1086,7 @@ mod tests {
 
         #[test]
         fn optimization_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec!["clang", "-O3", "-flto", "-fsave-optimization-record", "main.c"],
@@ -1118,7 +1106,7 @@ mod tests {
 
         #[test]
         fn target_flag_variations() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             for (args, expected_flag_args) in [
                 (
@@ -1141,7 +1129,7 @@ mod tests {
 
         #[test]
         fn sanitizer_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec![
@@ -1170,7 +1158,7 @@ mod tests {
 
         #[test]
         fn mllvm_flag() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec!["clang", "-O2", "-mllvm", "-inline-threshold=100", "myfile.c"],
@@ -1189,7 +1177,7 @@ mod tests {
 
         #[test]
         fn mllvm_flag_equals_form() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec!["clang", "-O2", "-mllvm=-inline-threshold=100", "myfile.c"],
@@ -1208,7 +1196,7 @@ mod tests {
 
         #[test]
         fn comprehensive_flag_coverage() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec![
@@ -1246,7 +1234,7 @@ mod tests {
 
         #[test]
         fn cross_compilation_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec![
@@ -1272,7 +1260,7 @@ mod tests {
 
         #[test]
         fn cuda_and_openmp_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec![
@@ -1299,7 +1287,7 @@ mod tests {
 
         #[test]
         fn framework_and_plugin_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec![
@@ -1330,7 +1318,7 @@ mod tests {
 
         #[test]
         fn analysis_and_codegen_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec![
@@ -1359,7 +1347,7 @@ mod tests {
 
         #[test]
         fn compilation_database_flag() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang",
                 vec!["clang", "-MJ", "compile_commands.json", "main.c"],
@@ -1379,7 +1367,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_cpath() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
@@ -1406,7 +1394,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_c_include_path() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let mut env = HashMap::new();
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
             let execution = create_execution_with_env(
@@ -1431,7 +1419,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_cplus_include_path() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let mut env = HashMap::new();
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
             let execution = create_execution_with_env(
@@ -1456,7 +1444,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_multiple() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
@@ -1484,7 +1472,7 @@ mod tests {
 
         #[test]
         fn environment_variables_empty_paths() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let c_include_path = create_path_string(&["", "", "", ""]);
             let mut env = HashMap::new();
             env.insert("CPATH", "");
@@ -1507,7 +1495,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_objc_include_path() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let objc_include_path = create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
             let mut env = HashMap::new();
             env.insert("OBJC_INCLUDE_PATH", objc_include_path.as_str());
@@ -1534,7 +1522,7 @@ mod tests {
         /// variable processing order may not match HashMap iteration order.
         #[test]
         fn environment_variables_all_types() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let mut env = HashMap::new();
             env.insert("CPATH", "/usr/include");
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
@@ -1564,7 +1552,7 @@ mod tests {
 
         #[test]
         fn cc1_invocation_ignored() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             // User-facing clang command should be recognized
             let user_execution = create_execution(
@@ -1644,7 +1632,7 @@ mod tests {
         // Requirements: recognition-cpp20-modules
         #[test]
         fn precompile_module_interface_does_not_source_the_output() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang++",
                 vec!["clang++", "--precompile", "-std=c++20", "foo.cppm", "-o", "foo.pcm"],
@@ -1665,7 +1653,7 @@ mod tests {
         // Requirements: recognition-cpp20-modules
         #[test]
         fn module_file_flag_consumes_precompiled_module_without_sourcing_it() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "clang++",
                 vec!["clang++", "-std=c++20", "-fmodule-file=foo=foo.pcm", "-c", "main.cpp"],
@@ -1689,7 +1677,7 @@ mod tests {
 
         #[test]
         fn basic() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "flang",
                 vec!["flang", "-fbackslash", "-ffree-form", "-J/path/to/modules", "-cpp", "main.f90"],
@@ -1712,7 +1700,7 @@ mod tests {
 
         #[test]
         fn basic_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("nvcc", vec!["nvcc", "-c", "kernel.cu", "-o", "kernel.o"], "/test");
             assert_command(
@@ -1728,7 +1716,7 @@ mod tests {
 
         #[test]
         fn gpu_architecture_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "nvcc",
                 vec![
@@ -1756,7 +1744,7 @@ mod tests {
 
         #[test]
         fn device_compilation_modes() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "nvcc",
                 vec!["nvcc", "--device-c", "--relocatable-device-code=true", "kernel.cu", "-o", "kernel.o"],
@@ -1776,7 +1764,7 @@ mod tests {
 
         #[test]
         fn host_compiler_passthrough() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "nvcc",
                 vec!["nvcc", "-Xcompiler", "-Wall", "-Xlinker", "-rpath=/usr/lib", "main.cu"],
@@ -1797,7 +1785,7 @@ mod tests {
 
         #[test]
         fn debug_and_optimization() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "nvcc",
                 vec!["nvcc", "-G", "--generate-line-info", "-O2", "--use_fast_math", "kernel.cu"],
@@ -1818,7 +1806,7 @@ mod tests {
 
         #[test]
         fn flag_formats() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
 
             for args in [
                 vec!["nvcc", "--gpu-architecture=sm_80", "-c", "kernel.cu"],
@@ -1835,7 +1823,7 @@ mod tests {
 
         #[test]
         fn specific_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("nvcc", vec!["nvcc", "--compile", "kernel.cu"], "/test");
             assert_command(
                 sut.recognize(execution),
@@ -1853,7 +1841,7 @@ mod tests {
 
         #[test]
         fn basic_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("ifort", vec!["ifort", "-c", "test.f90"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -1865,7 +1853,7 @@ mod tests {
 
         #[test]
         fn preprocessing_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "ifort",
                 vec!["ifort", "-fpp", "-DDEBUG", "-I/usr/include", "test.f90"],
@@ -1881,7 +1869,7 @@ mod tests {
 
         #[test]
         fn linking_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("ifort", vec!["ifort", "-shared-intel", "-lm", "test.o"], "/project");
             let result = sut.recognize(execution);
@@ -1894,7 +1882,7 @@ mod tests {
 
         #[test]
         fn info_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("ifort", vec!["ifort", "--version"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -1909,7 +1897,7 @@ mod tests {
 
         #[test]
         fn basic_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("crayftn", vec!["crayftn", "-c", "test.f90"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -1921,7 +1909,7 @@ mod tests {
 
         #[test]
         fn preprocessing_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "crayftn",
                 vec!["crayftn", "-DDEBUG", "-I/usr/include", "test.f90"],
@@ -1937,7 +1925,7 @@ mod tests {
 
         #[test]
         fn linking_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("crayftn", vec!["crayftn", "-add-rpath", "-lm", "test.o"], "/project");
             let result = sut.recognize(execution);
@@ -1950,7 +1938,7 @@ mod tests {
 
         #[test]
         fn cray_specific_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "crayftn",
                 vec!["crayftn", "-craylibs", "-target-cpu=x86_64", "test.f90"],
@@ -1967,7 +1955,7 @@ mod tests {
 
         #[test]
         fn openmp_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("crayftn", vec!["crayftn", "-openmp", "test.f90"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -1984,7 +1972,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn basic_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("mpicc", vec!["mpicc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2000,7 +1988,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn compiler_override_glued_form_keeps_single_token_and_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("mpicc", vec!["mpicc", "-cc=gcc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2026,7 +2014,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn compiler_override_separate_form_consumes_value() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("mpicc", vec!["mpicc", "-cc", "gcc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
@@ -2048,7 +2036,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn wrapper_info_flags_are_info_and_exit() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             for args in [vec!["mpicc", "-showme"], vec!["mpicc", "-show"], vec!["mpicc", "-compile_info"]] {
                 let execution = create_execution("mpicc", args.clone(), "/project");
                 let result = sut.recognize(execution);
@@ -2066,7 +2054,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn basic_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("qcc", vec!["qcc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2084,7 +2072,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn variant_selector_is_retained_and_does_not_swallow_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("qcc", vec!["qcc", "-Vgcc_ntoaarch64le", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
@@ -2111,7 +2099,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn bare_variant_listing_flag_is_a_driver_option() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("qcc", vec!["qcc", "-V", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2134,7 +2122,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn separate_format_value_is_consumed_not_classified_as_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "nasm",
                 vec!["nasm", "-f", "elf64", "hello.asm", "-o", "hello.o"],
@@ -2159,7 +2147,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn lowercase_define_value_with_source_extension_is_not_a_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "nasm",
                 vec!["nasm", "-d", "CONFIG=release.asm", "-f", "elf64", "hello.asm"],
@@ -2182,7 +2170,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn glued_format_value_is_consumed_not_classified_as_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("nasm", vec!["nasm", "-felf64", "hello.asm"], "/project");
             let result = sut.recognize(execution);
             assert_command(
@@ -2200,7 +2188,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn version_flag_has_no_source_argument() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("nasm", vec!["nasm", "-v"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2220,7 +2208,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn yasm_long_version_option_has_no_source_argument() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("yasm", vec!["yasm", "--version"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2244,7 +2232,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn memory_limit_value_is_consumed_and_output_positional_is_not_a_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("fasm", vec!["fasm", "-m", "65536", "hello.asm", "hello.o"], "/project");
             let result = sut.recognize(execution);
@@ -2268,7 +2256,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn basic_compilation() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution("swiftc", vec!["swiftc", "-c", "hello.swift"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
@@ -2288,7 +2276,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn whole_module_invocation_keeps_all_sources_and_flags() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "swiftc",
                 vec!["swiftc", "-module-name", "App", "-emit-object", "a.swift", "b.swift"],
@@ -2311,7 +2299,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn swift_frontend_executable_is_ignored() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "swift-frontend",
                 vec!["swift-frontend", "-frontend", "-c", "a.swift"],
@@ -2325,7 +2313,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn frontend_flag_execution_is_ignored() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution =
                 create_execution("swiftc", vec!["swiftc", "-frontend", "-c", "a.swift"], "/project");
             assert_ignored(sut.recognize(execution), "internal invocation");
@@ -2336,7 +2324,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn version_flags_are_info_and_exit() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             for args in [vec!["swiftc", "--version"], vec!["swiftc", "-version"]] {
                 let execution = create_execution("swiftc", args.clone(), "/project");
                 let result = sut.recognize(execution);
@@ -2359,7 +2347,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn forwarded_flags_consume_dash_prefixed_value_not_a_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "swiftc",
                 vec![
@@ -2404,7 +2392,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn define_and_import_path_accept_glued_or_separate_value() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "swiftc",
                 vec!["swiftc", "-DDEBUG", "-I", "/usr/local/include", "a.swift"],
@@ -2429,7 +2417,7 @@ mod tests {
         // Requirements: recognition-compiler-names
         #[test]
         fn bridging_header_value_is_consumed_not_a_phantom_source() {
-            let sut = CompilerInterpreter::new_with_config(&[]);
+            let sut = CompilerInterpreter::default();
             let execution = create_execution(
                 "swiftc",
                 vec!["swiftc", "-import-objc-header", "Bridging.h", "-module-name", "App", "a.swift"],

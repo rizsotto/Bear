@@ -13,7 +13,7 @@
 //! entry; no new detection is introduced here. See the
 //! `output-response-file-inlining` requirement for the contract.
 
-use crate::config::CompilerType;
+use super::identity::CompilerType;
 use intercept::Execution;
 use log::warn;
 use std::path::{Path, PathBuf};

@@ -177,7 +177,7 @@ mod tests {
     fn test_validate_compiler_invalid_path() {
         let config = Compiler {
             path: PathBuf::from("/nonexistent/compiler"),
-            as_: Some(CompilerType::compiler("gcc")),
+            as_: Some("gcc".to_string()),
             ignore: false,
         };
 

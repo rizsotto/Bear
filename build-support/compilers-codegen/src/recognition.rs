@@ -110,15 +110,15 @@ fn escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// Generate the compiler-id data the config module needs to resolve the
-/// `as:` field: `KNOWN_IDS` (every real compiler family's `compiler.id`, in
-/// discovery order) and `WRAPPER_AS_NAMES` (the launcher basenames that also
-/// resolve to the one wrapper kind). Both are the sole accepted `as:`
-/// spellings; there are no aliases (see `compiler-as-no-aliases`).
+/// Generate the compiler-id data needed to resolve the config `as:` field:
+/// `KNOWN_IDS` (every real compiler family's `compiler.id`, in discovery
+/// order) and `WRAPPER_AS_NAMES` (the launcher basenames that also resolve to
+/// the one wrapper kind). Both are the sole accepted `as:` spellings; there
+/// are no aliases (see `compiler-as-no-aliases`).
 ///
-/// Emitted as `pub(crate)` statics for the `bear` crate to `include!` into
-/// its config module, so `CompilerType`'s hand-written deserializer validates
-/// against generated data instead of a hand-maintained mirror of the ids.
+/// Emitted as `pub(crate)` statics for the semantic analysis module to
+/// `include!`, so `CompilerType`'s spelling resolution validates against
+/// generated data instead of a hand-maintained mirror of the ids.
 pub fn generate_compiler_ids(
     compiler_files: &[CompilerFile],
     wrapper_tables: &[(String, WrapperTable)],
@@ -133,8 +133,8 @@ pub fn generate_compiler_ids(
     wrapper_names.sort_unstable();
     wrapper_names.dedup();
 
-    // A compiler id must not collide with a wrapper `as:` spelling. The config
-    // deserializer resolves "wrapper" and every launcher basename to the
+    // A compiler id must not collide with a wrapper `as:` spelling. Spelling
+    // resolution maps "wrapper" and every launcher basename to the
     // wrapper kind BEFORE consulting KNOWN_IDS, so a colliding compiler id
     // would be silently shadowed -- `as: <id>` would resolve to the launcher.
     // Reject it at codegen with a clear message.

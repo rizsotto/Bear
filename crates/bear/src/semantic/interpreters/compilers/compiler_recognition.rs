@@ -6,9 +6,9 @@
 //! using regular expressions instead of separate hard-coded lists and pattern
 //! matching functions for each compiler.
 
+use super::identity::{CompilerType, SpellingError};
 use super::probe::{CompilerProbe, default_probe};
 use super::wrapper::WRAPPER_NAMES;
-use crate::config::{Compiler, CompilerType};
 use regex_lite::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -32,11 +32,11 @@ const AMBIGUOUS_NAMES: &[&str] = &["cc", "c++", "CC"];
 /// Recognizes the compiler type for an executable path, using a layered
 /// strategy:
 ///
-/// 1. **Hint lookup** — user-supplied [`Compiler`] entries (canonicalized)
-///    are checked first; a hit short-circuits both probe and regex. A bare
-///    executable spelling also matches a configured entry by filename,
-///    because config paths must exist on disk while builds often spell
-///    only the name.
+/// 1. **Hint lookup** -- driver-supplied [`CompilerHints`] entries
+///    (canonicalized) are checked first; a hit short-circuits both probe and
+///    regex. A bare executable spelling also matches a configured entry by
+///    filename, because config paths must exist on disk while builds often
+///    spell only the name.
 /// 2. **Probe** — for ambiguous basenames (`cc`, `c++`, `CC`) the binary is
 ///    invoked with `--version` and classified by signature. Memoization
 ///    of probe results lives in the probe itself (see
@@ -58,25 +58,25 @@ impl CompilerRecognizer {
     /// `--version` probe on Unix, a no-op on Windows where compiler
     /// basenames are unambiguous).
     pub fn new() -> Self {
-        Self::with_probe(&[], default_probe())
+        Self::with_probe(CompilerHints::new(), default_probe())
     }
 
-    /// Creates a new compiler recognizer with configuration-based hints.
+    /// Creates a new compiler recognizer with driver-supplied hints.
     ///
     /// Uses the platform-default probe; user hints are consulted first and
     /// short-circuit the probe regardless of platform.
     ///
     /// # Arguments
     ///
-    /// * `compilers` - Slice of compiler configurations with optional type hints
-    pub fn new_with_config(compilers: &[Compiler]) -> Self {
-        Self::with_probe(compilers, default_probe())
+    /// * `hints` - The hint table built by [`CompilerHints`]
+    pub fn new_with_hints(hints: CompilerHints) -> Self {
+        Self::with_probe(hints, default_probe())
     }
 
     /// Creates a recognizer with an injectable probe. Used by tests to swap
     /// in a fake probe that does not fork+exec.
-    pub(crate) fn with_probe(compilers: &[Compiler], probe: Box<dyn CompilerProbe>) -> Self {
-        Self { patterns: DEFAULT_PATTERNS.clone(), hints: Self::build_hints_map(compilers), probe }
+    pub(crate) fn with_probe(hints: CompilerHints, probe: Box<dyn CompilerProbe>) -> Self {
+        Self { patterns: DEFAULT_PATTERNS.clone(), hints: hints.entries, probe }
     }
 
     /// Recognizes the compiler type from an executable path.
@@ -177,116 +177,110 @@ impl CompilerRecognizer {
 
         None
     }
-
-    /// Creates a hint lookup table from compiler configuration.
-    ///
-    /// This method processes a slice of [`Compiler`] configurations and builds a mapping
-    /// from filesystem paths to compiler types. This allows for explicit compiler type
-    /// specification that overrides pattern-based recognition.
-    ///
-    /// # Arguments
-    ///
-    /// * `compilers` - A slice of [`Compiler`] configurations from which to extract hints
-    ///
-    /// # Returns
-    ///
-    /// A [`HashMap`] mapping [`PathBuf`]s to [`CompilerType`]s over the
-    /// non-ignored compilers. Each entry contributes two keys: its
-    /// canonicalized path, and its bare filename -- builds often invoke a
-    /// configured compiler by name alone, and the filename key lets the
-    /// hint reach those spellings. When two entries share a filename but
-    /// disagree on the type, the first wins and a warning is logged.
-    ///
-    /// # Compiler Type Resolution
-    ///
-    /// For each non-ignored compiler, the compiler type is determined as follows:
-    /// 1. **Explicit `as_` field**: If the compiler has an `as_` field specified, that type is used
-    /// 2. **Pattern matching**: If `as_` is `None`, the filename is matched against default patterns
-    ///    (GCC, Clang, Fortran, Intel Fortran, Cray Fortran)
-    /// 3. **Fallback**: If no pattern matches, defaults to the `gcc` family
-    ///
-    /// # Path Canonicalization
-    ///
-    /// The method attempts to canonicalize each compiler path using [`PathBuf::canonicalize()`].
-    /// If canonicalization fails (e.g., due to the path not existing), the original path
-    /// is used instead. This helps with matching paths that may be specified differently
-    /// but refer to the same executable.
-    ///
-    /// # Examples
-    ///
-    /// Given a configuration like:
-    /// ```yaml
-    /// compilers:
-    ///   - path: /usr/bin/my-custom-gcc
-    ///     as: gcc
-    ///   - path: /opt/llvm/bin/clang++        # No 'as' field - will be guessed as Clang
-    ///   - path: /usr/bin/unknown-compiler    # No 'as' field - will default to GCC
-    ///   - path: /usr/bin/ignored-compiler
-    ///     ignore: true
-    /// ```
-    ///
-    /// This method would return a mapping containing entries for the first three compilers
-    /// but exclude the fourth due to the `ignore` flag. The second compiler would be
-    /// recognized as Clang through pattern matching, and the third would default to GCC.
-    fn build_hints_map(compilers: &[Compiler]) -> HashMap<PathBuf, CompilerType> {
-        let mut hints = HashMap::new();
-
-        for compiler in compilers {
-            // Skip ignored compilers
-            if compiler.ignore {
-                continue;
-            }
-
-            // Try to canonicalize the path for better matching
-            let canonical_path = compiler.path.canonicalize().unwrap_or_else(|_| compiler.path.clone());
-
-            let compiler_type = if let Some(as_type) = compiler.as_ {
-                // Use explicitly configured compiler type
-                as_type
-            } else {
-                // Guess compiler type using default patterns
-                let filename = compiler.path.file_name().and_then(|name| name.to_str()).unwrap_or("");
-
-                let guessed_type = DEFAULT_PATTERNS
-                    .iter()
-                    .find(|(_, pattern)| pattern.is_match(filename))
-                    .map(|(compiler_type, _)| *compiler_type);
-
-                // Fall back to GCC if no pattern matches
-                guessed_type.unwrap_or(CompilerType::compiler("gcc"))
-            };
-
-            if let Some(name) = compiler.path.file_name() {
-                match hints.entry(PathBuf::from(name)) {
-                    std::collections::hash_map::Entry::Vacant(entry) => {
-                        entry.insert(compiler_type);
-                    }
-                    std::collections::hash_map::Entry::Occupied(entry) => {
-                        if *entry.get() != compiler_type {
-                            log::warn!(
-                                "compiler config: '{}' shares the filename '{}' with an earlier \
-                                 entry of a different type; the earlier entry classifies bare \
-                                 invocations of that name",
-                                compiler.path.display(),
-                                name.to_string_lossy()
-                            );
-                        }
-                    }
-                }
-            }
-            // Never collides with a filename key for validated config:
-            // config paths must exist, so canonicalization yields an
-            // absolute, multi-component path.
-            hints.insert(canonical_path, compiler_type);
-        }
-
-        hints
-    }
 }
 
 impl Default for CompilerRecognizer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Builds the hint lookup table a [`CompilerRecognizer`] consults first.
+///
+/// The driver adds one configured compiler at a time -- a path plus the
+/// optional `as:` spelling the user wrote -- so the configuration schema
+/// never crosses into this module. Insertion order is the configuration
+/// order, which is what the first-wins rule for colliding filenames is
+/// defined against.
+#[derive(Clone, Debug, Default)]
+pub struct CompilerHints {
+    entries: HashMap<PathBuf, CompilerType>,
+}
+
+impl CompilerHints {
+    /// An empty hint table: recognition falls back to probe and regex only.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Resolves `spelling` and records the resulting hint for `path`.
+    ///
+    /// The entry contributes two keys: its canonicalized path, and its bare
+    /// filename -- builds often invoke a configured compiler by name alone,
+    /// and the filename key lets the hint reach those spellings. When two
+    /// entries share a filename but disagree on the type, the first wins and
+    /// a warning is logged.
+    ///
+    /// # Compiler type resolution
+    ///
+    /// 1. **Explicit spelling**: `Some(spelling)` resolves to that type, or
+    ///    fails with [`SpellingError`] when it names no known compiler.
+    /// 2. **Pattern matching**: `None` matches the filename against the
+    ///    default recognition patterns.
+    /// 3. **Fallback**: if no pattern matches, the `gcc` family. Unreachable
+    ///    for a spelling the user actually wrote.
+    ///
+    /// # Path canonicalization
+    ///
+    /// `path` is canonicalized for the path key; when canonicalization fails
+    /// (e.g. the path does not exist) the original is used. This matches
+    /// paths that are spelled differently but name the same executable.
+    pub fn add(&mut self, path: &Path, spelling: Option<&str>) -> Result<(), SpellingError> {
+        let compiler_type = match spelling {
+            Some(spelling) => spelling.parse::<CompilerType>()?,
+            None => Self::guess_from_filename(path),
+        };
+
+        if let Some(name) = path.file_name() {
+            match self.entries.entry(PathBuf::from(name)) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(compiler_type);
+                }
+                std::collections::hash_map::Entry::Occupied(entry) => {
+                    if *entry.get() != compiler_type {
+                        log::warn!(
+                            "compiler config: '{}' shares the filename '{}' with an earlier \
+                             entry of a different type; the earlier entry classifies bare \
+                             invocations of that name",
+                            path.display(),
+                            name.to_string_lossy()
+                        );
+                    }
+                }
+            }
+        }
+        // Never collides with a filename key for validated config:
+        // config paths must exist, so canonicalization yields an
+        // absolute, multi-component path.
+        let canonical_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        self.entries.insert(canonical_path, compiler_type);
+
+        Ok(())
+    }
+
+    /// Resolves `spelling` without recording a hint.
+    ///
+    /// A configured entry marked `ignore: true` contributes no hint, but a
+    /// misspelled `as:` in one must still fail the run, so the driver routes
+    /// those entries through here.
+    pub fn check(spelling: Option<&str>) -> Result<(), SpellingError> {
+        match spelling {
+            Some(spelling) => spelling.parse::<CompilerType>().map(|_| ()),
+            None => Ok(()),
+        }
+    }
+
+    /// Guesses a compiler type for an entry that named no `as:` spelling, by
+    /// matching its filename against the default recognition patterns and
+    /// falling back to the `gcc` family.
+    fn guess_from_filename(path: &Path) -> CompilerType {
+        let filename = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+
+        DEFAULT_PATTERNS
+            .iter()
+            .find(|(_, pattern)| pattern.is_match(filename))
+            .map(|(compiler_type, _)| *compiler_type)
+            .unwrap_or(CompilerType::compiler("gcc"))
     }
 }
 
@@ -374,6 +368,16 @@ mod tests {
         Path::new(s)
     }
 
+    /// Builds a hint table from `(path, spelling)` pairs, the way the driver
+    /// does for the configured compilers it does not ignore.
+    fn hints_for(entries: &[(&str, Option<&str>)]) -> CompilerHints {
+        let mut hints = CompilerHints::new();
+        for (path, spelling) in entries {
+            hints.add(Path::new(path), *spelling).expect("test spellings must resolve");
+        }
+        hints
+    }
+
     /// Asserts each `(name, expected)` case against `recognizer`, naming the
     /// case in the failure message so a table failure says which row broke.
     fn assert_cases(recognizer: &CompilerRecognizer, cases: &[(&str, Option<CompilerType>)]) {
@@ -391,7 +395,7 @@ mod tests {
     /// the regex/hint layer in isolation, without depending on whatever
     /// `cc`/`c++` resolve to on the host running the test.
     fn no_probe_recognizer() -> CompilerRecognizer {
-        CompilerRecognizer::with_probe(&[], Box::new(NoProbe))
+        CompilerRecognizer::with_probe(CompilerHints::new(), Box::new(NoProbe))
     }
 
     // Requirements: recognition-compiler-names
@@ -578,24 +582,9 @@ mod tests {
 
     #[test]
     fn test_recognize_with_config_hints() {
-        use crate::config::Compiler;
-        use std::path::PathBuf;
+        let hints = hints_for(&[("custom-gcc-wrapper", Some("gcc")), ("weird-clang-name", Some("clang"))]);
 
-        // Create test compiler configurations with hints
-        let compilers = vec![
-            Compiler {
-                path: PathBuf::from("custom-gcc-wrapper"),
-                as_: Some(CompilerType::compiler("gcc")),
-                ignore: false,
-            },
-            Compiler {
-                path: PathBuf::from("weird-clang-name"),
-                as_: Some(CompilerType::compiler("clang")),
-                ignore: false,
-            },
-        ];
-
-        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+        let recognizer = CompilerRecognizer::new_with_hints(hints);
 
         // Configured hints take priority
         assert_eq!(recognizer.recognize(path("custom-gcc-wrapper")), Some(CompilerType::compiler("gcc")));
@@ -609,19 +598,12 @@ mod tests {
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn test_config_hint_matches_bare_spelling_by_filename() {
-        use crate::config::Compiler;
-        use std::path::PathBuf;
-
         // The configured path is absolute (validation requires it to exist
         // on real hosts); the build spells only the name. NoProbe declines
         // everything and `cc` has no regex, so a hit proves the hint.
-        let compilers = vec![Compiler {
-            path: PathBuf::from("/opt/toolchain/cc"),
-            as_: Some(CompilerType::compiler("clang")),
-            ignore: false,
-        }];
+        let hints = hints_for(&[("/opt/toolchain/cc", Some("clang"))]);
 
-        let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
+        let sut = CompilerRecognizer::with_probe(hints, Box::new(NoProbe));
 
         assert_eq!(sut.recognize(path("cc")), Some(CompilerType::compiler("clang")));
     }
@@ -629,18 +611,11 @@ mod tests {
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn test_config_hint_does_not_filename_match_path_spellings() {
-        use crate::config::Compiler;
-        use std::path::PathBuf;
-
         // A path spelling names one concrete binary; it must not borrow the
         // classification of a differently-located configured entry.
-        let compilers = vec![Compiler {
-            path: PathBuf::from("/opt/toolchain/cc"),
-            as_: Some(CompilerType::compiler("clang")),
-            ignore: false,
-        }];
+        let hints = hints_for(&[("/opt/toolchain/cc", Some("clang"))]);
 
-        let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
+        let sut = CompilerRecognizer::with_probe(hints, Box::new(NoProbe));
 
         assert_eq!(sut.recognize(path("/usr/bin/cc")), None);
         assert_eq!(sut.recognize(path("./cc")), None);
@@ -649,29 +624,28 @@ mod tests {
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn test_conflicting_filename_hints_first_entry_wins() {
-        use crate::config::Compiler;
-        use std::path::PathBuf;
+        let hints = hints_for(&[("/opt/a/cc", Some("clang")), ("/opt/b/cc", Some("gcc"))]);
 
-        let compilers = vec![
-            Compiler {
-                path: PathBuf::from("/opt/a/cc"),
-                as_: Some(CompilerType::compiler("clang")),
-                ignore: false,
-            },
-            Compiler {
-                path: PathBuf::from("/opt/b/cc"),
-                as_: Some(CompilerType::compiler("gcc")),
-                ignore: false,
-            },
-        ];
-
-        let sut = CompilerRecognizer::with_probe(&compilers, Box::new(NoProbe));
+        let sut = CompilerRecognizer::with_probe(hints, Box::new(NoProbe));
 
         // The bare spelling takes the first configured entry (a warning is
         // logged for the disagreeing second); path spellings keep their own.
         assert_eq!(sut.recognize(path("cc")), Some(CompilerType::compiler("clang")));
         assert_eq!(sut.recognize(path("/opt/a/cc")), Some(CompilerType::compiler("clang")));
         assert_eq!(sut.recognize(path("/opt/b/cc")), Some(CompilerType::compiler("gcc")));
+    }
+
+    #[test]
+    fn test_hint_builder_rejects_an_unknown_spelling() {
+        // Both entry points resolve the spelling; only `add` records a hint.
+        let mut hints = CompilerHints::new();
+
+        let sut = hints.add(path("/opt/toolchain/cc"), Some("not-a-compiler"));
+        assert!(sut.is_err(), "an unknown spelling must not build a hint");
+        assert!(sut.unwrap_err().to_string().contains("unknown compiler id"));
+
+        let sut = CompilerHints::check(Some("not-a-compiler"));
+        assert!(sut.is_err(), "an unknown spelling must fail even without a hint");
     }
 
     #[test]
@@ -688,7 +662,7 @@ mod tests {
     fn test_empty_config() {
         // Test that recognizer with empty config works the same as new()
         let recognizer_new = CompilerRecognizer::new();
-        let recognizer_empty_config = CompilerRecognizer::new_with_config(&[]);
+        let recognizer_empty_config = CompilerRecognizer::new_with_hints(CompilerHints::new());
 
         assert_eq!(recognizer_new.recognize(path("gcc")), recognizer_empty_config.recognize(path("gcc")));
         assert_eq!(recognizer_new.recognize(path("clang")), recognizer_empty_config.recognize(path("clang")));
@@ -719,33 +693,19 @@ mod tests {
     }
 
     #[test]
-    fn test_build_hints_map_improved_behavior() {
-        use crate::config::Compiler;
-        use std::path::PathBuf;
+    fn test_hint_type_resolution_per_entry() {
+        let hints = hints_for(&[
+            // Entry with an explicit spelling - should use that type
+            ("custom-wrapper", Some("clang")),
+            // Entry without a spelling but matching a default pattern - should guess Clang
+            ("clang++", None),
+            // Entry without a spelling and no pattern match - should fall back to GCC
+            ("unknown-compiler", None),
+            // Another entry without a spelling, matching the Fortran pattern
+            ("gfortran", None),
+        ]);
 
-        // Create test compiler configurations with various scenarios
-        let compilers = vec![
-            // Compiler with explicit 'as' field - should use that type
-            Compiler {
-                path: PathBuf::from("custom-wrapper"),
-                as_: Some(CompilerType::compiler("clang")),
-                ignore: false,
-            },
-            // Compiler without 'as' field but matches default pattern - should guess Clang
-            Compiler { path: PathBuf::from("clang++"), as_: None, ignore: false },
-            // Compiler without 'as' field and no pattern match - should fall back to GCC
-            Compiler { path: PathBuf::from("unknown-compiler"), as_: None, ignore: false },
-            // Ignored compiler - should not be included in hints
-            Compiler {
-                path: PathBuf::from("ignored-gcc"),
-                as_: Some(CompilerType::compiler("gcc")),
-                ignore: true,
-            },
-            // Another compiler without 'as' field matching Fortran pattern
-            Compiler { path: PathBuf::from("gfortran"), as_: None, ignore: false },
-        ];
-
-        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+        let recognizer = CompilerRecognizer::new_with_hints(hints);
 
         // Test explicit 'as' field is used
         assert_eq!(recognizer.recognize(path("custom-wrapper")), Some(CompilerType::compiler("clang")));
@@ -756,11 +716,8 @@ mod tests {
         // Test fallback to GCC when no pattern matches
         assert_eq!(recognizer.recognize(path("unknown-compiler")), Some(CompilerType::compiler("gcc")));
 
-        // Test ignored compiler is not recognized via hints
-        assert_eq!(
-            recognizer.recognize(path("ignored-gcc")),
-            Some(CompilerType::compiler("gcc")) // Should fall back to regex pattern, not hint
-        );
+        // Test a name the builder never saw falls back to the regex pattern
+        assert_eq!(recognizer.recognize(path("unhinted-gcc")), Some(CompilerType::compiler("gcc")));
 
         // Test Fortran pattern matching when 'as' is None
         assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::compiler("gcc")));
@@ -1144,7 +1101,7 @@ mod tests {
         // The relative path "cc" canonicalizes to itself when the file does
         // not exist, so the probe key is the original PathBuf.
         let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::compiler("clang")));
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("clang")));
     }
@@ -1153,7 +1110,7 @@ mod tests {
     #[test]
     fn probe_classifies_cc_as_gcc_on_linux_like_host() {
         let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::compiler("gcc")));
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("gcc")));
     }
@@ -1168,7 +1125,7 @@ mod tests {
         // produced silently wrong entries on BSD/macOS hosts where cc is
         // Clang — exactly the bug this whole mechanism exists to fix.
         let probe = Box::new(FakeProbe::new());
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("cc")), None);
         assert_eq!(recognizer.recognize(path("c++")), None);
@@ -1183,7 +1140,7 @@ mod tests {
         // classify_version_output already recognizes -- no change to the
         // classifier itself is needed for this case.
         let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::compiler("clang")));
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("clang")));
     }
@@ -1193,7 +1150,7 @@ mod tests {
     fn probe_classifies_cray_prgenv_cc_as_gcc_via_fsf_banner() {
         // Simulates "CC" resolving to g++ under PrgEnv-gnu.
         let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::compiler("gcc")));
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("gcc")));
     }
@@ -1201,14 +1158,10 @@ mod tests {
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn config_hint_beats_probe_and_suppresses_it_for_cray_prgenv_cc() {
-        let compilers = vec![Compiler {
-            path: PathBuf::from("CC"),
-            as_: Some(CompilerType::compiler("cray_cc")),
-            ignore: false,
-        }];
+        let hints = hints_for(&[("CC", Some("cray_cc"))]);
         let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::compiler("clang")));
         let probe_ptr: *const FakeProbe = &*probe;
-        let recognizer = CompilerRecognizer::with_probe(&compilers, probe);
+        let recognizer = CompilerRecognizer::with_probe(hints, probe);
 
         assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("cray_cc")));
         let calls = unsafe { (*probe_ptr).calls() };
@@ -1223,7 +1176,7 @@ mod tests {
         // unrecognized -- documented limitation in
         // recognition-ambiguous-name-probe.md.
         let probe = Box::new(FakeProbe::new());
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("CC")), None);
     }
@@ -1233,17 +1186,13 @@ mod tests {
     fn config_hint_beats_probe_and_suppresses_it() {
         // The user's compilers: entry must win, and the probe must not run
         // when a hint already classifies the path.
-        let compilers = vec![Compiler {
-            path: PathBuf::from("cc"),
-            as_: Some(CompilerType::compiler("gcc")),
-            ignore: false,
-        }];
+        let hints = hints_for(&[("cc", Some("gcc"))]);
         let probe = Box::new(FakeProbe::new().answer("cc", CompilerType::compiler("clang")));
         // Take a raw pointer to the FakeProbe so we can read the call count
         // after handing ownership to the recognizer. Safe because the
         // recognizer owns the box for the duration of the test.
         let probe_ptr: *const FakeProbe = &*probe;
-        let recognizer = CompilerRecognizer::with_probe(&compilers, probe);
+        let recognizer = CompilerRecognizer::with_probe(hints, probe);
 
         assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("gcc")));
         let calls = unsafe { (*probe_ptr).calls() };
@@ -1255,7 +1204,7 @@ mod tests {
     fn non_ambiguous_names_are_not_probed() {
         let probe = Box::new(FakeProbe::new());
         let probe_ptr: *const FakeProbe = &*probe;
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         // A handful of non-ambiguous names: each must take the regex path
         // without going through the probe at all.
@@ -1280,7 +1229,7 @@ mod tests {
         // ambiguous and must never enter the probe path.
         let probe = Box::new(FakeProbe::new());
         let probe_ptr: *const FakeProbe = &*probe;
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("distcc")), Some(CompilerType::Wrapper));
@@ -1335,7 +1284,7 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let counting = CountingProbe { calls: Arc::clone(&calls) };
         let probe: Box<dyn super::super::probe::CompilerProbe> = Box::new(CachingProbe::new(counting));
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(&link_a), Some(CompilerType::compiler("clang")));
         assert_eq!(recognizer.recognize(&link_b), Some(CompilerType::compiler("clang")));
@@ -1373,7 +1322,7 @@ mod tests {
         // probe received it rather than the canonical wrapper path.
         let probe = Box::new(FakeProbe::new().answer(link.to_str().unwrap(), CompilerType::compiler("gcc")));
         let probe_ptr: *const FakeProbe = &*probe;
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         let sut = recognizer.recognize(&link);
 
@@ -1419,7 +1368,7 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let counting = CountingProbe { calls: Arc::clone(&calls) };
         let probe: Box<dyn super::super::probe::CompilerProbe> = Box::new(CachingProbe::new(counting));
-        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+        let recognizer = CompilerRecognizer::with_probe(CompilerHints::new(), probe);
 
         assert_eq!(recognizer.recognize(&link_cc), Some(CompilerType::compiler("gcc")));
         assert_eq!(recognizer.recognize(&link_cxx), Some(CompilerType::compiler("gcc")));

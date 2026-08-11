@@ -753,7 +753,7 @@ mod tests {
             "/home/user",
             std::collections::HashMap::new(),
         );
-        let interpreter = CompilerInterpreter::new_with_config(&[]);
+        let interpreter = CompilerInterpreter::default();
         let RecognizeResult::Recognized(command) = interpreter.recognize(execution) else {
             panic!("{executable} invocation must be recognized as a compiler command");
         };

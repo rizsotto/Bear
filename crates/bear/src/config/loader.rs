@@ -205,7 +205,7 @@ mod test {
             compilers: vec![
                 Compiler {
                     path: PathBuf::from("/usr/local/bin/cc"),
-                    as_: Some(CompilerType::compiler("gcc")),
+                    as_: Some(String::from("gcc")),
                     ignore: false,
                 },
                 Compiler { path: PathBuf::from("/usr/bin/cc"), as_: None, ignore: true },
@@ -417,69 +417,23 @@ mod test {
             compilers:
               - path: /nonexistent/compiler
                 as: "invalid_compiler_type"
-                flags:
-                    add: [""]
-                    remove: ["valid", ""]
             "#;
 
         fs::write(&config_file, invalid_config).unwrap();
 
-        // Try to load the config - should fail validation
+        // The `as:` spelling is not the schema layer's business: this config
+        // fails because the compiler path does not exist. The unknown
+        // spelling is caught later, in `Mode::configure` (see
+        // `configure_rejects_an_unknown_compiler_as_spelling`).
         let result = Loader::from_file(&config_file);
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            ConfigError::ParseError { source, .. } => {
-                // Verify we got a parse error for invalid compiler type
+            ConfigError::ValidationError { source, .. } => {
                 let error_msg = source.to_string();
-                assert!(error_msg.contains("unknown compiler id"));
-                assert!(error_msg.contains("invalid_compiler_type"));
+                assert!(error_msg.contains("/nonexistent/compiler"), "message: {error_msg}");
             }
-            other => panic!("Expected ParseError for invalid compiler type, got: {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_compiler_type_serialization() {
-        // Every canonical id deserializes to its own compiler family. The set
-        // is generated (KNOWN_IDS); no id is hand-listed here, so a new family
-        // is covered automatically.
-        for &id in KNOWN_IDS {
-            let sut = serde_json::from_str::<CompilerType>(&format!("\"{id}\"")).unwrap();
-
-            assert_eq!(sut, CompilerType::compiler(id), "id: {id}");
-        }
-
-        // The wrapper kind: "wrapper" plus every launcher basename resolve to
-        // the one runtime CompilerType::Wrapper (see compiler-as-no-aliases).
-        for spelling in std::iter::once("wrapper").chain(WRAPPER_AS_NAMES.iter().copied()) {
-            let sut = serde_json::from_str::<CompilerType>(&format!("\"{spelling}\"")).unwrap();
-
-            assert_eq!(sut, CompilerType::Wrapper, "spelling: {spelling}");
-        }
-    }
-
-    #[test]
-    fn test_compiler_type_rejects_dropped_aliases() {
-        // Every spelling that used to be an accepted alias now fails: one id,
-        // one spelling, verbatim.
-        let dropped_spellings = ["clangcl", "llvm", "intel-cc", "craycc"];
-
-        for spelling in dropped_spellings {
-            let json_str = format!("\"{spelling}\"");
-
-            let result = serde_json::from_str::<CompilerType>(&json_str);
-
-            match result {
-                Err(error) => {
-                    let message = error.to_string();
-                    assert!(
-                        message.contains("unknown compiler id"),
-                        "case: {spelling}, unexpected error message: {message}"
-                    );
-                }
-                Ok(value) => panic!("expected {spelling} to be rejected, got: {value:?}"),
-            }
+            other => panic!("Expected ValidationError for the missing compiler path, got: {:?}", other),
         }
     }
 
@@ -546,21 +500,11 @@ mod test {
         let config = result.unwrap();
         assert_eq!(config.compilers.len(), 5);
 
-        // Verify compiler type hints are correctly parsed
-        assert_eq!(config.compilers[0].as_, Some(CompilerType::compiler("gcc")));
-        assert_eq!(config.compilers[1].as_, Some(CompilerType::compiler("clang")));
-        assert_eq!(config.compilers[2].as_, Some(CompilerType::compiler("flang")));
-        assert_eq!(config.compilers[3].as_, Some(CompilerType::compiler("intel_fortran")));
-        assert_eq!(config.compilers[4].as_, Some(CompilerType::compiler("cray_fortran")));
-    }
-
-    #[test]
-    fn test_compiler_type_display_is_the_id_verbatim() {
-        // Display prints the id, not a curated pretty name: one spelling
-        // everywhere (YAML, config `as:`, generated data, output).
-        assert_eq!(CompilerType::compiler("gcc").to_string(), "gcc");
-        assert_eq!(CompilerType::compiler("clang_cl").to_string(), "clang_cl");
-        assert_eq!(CompilerType::compiler("intel_fortran").to_string(), "intel_fortran");
-        assert_eq!(CompilerType::Wrapper.to_string(), "wrapper");
+        // Verify compiler type hints are kept verbatim
+        assert_eq!(config.compilers[0].as_.as_deref(), Some("gcc"));
+        assert_eq!(config.compilers[1].as_.as_deref(), Some("clang"));
+        assert_eq!(config.compilers[2].as_.as_deref(), Some("flang"));
+        assert_eq!(config.compilers[3].as_.as_deref(), Some("intel_fortran"));
+        assert_eq!(config.compilers[4].as_.as_deref(), Some("cray_fortran"));
     }
 }

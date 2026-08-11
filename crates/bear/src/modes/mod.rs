@@ -10,7 +10,8 @@ mod execution;
 
 use crate::args::is_stdio;
 use crate::environment;
-use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
+use crate::semantic::interpreters::compilers::compiler_recognition::{CompilerHints, CompilerRecognizer};
+use crate::semantic::interpreters::compilers::identity::SpellingError;
 use crate::{args, config, output};
 use intercept_supervisor::CollectorOnTcp;
 use intercept_supervisor::context;
@@ -60,6 +61,12 @@ impl Mode {
             .map_err(|error| ConfigurationError::ConfigLoad(Box::new(error)))?;
         log::info!("{config}");
 
+        // Resolve every configured `as:` spelling once, here, so a typo fails
+        // at startup in every mode that reads configuration -- before a build
+        // starts. This is also the only place that sees both the config types
+        // and the semantic types, so it owns the conversion between them.
+        let hints = compiler_hints(&config.compilers)?;
+
         match mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept build and write events");
@@ -67,7 +74,7 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let recognizer = CompilerRecognizer::new();
+                let recognizer = CompilerRecognizer::new_with_hints(hints);
                 let build = environment::BuildEnvironment::create(
                     &context,
                     &config.intercept,
@@ -92,7 +99,7 @@ impl Mode {
                 log::debug!("Mode: replay events and semantic analysis");
 
                 let source = impls::RawEventReader::create(&input.path)?;
-                let consumer = impls::SemanticEventWriter::create(output, &config)
+                let consumer = impls::SemanticEventWriter::create(output, &config, hints)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(source), Box::new(consumer));
@@ -108,7 +115,7 @@ impl Mode {
                 let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
                 let producer =
                     impls::ShellScriptReader::create(&input.path, directory, context.environment.clone())?;
-                let consumer = impls::SemanticEventWriter::create(output, &config)
+                let consumer = impls::SemanticEventWriter::create(output, &config, hints)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
@@ -130,7 +137,7 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let recognizer = CompilerRecognizer::new();
+                let recognizer = CompilerRecognizer::new_with_hints(hints.clone());
                 let build = environment::BuildEnvironment::create(
                     &context,
                     &config.intercept,
@@ -140,7 +147,7 @@ impl Mode {
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
-                let consumer = impls::SemanticEventWriter::create(output, &config)
+                let consumer = impls::SemanticEventWriter::create(output, &config, hints)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
@@ -182,6 +189,29 @@ impl Mode {
     }
 }
 
+/// Converts the configured compilers into the semantic hint table.
+///
+/// Every entry has its `as:` spelling resolved, including the ones marked
+/// `ignore: true`: they contribute no hint, but a typo in one still fails the
+/// run, the way it did when the configuration schema validated the spelling
+/// itself. An entry without `as:` is classified by the builder.
+fn compiler_hints(compilers: &[config::Compiler]) -> Result<CompilerHints, ConfigurationError> {
+    let mut hints = CompilerHints::new();
+    for compiler in compilers {
+        let spelling = compiler.as_.as_deref();
+        let resolved = if compiler.ignore {
+            CompilerHints::check(spelling)
+        } else {
+            hints.add(&compiler.path, spelling)
+        };
+        resolved.map_err(|source| ConfigurationError::CompilerSpelling {
+            path: compiler.path.display().to_string(),
+            source,
+        })?;
+    }
+    Ok(hints)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigurationError {
     #[error("Failed to create collector: {0}")]
@@ -194,6 +224,15 @@ pub enum ConfigurationError {
     InvalidConfiguration(String),
     #[error("Failed to load configuration: {0}")]
     ConfigLoad(Box<config::ConfigError>),
+    /// Names the offending entry: serde used to point at the file and line,
+    /// and the path is the equivalent locator now that the schema layer no
+    /// longer resolves the spelling.
+    #[error("Invalid compiler configuration for '{path}': {source}")]
+    CompilerSpelling {
+        path: String,
+        #[source]
+        source: SpellingError,
+    },
 }
 
 mod impls {
@@ -203,12 +242,14 @@ mod impls {
     use crate::args::BuildCommand;
     use crate::environment;
     use crate::output::{ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError};
+    use crate::semantic::interpreters::compilers::compiler_recognition::CompilerHints;
     use crate::{args, config, output, parse_sh, semantic};
     use crossbeam_channel::{Receiver, Sender};
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
     use std::collections::HashMap;
     use std::io::IsTerminal;
+    use std::path::PathBuf;
     use std::process::ExitStatus;
     use std::sync::Arc;
     use std::{fs, io};
@@ -528,12 +569,26 @@ mod impls {
         ///
         /// The `output` argument contains the configuration for the output file location,
         /// while the `config` argument contains the configuration for the semantic analysis
-        /// and clang compilation database formatting.
+        /// and clang compilation database formatting. The `hints` were resolved once in
+        /// [`super::Mode::configure`].
         pub(super) fn create(
             output: args::BuildSemantic,
             config: &config::Main,
+            hints: CompilerHints,
         ) -> Result<Self, WriterCreationError> {
-            let interpreter = semantic::interpreters::create(config);
+            let ignored: Vec<PathBuf> = config
+                .compilers
+                .iter()
+                .filter(|compiler| compiler.ignore)
+                .map(|compiler| compiler.path.clone())
+                .collect();
+
+            let interpreter = semantic::interpreters::create(
+                hints,
+                ignored,
+                config.format.arguments.from_response_files,
+                config.format.arguments.from_environment,
+            );
             let writer = output::OutputWriter::try_from((&output, config))?;
 
             Ok(Self { interpreter: Box::new(interpreter), writer })
@@ -583,5 +638,141 @@ mod impls {
         fn run(&self, command: BuildCommand) -> Result<ExitStatus, SuperviseError> {
             self.environment.run_build(command)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
+
+    mod fixture {
+        use super::*;
+        use tempfile::TempDir;
+
+        /// A configuration file on disk, plus the executable it names, so the
+        /// compiler-path validation the loader performs passes and the run
+        /// reaches the `as:` resolution.
+        pub(super) struct ConfiguredRun {
+            _root: TempDir,
+            config_file: PathBuf,
+            compiler: PathBuf,
+            current_directory: PathBuf,
+        }
+
+        impl ConfiguredRun {
+            /// Writes a config whose single compiler entry carries `spelling`
+            /// and the given `ignore` flag.
+            pub(super) fn with_compiler(spelling: &str, ignore: bool) -> Self {
+                let root = tempfile::tempdir().expect("tempdir");
+                let compiler = root.path().join("my-compiler");
+                std::fs::write(&compiler, "#!/bin/sh\n").expect("write compiler");
+
+                let config_file = root.path().join("bear.yml");
+                std::fs::write(
+                    &config_file,
+                    format!(
+                        "schema: \"4.2\"\ncompilers:\n  - path: {}\n    as: \"{}\"\n    ignore: {}\n",
+                        compiler.display(),
+                        spelling,
+                        ignore
+                    ),
+                )
+                .expect("write config");
+
+                let current_directory = root.path().to_path_buf();
+                Self { _root: root, config_file, compiler, current_directory }
+            }
+
+            /// The configured compiler's path, as the diagnostic should name it.
+            pub(super) fn compiler_path(&self) -> String {
+                self.compiler.display().to_string()
+            }
+
+            pub(super) fn context(&self) -> context::Context {
+                context::Context {
+                    current_executable: PathBuf::from("/usr/bin/bear"),
+                    current_directory: self.current_directory.clone(),
+                    environment: HashMap::new(),
+                    preload_supported: false,
+                    confstr_path: String::new(),
+                }
+            }
+
+            /// Semantic mode reading standard input: the mode itself performs
+            /// no work at configure time, so the outcome is the `as:` verdict.
+            pub(super) fn arguments(&self) -> args::Arguments {
+                args::Arguments {
+                    config: Some(self.config_file.display().to_string()),
+                    mode: args::Mode::Semantic {
+                        input: args::BuildEvents { path: PathBuf::from("-") },
+                        output: args::BuildSemantic { path: PathBuf::from("-"), append: false },
+                    },
+                }
+            }
+        }
+    }
+
+    /// A misspelled `as:` fails at startup, before any input is read. The
+    /// message names the offending entry and still lists every accepted
+    /// spelling. Ignored entries are held to the same standard: they
+    /// contribute no hint, but a typo in one is still a configuration error.
+    #[test]
+    fn configure_rejects_an_unknown_compiler_as_spelling() {
+        let cases = [("an active entry", false), ("an ignored entry", true)];
+
+        for (case, ignore) in cases {
+            let fixture = fixture::ConfiguredRun::with_compiler("invalid_compiler_type", ignore);
+
+            let sut =
+                Mode::configure(fixture.context(), fixture.arguments()).err().map(|error| error.to_string());
+
+            let Some(message) = sut else {
+                panic!("case: {case}, expected the configuration to be rejected");
+            };
+            assert!(message.contains(&fixture.compiler_path()), "case: {case}, message: {message}");
+            assert!(message.contains("unknown compiler id"), "case: {case}, message: {message}");
+            assert!(message.contains("invalid_compiler_type"), "case: {case}, message: {message}");
+            assert!(message.contains("wrapper"), "case: {case}, message: {message}");
+            assert!(message.contains("gcc"), "case: {case}, message: {message}");
+        }
+    }
+
+    #[test]
+    fn configure_accepts_a_known_compiler_as_spelling() {
+        let cases = [("an active entry", false), ("an ignored entry", true)];
+
+        for (case, ignore) in cases {
+            let fixture = fixture::ConfiguredRun::with_compiler("gcc", ignore);
+
+            let sut = Mode::configure(fixture.context(), fixture.arguments());
+
+            assert!(sut.is_ok(), "case: {case}, expected the configuration to be accepted");
+        }
+    }
+
+    /// An ignored entry resolves its spelling but contributes no hint, so
+    /// recognition of that path falls back to the regex layer. Neither name
+    /// matches any recognition pattern, so a verdict can only come from a hint.
+    #[test]
+    fn ignored_entries_contribute_no_hint() {
+        let compilers = vec![
+            config::Compiler {
+                path: PathBuf::from("/opt/toolchain/quiet-tool"),
+                as_: Some("clang".to_string()),
+                ignore: true,
+            },
+            config::Compiler {
+                path: PathBuf::from("/opt/toolchain/loud-tool"),
+                as_: Some("clang".to_string()),
+                ignore: false,
+            },
+        ];
+
+        let sut = CompilerRecognizer::new_with_hints(compiler_hints(&compilers).unwrap());
+
+        assert_eq!(sut.recognize(Path::new("/opt/toolchain/quiet-tool")), None);
+        assert!(sut.recognize(Path::new("/opt/toolchain/loud-tool")).is_some());
     }
 }

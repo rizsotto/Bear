@@ -122,8 +122,8 @@ fn wrap_executables(executables: &[&str], avail: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::identity::CompilerType;
     use super::*;
-    use crate::config::CompilerType;
 
     #[test]
     fn lists_a_known_compiler_with_its_alias_and_executables() {
@@ -185,7 +185,7 @@ mod tests {
     /// Round-trip guard: every alias this renderer displays (`as <alias>`)
     /// must be a value the config `as:` field actually accepts. If a new
     /// compiler family's `type:` string in YAML and its `CompilerType`
-    /// serde spelling ever drift apart, this test -- not a confused user
+    /// spelling ever drift apart, this test -- not a confused user
     /// copy-pasting a broken config -- catches it.
     #[test]
     fn every_displayed_alias_deserializes_as_a_compiler_type() {
@@ -198,18 +198,17 @@ mod tests {
             .collect();
 
         for alias in aliases {
-            let json = format!("\"{alias}\"");
-            let sut: Result<CompilerType, _> = serde_json::from_str(&json);
-            assert!(sut.is_ok(), "alias '{alias}' does not deserialize as a CompilerType: {sut:?}");
+            let sut = alias.parse::<CompilerType>();
+            assert!(sut.is_ok(), "alias '{alias}' does not resolve to a CompilerType: {sut:?}");
         }
     }
 
     /// Round-trip guard for the wrapper side: `--print-compilers` shows no
     /// alias text for wrapper rows (see `alias_column`), so the previous
     /// test's filter skips them -- but the actual launcher basenames
-    /// (`ccache`, `distcc`, ...) must still deserialize to
+    /// (`ccache`, `distcc`, ...) must still resolve to
     /// `CompilerType::Wrapper` through the generated `WRAPPER_AS_NAMES` the
-    /// deserializer resolves against (config `as:` aliases were dropped;
+    /// spelling resolution consults (config `as:` aliases were dropped;
     /// these are the launcher tool names, not aliases of a shared id). This
     /// proves that generated list still covers every launcher name
     /// `RECOGNITION_PATTERNS` actually recognizes.
@@ -223,12 +222,11 @@ mod tests {
         assert!(!executables.is_empty(), "expected at least one wrapper row in RECOGNITION_PATTERNS");
 
         for name in executables {
-            let json = format!("\"{name}\"");
-            let sut: Result<CompilerType, _> = serde_json::from_str(&json);
+            let sut = name.parse::<CompilerType>();
             assert_eq!(
                 sut.ok(),
                 Some(CompilerType::Wrapper),
-                "wrapper executable '{name}' does not deserialize as CompilerType::Wrapper"
+                "wrapper executable '{name}' does not resolve to CompilerType::Wrapper"
             );
         }
     }

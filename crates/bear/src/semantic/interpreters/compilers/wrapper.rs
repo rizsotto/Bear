@@ -19,7 +19,7 @@
 //! `build-support/compilers-codegen`.
 
 use super::compiler_recognition::CompilerRecognizer;
-use crate::config::CompilerType;
+use super::identity::CompilerType;
 use intercept::Execution;
 
 use std::path::{Path, PathBuf};

@@ -27,7 +27,7 @@
 //!   open for writing across another fork+exec) is retried briefly
 //!   before the probe declines.
 
-use crate::config::CompilerType;
+use super::identity::CompilerType;
 use std::path::Path;
 
 #[cfg(unix)]
@@ -217,8 +217,8 @@ mod caching_tests {
 
 #[cfg(unix)]
 mod unix {
+    use super::super::identity::CompilerType;
     use super::CompilerProbe;
-    use crate::config::CompilerType;
     use intercept::environment::{KEY_OS_MACOS_PRELOAD_PATH, KEY_OS_PRELOAD_PATH};
     use std::os::unix::process::CommandExt;
     use std::path::Path;
