@@ -6,10 +6,14 @@ Thank you for taking the time to contribute!
 
 Bear is a Cargo workspace with the following crates:
 
-- **bear** — the main driver and semantic analysis tool
-- **intercept-preload** — the `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` shared library
-- **platform-checks** — compile-time platform feature detection
-- **integration-tests** — end-to-end tests that exercise the installed tool
+- **bear** - the application layer: CLI, configuration, modes, output
+- **semantic** - compiler recognition and flag parsing; owns the compiler
+  definition YAML
+- **intercept-preload** - the `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` shared library
+- **platform-checks** - compile-time platform feature detection
+- **integration-tests** - end-to-end tests that exercise the installed tool
+
+The root `CLAUDE.md` has the full crate table.
 
 Build, lint, and test with:
 

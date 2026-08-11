@@ -15,7 +15,7 @@
 //! recognizer's regex pattern itself comes from `RECOGNITION_PATTERNS`,
 //! generated from each wrapper file's own `recognize` entry). Both
 //! `WRAPPER_NAMES` and `WRAPPER_OPTIONS` are generated from
-//! `crates/bear/compilers/*.yaml` (the `type: wrapper` files) -- see
+//! `crates/semantic/compilers/*.yaml` (the `type: wrapper` files) -- see
 //! `build-support/compilers-codegen`.
 
 use super::compiler_recognition::CompilerRecognizer;

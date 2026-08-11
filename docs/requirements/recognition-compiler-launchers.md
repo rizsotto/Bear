@@ -116,6 +116,6 @@ Given `icecc gcc -c main.c`:
   prevention for Bear's own wrapper-mode interception; this file owns
   recognition of launcher invocations appearing in the build's own argv.
 - The launcher set and distcc's own-option list are defined in the
-  compiler-definition YAML data (`crates/bear/compilers/{ccache,distcc,icecc,sccache}.yaml`),
+  compiler-definition YAML data (`crates/semantic/compilers/{ccache,distcc,icecc,sccache}.yaml`),
   not hand-coded Rust; that YAML is an implementation detail, and this
   requirement remains the contract it must satisfy.

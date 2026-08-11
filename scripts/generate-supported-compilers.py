@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Generate the enumerated tables on site/src/reference/supported-compilers.md
-# crates/bear/compilers/*.yaml, the actual source of truth for compiler
+# crates/semantic/compilers/*.yaml, the actual source of truth for compiler
 # recognition. Those YAML files already drive `bear semantic
 # --print-compilers` and the codegen recognition table; this script keeps
 # the site page from hand-copying (and silently drifting from) the same
@@ -18,8 +18,8 @@
 #
 #     python3 scripts/generate-supported-compilers.py /tmp/scratch.md
 #
-# Parsing approach: crates/bear/compilers/*.yaml follows one fixed,
-# narrow shape (see crates/bear/compilers/README.md) -- a handful of
+# Parsing approach: crates/semantic/compilers/*.yaml follows one fixed,
+# narrow shape (see crates/semantic/compilers/README.md) -- a handful of
 # top-level keys, of which only four matter here (`type`, `compiler`,
 # `recognize`, `ignore_when`); the rest (`flags`, `environment`,
 # `options`, ...) are irrelevant to this page and skipped whole. No YAML
@@ -140,7 +140,7 @@ def parse_compiler_yaml(path: Path) -> dict:
 
     # Wrapper files carry no `compiler.id`: the launcher's own basename
     # (the file stem, by the directory's own convention) doubles as its
-    # `as:` spelling -- see crates/bear/compilers/README.md, "the launcher
+    # `as:` spelling -- see crates/semantic/compilers/README.md, "the launcher
     # basename is emitted into WRAPPER_AS_NAMES so `as: mywrapper` is
     # accepted".
     family_id = compiler_id if kind == "compiler" else path.stem

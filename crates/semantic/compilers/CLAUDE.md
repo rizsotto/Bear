@@ -16,7 +16,7 @@ hand-maintained file list. See `README.md` for the full schema of both.
 
 - Every compiler-kind YAML file maps to one compiler or compiler family;
   every wrapper-kind file maps to one compiler launcher
-- `compilers-codegen` reads these at build time (via `crates/bear/build.rs`) and generates static Rust arrays
+- `compilers-codegen` reads these at build time (via `crates/semantic/build.rs`) and generates static Rust arrays
 - After any edit: `cargo build && cargo test` to validate
 
 ## Adding a new compiler

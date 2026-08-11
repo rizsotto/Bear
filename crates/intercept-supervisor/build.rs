@@ -21,8 +21,8 @@ const PRELOAD_NAME: &str = "libexec.so";
 fn main() {
     // `src/installation.rs` resolves the runtime install layout from these
     // compile-time names via `env!()` (its tests also read `DRIVER_NAME`).
-    // They are validated and forwarded the same way `crates/bear/build.rs`
-    // does for its own consumers.
+    // `INTERCEPT_LIBDIR` is validated here and forwarded the same way
+    // `tests/integration/build.rs` does for the integration tests.
     let intercept_libdir = std::env::var("INTERCEPT_LIBDIR").unwrap_or_else(|_| "lib".to_string());
     validate_intercept_libdir(&intercept_libdir);
 

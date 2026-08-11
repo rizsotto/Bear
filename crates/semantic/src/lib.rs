@@ -1,31 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Semantic analysis module for command execution recognition and formatting.
+//! Compiler recognition and command line flag parsing.
 //!
-//! This module provides the core abstractions for analyzing executed commands and determining
-//! their semantic meaning (e.g., compiler invocations, ignored commands).
+//! Decides whether an intercepted [`Execution`] is a compiler invocation, and
+//! if so parses its command line into classified arguments. This crate is the
+//! analysis core: it knows about compilers, not about how Bear intercepts a
+//! build or how it writes its output.
 //!
-//! # Architecture
+//! # Pipeline
 //!
-//! The semantic analysis follows a pipeline approach:
+//! 1. **Recognition** ([`Interpreter`]) - classifies an [`Execution`] as a
+//!    recognized compiler call, an ignored program, or neither
+//!    ([`RecognizeResult`]). Build the configured chain with
+//!    [`interpreters::create`].
 //!
-//! 1. **Recognition** ([`Interpreter`] trait) - Analyzes raw [`Execution`] data to identify
-//!    known command types (compilers, build tools, etc.)
+//! 2. **Parsing** - a recognized call becomes a [`Command`]: its source files,
+//!    its [`CompilerPass`], and its [`Argument`] list.
 //!
-//! 2. **Classification** ([`Command`] enum) - Represents the recognized command type:
-//!    - [`Command::Compiler`] - A compiler invocation with structured arguments
-//!    - [`Command::Ignored`] - A command that should be filtered out
+//! # Core types
 //!
-//! 3. **Processing** - Further analysis by specialized modules:
-//!    - [`clang`] - Converts compiler commands to clang compilation database format
-//!    - [`interpreters`] - Various command recognition strategies
-//!
-//! # Core Types
-//!
-//! - [`Command`] - Represents a structured compiler invocation
-//! - [`Arguments`] - Trait for representing different types of compiler arguments
-//! - [`ArgumentKind`] - Classifies the semantic meaning of arguments
-//! - [`PassEffect`] - Represents how an argument affects the compilation pipeline
+//! - [`Command`] - a structured compiler invocation
+//! - [`Argument`] - one command line argument with its classification
+//! - [`ArgumentKind`] - what an argument means to the compiler
+//! - [`PassEffect`] - how an argument affects the compilation pipeline
+//! - [`CompilerHints`] - caller-supplied overrides for which executables are
+//!   which compiler, built from the `compilers:` configuration section
 
 pub mod interpreters;
 

@@ -2,14 +2,14 @@
 
 ## Context
 
-`CompilerType` (`crates/bear/src/config/types.rs`) used to accept many
-config `as:` spellings per compiler family through hand-written
-`#[serde(alias = ...)]` lists, plus whatever `#[serde(rename_all =
-"lowercase")]` happened to squash a Rust variant name into when no
-alias was written (for example `clangcl` for `ClangCl`, with no
-separator between the words). This alias surface was never designed
-as a feature; it accumulated over time as each compiler family was
-added, with no record of who relied on which spelling.
+The configuration schema used to deserialize `as:` straight into a
+compiler-family enum, and that enum accepted many spellings per family
+through hand-written `#[serde(alias = ...)]` lists, plus whatever
+`#[serde(rename_all = "lowercase")]` happened to squash a Rust variant
+name into when no alias was written (for example `clangcl` for
+`ClangCl`, with no separator between the words). This alias surface was
+never designed as a feature; it accumulated over time as each compiler
+family was added, with no record of who relied on which spelling.
 
 While building the wrapper-YAML plan (adding `ccache`/`distcc`/
 `sccache`/`icecc` as YAML-defined compiler launchers), two related
@@ -33,11 +33,14 @@ ideas were drafted in full and then reversed on 2026-07-20:
 Each compiler family accepts exactly one config `as:` spelling: its YAML
 `compiler.id`, verbatim, everywhere that spelling appears (the YAML file,
 the generated recognition data, `--print-compilers` output, and config
-parsing). No aliases, no re-spelling. The config deserializer validates
-an `as:` value against the generated set of ids and rejects anything
-else, naming the accepted values; there is no alias map and no
-per-family spelling to hand-maintain (see `compiler-family-definition`
-for how the family set became generated data).
+parsing). No aliases, no re-spelling. The configuration schema keeps the
+string the user wrote; resolving it onto a compiler family is the
+analysis core's job, and it resolves against the generated set of ids,
+rejecting anything else with a message naming every accepted value.
+There is no alias map and no per-family spelling to hand-maintain (see
+`compiler-family-definition` for how the family set became generated
+data). Resolution runs once at startup, before any build, so an unknown
+spelling still fails immediately rather than mid-build.
 
 Compiler launchers are the one exception: a launcher file (`ccache`,
 `distcc`, `sccache`, `icecc`) declares no family identity -- dispatch is

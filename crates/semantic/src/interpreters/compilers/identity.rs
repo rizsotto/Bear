@@ -79,7 +79,7 @@ impl fmt::Display for CompilerType {
     }
 }
 
-/// Failure to resolve a configured `as:` spelling onto a [`CompilerType`].
+/// Failure to resolve a configured `as:` spelling onto a `CompilerType`.
 #[derive(Debug, thiserror::Error)]
 pub enum SpellingError {
     // List every accepted `as:` value: the compiler ids plus the launcher

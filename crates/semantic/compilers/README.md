@@ -4,7 +4,7 @@ This directory contains YAML files that define how Bear recognizes compiler
 executables, categorizes their command-line flags, and filters internal
 invocations. Each file corresponds to one compiler (or compiler family).
 
-At build time, `crates/bear/build.rs` reads these files and generates static Rust
+At build time, `crates/semantic/build.rs` reads these files and generates static Rust
 arrays for flag tables, ignore filters, and recognition patterns. The generated
 code is included in the interpreter and recognition modules via `include!()`.
 

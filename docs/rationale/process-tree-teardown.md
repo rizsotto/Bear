@@ -21,7 +21,7 @@ Three mechanisms can terminate an entire subtree, one per platform family:
 
 Process groups are portable across unix and need no new dependency (`libc`
 is already present); the same group-kill *technique* is already proven in
-the version-probe watchdog (`semantic/interpreters/compilers/probe.rs`),
+the version-probe watchdog (`semantic/src/interpreters/compilers/probe.rs`),
 though Stage 1 uses the lighter `Command::process_group(0)` (safe std, keeps
 the session) rather than the watchdog's `unsafe` `setsid`. Their one gap is
 a child that
@@ -110,7 +110,7 @@ Two further forces shaped the design:
 ## Rejected: unifying the probe watchdog on `process_group(0)`
 
 It is tempting to drop the `unsafe setsid` in the version-probe watchdog
-(`semantic/interpreters/compilers/probe.rs`) and reuse Stage 1's safe
+(`semantic/src/interpreters/compilers/probe.rs`) and reuse Stage 1's safe
 `Command::process_group(0)`, on the theory that `setsid`'s extra
 controlling-terminal detach is a no-op once `stdin` is null and
 `stdout`/`stderr` are pipes. Testing refutes it: under the parallel probe
@@ -127,4 +127,4 @@ probe. The probe keeps `setsid`.
 
 - Requirement: `cli-signal-forwarding`
 - Prior art in-tree: the version-probe watchdog's `setsid` + `killpg`
-  teardown (`semantic/interpreters/compilers/probe.rs`)
+  teardown (`semantic/src/interpreters/compilers/probe.rs`)

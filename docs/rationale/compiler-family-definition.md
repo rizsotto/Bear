@@ -47,8 +47,9 @@ This reverses the earlier "set in the factory, not the YAML" guidance.
 - The six sync points and their three failure modes are removed, not
   converted: there is no parallel list left to drift from the data.
 - The public config surface (`as:`) accepts exactly each family's id,
-  verbatim (see `compiler-as-no-aliases`); the deserializer validates
-  against the generated data and names the accepted values on error.
+  verbatim (see `compiler-as-no-aliases`); the spelling is resolved at
+  startup against the generated data, and the error names every
+  accepted value.
 - What stays code, by design: the meaning of each `source_mode` and
   response-file-syntax value, the `cc`/`c++` version probe and its
   gcc/clang verdicts, the ambiguous-name set, and the source-extension

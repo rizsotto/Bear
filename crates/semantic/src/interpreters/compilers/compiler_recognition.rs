@@ -40,7 +40,7 @@ const AMBIGUOUS_NAMES: &[&str] = &["cc", "c++", "CC"];
 /// 2. **Probe** — for ambiguous basenames (`cc`, `c++`, `CC`) the binary is
 ///    invoked with `--version` and classified by signature. Memoization
 ///    of probe results lives in the probe itself (see
-///    [`super::probe::CachingProbe`]); the recognizer only owns the
+///    `CachingProbe`); the recognizer only owns the
 ///    dispatch policy.
 /// 3. **Regex fallback** — filename is matched against patterns generated
 ///    from `interpreters/*.yaml`. Note that the ambiguous names above are
@@ -54,7 +54,7 @@ pub struct CompilerRecognizer {
 
 impl CompilerRecognizer {
     /// Creates a new compiler recognizer with default patterns and the
-    /// platform-default probe ([`super::probe::default_probe`] -- the real
+    /// platform-default probe (`default_probe` -- the real
     /// `--version` probe on Unix, a no-op on Windows where compiler
     /// basenames are unambiguous).
     pub fn new() -> Self {
@@ -101,7 +101,7 @@ impl CompilerRecognizer {
         // 2. For known-ambiguous basenames, run the --version probe. The
         //    probe is what distinguishes BSD/macOS `cc` (Clang) from Linux
         //    `cc` (GCC). Caching of probe results lives inside the probe
-        //    itself ([`super::probe::CachingProbe`]) so the cost is at most
+        //    itself (`CachingProbe`) so the cost is at most
         //    one fork+exec per unique compiler path per process.
         let filename = executable_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if AMBIGUOUS_NAMES.contains(&filename)
@@ -139,7 +139,7 @@ impl CompilerRecognizer {
     /// Canonicalize `executable_path` and ask the probe to classify it.
     ///
     /// Canonicalization happens here (not in the probe) so the cache key
-    /// in [`super::probe::CachingProbe`] collapses different argv
+    /// in `CachingProbe` collapses different argv
     /// spellings of the same compiler into one entry.
     ///
     /// A masquerade link (an ambiguous name canonicalizing to a wrapper,

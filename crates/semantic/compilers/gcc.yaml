@@ -22,7 +22,7 @@ recognize:
   # The bare names `cc` and `c++` are intentionally not listed here. They
   # are ambiguous (GCC on Linux, Clang on FreeBSD/OpenBSD/NetBSD/DragonFly
   # and macOS) and dispatch is owned by the `--version` probe in
-  # bear/src/semantic/interpreters/compilers/probe.rs. If the probe cannot
+  # semantic/src/interpreters/compilers/probe.rs. If the probe cannot
   # classify, recognition returns NotRecognized rather than guessing.
 ignore_when:
   executables: ["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"]

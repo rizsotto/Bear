@@ -23,8 +23,8 @@ Conventions for Rust code across every workspace crate. The per-crate
   for unambiguous programmer bugs (violated API contract, malformed
   generated data), with a one-line comment stating the invariant.
 - **Module structure**: modules are organised into directories by
-  responsibility (`output/`, `semantic/`, `config/`, `modes/`), plus a few
-  top-level modules. Extend an existing module before
+  responsibility (`output/`, `config/`, `modes/`, `interpreters/`), plus a
+  few top-level modules. Extend an existing module before
   adding one; keep each module's public surface as small as the crate needs.
 - **Abstraction**: introduce a trait only for a real polymorphism seam with
   a second implementation in sight. No speculative abstractions.

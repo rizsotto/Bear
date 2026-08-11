@@ -23,7 +23,7 @@ not need to read any other document to use it.
 | `src/guides/` | `troubleshooting.md`, plus `recipes/` below it. |
 | `src/guides/recipes/` | Task pages plus `index.md`, the recipe index. |
 | `src/reference/` | `configuration.md` and `supported-compilers.md`. |
-| `src/reference/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/bear/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
+| `src/reference/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/semantic/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
 | `src/understanding/` | The explanation pages. |
 | `src/platforms/` | One page per operating system. |
 | `theme/head.hbs` | Site-wide, static `<head>` content, injected by mdBook into every page. It holds the Google Search Console ownership token and nothing else; removing the tag un-verifies the property. Per-page `<head>` content does not go here (see the file's own comment). |
@@ -250,7 +250,7 @@ It must print `OK` and exit 0. The check has seven parts:
    this the not-found page could ship a dead link.
 5. `src/reference/supported-compilers.md` must match what
    `scripts/generate-supported-compilers.py` produces from the current
-   `crates/bear/compilers/*.yaml`. After changing a compiler YAML file,
+   `crates/semantic/compilers/*.yaml`. After changing a compiler YAML file,
    or the generator, run it and commit its output with the YAML change.
 6. No configuration key named on `src/reference/configuration.md` may be
    absent from `man/bear.1.md`, which owns the configuration contract.

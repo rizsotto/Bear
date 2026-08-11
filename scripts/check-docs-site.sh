@@ -35,7 +35,7 @@
 #      matching `<page>.md`. That page links absolutely because Pages
 #      serves it for any missing path, so part 2 cannot follow its links.
 #   5. `src/reference/supported-compilers.md` is generated, in part, from
-#      `crates/bear/compilers/*.yaml` by
+#      `crates/semantic/compilers/*.yaml` by
 #      `scripts/generate-supported-compilers.py`. Regenerate it into a
 #      scratch file and diff against the committed page: any difference
 #      means the YAML changed, or someone hand-edited the generated

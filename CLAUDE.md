@@ -26,7 +26,7 @@ It intercepts compiler invocations during a build and records them.
 
 | Crate | Purpose |
 |---|---|
-| `crates/bear` | Main driver, CLI, semantic analysis, output |
+| `crates/bear` | Application layer: CLI, configuration, modes, output |
 | `crates/semantic` | Compiler recognition and flag parsing; owns the `compilers/*.yaml` definitions |
 | `crates/bear-driver` | Driver/supervisor binary; orchestrates interception and output |
 | `crates/intercept` | Shared/agent-side interception runtime (Execution, reporter, wire, env helpers) |
@@ -46,8 +46,9 @@ These files contain rules, context, and constraints specific to that area.
 
 | When you are about to... | Read first |
 |---|---|
-| Modify CLI arguments or output format | `crates/bear/CLAUDE.md` |
-| Edit or add compiler interpreter YAML | `crates/bear/compilers/CLAUDE.md` |
+| Modify CLI arguments, configuration, or output format | `crates/bear/CLAUDE.md` |
+| Touch compiler recognition or flag parsing | `crates/semantic/CLAUDE.md` |
+| Edit or add compiler interpreter YAML | `crates/semantic/compilers/CLAUDE.md` |
 | Edit the YAML-to-Rust code generator | `build-support/compilers-codegen/CLAUDE.md` |
 | Add or change a host capability probe | `build-support/platform-checks/CLAUDE.md` |
 | Touch the preload interception library | `crates/intercept-preload/CLAUDE.md` |
@@ -75,7 +76,7 @@ Do not skip these reads. They contain constraints that prevent regressions.
 
 The workspace builds in three layers before linking the user-facing binaries:
 
-1. `compilers-codegen` runs from `crates/bear/build.rs` to emit interpreter
+1. `compilers-codegen` runs from `crates/semantic/build.rs` to emit interpreter
    tables. See `build-support/compilers-codegen/CLAUDE.md`.
 2. `build-support/platform-checks/build.rs` probes the host once for headers
    and symbols. Consumers replay the results via
@@ -87,7 +88,8 @@ The workspace builds in three layers before linking the user-facing binaries:
 `INTERCEPT_LIBDIR` is the one cross-cutting build-time env var
 (relative path to the install location of `libexec.so` /
 `libexec.dylib`; defaults to `lib`). Validated and forwarded by both
-`crates/bear/build.rs` and `tests/integration/build.rs`.
+`crates/intercept-supervisor/build.rs`, which is where `installation.rs`
+reads it back, and `tests/integration/build.rs`.
 
 ## Host requirements
 

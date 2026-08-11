@@ -167,7 +167,7 @@ fn successful_build_multiple_sources() -> Result<()> {
 /// `-xc++-header` precompiled-header invocations from the database
 /// because the source-file heuristic did not recognize `.hpp` as a
 /// source. 4.x added `.hpp`/`.h`/`.hxx`/`.tcc` to SOURCE_EXTENSIONS
-/// (bear/src/semantic/interpreters/matchers/source.rs); no test
+/// (semantic/src/interpreters/matchers/source.rs); no test
 /// asserts this for the -xc++-header flow. Lock it in so a future
 /// reshuffle of the extension table cannot silently drop PCH builds.
 // Requirements: output-json-compilation-database, output-compilation-entries
