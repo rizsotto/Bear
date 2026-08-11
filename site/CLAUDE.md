@@ -107,6 +107,11 @@ is for users.
 8. **Cross-link related pages, and link back to the recipe index.**
    Every recipe links to `recipes/index.md`; other pages link to the
    recipes, platform pages, or explanation pages a reader needs next.
+   The link runs both ways: `recipes/index.md` lists every recipe. It
+   and `SUMMARY.md` are two hand-maintained lists of the same pages, and
+   `check-docs-site.sh` only checks the second, so a recipe added to
+   `SUMMARY.md` alone reaches nobody who browses the index. Keep the two
+   in the same order.
 9. **Exactly one Diataxis type per page, declared and obeyed.** The
    first line of every source file is an HTML comment naming its type:
 
@@ -118,6 +123,33 @@ is for users.
    mechanism; it links to `how-it-works.md`. An explanation page carries
    no commands to copy; it links to the recipe. This rule is what keeps
    rule 3 honest.
+10. **A page states facts about Bear, never facts about itself.** No
+    roadmap of the headings the reader can already see ("The rest of
+    this page covers ..."), no announcement of what the page is for
+    ("This page explains how that matching works"), no description of
+    its relationship to another document ("this page mirrors it,
+    organized one section at a time"), and no defending a writing
+    decision to the reader ("this page takes it as the starting point,
+    not something to reprove"). The rules this file states about a
+    collection of pages are for the writer; do not restate one on the
+    page it governs. This is rule 4 generalized, and it is enforced by
+    rule 3: the opening paragraph is the working answer, and a roadmap
+    spends it on the table of contents instead, which is then what
+    `scripts/postprocess-docs-site.sh` lifts into the page's
+    `<meta name="description">`.
+
+    Two forms of self-reference stay, because both do work for the
+    reader rather than for the author:
+
+    - a tutorial's "By the end of this page you will have ..." opening,
+      which promises an outcome and lets someone decide whether to spend
+      the time;
+    - a scope boundary that routes, as `troubleshooting.md` opens: the
+      empty-database recipe works through those causes one by one, and
+      this page collects the rest. It stops a reader on the wrong page.
+
+    The test is direction. A sentence that sends the reader somewhere
+    stays; a sentence that describes where they already are goes.
 
 ## Code-block tags
 
@@ -274,9 +306,12 @@ minimalism applies to documentation tooling too. Do not add one.
 
 ## Writing checklist
 
-- The page is listed in `SUMMARY.md` and the file exists.
+- The page is listed in `SUMMARY.md` and the file exists, and a recipe
+  is listed on `recipes/index.md` too.
 - The type comment is on the first line and the page stays inside it.
 - The first paragraph answers the question.
+- No sentence describes the page itself, except a tutorial's outcome
+  promise or a scope boundary that routes the reader elsewhere.
 - Every command was run, or an integration test is cited.
 - Every flag, key, and default was checked against `man/bear.1.md`.
 - Every compiler name was checked against the recognition snapshot.
