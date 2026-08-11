@@ -336,6 +336,17 @@ C++20 module\-interface units (\f[CR].cppm\f[R], \f[CR].ixx\f[R], and
 similar) are recognized as sources, while precompiled \f[CR].pcm\f[R]
 artifacts never appear as an entry\(cqs \f[CR]file\f[R].
 .PP
+In wrapper mode this section also decides what gets wrapped.
+With no entry other than \f[CR]ignore\f[R] ones, Bear scans PATH at
+startup and wraps every compiler it recognizes.
+As soon as one entry is not ignored, Bear wraps exactly the listed paths
+and skips the scan, so listing one unusual compiler stops \f[CR]gcc\f[R]
+and \f[CR]clang\f[R] from being intercepted unless they are listed too.
+Compilers named in the compiler environment variables (\f[CR]CC\f[R],
+\f[CR]CXX\f[R], and similar) are wrapped either way.
+Preload mode is unaffected: it intercepts every executed program
+regardless of this section.
+.PP
 Use this section when a compiler at a given path is not recognized, or
 is recognized wrongly:
 .IP \(bu 2

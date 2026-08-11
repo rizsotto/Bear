@@ -323,6 +323,16 @@ include paths can point at it directly, for example with clangd's
 similar) are recognized as sources, while precompiled `.pcm` artifacts
 never appear as an entry's `file`.
 
+In wrapper mode this section also decides what gets wrapped. With no
+entry other than `ignore` ones, Bear scans PATH at startup and wraps
+every compiler it recognizes. As soon as one entry is not ignored, Bear
+wraps exactly the listed paths and skips the scan, so listing one
+unusual compiler stops `gcc` and `clang` from being intercepted unless
+they are listed too. Compilers named in the compiler environment
+variables (`CC`, `CXX`, and similar) are wrapped either way. Preload
+mode is unaffected: it intercepts every executed program regardless of
+this section.
+
 Use this section when a compiler at a given path is not recognized, or
 is recognized wrongly:
 

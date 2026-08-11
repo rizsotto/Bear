@@ -21,6 +21,12 @@ gets a compilation database without modifying the build system.
   build output or exit codes
 - Bare compiler names in environment variables (e.g. `CC=gcc`) are
   resolved via PATH before creating wrappers
+- Explicitly configured compilers select what is wrapped: when none is
+  configured for interception, compilers are discovered by scanning
+  PATH; when at least one is, exactly those are wrapped and the scan is
+  skipped. Entries excluded from the database do not count as
+  configured for interception. Compilers named in environment variables
+  are wrapped either way
 - The reported execution names the real compiler by its absolute path,
   never the wrapper path
 - The `.bear/` directory is created in the current working directory

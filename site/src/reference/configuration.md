@@ -70,6 +70,16 @@ Default: `[]` (no overrides; every compiler is recognized automatically).
 - **`compilers.ignore`**: Exclude this executable's invocations from the
   database. Optional. Default: `false`.
 
+In wrapper mode this section also decides which executables get wrapped.
+With no entry other than `ignore` ones, Bear scans PATH at startup and
+wraps every compiler it recognizes. As soon as one entry is not ignored,
+Bear wraps exactly the listed paths and skips the scan, so listing a
+single unusual compiler stops `gcc` and `clang` from being intercepted
+unless you list them as well. Compilers named in the compiler
+environment variables (`CC`, `CXX`, and similar) are wrapped either way.
+Preload mode is unaffected, because it intercepts every executed program
+regardless of this section.
+
 ## sources
 
 ```yaml
