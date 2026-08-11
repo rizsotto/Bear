@@ -174,16 +174,16 @@ accept it.
 - [Bear produces an empty compile_commands.json](empty-compilation-database.md)
   when even a clean build gives you nothing.
 - [Set up clangd for a project without CMake](clangd-setup.md) for
-  pointing your editor at the file this page produces.
+  pointing your editor at the database once it exists.
 - [Use Bear with ccache, distcc, or icecc](ccache-distcc-icecc.md) if
   your Makefile invokes the compiler through a launcher.
 - [Run Bear inside a Docker container](docker.md) if the build itself
   runs in a container.
-- [How Bear works](../../understanding/how-it-works.md) for the interception mechanism
-  behind everything on this page.
+- [How Bear works](../../understanding/how-it-works.md) for the interception
+  mechanism.
 - [Command-line options](../../reference/command-line.md) and [Configure
   Bear](../../reference/configuration.md) for the flags and keys named
   above.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

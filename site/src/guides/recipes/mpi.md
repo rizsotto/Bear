@@ -56,8 +56,8 @@ and none of the wrapper's baked-in `-I`/`-L` flags, since Bear does not
 run the wrapper to learn them. Clang tooling that needs those flags to
 resolve MPI headers should point at the wrapper directly; clangd does
 this with `--query-driver`. See [Set up clangd for a project without
-CMake](clangd-setup.md) for pointing an editor at the database this page
-produces.
+CMake](clangd-setup.md) for pointing an editor at the database once it
+exists.
 
 ## The compiler the wrapper execs is usually not a second entry
 
@@ -82,7 +82,7 @@ source file named `gcc`.
 - [Use Bear with Intel oneAPI compilers](intel-oneapi.md) for the
   `intel_cc`/`intel_fortran` families the Intel MPI wrappers reuse.
 - [Use Bear with ccache, distcc, or icecc](ccache-distcc-icecc.md) for
-  the launcher case this page contrasts with.
+  the launcher case, where Bear records the wrapped compiler instead.
 - [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.

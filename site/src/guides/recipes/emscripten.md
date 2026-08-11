@@ -73,9 +73,9 @@ getting the database itself into a place clangd finds it.
   gets wrong.
 - [Generate compile_commands.json for a Makefile
   project](compile-commands-for-makefile.md) for the Autotools-style
-  two-step pattern this page reuses for `emcmake`.
+  two-step pattern `emcmake` needs.
 - [Set up clangd for a project without CMake](clangd-setup.md) for
-  pointing your editor at the database this page produces.
-- [Recipes](index.md) for the rest of the task pages.
+  pointing your editor at the database once it exists.
+- [Recipes](index.md) for the other tasks.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

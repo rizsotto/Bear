@@ -17,10 +17,8 @@ docker exec my-container sh -c "bear -- make -j4"
 
 This is the working answer for the common case: a normal, dynamically
 linked build toolchain, building for the container's own architecture.
-The rest of this page covers getting Bear into the image, the cases
-where the mechanism needs help, and the one problem that is specific to
-containers: the paths Bear records belong to the container's filesystem,
-not the host's.
+One problem is specific to containers: the paths Bear records belong to
+the container's filesystem, not the host's.
 
 ## Installing Bear in the image
 
@@ -49,9 +47,8 @@ describes for cross-compilation.
 `bear -- docker exec ...` from the host does not work: `docker exec`
 hands the command to the Docker daemon, which runs it in the container's
 own process tree, one the host-side Bear process never sees, so it never
-observes the compiler invocations. This is explained in full in
-[Bear on Linux, WSL2, and Docker](../../platforms/linux.md); this page
-takes it as the starting point, not something to reprove.
+observes the compiler invocations. [Bear on Linux, WSL2, and
+Docker](../../platforms/linux.md) explains this in full.
 
 ## What the container needs for preload interception
 
@@ -127,8 +124,8 @@ Three ways to deal with it, in order of how little they change:
   database, and the mismatch does not arise.
 
 Related: [Bear on Linux, WSL2, and Docker](../../platforms/linux.md) for
-the platform-level notes this page builds on,
-[Troubleshooting](../troubleshooting.md) for a database that comes out
-wrong, and the [Recipes](index.md) index for other tasks.
+the platform-level notes, [Troubleshooting](../troubleshooting.md) for a
+database that comes out wrong, and the [Recipes](index.md) index for
+other tasks.
 
   [install]: https://github.com/rizsotto/Bear/blob/master/INSTALL.md

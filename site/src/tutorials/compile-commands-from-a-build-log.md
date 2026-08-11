@@ -175,6 +175,6 @@ cannot miss a command or resolve a compiler name wrong. Reach for
   builds, incremental builds, and the rest of the Make-specific detail.
 - [Bear produces an empty compile_commands.json](../guides/recipes/empty-compilation-database.md)
   if a database, from either path, comes out shorter than expected.
-- [Recipes](../guides/recipes/index.md) for the rest of the task pages.
+- [Recipes](../guides/recipes/index.md) for the other tasks.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

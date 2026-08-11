@@ -8,9 +8,7 @@ bear -- make
 
 Run your build under Bear once to produce `compile_commands.json`, and
 clangd picks it up automatically the next time you open a source file in
-your editor - no CMake, no manual flag lists. The rest of this page is
-about getting that file where clangd looks for it, and confirming that
-it actually found it.
+your editor - no CMake, no manual flag lists.
 
 ## Where the file has to be
 

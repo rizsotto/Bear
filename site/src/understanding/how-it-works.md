@@ -11,9 +11,9 @@ events it recognizes as compiler invocations into compilation-database
 entries. Combined mode runs both in one process; `bear intercept` and
 `bear semantic` run them as two separate steps over a file in between,
 and `bear parse-sh` replaces capture entirely by reconstructing events
-from text instead of running anything. This page explains the
-mechanism; for the commands themselves see [Getting started with
-Bear](../tutorials/getting-started.md) and the [Recipes](../guides/recipes/index.md).
+from text instead of running anything. For the commands themselves see
+[Getting started with Bear](../tutorials/getting-started.md) and the
+[Recipes](../guides/recipes/index.md).
 
 ## Two ways to capture a real build
 

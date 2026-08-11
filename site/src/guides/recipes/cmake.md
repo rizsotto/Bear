@@ -18,8 +18,8 @@ this produces with [Set up clangd for a project without
 CMake](clangd-setup.md), which covers `--compile-commands-dir` and the
 `.clangd` `CompilationDatabase` key.
 
-This is the better answer for the ordinary CMake project, and the rest of
-this page is about the cases where it is not enough.
+For the ordinary CMake project that is the better answer. Bear is for
+the cases where it is not enough.
 
 ## Generators that ignore the variable
 

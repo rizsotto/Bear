@@ -11,9 +11,8 @@ short list of names that are genuinely ambiguous across platforms, and
 name matches, the command line is
 parsed with that family's own flag rules, since GCC, MSVC, and Swift
 (to pick three) do not agree on how to spell an include path or an
-output file. This page explains how that matching works and lists the
-names it currently covers; the configuration keys that let you extend
-or correct it are in the [`bear(1)` man page][manpage] and explained in
+output file. The configuration keys that let you extend or correct that
+matching are in the [`bear(1)` man page][manpage] and explained in
 [Configure Bear](configuration.md).
 
 ## Cross-compiler prefixes and version suffixes

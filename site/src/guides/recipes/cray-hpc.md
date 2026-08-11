@@ -63,4 +63,4 @@ compilers:
   build also calls `mpicc`/`mpifort`-style wrappers directly instead of
   the `cc`/`CC`/`ftn` drivers.
 - [Configure Bear](../../reference/configuration.md) for the `compilers:` section.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.

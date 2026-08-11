@@ -6,9 +6,7 @@ Bear reads an optional `bear.yml`. Every key is optional except `schema`,
 which is required once you write a file at all; every section below
 states its default, so a key you do not write keeps that value. The
 canonical source for every key, accepted value, and default is the
-[`bear(1)` man page][manpage] CONFIGURATION section; this page mirrors
-it, organized one section at a time, with the shape a user would
-actually write next to its default.
+[`bear(1)` man page][manpage] CONFIGURATION section.
 
 ## Where the file is found
 

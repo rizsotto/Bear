@@ -178,4 +178,4 @@ cross-compiling](cross-compilation.md#when-preload-cannot-reach-the-compiler).
   even when a preload library never loaded.
 - [Troubleshooting](../troubleshooting.md) for `LD_PRELOAD` errors and
   other silent interception failures.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.

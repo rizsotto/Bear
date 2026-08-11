@@ -76,5 +76,5 @@ for what each method can and cannot reach.
 - [Supported compilers](../../reference/supported-compilers.md) for the full name
   table and the `compilers:` override.
 - [Generate compile_commands.json for a Makefile project](compile-commands-for-makefile.md)
-  for the general Make workflow this page builds on.
-- [Recipes](index.md) for the rest of the task pages.
+  for the general Make workflow.
+- [Recipes](index.md) for the other tasks.

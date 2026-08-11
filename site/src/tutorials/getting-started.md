@@ -140,5 +140,5 @@ refactoring tools, takes it from there.
   `compile_commands.json`](../guides/recipes/empty-compilation-database.md) if a
   real project's database comes out empty, and
   [Troubleshooting](../guides/troubleshooting.md) if it comes out wrong.
-- [How Bear works](../understanding/how-it-works.md) for the interception mechanism
-  behind this page.
+- [How Bear works](../understanding/how-it-works.md) for the interception
+  mechanism.

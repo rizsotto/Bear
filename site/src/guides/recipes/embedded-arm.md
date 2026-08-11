@@ -97,4 +97,4 @@ pointing your editor at the database once it exists.
 - [Set up clangd for a project without CMake](clangd-setup.md).
 - [Supported compilers](../../reference/supported-compilers.md) for the full
   recognized-name table.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.

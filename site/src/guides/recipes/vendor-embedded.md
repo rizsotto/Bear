@@ -90,4 +90,4 @@ recognized](../../reference/supported-compilers.md#what-is-not-recognized).
 - [Generate compile_commands.json for a Makefile
   project](compile-commands-for-makefile.md) for the general Make
   workflow these toolchains build on.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.

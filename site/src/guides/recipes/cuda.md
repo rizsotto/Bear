@@ -98,9 +98,9 @@ runs from its own temporary directory.
   gets wrong.
 - [Generate compile_commands.json for a Makefile
   project](compile-commands-for-makefile.md) for the general Make
-  workflow this page builds on.
+  workflow.
 - [Set up clangd for a project without CMake](clangd-setup.md) for
-  pointing your editor at the database this page produces.
-- [Recipes](index.md) for the rest of the task pages.
+  pointing your editor at the database once it exists.
+- [Recipes](index.md) for the other tasks.
 
   [manpage]: https://github.com/rizsotto/Bear/blob/master/man/bear.1.md

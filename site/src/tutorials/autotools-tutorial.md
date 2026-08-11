@@ -185,9 +185,9 @@ compiler directly and Bear observes nothing. For libtasn1, that step is
 `./configure`. See [How Bear works](../understanding/how-it-works.md) for the mechanism
 behind both interception methods.
 
-That makes this project's `configure` step the one place on this site
-where running under Bear is required, not just harmless. Write a
-`bear.yml` next to the source tree:
+That makes libtasn1's `configure` step a case where running under Bear
+is required, not just harmless. Write a `bear.yml` next to the source
+tree:
 
 ```yaml
 schema: "4.2"
@@ -232,5 +232,5 @@ probes survive into the final database.
 - [Recover compile_commands.json from a build
   log](compile-commands-from-a-build-log.md) if you cannot run the build
   yourself, only read its log.
-- [How Bear works](../understanding/how-it-works.md) for the interception mechanism
-  behind every build on this page.
+- [How Bear works](../understanding/how-it-works.md) for the interception
+  mechanism.

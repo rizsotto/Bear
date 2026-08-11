@@ -58,4 +58,4 @@ Bear](../../reference/configuration.md) for the key itself.
 - [Supported compilers](../../reference/supported-compilers.md) for the complete
   recognized-name table and the ambiguous-name rules.
 - [Configure Bear](../../reference/configuration.md) for the `compilers:` section.
-- [Recipes](index.md) for the rest of the task pages.
+- [Recipes](index.md) for the other tasks.
