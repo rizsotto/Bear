@@ -833,6 +833,7 @@ mod test {
         assert!(sut.environment_overrides.get("CXX").unwrap().contains(".bear"));
     }
 
+    // Requirements: interception-wrapper-mechanism
     #[test]
     fn test_path_discovery_with_empty_executables() {
         #[cfg(unix)]
@@ -872,6 +873,10 @@ mod test {
         assert!(wrapper_config.get_executable("notacompiler").is_none());
     }
 
+    // Configured executables replace the PATH scan rather than adding to it.
+    // This is the contract, not an oversight: see
+    // `interception-wrapper-mechanism`.
+    // Requirements: interception-wrapper-mechanism
     #[test]
     fn test_path_discovery_skipped_with_executables() {
         let compiler = if cfg!(unix) { "gcc" } else { "gcc.exe" };

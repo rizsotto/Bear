@@ -446,6 +446,127 @@ intercept:
     Ok(())
 }
 
+/// An explicitly configured compiler list REPLACES PATH-based discovery in
+/// wrapper mode; it does not extend it. When the user configures at least one
+/// compiler for interception, exactly those are wrapped and the PATH scan is
+/// skipped, so a compiler the build finds on PATH but the user did not
+/// configure is left alone. That is the contract, not an oversight: the
+/// configured list is how a user narrows interception to the toolchain they
+/// care about, and a scan that ran anyway would silently widen it again.
+///
+/// One run cannot show this. "Nothing was intercepted" also holds when the
+/// build script is broken, so the test runs the SAME build script twice and
+/// varies only the configuration: with no `compilers:` entry the PATH scan
+/// wraps the compiler and the source appears in the database; with one entry
+/// naming an unrelated executable the scan is skipped and the source does not
+/// appear. A failure on the first case means discovery broke; a failure on
+/// the second means the scan is no longer being skipped, and interception
+/// now reaches beyond what the user configured.
+///
+/// The build must call the compiler by its bare name, resolved through PATH.
+/// Compilers named in the compiler environment variables are registered in
+/// both cases, so a `$CC`-based script would be intercepted in the second run
+/// too; those variables are stripped from both children for the same reason.
+// Requirements: interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_configured_compilers_replace_path_discovery() -> Result<()> {
+    // The make-family program variables, the subset of `program_env` that can
+    // name a C compiler. Bear registers a wrapper for these regardless of the
+    // configured list, so one left set by the host would wrap the compiler in
+    // the configured run and mask the contrast. The cargo-family keys in
+    // `program_env` are omitted deliberately: they cannot name this compiler.
+    const COMPILER_ENV_VARS: [&str; 11] =
+        ["CC", "CXX", "CPP", "FC", "AR", "AS", "M2C", "PC", "LEX", "YACC", "LINT"];
+
+    let env = TestEnvironment::new("wrapper_configured_compilers")?;
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    // Bare name, resolved by the shell through PATH -- the only invocation
+    // shape that distinguishes the two configurations.
+    let build = format!("{} -c test.c -o test.o\n", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    // A configured entry only has to exist on disk: the validator checks the
+    // path, and configured executables are registered without asking whether
+    // they are compilers. The build never invokes this one; its only job is
+    // to make the configured list non-empty.
+    let decoy = env.create_shell_script("decoy-cc", "exit 1")?;
+
+    let control_config = r#"
+schema: "4.2"
+
+intercept:
+  mode: wrapper
+"#
+    .to_string();
+    let configured_config = format!(
+        r#"
+schema: "4.2"
+
+intercept:
+  mode: wrapper
+
+compilers:
+  - path: '{decoy}'
+"#,
+        decoy = decoy.display()
+    );
+
+    let cases = [
+        ("control: no configured compilers, PATH scan runs", control_config, "control.json", true),
+        ("configured compiler list, PATH scan skipped", configured_config, "configured.json", false),
+    ];
+
+    for (case, config, output, expected) in cases {
+        let config_path = env.test_dir().join(format!("{output}.config.yaml"));
+        std::fs::write(&config_path, &config)?;
+
+        let mut cmd = env.command_bear();
+        cmd.current_dir(env.test_dir()).args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            output,
+            "--",
+            SHELL_PATH,
+            script.to_str().unwrap(),
+        ]);
+        for key in COMPILER_ENV_VARS {
+            cmd.env_remove(key);
+        }
+        let run = cmd.output()?;
+        assert!(
+            run.status.success(),
+            "[{case}] bear failed, so neither outcome can be trusted:\nstdout={}\nstderr={}",
+            String::from_utf8_lossy(&run.stdout),
+            String::from_utf8_lossy(&run.stderr)
+        );
+
+        let sut = env.load_compilation_database(output)?;
+        let intercepted = sut
+            .entries()
+            .iter()
+            .any(|entry| entry.get("file").and_then(|v| v.as_str()).is_some_and(|f| f.ends_with("test.c")));
+        assert_eq!(
+            intercepted,
+            expected,
+            "[{case}] expected test.c to be {} in the database. {}\nentries: {:#?}",
+            if expected { "present" } else { "absent" },
+            if expected {
+                "An empty configured list must fall back to the PATH scan, which wraps the compiler."
+            } else {
+                "A non-empty configured list replaces the PATH scan; wrapping anything else means \
+                 interception now reaches beyond what the user configured."
+            },
+            sut.entries()
+        );
+    }
+
+    Ok(())
+}
+
 /// Test wrapper-based interception
 // Requirements: interception-wrapper-mechanism
 #[test]

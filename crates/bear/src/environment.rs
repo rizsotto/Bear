@@ -52,11 +52,7 @@ impl BuildEnvironment {
     ) -> Result<Self, ConfigurationError> {
         let inner = match intercept {
             config::Intercept::Wrapper => {
-                let executables: Vec<PathBuf> = compilers
-                    .iter()
-                    .filter(|compiler| !compiler.ignore)
-                    .map(|compiler| compiler.path.clone())
-                    .collect();
+                let executables = wrapped_executables(compilers);
                 runner::BuildEnvironment::create_as_wrapper(context, &executables, address, is_compiler)?
             }
             config::Intercept::Preload => runner::BuildEnvironment::create_as_preload(context, address)?,
@@ -74,6 +70,17 @@ impl BuildEnvironment {
     ) -> Result<ExitStatus, intercept_supervisor::SuperviseError> {
         self.inner.run_build(&build_command.arguments)
     }
+}
+
+/// The configured executables to wrap in wrapper mode.
+///
+/// An entry the user excluded from the database gets no wrapper, and it does
+/// not count as a configured executable either: a configuration that only
+/// excludes compilers yields an empty list, which leaves the supervisor free
+/// to discover compilers on PATH. A non-empty list replaces that scan (see
+/// `interception-wrapper-mechanism`).
+fn wrapped_executables(compilers: &[config::Compiler]) -> Vec<PathBuf> {
+    compilers.iter().filter(|compiler| !compiler.ignore).map(|compiler| compiler.path.clone()).collect()
 }
 
 /// Creates an [`intercept::Execution`] from a build command with automatic
@@ -97,4 +104,48 @@ pub fn execution_from_build_command(command: &args::BuildCommand) -> intercept::
         environment,
     }
     .trim()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn compiler(path: &str) -> config::Compiler {
+        config::Compiler { path: PathBuf::from(path), as_: None, ignore: false }
+    }
+
+    fn ignored(path: &str) -> config::Compiler {
+        config::Compiler { ignore: true, ..compiler(path) }
+    }
+
+    // Requirements: interception-wrapper-mechanism
+    #[test]
+    fn only_the_compilers_kept_in_the_database_are_wrapped() {
+        let cases = [
+            ("nothing configured", vec![], vec![]),
+            ("one compiler", vec![compiler("/usr/bin/mycc")], vec!["/usr/bin/mycc"]),
+            ("excluded compiler", vec![ignored("/usr/bin/mycc")], vec![]),
+            ("one of each", vec![compiler("/usr/bin/mycc"), ignored("/usr/bin/nope")], vec!["/usr/bin/mycc"]),
+        ];
+
+        for (case, compilers, expected) in cases {
+            let sut = wrapped_executables(&compilers);
+
+            let expected: Vec<PathBuf> = expected.into_iter().map(PathBuf::from).collect();
+            assert_eq!(sut, expected, "case: {case}");
+        }
+    }
+
+    /// A configuration that only excludes compilers must not switch
+    /// interception over to the configured list, because that would silently
+    /// stop the PATH scan and leave the real compilers unwrapped.
+    // Requirements: interception-wrapper-mechanism
+    #[test]
+    fn excluding_every_compiler_leaves_path_discovery_enabled() {
+        let compilers = vec![ignored("/usr/bin/mycc"), ignored("/usr/bin/nope")];
+
+        let sut = wrapped_executables(&compilers);
+
+        assert!(sut.is_empty(), "an all-excluded configuration must not count as a configured list");
+    }
 }
