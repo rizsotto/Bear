@@ -44,7 +44,7 @@ fn flags_dir() -> std::path::PathBuf {
         .ancestors()
         .nth(2)
         .expect("CARGO_MANIFEST_DIR is build-support/compilers-codegen, two levels below the workspace root");
-    workspace_root.join("crates/bear/compilers")
+    workspace_root.join("crates/semantic/compilers")
 }
 
 #[test]

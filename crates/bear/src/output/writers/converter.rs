@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::IteratorWriter;
+use crate::config;
 use crate::output::WriterError;
 use crate::output::clang;
 use crate::output::statistics::OutputStatistics;
-use crate::{config, semantic};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -40,7 +40,7 @@ mod tests {
     use super::*;
     use crate::output::statistics::OutputStatistics;
     use crate::output::writers::fixtures::CollectingWriter;
-    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
 

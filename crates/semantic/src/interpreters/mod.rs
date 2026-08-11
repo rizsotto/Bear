@@ -6,7 +6,7 @@
 //! exclude specific compilers.
 
 mod combinators;
-pub mod compilers;
+pub(crate) mod compilers;
 mod ignore;
 pub(crate) mod matchers;
 
@@ -64,7 +64,7 @@ mod test {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::semantic::RecognizeResult;
+    use crate::RecognizeResult;
     use intercept::Execution;
 
     /// The default wiring: no hints, nothing ignored, and the default

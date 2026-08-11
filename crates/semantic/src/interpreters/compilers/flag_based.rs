@@ -11,7 +11,7 @@ use super::super::matchers::{
     EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule,
 };
 use super::response_file::Syntax;
-use crate::semantic::{
+use crate::{
     Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, PassEffect, RecognizeResult,
     SourceMode,
 };
@@ -462,7 +462,7 @@ mod flag_table_invariants {
 #[cfg(test)]
 mod pass_through_tests {
     use super::*;
-    use crate::semantic::interpreters::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
+    use crate::interpreters::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
 
     #[test]
     fn test_pass_through_flag_stops_parsing() {
@@ -517,7 +517,7 @@ mod pass_through_tests {
 #[cfg(test)]
 mod vala_tests {
     use super::*;
-    use crate::semantic::interpreters::matchers::FlagAnalyzer;
+    use crate::interpreters::matchers::FlagAnalyzer;
 
     // `-X` forwards exactly one token to the C compiler, and that token usually
     // starts with '-' (e.g. `-X -lm`). Because Bear treats any bare argument as
@@ -549,7 +549,7 @@ mod vala_tests {
 #[cfg(test)]
 mod slash_prefix_tests {
     use super::*;
-    use crate::semantic::interpreters::matchers::{FlagAnalyzer, FlagRule};
+    use crate::interpreters::matchers::{FlagAnalyzer, FlagRule};
 
     #[test]
     fn slash_prefixed_args_treated_as_source_without_slash_support() {
@@ -576,7 +576,7 @@ mod slash_prefix_tests {
 
     #[test]
     fn output_extraction_works_with_glued_eq() {
-        use crate::semantic::interpreters::matchers::FlagPattern;
+        use crate::interpreters::matchers::FlagPattern;
         use std::sync::LazyLock;
 
         static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
@@ -592,7 +592,7 @@ mod slash_prefix_tests {
 
     #[test]
     fn output_extraction_works_with_glued_colon() {
-        use crate::semantic::interpreters::matchers::FlagPattern;
+        use crate::interpreters::matchers::FlagPattern;
         use std::sync::LazyLock;
 
         static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
@@ -608,7 +608,7 @@ mod slash_prefix_tests {
 
     #[test]
     fn output_extraction_works_with_glued_value() {
-        use crate::semantic::interpreters::matchers::FlagPattern;
+        use crate::interpreters::matchers::FlagPattern;
         use std::sync::LazyLock;
 
         static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {

@@ -29,13 +29,17 @@
 
 pub mod interpreters;
 
-#[cfg(test)]
+/// Command factories and comparison helpers for tests. Compiled only for this
+/// crate's own tests and for dependents that turn on the `testing` feature.
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+pub use interpreters::compilers::compiler_recognition::{CompilerHints, CompilerRecognizer};
+pub use interpreters::compilers::identity::SpellingError;
 pub use interpreters::compilers::print_compilers;
+pub use interpreters::matchers::{is_c_family_source, is_header_file, looks_like_a_source_file};
 
 use intercept::Execution;
-use interpreters::matchers::looks_like_a_source_file;
 
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};

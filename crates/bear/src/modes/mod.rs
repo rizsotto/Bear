@@ -10,11 +10,11 @@ mod execution;
 
 use crate::args::is_stdio;
 use crate::environment;
-use crate::semantic::interpreters::compilers::compiler_recognition::{CompilerHints, CompilerRecognizer};
-use crate::semantic::interpreters::compilers::identity::SpellingError;
 use crate::{args, config, output};
 use intercept_supervisor::CollectorOnTcp;
 use intercept_supervisor::context;
+use semantic::SpellingError;
+use semantic::{CompilerHints, CompilerRecognizer};
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -177,7 +177,7 @@ impl Mode {
                 print!(
                     "Bear {} recognizes the following compilers:\n\n{}",
                     env!("CARGO_PKG_VERSION"),
-                    crate::semantic::print_compilers()
+                    semantic::print_compilers()
                 );
                 return ExitCode::SUCCESS;
             }
@@ -242,11 +242,11 @@ mod impls {
     use crate::args::BuildCommand;
     use crate::environment;
     use crate::output::{ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError};
-    use crate::semantic::interpreters::compilers::compiler_recognition::CompilerHints;
-    use crate::{args, config, output, parse_sh, semantic};
+    use crate::{args, config, output, parse_sh};
     use crossbeam_channel::{Receiver, Sender};
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
+    use semantic::CompilerHints;
     use std::collections::HashMap;
     use std::io::IsTerminal;
     use std::path::PathBuf;

@@ -37,8 +37,8 @@
 use super::Entry;
 use super::path_format::{ResolveFn, resolver_for};
 use crate::config;
-use crate::semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, SourceMode};
 use log::warn;
+use semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, SourceMode};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
@@ -419,7 +419,7 @@ mod tests {
     use super::super::path_format::FormatError;
     use super::*;
     use crate::config::{ArgumentsFormat, EntryFormat, Format, PathFormat, PathResolver};
-    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::ffi::OsStr;
     use std::io;
 
@@ -744,8 +744,7 @@ mod tests {
     /// classification (not a hand-written one), because entry suppression is
     /// decided from it.
     fn recognize_and_convert(executable: &str, args: Vec<&str>) -> Vec<Entry> {
-        use crate::semantic::interpreters::compilers::CompilerInterpreter;
-        use crate::semantic::{Interpreter, RecognizeResult};
+        use semantic::{CompilerHints, Interpreter, RecognizeResult};
 
         let execution = intercept::Execution::from_strings(
             executable,
@@ -753,7 +752,9 @@ mod tests {
             "/home/user",
             std::collections::HashMap::new(),
         );
-        let interpreter = CompilerInterpreter::default();
+        // The same wiring the driver builds: no hints, nothing ignored, and
+        // the default argument handling.
+        let interpreter = semantic::interpreters::create(CompilerHints::new(), vec![], false, true);
         let RecognizeResult::Recognized(command) = interpreter.recognize(execution) else {
             panic!("{executable} invocation must be recognized as a compiler command");
         };
@@ -1298,7 +1299,7 @@ mod tests {
     /// the valac interpreter produces. `from_strings` always sets
     /// `PerSourceStripped`, so combined-path tests flip it here.
     fn combined(mut cmd: Command) -> Command {
-        cmd.source_mode = crate::semantic::SourceMode::Combined;
+        cmd.source_mode = semantic::SourceMode::Combined;
         cmd
     }
 
@@ -1306,7 +1307,7 @@ mod tests {
     /// what the swiftc interpreter produces. `from_strings` always sets
     /// `PerSourceStripped`, so whole-module tests flip it here.
     fn per_source_full(mut cmd: Command) -> Command {
-        cmd.source_mode = crate::semantic::SourceMode::PerSourceFull;
+        cmd.source_mode = semantic::SourceMode::PerSourceFull;
         cmd
     }
 

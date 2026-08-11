@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::ffi::OsString;
 
-use crate::semantic::{Execution, Interpreter, RecognizeResult};
+use crate::{Execution, Interpreter, RecognizeResult};
 
 const COREUTILS_MESSAGE: &str = "coreutils executable";
 const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";

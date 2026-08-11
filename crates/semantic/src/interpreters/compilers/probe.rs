@@ -37,7 +37,7 @@ use std::collections::HashMap;
 #[cfg(unix)]
 use std::path::PathBuf;
 
-/// `Send` (and not `Sync`) for the same reason as [`crate::semantic::Interpreter`]:
+/// `Send` (and not `Sync`) for the same reason as [`crate::Interpreter`]:
 /// the probe lives inside the interpreter that is moved into the single
 /// consumer thread, and is never shared across threads.
 pub trait CompilerProbe: Send {

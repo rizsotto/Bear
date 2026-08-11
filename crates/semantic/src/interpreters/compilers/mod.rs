@@ -115,7 +115,7 @@ impl Interpreter for CompilerInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::{ArgumentKind, CompilerPass, PassEffect};
+    use crate::{ArgumentKind, CompilerPass, PassEffect};
     use std::borrow::Cow;
     use std::collections::HashMap;
     use std::path::{Path, PathBuf};

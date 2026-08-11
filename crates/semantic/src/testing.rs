@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Argument, ArgumentKind, Command, PassEffect, SourceMode};
+use super::{Argument, ArgumentKind, Command, SourceMode};
 use std::path::PathBuf;
 
 impl Command {
@@ -40,6 +40,7 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PassEffect;
     use std::borrow::Cow;
     use std::path::Path;
 

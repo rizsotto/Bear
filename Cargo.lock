@@ -99,7 +99,6 @@ name = "bear"
 version = "4.2.1"
 dependencies = [
  "clap",
- "compilers-codegen",
  "crossbeam-channel",
  "glob",
  "intercept",
@@ -107,7 +106,7 @@ dependencies = [
  "libc",
  "log",
  "mockall",
- "regex-lite",
+ "semantic",
  "serde",
  "serde-saphyr",
  "serde_json",
@@ -912,6 +911,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "semantic"
+version = "4.2.1"
+dependencies = [
+ "compilers-codegen",
+ "intercept",
+ "libc",
+ "log",
+ "mockall",
+ "regex-lite",
+ "shell-words",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

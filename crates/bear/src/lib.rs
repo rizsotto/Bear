@@ -6,4 +6,3 @@ pub mod environment;
 pub mod modes;
 pub mod output;
 pub mod parse_sh;
-pub mod semantic;

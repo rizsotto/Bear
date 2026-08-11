@@ -15,7 +15,7 @@ mod intercept;
 mod statistics;
 mod writers;
 
-use crate::{args, config, semantic};
+use crate::{args, config};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -99,7 +99,7 @@ pub enum WriterError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::sync::atomic::Ordering;
 
     fn make_compile_command(file: &str) -> Command {

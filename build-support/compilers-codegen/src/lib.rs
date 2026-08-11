@@ -436,7 +436,7 @@ fn write_output(out_dir: &Path, filename: &str, content: String) -> Result<()> {
 /// Path to the YAML flag definitions in the workspace.
 ///
 /// `CARGO_MANIFEST_DIR` is `<root>/build-support/compilers-codegen`; the YAML
-/// lives at `<root>/crates/bear/compilers`, so walk up two levels to the
+/// lives at `<root>/crates/semantic/compilers`, so walk up two levels to the
 /// workspace root.
 pub(crate) fn flags_dir() -> std::path::PathBuf {
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -444,7 +444,7 @@ pub(crate) fn flags_dir() -> std::path::PathBuf {
         .ancestors()
         .nth(2)
         .expect("CARGO_MANIFEST_DIR is build-support/compilers-codegen, two levels below the workspace root");
-    workspace_root.join("crates/bear/compilers")
+    workspace_root.join("crates/semantic/compilers")
 }
 
 /// Load all YAML flag tables from the workspace compilers directory, keyed

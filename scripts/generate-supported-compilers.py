@@ -261,7 +261,7 @@ def render_generated_block(compilers: list[dict], wrappers: list[dict]) -> str:
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
-    compilers_dir = repo_root / "crates" / "bear" / "compilers"
+    compilers_dir = repo_root / "crates" / "semantic" / "compilers"
     template_path = repo_root / "site" / "src" / "reference" / "supported-compilers.md"
 
     if not compilers_dir.is_dir():

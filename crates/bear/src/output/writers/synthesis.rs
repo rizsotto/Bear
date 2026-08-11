@@ -25,7 +25,7 @@ use crate::config::{HeaderStrategy, Headers};
 use crate::output::WriterError;
 use crate::output::clang::Entry;
 use crate::output::statistics::OutputStatistics;
-use crate::semantic::interpreters::matchers::{is_c_family_source, is_header_file, looks_like_a_source_file};
+use semantic::{is_c_family_source, is_header_file, looks_like_a_source_file};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

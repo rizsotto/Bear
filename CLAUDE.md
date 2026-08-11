@@ -27,6 +27,7 @@ It intercepts compiler invocations during a build and records them.
 | Crate | Purpose |
 |---|---|
 | `crates/bear` | Main driver, CLI, semantic analysis, output |
+| `crates/semantic` | Compiler recognition and flag parsing; owns the `compilers/*.yaml` definitions |
 | `crates/bear-driver` | Driver/supervisor binary; orchestrates interception and output |
 | `crates/intercept` | Shared/agent-side interception runtime (Execution, reporter, wire, env helpers) |
 | `crates/intercept-supervisor` | Driver-side interception (supervise, TCP collector, build environment) |

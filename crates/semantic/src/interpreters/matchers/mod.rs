@@ -11,7 +11,7 @@
 
 pub(super) mod source;
 
-use crate::semantic::ArgumentKind;
+use crate::ArgumentKind;
 
 pub use source::{is_c_family_source, is_header_file, looks_like_a_source_file};
 
@@ -267,7 +267,7 @@ impl EnvRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::{CompilerPass, PassEffect};
+    use crate::{CompilerPass, PassEffect};
     use std::sync::LazyLock;
 
     // Create test-specific flags (not compiler-specific)

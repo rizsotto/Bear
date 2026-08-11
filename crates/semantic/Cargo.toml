@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 [package]
-name = "bear"
-description = "Bear is a tool that generates a compilation database for clang tooling."
+name = "semantic"
+description = "Compiler recognition and command line flag parsing for Bear."
 keywords = ["clang", "clang-tooling", "compilation-database"]
 version.workspace = true
 authors.workspace = true
@@ -12,25 +12,26 @@ license.workspace = true
 edition.workspace = true
 
 [lib]
-name = "bear"
+name = "semantic"
 path = "src/lib.rs"
+
+[features]
+# Compiles the `testing` module (command factories and comparison helpers)
+# into the library, so dependents can build their own tests against it.
+# Off by default, so release builds carry no test factories.
+testing = []
 
 [dependencies]
 intercept = { path = "../intercept" }
-intercept-supervisor = { path = "../intercept-supervisor" }
-semantic = { path = "../semantic" }
 thiserror.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-serde-saphyr.workspace = true
-clap.workspace = true
 log.workspace = true
 shell-words.workspace = true
-crossbeam-channel.workspace = true
+regex-lite.workspace = true
 libc.workspace = true
-glob.workspace = true
+
+[build-dependencies]
+compilers-codegen = { path = "../../build-support/compilers-codegen" }
 
 [dev-dependencies]
-semantic = { path = "../semantic", features = ["testing"] }
 tempfile.workspace = true
 mockall.workspace = true

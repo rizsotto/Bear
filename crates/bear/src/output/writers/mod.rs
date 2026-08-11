@@ -22,7 +22,7 @@ mod validating;
 use super::statistics::OutputStatistics;
 use super::{WriterCreationError, WriterError};
 use crate::args::is_stdio;
-use crate::{args, config, semantic};
+use crate::{args, config};
 use std::sync::Arc;
 
 use append::AppendClangOutputWriter;
@@ -208,7 +208,7 @@ mod fixtures {
 mod tests {
     use super::*;
     use crate::config;
-    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::sync::atomic::Ordering;
 
     fn make_compile_command(file: &str) -> semantic::Command {

@@ -38,6 +38,7 @@ fn main() {
 
     // Re-run if bear or intercept-preload artifacts change
     println!("cargo:rerun-if-changed=../../crates/bear/src");
+    println!("cargo:rerun-if-changed=../../crates/semantic/src");
     println!("cargo:rerun-if-changed=../../crates/intercept-preload/src");
 
     // Locate install script and repo root for integration tests.

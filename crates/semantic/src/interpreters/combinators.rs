@@ -68,9 +68,9 @@ impl<T: Interpreter> Interpreter for OutputLogger<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::semantic::Command;
-    use crate::semantic::MockInterpreter;
-    use crate::semantic::SourceMode;
+    use crate::Command;
+    use crate::MockInterpreter;
+    use crate::SourceMode;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
