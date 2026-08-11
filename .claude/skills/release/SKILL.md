@@ -118,6 +118,14 @@ order, when applicable:
   chronically invisible volunteers - name them every release.
 - `### New Contributors` - first-time contributors only
 
+Commit subjects are not enough on their own. A `refactor:` or `test:`
+commit can still change something a user sees, typically the wording of a
+diagnostic or the shape of a log line, and its subject will not say so.
+Read the bodies, and read any rationale entry added since the previous
+tag: those record accepted user-visible costs in their Consequences
+section. Anything a user could have scripted against belongs in the notes
+even when no feature changed.
+
 Trailer:
 
 ```
@@ -129,6 +137,10 @@ Useful inputs while drafting:
 ```sh
 # commit subjects since the previous tag
 git log --pretty="%s" PREV..X.Y.Z
+
+# rationale entries added since the previous tag; their Consequences
+# sections name the user-visible deltas the subjects above will not
+git log --diff-filter=A --name-only --pretty=format: PREV..X.Y.Z -- docs/rationale/
 
 # external contributors since the previous tag
 git log --pretty="%an <%ae>" PREV..X.Y.Z | sort -u
