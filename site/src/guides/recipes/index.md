@@ -2,8 +2,8 @@
 
 # Recipes
 
-One page per task. Each recipe answers a single question and opens with
-the command that answers it.
+How to generate `compile_commands.json` for a specific build system,
+toolchain, or environment, and what to do when the result is wrong.
 
 - [Generate compile_commands.json for a Makefile project](compile-commands-for-makefile.md)
   - the main recipe: plain Make, autotools, incremental and parallel
@@ -27,6 +27,9 @@ the command that answers it.
 
 - [Generate compile_commands.json when cross-compiling](cross-compilation.md) -
   a target-prefixed GCC or Clang.
+- [Intercept a 32-bit build on a 64-bit host](multilib.md) - a second
+  preload library, for a build that runs 32-bit compilers or build
+  tools.
 - [Generate compile_commands.json for an STM32 or arm-none-eabi
   project](embedded-arm.md) - the bare-metal Arm GCC toolchain.
 - [Use Bear with a vendor embedded toolchain](vendor-embedded.md) - QNX,
