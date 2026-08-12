@@ -38,7 +38,7 @@ slash_prefix: false
 flags:
   - match: {pattern: "--prefix=*"}
     result: configures_preprocessing
-  - match: {pattern: "-F*"}
+  - match: {pattern: "-F{ }*"}
     result: configures_compiling
   - match: {pattern: "-ObjC"}
     result: none

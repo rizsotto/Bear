@@ -1,6 +1,6 @@
 ---
 source: build-support/compilers-codegen/tests/snapshots.rs
-expression: "generate_flag_file(\"cray_cc\")"
+expression: generated
 ---
 // Generated from compilers/cray_cc.yaml -- DO NOT EDIT
 static CRAY_CC_FLAGS: [FlagRule; 200] = [
@@ -165,7 +165,7 @@ static CRAY_CC_FLAGS: [FlagRule; 200] = [
     FlagRule::new(FlagPattern::Exactly("-MQ", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-CC", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Prefix("-F", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-F"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-Z", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-a", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-r", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),

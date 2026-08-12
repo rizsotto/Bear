@@ -1,6 +1,6 @@
 ---
 source: build-support/compilers-codegen/tests/snapshots.rs
-expression: "generate_flag_file(\"intel_cc\")"
+expression: generated
 ---
 // Generated from compilers/intel_cc.yaml -- DO NOT EDIT
 static INTEL_CC_FLAGS: [FlagRule; 262] = [
@@ -227,7 +227,7 @@ static INTEL_CC_FLAGS: [FlagRule; 262] = [
     FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("-x", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-V", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
-    FlagRule::new(FlagPattern::Prefix("-F", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-F"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-Z", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-a", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-r", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),

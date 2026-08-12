@@ -875,6 +875,75 @@ fn clang_cl_inherits_msvc_per_warning_options() -> Result<()> {
 
 // Requirements: output-compilation-entries
 //
+// Regression test for issue #715: Clang's `-F` (framework search path) is a
+// JoinedOrSeparate option, so `-F /Frameworks` and `-F/Frameworks` are the same
+// invocation. Bear only recognized the joined spelling, so the separated operand
+// fell through to source classification and was dropped, leaving a standalone
+// `-F` that no compiler can consume. SwiftPM emits the separated form on macOS,
+// which is how this surfaced.
+//
+// Both spellings are checked in one run, each on its own translation unit, so the
+// pair cannot drift apart. `bear semantic` runs the interpreter without executing
+// clang, so no toolchain is required and the executable name can be a bare `clang`.
+#[test]
+fn clang_framework_search_path_preserves_separated_and_joined_operand() -> Result<()> {
+    let env = TestEnvironment::new("clang_framework_search_path")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let clang = "clang";
+
+    let event_separated = json!({
+        "executable": clang,
+        "arguments": [clang, "-F", "/Frameworks", "-c", "separated.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let event_joined = json!({
+        "executable": clang,
+        "arguments": [clang, "-F/Frameworks", "-c", "joined.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    let events = format!("{}\n{}", event_separated, event_joined);
+
+    env.create_source_files(&[
+        ("events.json", &events),
+        ("separated.cpp", "int main() { return 0; }"),
+        ("joined.cpp", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+
+    db.assert_contains(&compilation_entry!(
+        file: "separated.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            clang.to_string(),
+            "-F".to_string(), "/Frameworks".to_string(),
+            "-c".to_string(),
+            "separated.cpp".to_string(),
+        ]
+    ))?;
+    db.assert_contains(&compilation_entry!(
+        file: "joined.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            clang.to_string(),
+            "-F/Frameworks".to_string(),
+            "-c".to_string(),
+            "joined.cpp".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
 // Vala's `valac` is a transpiler-driver: it parses GNU-style (GOption) flags,
 // many of which take a separate-token value (`--pkg gio-2.0`, `--basedir ../src`).
 // Because Bear classifies any bare argument as a source file, an unrecognized
