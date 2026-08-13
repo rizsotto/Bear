@@ -12,8 +12,8 @@ use super::super::matchers::{
 };
 use super::response_file::Syntax;
 use crate::{
-    Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, PassEffect, RecognizeResult,
-    SourceMode,
+    Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, OutputSpelling, PassEffect,
+    RecognizeResult, SourceMode,
 };
 
 /// A generic compiler interpreter parameterized by a flag table and ignore filters.
@@ -167,17 +167,22 @@ fn parse_arguments_owned(
                         let val = std::mem::take(&mut args[i]);
                         let flag_str = match_result.rule.pattern.flag();
                         let after_flag = &val[flag_str.len()..];
-                        // Skip separator character (= or :) if present
-                        let path = if after_flag.starts_with('=') || after_flag.starts_with(':') {
-                            after_flag[1..].to_string()
-                        } else {
-                            after_flag.to_string()
+                        // Remember how the build joined the flag and its
+                        // value, so the entry can spell it back the way this
+                        // compiler accepts.
+                        let (spelling, path) = match after_flag.strip_prefix('=') {
+                            Some(rest) => (OutputSpelling::Equals, rest),
+                            None => match after_flag.strip_prefix(':') {
+                                Some(rest) => (OutputSpelling::Colon, rest),
+                                None => (OutputSpelling::Glued, after_flag),
+                            },
                         };
-                        Argument::Output { flag: flag_str.to_string(), path }
+                        Argument::Output { flag: flag_str.to_string(), path: path.to_string(), spelling }
                     }
                     2 => Argument::Output {
                         flag: std::mem::take(&mut args[i]),
                         path: std::mem::take(&mut args[i + 1]),
+                        spelling: OutputSpelling::Separate,
                     },
                     _ => {
                         unreachable!("Output file should be specified with glued or separate value")
@@ -585,9 +590,8 @@ mod slash_prefix_tests {
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let mut args = vec!["gcc".to_string(), "-o=foo.o".to_string()];
         let result = parse_arguments_owned(&analyzer, &mut args, false);
-        assert!(
-            matches!(result[1], Argument::Output { ref flag, ref path } if flag == "-o" && path == "foo.o")
-        );
+        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+                if flag == "-o" && path == "foo.o" && spelling == OutputSpelling::Equals));
     }
 
     #[test]
@@ -601,9 +605,8 @@ mod slash_prefix_tests {
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let mut args = vec!["cl".to_string(), "/Fo:foo.obj".to_string()];
         let result = parse_arguments_owned(&analyzer, &mut args, true);
-        assert!(
-            matches!(result[1], Argument::Output { ref flag, ref path } if flag == "/Fo" && path == "foo.obj")
-        );
+        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+                if flag == "/Fo" && path == "foo.obj" && spelling == OutputSpelling::Colon));
     }
 
     #[test]
@@ -618,9 +621,25 @@ mod slash_prefix_tests {
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let mut args = vec!["gcc".to_string(), "-ofoo.o".to_string()];
         let result = parse_arguments_owned(&analyzer, &mut args, false);
-        assert!(
-            matches!(result[1], Argument::Output { ref flag, ref path } if flag == "-o" && path == "foo.o")
-        );
+        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+                if flag == "-o" && path == "foo.o" && spelling == OutputSpelling::Glued));
+    }
+
+    /// The separate spelling is the only one that may re-emit as two tokens.
+    #[test]
+    fn output_extraction_records_the_separate_form() {
+        use crate::interpreters::matchers::FlagPattern;
+        use std::sync::LazyLock;
+
+        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
+            vec![FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output)]
+        });
+
+        let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
+        let mut args = vec!["gcc".to_string(), "-o".to_string(), "foo.o".to_string()];
+        let result = parse_arguments_owned(&analyzer, &mut args, false);
+        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+                if flag == "-o" && path == "foo.o" && spelling == OutputSpelling::Separate));
     }
 }
 
@@ -633,7 +652,7 @@ mod environment_mapping_tests {
         args.iter()
             .flat_map(|a| match a {
                 Argument::Other { arguments, .. } => arguments.clone(),
-                Argument::Output { flag, path } => vec![flag.clone(), path.clone()],
+                Argument::Output { flag, path, .. } => vec![flag.clone(), path.clone()],
                 Argument::Source { path, .. } => vec![path.clone()],
             })
             .collect()

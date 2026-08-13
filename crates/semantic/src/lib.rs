@@ -82,8 +82,43 @@ pub enum Argument {
     Other { arguments: Vec<String>, kind: ArgumentKind },
     /// A source or object file argument.
     Source { path: String, binary: bool },
-    /// An output file argument (e.g. `-o main.o`).
-    Output { flag: String, path: String },
+    /// An output file argument (e.g. `-o main.o`). The flag and the path are
+    /// stored apart so the path stays individually addressable, and
+    /// [`OutputSpelling`] remembers how the build wrote them so they can be
+    /// spelled back the way the compiler accepts.
+    Output { flag: String, path: String, spelling: OutputSpelling },
+}
+
+/// How an output flag and its value were written on the observed command line.
+///
+/// Compilers do not all accept the same spelling: `cl.exe` documents that
+/// `/Fo` takes no space before its value, and TI's long options glue their
+/// value after `=`. Re-spelling one form as another produces a database entry
+/// the compiler would reject, so the observed form is kept.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OutputSpelling {
+    /// Two tokens: `-o main.o`.
+    Separate,
+    /// One token, value glued straight onto the flag: `-omain.o`, `/FoX.obj`.
+    Glued,
+    /// One token, flag and value joined by `=`: `--output_file=x.obj`.
+    Equals,
+    /// One token, flag and value joined by `:`: `/Fo:X.obj`.
+    Colon,
+}
+
+impl OutputSpelling {
+    /// Writes `flag` and `path` back as the command line tokens this spelling
+    /// stands for: one joined token, or the two the build passed separately.
+    fn as_arguments(self, flag: &str, path: &Path) -> Vec<String> {
+        let path = path.to_string_lossy();
+        match self {
+            Self::Separate => vec![flag.to_string(), path.to_string()],
+            Self::Glued => vec![format!("{flag}{path}")],
+            Self::Equals => vec![format!("{flag}={path}")],
+            Self::Colon => vec![format!("{flag}:{path}")],
+        }
+    }
 }
 
 impl Argument {
@@ -109,10 +144,9 @@ impl Argument {
                 let updated = path_updater(p);
                 vec![updated.to_string_lossy().to_string()]
             }
-            Self::Output { flag, path } => {
-                let p = Path::new(path);
-                let updated = path_updater(p);
-                vec![flag.clone(), updated.to_string_lossy().to_string()]
+            Self::Output { flag, path, spelling } => {
+                let updated = path_updater(Path::new(path));
+                spelling.as_arguments(flag, &updated)
             }
         }
     }

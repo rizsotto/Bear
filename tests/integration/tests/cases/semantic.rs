@@ -945,8 +945,8 @@ fn msvc_glued_output_flags_survive_and_set_output_field() -> Result<()> {
     let sut = env.load_compilation_database("compile_commands.json")?;
     sut.assert_count(1)?;
 
-    // `/Fo` is an output flag, so it round-trips as the flag plus its value;
-    // `/Fd` is an ordinary compile-stage flag and keeps its glued spelling.
+    // `/Fo` is an output flag and keeps the glued spelling the build used;
+    // `/Fd` is an ordinary compile-stage flag and keeps its glued spelling too.
     sut.assert_contains(&compilation_entry!(
         file: source.to_string(),
         directory: temp_dir.to_string(),
@@ -957,7 +957,7 @@ fn msvc_glued_output_flags_survive_and_set_output_field() -> Result<()> {
             "/DWIN32".to_string(),
             "/EHsc".to_string(), "/Zi".to_string(), "/Od".to_string(),
             "-std:c++20".to_string(), "-MDd".to_string(), "/Zc:__cplusplus".to_string(),
-            "/Fo".to_string(), object.to_string(),
+            format!("/Fo{}", object),
             pdb_dir.to_string(), "/FS".to_string(),
             "-c".to_string(), source.to_string(),
         ]
@@ -1087,7 +1087,7 @@ fn msvc_assembly_listing_flags_survive() -> Result<()> {
         directory: temp_dir.to_string(),
         arguments: vec![
             cl.to_string(), "/nologo".to_string(),
-            "/Fo".to_string(), "NUL".to_string(),
+            "/FoNUL".to_string(),
             "/FAs".to_string(), r"/FaCMakeFiles\x.dir\a.cpp.s".to_string(),
             "-c".to_string(), "a.cpp".to_string(),
         ]
@@ -1134,7 +1134,7 @@ fn msvc_stack_size_option_takes_a_separate_value() -> Result<()> {
         directory: temp_dir.to_string(),
         arguments: vec![
             cl.to_string(),
-            "/Fo".to_string(), "foo.obj".to_string(),
+            "/Fofoo.obj".to_string(),
             "/c".to_string(), "a.cpp".to_string(),
         ]
     ))?;
@@ -1193,7 +1193,7 @@ fn clang_cl_inherits_msvc_glued_output_flags() -> Result<()> {
         directory: temp_dir.to_string(),
         arguments: vec![
             cl.to_string(), "/nologo".to_string(),
-            "/Fo".to_string(), object.to_string(),
+            format!("/Fo{}", object),
             "/FdCMakeFiles/x.dir/".to_string(), "/Yc".to_string(),
             "-c".to_string(), "a.cpp".to_string(),
         ]
@@ -1206,6 +1206,228 @@ fn clang_cl_inherits_msvc_glued_output_flags() -> Result<()> {
         "clang-cl must inherit the MSVC /Fo rule, got output {:?}",
         entry.get("output")
     );
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
+// An output flag and its value keep the joining the build used. Re-spelling
+// one form as another produces an entry the originating compiler rejects:
+// `cl.exe` documents that `/Fo` takes no space before its value, and TI's
+// long options glue their value after `=`. Only the separate spelling may
+// re-emit as two tokens. The `output` field carries the bare path either way.
+#[test]
+fn output_flag_keeps_the_spelling_the_build_used() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("output_flag_spelling")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    // (compiler, arguments as invoked, source, expected output field). The
+    // recorded arguments must equal the invoked ones: this whole test is that
+    // the argument list is a faithful round trip.
+    let cases: Vec<(&str, Vec<&str>, &str, &str)> = vec![
+        ("gcc", vec!["gcc", "-c", "-oglued.o", "glued.c"], "glued.c", "glued.o"),
+        ("gcc", vec!["gcc", "-c", "-o", "separate.o", "separate.c"], "separate.c", "separate.o"),
+        ("cl.exe", vec!["cl.exe", "/c", "/Fomsvcglued.obj", "msvcglued.c"], "msvcglued.c", "msvcglued.obj"),
+        ("cl.exe", vec!["cl.exe", "/c", "/Fo:msvccolon.obj", "msvccolon.c"], "msvccolon.c", "msvccolon.obj"),
+        ("armcl", vec!["armcl", "--output_file=ti.obj", "ti.c"], "ti.c", "ti.obj"),
+    ];
+
+    let events = cases
+        .iter()
+        .map(|(compiler, arguments, _, _)| {
+            json!({
+                "executable": compiler,
+                "arguments": arguments,
+                "working_dir": temp_dir,
+                "environment": {}
+            })
+            .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    env.create_source_files(&[("events.json", &events)])?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, output_field_config())?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(cases.len())?;
+
+    for (_, arguments, source, output) in &cases {
+        sut.assert_contains(&compilation_entry!(
+            file: source.to_string(),
+            directory: temp_dir.to_string(),
+            arguments: arguments.iter().map(|token| token.to_string()).collect::<Vec<_>>()
+        ))
+        .with_context(|| format!("invocation `{}`", arguments.join(" ")))?;
+
+        // The `output` field is the bare path, never the joined token.
+        let entry = sut
+            .entries()
+            .iter()
+            .find(|entry| entry.get("file").and_then(Value::as_str) == Some(*source))
+            .with_context(|| format!("no entry for {source}"))?;
+        assert_eq!(
+            entry.get("output").and_then(Value::as_str),
+            Some(*output),
+            "the output field must carry the bare path for {source}, got {:?}",
+            entry.get("output")
+        );
+    }
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
+// A configured path format must reach the path *inside* a glued output token.
+// The flag and its value share one token (`-oglued.o`), so the token cannot be
+// treated as a path wholesale: doing so rewrites `-oglued.o` into
+// `<dir>/-oglued.o`, a nonsense argument. The flag spelling stays untouched
+// and only the path part is resolved.
+#[test]
+fn glued_output_path_is_rewritten_inside_the_token() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("glued_output_path_format")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "-oglued.o", "glued.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    let config = r#"
+schema: "4.2"
+
+format:
+  paths:
+    directory: absolute
+    file: absolute
+  entries:
+    use_array_format: true
+    include_output_field: true
+"#;
+    env.create_source_files(&[("events.json", &event.to_string()), ("glued.c", "int main() { return 0; }")])?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+
+    let source = env.test_dir().join("glued.c");
+    let object = env.test_dir().join("glued.o");
+
+    sut.assert_contains(&compilation_entry!(
+        file: source.to_str().unwrap().to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "gcc".to_string(),
+            "-c".to_string(),
+            format!("-o{}", object.display()),
+            source.to_str().unwrap().to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: output-header-entries
+//
+// A synthesized header entry clones the donor's arguments with the output
+// flag removed. That removal must recognize the glued spelling too: a
+// leftover `-omain.o` in a header entry names an object the header does not
+// produce.
+#[test]
+fn synthesized_header_entry_drops_a_glued_output_flag() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("header_entry_glued_output")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "-omain.o", "main.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    let config = r#"
+schema: "4.2"
+
+headers:
+  enabled: true
+  strategy: siblings
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#;
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("main.c", "int main() { return 0; }"),
+        ("util.h", "int util(void);"),
+    ])?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(2)?;
+
+    // The donor keeps its glued spelling ...
+    sut.assert_contains(&compilation_entry!(
+        file: "main.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "gcc".to_string(), "-c".to_string(), "-omain.o".to_string(), "main.c".to_string(),
+        ]
+    ))?;
+
+    // ... and the synthesized entry drops it whole, not just its flag half.
+    sut.assert_contains(&compilation_entry!(
+        file: "util.h".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["gcc".to_string(), "-c".to_string(), "util.h".to_string()]
+    ))?;
 
     Ok(())
 }

@@ -248,6 +248,11 @@ impl CommandConverter {
     ) -> Vec<String> {
         let mut command_args = vec![];
 
+        // Every path goes through the resolver, the same one the `output` field
+        // uses, so an entry cannot disagree with itself about a path.
+        let format_path: &dyn Fn(&Path) -> Cow<Path> =
+            &|path: &Path| Cow::Owned(self.format_source_file(formatted_directory, path));
+
         for (idx, arg) in cmd.arguments.iter().enumerate() {
             // For separable compilers, skip the other source arguments (keep only
             // the one we are building for). For combined compilers (`None`), keep all.
@@ -268,42 +273,14 @@ impl CommandConverter {
                 continue;
             }
 
-            // Get arguments with original paths, then format any file paths
-            let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
-            let original_args = arg.as_arguments(path_updater);
-
-            // For file-type arguments, we need to format the paths
+            // The compiler is recorded as the executable Bear observed, not as
+            // the token the command line carried; everything else spells itself.
             match arg.kind() {
-                ArgumentKind::Source { .. } | ArgumentKind::Output => {
-                    // These might contain file paths that need formatting
-                    let formatted_args = original_args
-                        .into_iter()
-                        .map(|arg_str| {
-                            let path = Path::new(&arg_str);
-                            if path.is_absolute() || path.extension().is_some() {
-                                // Likely a file path, format it
-                                self.format_source_file(formatted_directory, path)
-                                    .to_string_lossy()
-                                    .to_string()
-                            } else {
-                                // Likely a flag, keep as-is
-                                arg_str
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    command_args.extend(formatted_args);
-                }
-                ArgumentKind::Compiler => {
-                    if let Some(exe_str) = cmd.executable.to_str() {
-                        command_args.push(exe_str.to_string());
-                    } else {
-                        command_args.extend(original_args);
-                    }
-                }
-                _ => {
-                    // Non-file arguments, use as-is
-                    command_args.extend(original_args);
-                }
+                ArgumentKind::Compiler => match cmd.executable.to_str() {
+                    Some(exe_str) => command_args.push(exe_str.to_string()),
+                    None => command_args.extend(arg.as_arguments(format_path)),
+                },
+                _ => command_args.extend(arg.as_arguments(format_path)),
             }
         }
 
