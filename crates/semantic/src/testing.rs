@@ -181,12 +181,16 @@ mod tests {
         };
         let path_updater: &dyn Fn(&Path) -> Cow<Path> =
             &|path: &Path| Cow::Owned(Path::new("/build").join(path));
+        // Spelled with the platform's own separator: `Path::join` writes a
+        // backslash on Windows, and the point of the test is where the path
+        // lands, not how the platform spells it.
+        let rewritten = Path::new("/build").join("main.o");
 
         // act
         let actual = sut.as_arguments(path_updater);
 
         // assert
-        assert_eq!(actual, vec!["-o/build/main.o"]);
-        assert_eq!(sut.as_file(path_updater), Some(PathBuf::from("/build/main.o")));
+        assert_eq!(actual, vec![format!("-o{}", rewritten.display())]);
+        assert_eq!(sut.as_file(path_updater), Some(rewritten));
     }
 }
