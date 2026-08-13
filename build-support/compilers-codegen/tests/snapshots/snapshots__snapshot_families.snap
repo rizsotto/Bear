@@ -1,6 +1,6 @@
 ---
 source: build-support/compilers-codegen/tests/snapshots.rs
-assertion_line: 155
+assertion_line: 67
 expression: "generate_families(&compiler_files, &raw_tables)"
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
@@ -22,6 +22,7 @@ include!(concat!(env!("OUT_DIR"), "/flags_msvc.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_nasm.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_nvidia_hpc.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_swift.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_ti_cgt.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
 pub(super) static FAMILIES: &[FamilyDef] = &[
     FamilyDef { id: "armclang", flags: &ARMCLANG_FLAGS, ignore_executables: &ARMCLANG_IGNORE_EXECUTABLES, ignore_flags: &ARMCLANG_IGNORE_FLAGS, slash_prefix: ARMCLANG_SLASH_PREFIX, env_rules: &ARMCLANG_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
@@ -42,5 +43,6 @@ pub(super) static FAMILIES: &[FamilyDef] = &[
     FamilyDef { id: "nasm", flags: &NASM_FLAGS, ignore_executables: &NASM_IGNORE_EXECUTABLES, ignore_flags: &NASM_IGNORE_FLAGS, slash_prefix: NASM_SLASH_PREFIX, env_rules: &NASM_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
     FamilyDef { id: "nvidia_hpc", flags: &NVIDIA_HPC_FLAGS, ignore_executables: &NVIDIA_HPC_IGNORE_EXECUTABLES, ignore_flags: &NVIDIA_HPC_IGNORE_FLAGS, slash_prefix: NVIDIA_HPC_SLASH_PREFIX, env_rules: &NVIDIA_HPC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
     FamilyDef { id: "swift", flags: &SWIFT_FLAGS, ignore_executables: &SWIFT_IGNORE_EXECUTABLES, ignore_flags: &SWIFT_IGNORE_FLAGS, slash_prefix: SWIFT_SLASH_PREFIX, env_rules: &SWIFT_ENV_RULES, source_mode: SourceMode::PerSourceFull, response_file_syntax: Syntax::GnuClang },
+    FamilyDef { id: "ti_cgt", flags: &TI_CGT_FLAGS, ignore_executables: &TI_CGT_IGNORE_EXECUTABLES, ignore_flags: &TI_CGT_IGNORE_FLAGS, slash_prefix: TI_CGT_SLASH_PREFIX, env_rules: &TI_CGT_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
     FamilyDef { id: "vala", flags: &VALA_FLAGS, ignore_executables: &VALA_IGNORE_EXECUTABLES, ignore_flags: &VALA_IGNORE_FLAGS, slash_prefix: VALA_SLASH_PREFIX, env_rules: &VALA_ENV_RULES, source_mode: SourceMode::Combined, response_file_syntax: Syntax::GnuClang },
 ];

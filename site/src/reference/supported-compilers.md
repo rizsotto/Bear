@@ -265,6 +265,19 @@ Internal, not user-facing: `swift-frontend`. Bear recognizes these only so it ca
 
 An invocation is also ignored when its arguments include `-frontend`: that is an internal frontend or codegen call, not a user-facing compile.
 
+#### `ti_cgt`
+
+Configuration `as:` value: `ti_cgt`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `armcl` | TI Code Generation Tools (Arm) | not recognized | not recognized | [ti.com](https://www.ti.com/lit/ug/spnu151v/spnu151v.pdf) |
+| `cl6x` | TI Code Generation Tools (C6000) | not recognized | not recognized | [ti.com](https://www.ti.com/lit/ug/spru187/spru187.pdf) |
+| `cl7x` | TI Code Generation Tools (C7000) | not recognized | not recognized | [ti.com](https://www.ti.com/lit/ug/spruig8/spruig8.pdf) |
+| `cl2000` | TI Code Generation Tools (C2000) | not recognized | not recognized | [ti.com](https://www.ti.com/lit/ug/spru514/spru514.pdf) |
+| `cl430` | TI Code Generation Tools (MSP430) | not recognized | not recognized | [ti.com](https://www.ti.com/lit/ug/slau132/slau132.pdf) |
+| `clpru` | TI Code Generation Tools (PRU) | not recognized | not recognized | [ti.com](https://www.ti.com/lit/ug/spruhv7/spruhv7.pdf) |
+
 #### `vala`
 
 Configuration `as:` value: `vala`.

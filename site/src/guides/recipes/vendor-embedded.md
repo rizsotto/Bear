@@ -9,8 +9,9 @@ bear -- make
 ```
 
 This covers three vendor toolchains: QNX Momentics, Microchip's MPLAB X
-(XC8), and Texas Instruments' Clang-based Arm compiler. Each builds
-through a Makefile (MPLAB X generates one), and Bear needs nothing
+(XC8), and Texas Instruments' compilers, both the Clang-based Arm driver
+and the classic Code Generation Tools. Each builds through a Makefile
+(MPLAB X and Code Composer Studio generate one), and Bear needs nothing
 toolchain-specific once that Makefile runs under it. What differs between
 them is which executable name gets recognized as what; the full name
 table, `as:` ids, and prefix/suffix rules for every family are on
@@ -62,21 +63,24 @@ Bear recognizes `tiarmclang`, TI's Clang-based compiler for Arm targets,
 under the `clang` family (not a TI-specific id, and not `armclang`, which
 names Arm Ltd.'s own Compiler 6 instead).
 
-TI's earlier, non-Clang Code Generation Tools - the classic drivers for
-C2000, C6000, MSP430, and the pre-Clang Arm compiler (`armcl`, `cl2000`,
-`cl430`, `cl6x`) - are not in Bear's recognition table at all. An
-invocation of one of these produces no entry: not a wrong one, none.
+TI's earlier, non-Clang Code Generation Tools are recognized under the
+`ti_cgt` family: one driver per target, `armcl`, `cl6x`, `cl7x`,
+`cl2000`, `cl430`, and `clpru`, all sharing one option dialect that is
+not GCC's. Bear parses them with TI's own flag rules, so an include path
+spelled `--include_path=bsp/include` is classified as one, and the
+`output` field comes from `--output_file`, TI's spelling of `-o`.
 
-A [`compilers:` entry](../../reference/supported-compilers.md#as-and-ignore-hints)
-pointing at the executable's path can force one of these to be parsed
-with, for example, `as: gcc`, but that only helps to the extent its flag
-dialect actually matches GCC's. It does not for the option that matters
-most for the recorded entry: these tools spell an output file
-`--output_file=main.obj`, not GCC's `-o main.obj`, so the `output` field
-GCC's rules populate from `-o` comes out empty, and every other flag the
-two dialects spell differently is misparsed the same way. The other
-option is filing an issue against the project; see [what is not
-recognized](../../reference/supported-compilers.md#what-is-not-recognized).
+Code Composer Studio generates a makefile per build configuration under
+the configuration's own directory (`Debug`, `Release`), and drives the
+build through it. Run `bear -- make` from that directory. The command
+lines it generates carry a dependency file and an object directory
+(`--preproc_dependency=`, `--obj_directory=`) alongside the source, and
+still compile, because CCS pairs them with `--preproc_with_compile`.
+
+One TI invocation deliberately yields no entry: the link step. CCS links
+through the same driver with `-z`, which hands the rest of the command
+line to the linker, so the object list and the linker command file that
+follow are not read as translation units.
 
 ## Related pages
 

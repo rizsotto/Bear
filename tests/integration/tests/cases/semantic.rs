@@ -1201,6 +1201,91 @@ fn ti_tiarmclang_execution_yields_single_entry() -> Result<()> {
 
 // Requirements: recognition-compiler-names
 //
+// TI's classic Code Generation Tools ship one driver per target family,
+// all speaking the same option dialect (`--compile_only` is TI's `-c`).
+// Each driver name has to be recognized on its own.
+#[test]
+fn ti_cgt_driver_names_yield_single_entry() -> Result<()> {
+    for driver in ["armcl", "cl6x", "cl7x", "cl2000", "cl430", "clpru"] {
+        assert_driver_yields_single_entry(
+            &format!("ti_cgt_{driver}_execution"),
+            &[driver, "--compile_only", "hello.c"],
+        )
+        .with_context(|| format!("driver {driver}"))?;
+    }
+
+    Ok(())
+}
+
+// Requirements: recognition-compiler-names
+//
+// The shape Code Composer Studio generates: TI long options glue their
+// value after `=`, so `--preproc_dependency`'s dependency file and
+// `--obj_directory`'s directory must be consumed as those flags' values
+// rather than read as further source files, and the invocation still
+// compiles because `--preproc_with_compile` resumes it.
+#[test]
+fn ti_cgt_code_composer_studio_command_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry(
+        "ti_cgt_ccs_command",
+        &[
+            "armcl",
+            "-mv7R4",
+            "--code_state=32",
+            "--float_support=VFPv3D16",
+            "-me",
+            "--include_path=include",
+            "-g",
+            "--diag_warning=225",
+            "--abi=eabi",
+            "--preproc_with_compile",
+            "--preproc_dependency=hello.d_raw",
+            "--obj_directory=obj",
+            "hello.c",
+        ],
+    )
+}
+
+// Requirements: output-compilation-entries
+//
+// Two TI invocations that compile nothing. `--preproc_only` writes
+// preprocessed output and stops, like `-E`. `-z` hands the rest of the
+// command line to the linker, which is how a Code Composer Studio
+// makefile spells its link step through the same driver; nothing after
+// it is a translation unit.
+#[test]
+fn ti_cgt_non_compiling_invocations_yield_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("ti_cgt_non_compiling")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    for arguments in
+        [vec!["armcl", "--preproc_only", "hello.c"], vec!["armcl", "-z", "-o", "hello.out", "hello.c"]]
+    {
+        let event = json!({
+            "executable": "armcl",
+            "arguments": arguments,
+            "working_dir": temp_dir,
+            "environment": {}
+        });
+
+        env.create_source_files(&[
+            ("events.json", &event.to_string()),
+            ("armcl", ""),
+            ("hello.c", "int main() { return 0; }"),
+        ])?;
+
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+        let db = env.load_compilation_database("compile_commands.json")?;
+        db.assert_count(0).with_context(|| format!("arguments {arguments:?} must yield no entry"))?;
+    }
+
+    Ok(())
+}
+
+// Requirements: recognition-compiler-names
+//
 // An `xc8-cc -c hello.c` execution yields one entry (Microchip's gcc-styled
 // XC8 driver, parsed with GCC flag semantics).
 #[test]

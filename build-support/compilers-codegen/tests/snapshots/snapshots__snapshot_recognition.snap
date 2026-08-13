@@ -1,6 +1,6 @@
 ---
 source: build-support/compilers-codegen/tests/snapshots.rs
-assertion_line: 119
+assertion_line: 32
 expression: "generate_recognition_patterns(&raw_tables, &compiler_files,\n&wrapper_tables).unwrap()"
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
@@ -37,6 +37,12 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = 
     ("nvidia_hpc", &["pgcc", "pgc++", "pgfortran"], false, true, Some("PGI (legacy NVIDIA HPC)")),
     ("swift", &["swiftc"], false, false, Some("Swift")),
     ("swift", &["swift-frontend"], false, false, None),
+    ("ti_cgt", &["armcl"], false, false, Some("TI Code Generation Tools (Arm)")),
+    ("ti_cgt", &["cl6x"], false, false, Some("TI Code Generation Tools (C6000)")),
+    ("ti_cgt", &["cl7x"], false, false, Some("TI Code Generation Tools (C7000)")),
+    ("ti_cgt", &["cl2000"], false, false, Some("TI Code Generation Tools (C2000)")),
+    ("ti_cgt", &["cl430"], false, false, Some("TI Code Generation Tools (MSP430)")),
+    ("ti_cgt", &["clpru"], false, false, Some("TI Code Generation Tools (PRU)")),
     ("vala", &["valac"], true, true, Some("Vala")),
     ("wrapper", &["ccache"], false, false, Some("Compiler cache")),
     ("wrapper", &["sccache"], false, false, Some("Compiler cache")),

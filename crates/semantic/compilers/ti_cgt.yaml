@@ -1,0 +1,251 @@
+# TI's classic Code Generation Tools: the pre-Clang drivers Code Composer
+# Studio still generates makefiles for. One option dialect is shared across
+# every target (the target-specific part is the `--silicon_version` value),
+# and it is not derived from gcc's, so this family has no `extends:`.
+#
+# TI's newer Clang-based driver (`tiarmclang`) is a different tool with
+# gcc-style options; it is recognized under the `clang` family, not here.
+type: compiler
+compiler:
+  id: ti_cgt
+recognize:
+  - description: "TI Code Generation Tools (Arm)"
+    references:
+      - "https://www.ti.com/lit/ug/spnu151v/spnu151v.pdf"
+    executables: ["armcl"]
+    versioned: false
+    cross_compilation: false
+  - description: "TI Code Generation Tools (C6000)"
+    references:
+      - "https://www.ti.com/lit/ug/spru187/spru187.pdf"
+    executables: ["cl6x"]
+    versioned: false
+    cross_compilation: false
+  - description: "TI Code Generation Tools (C7000)"
+    references:
+      - "https://www.ti.com/lit/ug/spruig8/spruig8.pdf"
+    executables: ["cl7x"]
+    versioned: false
+    cross_compilation: false
+  - description: "TI Code Generation Tools (C2000)"
+    references:
+      - "https://www.ti.com/lit/ug/spru514/spru514.pdf"
+    executables: ["cl2000"]
+    versioned: false
+    cross_compilation: false
+  - description: "TI Code Generation Tools (MSP430)"
+    references:
+      - "https://www.ti.com/lit/ug/slau132/slau132.pdf"
+    executables: ["cl430"]
+    versioned: false
+    cross_compilation: false
+  - description: "TI Code Generation Tools (PRU)"
+    references:
+      - "https://www.ti.com/lit/ug/spruhv7/spruhv7.pdf"
+    executables: ["clpru"]
+    versioned: false
+    cross_compilation: false
+slash_prefix: false
+flags:
+  # --- Control: what the driver stops after ---
+  # `-c` and `-n` mirror gcc's `-c` and `-S`. `-z` hands everything that
+  # follows to the linker, which is how a CCS makefile spells its link
+  # step: same driver, object files and linker options after the `-z`.
+  - match: {pattern: "--compile_only"}
+    result: stops_at_compiling
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+  - match: {pattern: "--skip_assembler"}
+    result: stops_at_assembling
+  - match: {pattern: "-n"}
+    result: stops_at_assembling
+  - match: {pattern: "--run_linker"}
+    result: pass_through
+  - match: {pattern: "-z"}
+    result: pass_through
+
+  # --- Preprocessing ---
+  - match: {pattern: "--include_path=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "--define=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "--undefine=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-U{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "--preinclude=*"}
+    result: configures_preprocessing
+
+  # The `-pp<x>` family. Three of them write preprocessed output and
+  # compile nothing, so they suppress the entry the way `-E` does. The
+  # other three write a side file (dependencies, include list, macro
+  # list); on their own they also stop before compiling, but Code
+  # Composer Studio always pairs them with `--preproc_with_compile`,
+  # which resumes the compilation. A flag table cannot express "unless
+  # `-ppa` is also present", and dropping every CCS compile is the worse
+  # of the two errors, so these three stay non-terminal.
+  - match: {pattern: "--preproc_only"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-ppo"}
+    result: stops_at_preprocessing
+  - match: {pattern: "--preproc_with_comment"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-ppc"}
+    result: stops_at_preprocessing
+  - match: {pattern: "--preproc_with_line"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-ppl"}
+    result: stops_at_preprocessing
+  - match: {pattern: "--preproc_dependency=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-ppd*"}
+    result: configures_preprocessing
+  - match: {pattern: "--preproc_includes=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-ppi*"}
+    result: configures_preprocessing
+  - match: {pattern: "--preproc_macros=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-ppm*"}
+    result: configures_preprocessing
+  - match: {pattern: "--preproc_with_compile"}
+    result: configures_preprocessing
+  - match: {pattern: "-ppa"}
+    result: configures_preprocessing
+
+  # --- Output naming ---
+  # `--output_file` names the compilation's output; the `_directory`
+  # options only say where files land, so they configure the compile
+  # rather than name its output (the entry's output field must stay a
+  # file, never a directory).
+  - match: {pattern: "--output_file=*"}
+    result: output
+  - match: {pattern: "-fe{ }*"}
+    result: output
+  - match: {pattern: "--obj_directory=*"}
+    result: configures_compiling
+  - match: {pattern: "-fr{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--asm_directory=*"}
+    result: configures_compiling
+  - match: {pattern: "-fs{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--list_directory=*"}
+    result: configures_compiling
+  - match: {pattern: "-ff{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--abs_directory=*"}
+    result: configures_compiling
+  - match: {pattern: "-fb{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--temp_directory=*"}
+    result: configures_compiling
+  - match: {pattern: "-ft{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--pp_directory=*"}
+    result: configures_preprocessing
+
+  # --- File-type overrides: the value is a source path, so it must be
+  # consumed as this flag's value and not classified a second time ---
+  - match: {pattern: "--c_file=*"}
+    result: configures_compiling
+  - match: {pattern: "-fc{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--cpp_file=*"}
+    result: configures_compiling
+  - match: {pattern: "-fp{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--asm_file=*"}
+    result: configures_assembling
+  - match: {pattern: "-fa{ }*"}
+    result: configures_assembling
+  - match: {pattern: "--obj_file=*"}
+    result: configures_linking
+  - match: {pattern: "-fo{ }*"}
+    result: configures_linking
+
+  # --- Assembler ---
+  - match: {pattern: "--asm_define=*"}
+    result: configures_assembling
+  - match: {pattern: "-ad{ }*"}
+    result: configures_assembling
+  - match: {pattern: "--asm_undefine=*"}
+    result: configures_assembling
+  - match: {pattern: "-au{ }*"}
+    result: configures_assembling
+  # -aa, -al, -apd, -api: listing and dependency switches, no value.
+  - match: {pattern: "-a*"}
+    result: configures_assembling
+
+  # --- Linking (reached only when `-z` did not already stop parsing) ---
+  - match: {pattern: "--library=*"}
+    result: configures_linking
+  - match: {pattern: "-l{ }*"}
+    result: configures_linking
+  - match: {pattern: "--search_path=*"}
+    result: configures_linking
+  - match: {pattern: "-i{ }*"}
+    result: configures_linking
+
+  # --- Command files ---
+  # TI spells a response file `-@file`, not gcc's `@file`, so Bear's
+  # response-file inlining does not apply; the argument is recorded as
+  # written.
+  - match: {pattern: "--cmd_file=*"}
+    result: none
+  - match: {pattern: "-@{ }*"}
+    result: none
+
+  # --- Code generation, diagnostics, and the rest of the short forms ---
+  # Every one of these glues its value when it takes one (`-mv7R4`,
+  # `-O2`, `-pds225`), so a prefix rule that consumes no separate
+  # argument cannot swallow a source file.
+  - match: {pattern: "-m*"}
+    result: configures_compiling
+  - match: {pattern: "-O*"}
+    result: configures_compiling
+  - match: {pattern: "-o*"}
+    result: configures_compiling
+  - match: {pattern: "-p*"}
+    result: configures_compiling
+  - match: {pattern: "-e*"}
+    result: configures_compiling
+  - match: {pattern: "-g"}
+    result: configures_compiling
+  - match: {pattern: "-k"}
+    result: configures_compiling
+  - match: {pattern: "-q*"}
+    result: configures_compiling
+  - match: {pattern: "-s*"}
+    result: configures_compiling
+  - match: {pattern: "-fg"}
+    result: configures_compiling
+  - match: {pattern: "-rr{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-rtti"}
+    result: configures_compiling
+  - match: {pattern: "-neon"}
+    result: configures_compiling
+
+  # --- Info and exit ---
+  - match: {pattern: "--help"}
+    result: info_and_exit
+  - match: {pattern: "-h"}
+    result: info_and_exit
+  - match: {pattern: "--tool_version"}
+    result: info_and_exit
+  - match: {pattern: "-version"}
+    result: info_and_exit
+  - match: {pattern: "--compiler_revision"}
+    result: info_and_exit
+
+  # A TI long option that takes a value always glues it after `=`, never
+  # as a separate token, so this catch-all can never swallow a source
+  # file. It keeps an unlisted option (there are well over a hundred, most
+  # of them code-generation tuning) from being read as one.
+  - match: {pattern: "--*"}
+    result: none
