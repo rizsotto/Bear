@@ -15,6 +15,7 @@
 - [Recipes](guides/recipes/index.md)
   - [Generate compile_commands.json for a Makefile project](guides/recipes/compile-commands-for-makefile.md)
   - [Generate compile_commands.json for a CMake project](guides/recipes/cmake.md)
+  - [Capture a complete dry run for bear parse-sh](guides/recipes/dry-run-capture.md)
   - [Bear produces an empty compile_commands.json](guides/recipes/empty-compilation-database.md)
   - [Set up clangd for a project without CMake](guides/recipes/clangd-setup.md)
   - [clangd has no compile command for a header](guides/recipes/headers.md)

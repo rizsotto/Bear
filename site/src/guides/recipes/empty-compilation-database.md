@@ -14,7 +14,10 @@ bear -- make
 
 If a clean rebuild still leaves `[]`, work through the other causes
 below, most common first. Each one shows the command that confirms it
-and the command that fixes it.
+and the command that fixes it. If the `[]` came out of `bear parse-sh`
+instead of a build run under Bear, go to [Capture a complete dry run for
+`bear parse-sh`](dry-run-capture.md), where the causes are the dry run's
+rather than interception's.
 
 ## The build had nothing to compile
 

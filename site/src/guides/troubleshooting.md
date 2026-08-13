@@ -27,6 +27,11 @@ not written. Include this output when reporting a problem.
 
 ## The output is missing entries
 
+If the database was built from dry-run text by `bear parse-sh` rather
+than from a build run under Bear, the entries are missing from the text
+itself: go to [Capture a complete dry run for `bear
+parse-sh`](recipes/dry-run-capture.md) instead.
+
 Same causes as an empty database, but partial - a compiler ran and was
 recognized, yet its entry did not survive to the file. The most common
 cause is `--append` (see [Command-line
@@ -84,6 +89,23 @@ entry per file per directory is what most Clang tooling wants, and
 matching on `arguments` too gives you every invocation at the cost of a
 larger database in which clangd (and most other consumers) still picks
 only one entry per file.
+
+## The database from a dry run is empty or missing directories
+
+`bear parse-sh` records exactly what the dry-run text contains, so an
+empty or short database means the build system printed less than you
+expected. Capture the dry run again with the flags that make it print
+everything:
+
+```sh
+LC_ALL=C make -Bnwk | bear parse-sh
+```
+
+[Capture a complete dry run for `bear
+parse-sh`](recipes/dry-run-capture.md) works through what each of those
+answers, the cases no flag fixes (a sub-make that never descends, a
+ninja dry run that prints progress instead of commands), and how to read
+the skip report Bear writes on standard error.
 
 ## The output has duplicate entries
 

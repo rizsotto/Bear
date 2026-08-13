@@ -173,6 +173,9 @@ cannot miss a command or resolve a compiler name wrong. Reach for
 - [Generate compile_commands.json for a Makefile
   project](../guides/recipes/compile-commands-for-makefile.md) for recursive
   builds, incremental builds, and the rest of the Make-specific detail.
+- [Capture a complete dry run for `bear
+  parse-sh`](../guides/recipes/dry-run-capture.md) for the capture flags
+  that decide how much of the build reaches the log in the first place.
 - [Bear produces an empty compile_commands.json](../guides/recipes/empty-compilation-database.md)
   if a database, from either path, comes out shorter than expected.
 - [Recipes](../guides/recipes/index.md) for the other tasks.

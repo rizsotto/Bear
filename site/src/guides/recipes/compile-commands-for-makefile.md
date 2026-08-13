@@ -151,7 +151,9 @@ among others; an unparsed line is skipped and reported on standard error
 with its line number). Prefer `bear -- make` whenever you can actually
 run the build; reach for `parse-sh` only when you cannot. See `bear
 parse-sh` in the [`bear(1)` man page][manpage] for the full list of what
-it understands.
+it understands, and [Capture a complete dry run for `bear
+parse-sh`](dry-run-capture.md) for the rest of the capture flags and the
+cases where the dry run leaves commands out altogether.
 
 ## Where the output goes, and how to change it
 

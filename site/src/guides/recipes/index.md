@@ -11,6 +11,9 @@ toolchain, or environment, and what to do when the result is wrong.
   running the build.
 - [Generate compile_commands.json for a CMake project](cmake.md) - when
   CMake's own export is enough, and when it is not.
+- [Capture a complete dry run for bear parse-sh](dry-run-capture.md) -
+  get every compiler command into the text, for a build you cannot run
+  under Bear.
 - [Bear produces an empty compile_commands.json](empty-compilation-database.md)
   - what to check when the file comes out empty or short.
 - [Set up clangd for a project without CMake](clangd-setup.md) - point
