@@ -1,9 +1,10 @@
 ---
-source: bear-codegen/tests/snapshots.rs
-expression: "generate_flag_file(\"clang_cl\")"
+source: build-support/compilers-codegen/tests/snapshots.rs
+assertion_line: 23
+expression: generated
 ---
 // Generated from compilers/clang_cl.yaml -- DO NOT EDIT
-static CLANG_CL_FLAGS: [FlagRule; 169] = [
+static CLANG_CL_FLAGS: [FlagRule; 170] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-fms-compatibility-version"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-fprofile-instr-generate", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fprofile-instr-generate"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -84,13 +85,14 @@ static CLANG_CL_FLAGS: [FlagRule; 169] = [
     FlagRule::new(FlagPattern::Exactly("/WX-", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/LDd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("/EP", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fo"), ArgumentKind::Output),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fe"), ArgumentKind::Output),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fd"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fa"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fi"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fm"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/FR"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/Fo", 0), ArgumentKind::Output),
+    FlagRule::new(FlagPattern::Prefix("/Fe", 0), ArgumentKind::Output),
+    FlagRule::new(FlagPattern::Prefix("/Fd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/FA", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/Fa", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/Fi", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Prefix("/Fm", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Prefix("/FR", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/FI"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/Tc"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/Tp"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -149,9 +151,9 @@ static CLANG_CL_FLAGS: [FlagRule; 169] = [
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/we"), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/wo"), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/FC", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Yc"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Yu"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fp"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/Yc", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/Yu", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("/Fp", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("/YX", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("/Y-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("/LD", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
@@ -171,7 +173,7 @@ static CLANG_CL_FLAGS: [FlagRule; 169] = [
     FlagRule::new(FlagPattern::Exactly("/u", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("/X", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("/w", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/F"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Exactly("/F", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("/J", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
 ];
 static CLANG_CL_IGNORE_EXECUTABLES: [&str; 3] = ["c1", "c1xx", "c2", ];

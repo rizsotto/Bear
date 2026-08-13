@@ -30,19 +30,28 @@ flags:
     result: stops_at_preprocessing
 
   # --- Output flags ---
-  - match: {pattern: "/Fo{:}*"}
+  # cl.exe glues the value to every /F-family option ("Don't put a space
+  # between the option and pathname"); /Fo and /Fe additionally accept it
+  # after a ':', and /Fe and /FR make it optional. A prefix rule is the only
+  # form that takes the glued spelling and never consumes the following
+  # argument, so a valueless option cannot swallow the source file.
+  - match: {pattern: "/Fo*"}
     result: output
-  - match: {pattern: "/Fe{:}*"}
+  - match: {pattern: "/Fe*"}
     result: output
-  - match: {pattern: "/Fd{:}*"}
+  - match: {pattern: "/Fd*"}
     result: configures_compiling
-  - match: {pattern: "/Fa{:}*"}
+  # /FA[c][s][u] selects the listing contents and takes no path at all;
+  # /Fa names the listing file. The two are distinguished by case.
+  - match: {pattern: "/FA*"}
     result: configures_compiling
-  - match: {pattern: "/Fi{:}*"}
+  - match: {pattern: "/Fa*"}
+    result: configures_compiling
+  - match: {pattern: "/Fi*"}
     result: configures_preprocessing
-  - match: {pattern: "/Fm{:}*"}
+  - match: {pattern: "/Fm*"}
     result: configures_linking
-  - match: {pattern: "/FR{:}*"}
+  - match: {pattern: "/FR*"}
     result: configures_compiling
   - match: {pattern: "/doc{:}*"}
     result: configures_compiling
@@ -255,11 +264,13 @@ flags:
     result: none
 
   # --- Precompiled headers ---
-  - match: {pattern: "/Yc{:}*"}
+  # /Yc and /Yu take an optional glued filename ("/Yc", "/Ycstdafx.h") and
+  # /Fp a required glued one; none of them reads a separate argument.
+  - match: {pattern: "/Yc*"}
     result: configures_compiling
-  - match: {pattern: "/Yu{:}*"}
+  - match: {pattern: "/Yu*"}
     result: configures_compiling
-  - match: {pattern: "/Fp{:}*"}
+  - match: {pattern: "/Fp*"}
     result: configures_compiling
   - match: {pattern: "/YX"}
     result: configures_compiling
@@ -269,7 +280,9 @@ flags:
   # --- Linking ---
   - match: {pattern: "/link"}
     result: pass_through
-  - match: {pattern: "/F{ }*"}
+  # /F sets the stack size and spells its value as a separate argument
+  # ("/F 1024"); it must never absorb a glued /F-family option.
+  - match: {pattern: "/F", count: 1}
     result: configures_linking
   - match: {pattern: "/LDd"}
     result: configures_linking

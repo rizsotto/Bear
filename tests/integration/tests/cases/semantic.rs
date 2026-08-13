@@ -873,6 +873,343 @@ fn clang_cl_inherits_msvc_per_warning_options() -> Result<()> {
     Ok(())
 }
 
+/// The `format:` config that turns on the optional per-entry `output` field
+/// and keeps every path exactly as the build spelled it, so an MSVC-style
+/// Windows path survives a Unix test host unchanged.
+fn output_field_config() -> &'static str {
+    r#"
+schema: "4.2"
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+  entries:
+    use_array_format: true
+    include_output_field: true
+"#
+}
+
+// Requirements: output-compilation-entries
+//
+// Regression test: the MSVC `/F`-family options spell their value glued to the
+// option (`/FoCMakeFiles\x.dir\a.cpp.obj`), which is what CMake's
+// `Modules/Platform/Windows-MSVC.cmake` compile template and Meson both emit.
+// Bear used to spell these as "value after a colon, or a separate argument",
+// so a glued `/Fo` matched neither; it fell through to `/F` (the stack-size
+// option, classified as a link-stage flag) and was stripped from the entry.
+// The object path then vanished from `arguments` and no `output` field was
+// produced. The command line below is a real one, from a CMake + MSVC 2022
+// build of jackhumbert/scc_mod.
+#[test]
+fn msvc_glued_output_flags_survive_and_set_output_field() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("msvc_glued_output_flags")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "cl.exe";
+    let object = r"CMakeFiles\Detours.dir\deps\detours\src\image.cpp.obj";
+    let pdb_dir = r"/FdCMakeFiles\Detours.dir\";
+    let source = r"D:\Code\scc_mod\deps\detours\src\image.cpp";
+
+    let event = json!({
+        "executable": cl,
+        "arguments": [
+            cl,
+            "/nologo", "/TP",
+            "-DUNICODE", r"-ID:\Code\scc_mod\deps\detours\src", "/DWIN32",
+            "/EHsc", "/Zi", "/Od", "-std:c++20", "-MDd", "/Zc:__cplusplus",
+            format!("/Fo{}", object), pdb_dir, "/FS",
+            "-c", source,
+        ],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, output_field_config())?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+
+    // `/Fo` is an output flag, so it round-trips as the flag plus its value;
+    // `/Fd` is an ordinary compile-stage flag and keeps its glued spelling.
+    sut.assert_contains(&compilation_entry!(
+        file: source.to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(),
+            "/nologo".to_string(), "/TP".to_string(),
+            "-DUNICODE".to_string(), r"-ID:\Code\scc_mod\deps\detours\src".to_string(),
+            "/DWIN32".to_string(),
+            "/EHsc".to_string(), "/Zi".to_string(), "/Od".to_string(),
+            "-std:c++20".to_string(), "-MDd".to_string(), "/Zc:__cplusplus".to_string(),
+            "/Fo".to_string(), object.to_string(),
+            pdb_dir.to_string(), "/FS".to_string(),
+            "-c".to_string(), source.to_string(),
+        ]
+    ))?;
+
+    let entry = &sut.entries()[0];
+    assert_eq!(
+        entry.get("output").and_then(Value::as_str),
+        Some(object),
+        "the glued /Fo value must become the entry's output field, got {:?}",
+        entry.get("output")
+    );
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
+// Regression test: `/Yc` creates a precompiled header and its filename is
+// optional (`/Yc` or `/Ycstdafx.h`). Bear used to accept the value as a
+// separate argument, so a bare `/Yc` swallowed the source file that followed
+// it. The invocation then had no recognized source and produced an EMPTY
+// database instead of one entry.
+#[test]
+fn msvc_bare_precompiled_header_flag_does_not_consume_the_source() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("msvc_bare_pch_flag")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "cl.exe";
+
+    // Both /Yc and /Yu have an optional filename; cover the bare spelling of
+    // each, plus the glued spelling that must keep its exact token.
+    let event_create = json!({
+        "executable": cl,
+        "arguments": [cl, "/c", "/Yc", "create.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let event_use = json!({
+        "executable": cl,
+        "arguments": [cl, "/c", "/Yu", "/Fpstdafx.pch", "use.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let event_glued = json!({
+        "executable": cl,
+        "arguments": [cl, "/c", "/Ycstdafx.h", "glued.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    let events = format!("{}\n{}\n{}", event_create, event_use, event_glued);
+    env.create_source_files(&[
+        ("events.json", &events),
+        ("create.cpp", "int f(void) { return 0; }"),
+        ("use.cpp", "int g(void) { return 0; }"),
+        ("glued.cpp", "int h(void) { return 0; }"),
+    ])?;
+
+    // act
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(3)?;
+
+    sut.assert_contains(&compilation_entry!(
+        file: "create.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![cl.to_string(), "/c".to_string(), "/Yc".to_string(), "create.cpp".to_string()]
+    ))?;
+    sut.assert_contains(&compilation_entry!(
+        file: "use.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(), "/c".to_string(),
+            "/Yu".to_string(), "/Fpstdafx.pch".to_string(),
+            "use.cpp".to_string(),
+        ]
+    ))?;
+    sut.assert_contains(&compilation_entry!(
+        file: "glued.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(), "/c".to_string(), "/Ycstdafx.h".to_string(), "glued.cpp".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
+// Regression test: CMake's MSVC assembly rule is
+// `cl /FoNUL /FAs /Fa<listing> ... -c <source>`. `/FA[c][s][u]` selects the
+// listing contents and takes no path at all, and had no rule of its own, so
+// `/FAs` fell through to `/F` and was stripped along with `/FoNUL` and the
+// glued `/Fa`. All three must survive, and the match must be case sensitive
+// so that `/FAs` and `/Fa<path>` stay distinct options.
+#[test]
+fn msvc_assembly_listing_flags_survive() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("msvc_assembly_listing_flags")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "cl.exe";
+
+    let event = json!({
+        "executable": cl,
+        "arguments": [cl, "/nologo", "/FoNUL", "/FAs", r"/FaCMakeFiles\x.dir\a.cpp.s", "-c", "a.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string()), ("a.cpp", "int main() { return 0; }")])?;
+
+    // act
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+
+    sut.assert_contains(&compilation_entry!(
+        file: "a.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(), "/nologo".to_string(),
+            "/Fo".to_string(), "NUL".to_string(),
+            "/FAs".to_string(), r"/FaCMakeFiles\x.dir\a.cpp.s".to_string(),
+            "-c".to_string(), "a.cpp".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
+// `/F` sets the stack size and spells its value as a separate argument
+// (`/F 1024`), which is a link-stage setting and is therefore stripped from a
+// compile entry together with its value. It must not double as a prefix for
+// the glued `/F`-family options: `/Fofoo.obj` is an object file name, not a
+// stack size, and must survive.
+#[test]
+fn msvc_stack_size_option_takes_a_separate_value() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("msvc_stack_size_option")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "cl.exe";
+
+    let event = json!({
+        "executable": cl,
+        "arguments": [cl, "/F", "1024", "/Fofoo.obj", "/c", "a.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string()), ("a.cpp", "int main() { return 0; }")])?;
+
+    // act
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+
+    // `/F 1024` is consumed as one link-stage option (both tokens gone), while
+    // `/Fofoo.obj` is recognized as the object file name and kept.
+    sut.assert_contains(&compilation_entry!(
+        file: "a.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(),
+            "/Fo".to_string(), "foo.obj".to_string(),
+            "/c".to_string(), "a.cpp".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries, recognition-compiler-names
+//
+// `clang_cl.yaml` inherits the `/F`-family and precompiled-header rules via
+// `extends: msvc`, and clang-cl accepts the same glued spellings. Drive the
+// runtime matcher through a clang-cl invocation to confirm the fix reaches
+// the inheriting family end-to-end, not just the snapshot of the generated
+// flag array.
+#[test]
+fn clang_cl_inherits_msvc_glued_output_flags() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("clang_cl_glued_output_flags")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "clang-cl.exe";
+    let object = "CMakeFiles/x.dir/a.cpp.obj";
+
+    let event = json!({
+        "executable": cl,
+        "arguments": [
+            cl, "/nologo",
+            format!("/Fo{}", object), "/FdCMakeFiles/x.dir/", "/Yc",
+            "-c", "a.cpp",
+        ],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string()), ("a.cpp", "int main() { return 0; }")])?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, output_field_config())?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+
+    sut.assert_contains(&compilation_entry!(
+        file: "a.cpp".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(), "/nologo".to_string(),
+            "/Fo".to_string(), object.to_string(),
+            "/FdCMakeFiles/x.dir/".to_string(), "/Yc".to_string(),
+            "-c".to_string(), "a.cpp".to_string(),
+        ]
+    ))?;
+
+    let entry = &sut.entries()[0];
+    assert_eq!(
+        entry.get("output").and_then(Value::as_str),
+        Some(object),
+        "clang-cl must inherit the MSVC /Fo rule, got output {:?}",
+        entry.get("output")
+    );
+
+    Ok(())
+}
+
 // Requirements: output-compilation-entries
 //
 // Regression test for issue #715: Clang's `-F` (framework search path) is a
