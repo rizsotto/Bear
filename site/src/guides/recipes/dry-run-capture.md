@@ -59,6 +59,56 @@ make -nw -C sub | bear parse-sh --append
 entries carry the right `directory` whichever directory you run the
 command from.
 
+## A recipe that leaves its wildcard to the shell
+
+An entry whose `file` is `*.c` comes from a recipe that never had its
+wildcard expanded. `-n` prints the recipe line as written, and the shell
+that would have expanded the glob never ran, so the glob reaches Bear
+intact and is recorded as the source it claims to be:
+
+```
+lib.a : *.c
+	$(CC) -c $(CFLAGS) *.c
+```
+
+```shell
+$ make -Bnw
+cc -c -Wall *.c
+$ make -Bnw | bear parse-sh -o -
+[
+  {
+    "file": "*.c",
+    "arguments": [ "cc", "-c", "-Wall", "*.c" ],
+    "directory": "/home/you/project"
+  }
+]
+```
+
+Have make expand the wildcard instead of the shell. `$(wildcard)` runs
+when make reads the Makefile, before any recipe is printed, so the dry
+run carries the file names:
+
+```
+SRCS = $(wildcard *.c)
+
+lib.a : $(SRCS)
+	$(CC) -c $(CFLAGS) $(SRCS)
+```
+
+```shell
+$ make -Bnw
+cc -c -Wall a.c b.c
+$ make -Bnw | bear parse-sh -o - | grep '"file"'
+    "file": "a.c",
+    "file": "b.c",
+```
+
+The two recipes build the same thing; only the expansion moves. When the
+Makefile is not yours to change, run the build under interception
+instead: the shell expands the glob before the compiler starts, so the
+`exec()` Bear observes already names both sources, and the same two
+entries come out.
+
 ## An up-to-date tree, or one that stops on an error
 
 Neither case is loud: everything Bear does get is valid text, so no line
