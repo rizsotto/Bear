@@ -101,10 +101,13 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v6
-      - name: Install Cargo Audit
-        run: cargo install cargo-audit
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
       - name: Run Cargo Audit
-        run: cargo audit
+        run: cargo audit --deny warnings
