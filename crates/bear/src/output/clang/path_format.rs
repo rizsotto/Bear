@@ -29,10 +29,11 @@
 //! that fails falls back to its original path (see `CommandConverter` in
 //! `converter.rs`).
 //!
-//! The `arguments` attribute carries compiler flags, some of which embed file
-//! paths. These are intentionally left untransformed: rewriting them would
-//! require a flag-aware path rewriter for every compiler, which is fragile and
-//! out of scope.
+//! The source and output paths that reappear in the `arguments` attribute go
+//! through the `file` resolver too, so an entry cannot disagree with itself
+//! about a path. Paths embedded inside other flags (`-I../include` and its
+//! kind) are left untransformed: rewriting them would require a flag-aware
+//! path rewriter for every compiler, which is fragile and out of scope.
 
 use crate::config::PathResolver;
 use std::io;

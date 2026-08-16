@@ -1437,6 +1437,82 @@ format:
     Ok(())
 }
 
+// Requirements: output-path-format
+//
+// The configured `file` strategy reaches the source and the output path where
+// they reappear in `arguments`, so an entry cannot disagree with itself about
+// a path a consumer reads from either place. A path that is the payload of
+// some other flag (`-I../include`) is not individually addressable and is
+// carried through exactly as the build spelled it.
+#[test]
+fn configured_file_format_reaches_the_argument_paths_but_not_flag_payloads() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("argument_path_format")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "-I../include", "src/main.c", "-o", "obj/main.o"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    let config = r#"
+schema: "4.2"
+
+format:
+  paths:
+    directory: absolute
+    file: absolute
+  entries:
+    use_array_format: true
+    include_output_field: true
+"#;
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("src/main.c", "int main() { return 0; }"),
+    ])?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+
+    // Spell the expectations the way the code does, with `Path::join` and never
+    // a literal separator, so the assertion holds on Windows too.
+    let source = env.test_dir().join("src").join("main.c");
+    let object = env.test_dir().join("obj").join("main.o");
+
+    sut.assert_contains(
+        &CompilationEntryMatcher::new()
+            .file(source.to_str().unwrap())
+            .directory(temp_dir)
+            .output(object.to_str().unwrap())
+            .arguments(vec![
+                "gcc".to_string(),
+                "-c".to_string(),
+                "-I../include".to_string(),
+                source.to_str().unwrap().to_string(),
+                "-o".to_string(),
+                object.to_str().unwrap().to_string(),
+            ]),
+    )?;
+
+    Ok(())
+}
+
 // Requirements: output-header-entries
 //
 // A synthesized header entry clones the donor's arguments with the output

@@ -23,6 +23,8 @@ Bear provides configurable path formatting for the `directory`, `file`, and
 - The `file` field path format is configurable
 - The `output` field is formatted using the same strategy as `file`; on
   formatting failure, Bear falls back to the original unformatted path
+- The source and output paths that appear in the `arguments` array are
+  formatted with the same strategy as the `file` field
 - Four formatting behaviors are supported:
   - preserve the path exactly as observed during interception, with no
     transformation applied (the default)
@@ -51,9 +53,8 @@ Bear provides configurable path formatting for the `directory`, `file`, and
 
 ## Known limitations
 
-- Paths inside the `arguments` array (include paths, output paths in
-  flags) are deliberately not transformed. Rewriting them would require
-  a compiler-flag-aware path rewriter, which is complex and error-prone.
+- Paths embedded inside other flags, such as include search paths, are
+  not transformed; they are written exactly as the build spelled them.
 
 ## Testing
 
@@ -114,6 +115,15 @@ output is written:
 > then `file` is written as the resolved real path,
 > and `output` falls back to the original unformatted path
 > `obj/main.o`, with a warning.
+
+Given a build invoked from `/home/user/project` that compiles
+`src/main.c` to `obj/main.o` and passes the include path `-I../include`:
+
+> When path format for file is `absolute`,
+> then the `arguments` array carries the source as
+> `/home/user/project/src/main.c` and the output as
+> `/home/user/project/obj/main.o`,
+> and `-I../include` is carried unchanged.
 
 Given path format for directory set to `relative`:
 
