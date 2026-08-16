@@ -85,8 +85,8 @@ jobs:
       - name: Run Codespell
         run: codespell
 
-  security-audit:
-    name: Security Audit
+  audit:
+    name: Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -95,6 +95,6 @@ jobs:
           toolchain: stable
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit
-      - name: Run Cargo Audit
-        run: cargo audit --deny warnings
+          tool: cargo-deny
+      - name: Run Cargo Deny
+        run: cargo deny check advisories licenses

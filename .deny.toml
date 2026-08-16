@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Every dependency is statically linked into GPL-3.0-or-later binaries,
+# so each one has to carry a GPL-3.0-compatible license. CI gates on
+# this because the alternative is finding out from a distribution
+# packager, after release, that the linked result cannot be shipped.
+#
+# The list is deliberately minimal: each entry is load-bearing for the
+# current tree, and cargo-deny reports any allowance nothing matches, so
+# a stale entry does not sit here unnoticed. A dependency that needs a
+# new entry is a decision worth making explicitly rather than a default
+# worth inheriting.
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    # Both of these appear only inside AND expressions, where the
+    # permissive alternative cannot satisfy the requirement on its own:
+    # encoding_rs is "(Apache-2.0 OR MIT) AND BSD-3-Clause", and
+    # unicode-ident is "(MIT OR Apache-2.0) AND Unicode-3.0".
+    "BSD-3-Clause",
+    "Unicode-3.0",
+    # Bear's own crates. Nine of the eleven are publishable, so they are
+    # part of the graph cargo-deny walks.
+    "GPL-3.0-or-later",
+]
+
+# Stated rather than inherited. These three carry the whole weight of the
+# advisory gate, and two of cargo-deny's defaults are looser than what
+# this job enforced when it ran cargo-audit: unsound defaults to the
+# workspace only, and yanked to a warning. Pinning them keeps a
+# cargo-deny upgrade from quietly relaxing the gate.
+[advisories]
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
