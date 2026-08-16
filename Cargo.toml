@@ -20,7 +20,7 @@ thiserror = "2.0"
 anyhow = "1.0"
 serde = { version = "1.0", default-features = false, features = ["derive", "std"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-serde-saphyr = "0.0.28"
+serde-saphyr = "1.1"
 crossbeam-channel = { version = "0.5", default-features = false, features = ["std"] }
 clap = { version = "4.6", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
 clap_complete = { version = "4.6", default-features = false }
