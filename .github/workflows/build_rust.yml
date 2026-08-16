@@ -7,12 +7,17 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# No job here writes to the repository or its metadata; reading the
+# checkout is the only scope any of them needs.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -24,7 +29,7 @@ jobs:
     name: Compile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -38,14 +43,14 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-          - macOS-latest
+          - macos-latest
         toolchain:
           - stable
           - nightly
     runs-on: ${{ matrix.os }}
     needs: [compile]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
@@ -72,7 +77,7 @@ jobs:
     name: Generate Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -82,27 +87,17 @@ jobs:
     name: Spell Check Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Codespell
         run: pip install codespell
       - name: Run Codespell
         run: codespell
 
-  copyright:
-    name: Generate Copyright Notes
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install Cargo License
-        run: cargo install cargo-license
-      - name: Generate License Report
-        run: cargo license
-
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable

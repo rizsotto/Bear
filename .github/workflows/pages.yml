@@ -10,12 +10,18 @@ env:
   # used to build the documentation site. Never install unpinned.
   MDBOOK_VERSION: 0.5.4
 
+# Default for every job. The deploy job overrides this wholesale (a
+# job-level block replaces the default rather than merging into it), so
+# it has to restate contents: read for its own checkout.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build Documentation Site
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -36,13 +42,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
