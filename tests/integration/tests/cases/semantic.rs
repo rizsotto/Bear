@@ -1098,6 +1098,84 @@ fn msvc_assembly_listing_flags_survive() -> Result<()> {
 
 // Requirements: output-compilation-entries
 //
+// MSVC writes an output option four ways, and every one has to survive into
+// the entry as the build spelled it, with the path reaching the output field:
+//
+//   /Fo             no value, so it names no file
+//   /Fomain.obj     glued, the spelling CMake and Meson emit
+//   /Fo:main.obj    after a colon
+//   /Fo: main.obj   colon, value in the next argument
+//
+// The bare form is the one that has to name no output at all. Reading it as
+// an output with an empty path made the entry claim the working directory
+// once paths were resolved, and the separated colon form used to lose its
+// value entirely: unclaimed, it was read as an object file input and dropped.
+#[test]
+fn msvc_output_flag_spellings_are_recorded_as_written() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("msvc_output_spellings")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, output_field_config())?;
+
+    let cases: Vec<(Vec<&str>, Option<&str>)> = vec![
+        (vec!["/c", "/Fo", "main.cpp"], None),
+        (vec!["/c", "/Fomain.obj", "main.cpp"], Some("main.obj")),
+        (vec!["/c", "/Fo:main.obj", "main.cpp"], Some("main.obj")),
+        (vec!["/c", "/Fo:", "main.obj", "main.cpp"], Some("main.obj")),
+        (vec!["/Fe", "main.cpp"], None),
+        (vec!["/Feapp.exe", "main.cpp"], Some("app.exe")),
+    ];
+
+    for (arguments, expected_output) in cases {
+        let mut argv = vec!["cl.exe"];
+        argv.extend(arguments.iter().copied());
+
+        let event = json!({
+            "executable": "cl.exe",
+            "arguments": argv,
+            "working_dir": temp_dir,
+            "environment": {}
+        });
+        env.create_source_files(&[
+            ("events.json", &event.to_string()),
+            ("main.cpp", "int main() { return 0; }"),
+        ])?;
+
+        // act
+        env.run_bear_success(&[
+            "--config",
+            config_path.to_str().unwrap(),
+            "semantic",
+            "--input",
+            "events.json",
+            "--output",
+            "compile_commands.json",
+        ])?;
+
+        // assert
+        let sut = env.load_compilation_database("compile_commands.json")?;
+        sut.assert_count(1).with_context(|| format!("case {arguments:?}"))?;
+        sut.assert_contains(&compilation_entry!(
+            file: "main.cpp".to_string(),
+            directory: temp_dir.to_string(),
+            arguments: argv.iter().map(|a| a.to_string()).collect::<Vec<_>>()
+        ))
+        .with_context(|| format!("case {arguments:?} must round-trip its arguments"))?;
+
+        let entry = &sut.entries()[0];
+        assert_eq!(
+            entry.get("output").and_then(Value::as_str),
+            expected_output,
+            "case {arguments:?} output field"
+        );
+    }
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries
+//
 // `/F` sets the stack size and spells its value as a separate argument
 // (`/F 1024`), which is a link-stage setting and is therefore stripped from a
 // compile entry together with its value. It must not double as a prefix for

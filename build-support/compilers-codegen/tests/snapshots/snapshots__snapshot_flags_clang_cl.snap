@@ -4,7 +4,7 @@ assertion_line: 23
 expression: generated
 ---
 // Generated from compilers/clang_cl.yaml -- DO NOT EDIT
-static CLANG_CL_FLAGS: [FlagRule; 170] = [
+static CLANG_CL_FLAGS: [FlagRule; 174] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-fms-compatibility-version"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-fprofile-instr-generate", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fprofile-instr-generate"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -73,6 +73,8 @@ static CLANG_CL_FLAGS: [FlagRule; 170] = [
     FlagRule::new(FlagPattern::Exactly("-m32", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-m64", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-###", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/Fo:"), ArgumentKind::Output),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/Fe:"), ArgumentKind::Output),
     FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/doc"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithColon("/std"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("/GR-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -85,6 +87,8 @@ static CLANG_CL_FLAGS: [FlagRule; 170] = [
     FlagRule::new(FlagPattern::Exactly("/WX-", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/LDd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("/EP", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("/Fo", 0), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("/Fe", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("/Fo", 0), ArgumentKind::Output),
     FlagRule::new(FlagPattern::Prefix("/Fe", 0), ArgumentKind::Output),
     FlagRule::new(FlagPattern::Prefix("/Fd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),

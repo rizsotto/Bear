@@ -30,11 +30,29 @@ flags:
     result: stops_at_preprocessing
 
   # --- Output flags ---
-  # cl.exe glues the value to every /F-family option ("Don't put a space
-  # between the option and pathname"); /Fo and /Fe additionally accept it
-  # after a ':', and /Fe and /FR make it optional. A prefix rule is the only
-  # form that takes the glued spelling and never consumes the following
-  # argument, so a valueless option cannot swallow the source file.
+  # /Fo and /Fe write their value four ways, and each needs its own rule:
+  #
+  #   /Fo             no value, so it names no file      -> a plain flag
+  #   /Foa.obj        glued, what CMake and Meson emit   -> the prefix rule
+  #   /Fo:b.obj       after a colon                      -> the colon rule
+  #   /Fo: c.obj      colon, value in the next argument  -> the colon rule
+  #
+  # The colon rules carry the colon in the flag itself, so "glued or
+  # separate" covers the last two at once, and their longer flag sorts them
+  # ahead of the prefix rules.
+  #
+  # The bare rule must stay above the prefix rule: both flags are the same
+  # length, so the generated table keeps them in the order written here, and
+  # the prefix rule would otherwise match a lone /Fo with an empty value,
+  # leaving the entry to claim an output the build never named.
+  - match: {pattern: "/Fo:{ }*"}
+    result: output
+  - match: {pattern: "/Fe:{ }*"}
+    result: output
+  - match: {pattern: "/Fo"}
+    result: none
+  - match: {pattern: "/Fe"}
+    result: none
   - match: {pattern: "/Fo*"}
     result: output
   - match: {pattern: "/Fe*"}

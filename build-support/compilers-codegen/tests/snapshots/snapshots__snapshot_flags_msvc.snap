@@ -4,7 +4,7 @@ assertion_line: 23
 expression: generated
 ---
 // Generated from compilers/msvc.yaml -- DO NOT EDIT
-static MSVC_FLAGS: [FlagRule; 134] = [
+static MSVC_FLAGS: [FlagRule; 138] = [
     FlagRule::new(FlagPattern::Exactly("/external:anglebrackets", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/Qfast_transcendentals", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithColon("/execution-charset"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -38,6 +38,8 @@ static MSVC_FLAGS: [FlagRule; 134] = [
     FlagRule::new(FlagPattern::Exactly("/Qpar", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("/Wall", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/link", 0), ArgumentKind::Other(PassEffect::PassThrough)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/Fo:"), ArgumentKind::Output),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/Fe:"), ArgumentKind::Output),
     FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/doc"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithColon("/std"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("/GR-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -50,6 +52,8 @@ static MSVC_FLAGS: [FlagRule; 134] = [
     FlagRule::new(FlagPattern::Exactly("/WX-", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/LDd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("/EP", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("/Fo", 0), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("/Fe", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("/Fo", 0), ArgumentKind::Output),
     FlagRule::new(FlagPattern::Prefix("/Fe", 0), ArgumentKind::Output),
     FlagRule::new(FlagPattern::Prefix("/Fd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
