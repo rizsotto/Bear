@@ -971,14 +971,25 @@ fn probe_dispatches_cc_to_clang_when_version_advertises_clang() -> Result<()> {
 
     // Use command_bear() directly so we can force RUST_LOG=debug without
     // touching the test process env (which would race with parallel tests).
+    //
+    // `CFLAGS` carries a flag that names GCC, to reproduce #716: the debug
+    // log dumps the intercepted execution's environment, so a build
+    // environment that merely mentions GCC (as a Gentoo package build does)
+    // must not read as "the GCC interpreter recognized this command".
+    //
+    // It has to be a flags variable rather than `CC`, which is how the
+    // reported build spelled it. `CC` is a program variable: in wrapper mode
+    // the runner resolves its value on PATH, so a Gentoo triplet name would
+    // log a resolution warning on every other distro. `CFLAGS` reaches the
+    // log through the same env filter (`intercept::environment`) without
+    // ever being resolved or folded into the recorded arguments, so the
+    // reproduction costs nothing on hosts that have no such compiler.
     let mut cmd = env.command_bear();
-    cmd.current_dir(env.test_dir()).env("RUST_LOG", "debug").env("RUST_BACKTRACE", "1").args([
-        "--output",
-        "compile_commands.json",
-        "--",
-        SHELL_PATH,
-        script.to_str().unwrap(),
-    ]);
+    cmd.current_dir(env.test_dir())
+        .env("RUST_LOG", "debug")
+        .env("RUST_BACKTRACE", "1")
+        .env("CFLAGS", "-frecord-gcc-switches")
+        .args(["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()]);
     let output = cmd.output()?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "bear failed:\n{}", stderr);
@@ -995,25 +1006,65 @@ fn probe_dispatches_cc_to_clang_when_version_advertises_clang() -> Result<()> {
     // parses the command, and `gcc                 : Recognized(...)` if the
     // GCC flag table did. We assert the former is present and the latter is
     // absent for this run.
-    //
-    // Note: we look for "Recognized(" specifically to ignore any unrelated
-    // log lines that might mention the id in passing (e.g. the probe's
-    // "clang version" reading of `cc --version`).
-    let saw_clang_recognized = stderr.lines().any(|l| l.contains("clang") && l.contains("Recognized("));
-    let saw_gcc_recognized = stderr.lines().any(|l| l.contains("gcc") && l.contains("Recognized("));
+    let recognized = interpreters_that_recognized(&stderr);
 
     assert!(
-        saw_clang_recognized,
+        recognized.contains(&"clang"),
         "expected a `clang ... Recognized(` log line proving probe dispatched to Clang.\nstderr:\n{}",
         stderr
     );
     assert!(
-        !saw_gcc_recognized,
+        !recognized.contains(&"gcc"),
         "did not expect a `gcc ... Recognized(` log line; that would mean the probe was bypassed and the regex fell back to GCC.\nstderr:\n{}",
         stderr
     );
 
     Ok(())
+}
+
+/// Collect the interpreter ids that reported a `Recognized` verdict in a
+/// debug log, as emitted by the `OutputLogger` combinator:
+///
+/// ```text
+/// [...  semantic::interpreters::combinators] clang               : Recognized(Command { ... })
+/// ```
+///
+/// The id and the verdict are matched positionally, not by substring: both
+/// the `Execution` dump of a `NotRecognized(...)` verdict and the build
+/// environment it carries can mention a compiler id in passing (a Gentoo
+/// build sets `CC=x86_64-pc-linux-gnu-gcc` and `CFLAGS=-frecord-gcc-switches`,
+/// for instance), and `NotRecognized(` itself ends in `Recognized(`.
+fn interpreters_that_recognized(stderr: &str) -> Vec<&str> {
+    stderr
+        .lines()
+        .filter_map(|line| line.split_once("combinators] "))
+        .filter_map(|(_, entry)| entry.split_once(": "))
+        .filter(|(_, verdict)| verdict.starts_with("Recognized("))
+        .map(|(id, _)| id.trim_end())
+        .collect()
+}
+
+/// Regression guard for #716: the probe test above read the debug log with
+/// plain `contains` checks, so a `NotRecognized` line whose environment dump
+/// mentioned GCC (the Gentoo package build sets `CC=x86_64-pc-linux-gnu-gcc`)
+/// read as "the probe fell back to GCC" and failed the test on a run where
+/// the probe had in fact dispatched to Clang. The lines below are taken from
+/// that build log.
+// Requirements: recognition-ambiguous-name-probe
+#[test]
+fn recognized_ids_come_from_the_verdict_not_the_execution_dump() {
+    let log = concat!(
+        "[21:17:10.137 DEBUG bear[2649] semantic::interpreters::combinators] coreutils_to_ignore : ",
+        "NotRecognized(Execution { executable: \"/tmp/fake-cc/cc\", arguments: [\"cc\", \"-c\", ",
+        "\"hello.c\"], environment: {\"CC\": \"x86_64-pc-linux-gnu-gcc\", \"CFLAGS\": ",
+        "\"-O2 -ggdb3 -frecord-gcc-switches\"} })\n",
+        "[21:17:10.142 DEBUG bear[2649] semantic::interpreters::combinators] clang               : ",
+        "Recognized(Command { executable: \"/tmp/fake-cc/cc\", source_mode: PerSourceStripped })\n",
+    );
+
+    let sut = interpreters_that_recognized(log);
+
+    assert_eq!(sut, vec!["clang"], "only the Recognized verdict's own id counts, got {sut:?}");
 }
 
 /// Regression guard for #532: --append was unusable on large projects in the
