@@ -96,6 +96,14 @@ entries are placed before the existing ones, so a rebuilt file's newest
 invocation survives duplicate filtering and replaces the stale entry
 (see `duplicates` under CONFIGURATION).
 
+**\-\-overwrite**
+: Replace the output file with only this run's entries. This is what
+Bear already does when neither flag is given; the flag exists so a
+script can name the behaviour it depends on rather than rely on the
+default. Giving it together with `--append` is an error. A future
+release makes appending the default, and a script that passes
+`--overwrite` today keeps its current behaviour across that change.
+
 **-h, \-\-help**
 : Print help.
 
@@ -140,6 +148,10 @@ write is neither atomic nor appendable, so `--output -` together with
 : Same as in combined mode: place new entries before the existing ones
 in the output file.
 
+**\-\-overwrite**
+: Same as in combined mode: name the current default explicitly. Not
+accepted together with `--append`.
+
 ## bear parse-sh
 
 Produces the compilation database from shell command text, without
@@ -162,6 +174,10 @@ write is neither atomic nor appendable, so `--output -` together with
 **-a, \-\-append**
 : Same as in combined mode: place new entries before the existing ones
 in the output file.
+
+**\-\-overwrite**
+: Same as in combined mode: name the current default explicitly. Not
+accepted together with `--append`.
 
 **-C, \-\-directory** *DIR*
 : Initial working directory for the parsed commands. Use it for input

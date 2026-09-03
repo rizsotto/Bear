@@ -98,6 +98,16 @@ New entries are placed before the existing ones, so a rebuilt file\(cqs
 newest invocation survives duplicate filtering and replaces the stale
 entry (see \f[CR]duplicates\f[R] under CONFIGURATION).
 .TP
+\f[B]\-\-overwrite\f[R]
+Replace the output file with only this run\(cqs entries.
+This is what Bear already does when neither flag is given; the flag
+exists so a script can name the behaviour it depends on rather than rely
+on the default.
+Giving it together with \f[CR]\-\-append\f[R] is an error.
+A future release makes appending the default, and a script that passes
+\f[CR]\-\-overwrite\f[R] today keeps its current behaviour across that
+change.
+.TP
 \f[B]\-h, \-\-help\f[R]
 Print help.
 .TP
@@ -138,6 +148,10 @@ atomic nor appendable, so \f[CR]\-\-output \-\f[R] together with
 \f[B]\-a, \-\-append\f[R]
 Same as in combined mode: place new entries before the existing ones in
 the output file.
+.TP
+\f[B]\-\-overwrite\f[R]
+Same as in combined mode: name the current default explicitly.
+Not accepted together with \f[CR]\-\-append\f[R].
 .SS bear parse\-sh
 Produces the compilation database from shell command text, without
 running anything.
@@ -164,6 +178,10 @@ atomic nor appendable, so \f[CR]\-\-output \-\f[R] together with
 \f[B]\-a, \-\-append\f[R]
 Same as in combined mode: place new entries before the existing ones in
 the output file.
+.TP
+\f[B]\-\-overwrite\f[R]
+Same as in combined mode: name the current default explicitly.
+Not accepted together with \f[CR]\-\-append\f[R].
 .TP
 \f[B]\-C, \-\-directory\f[R] \f[I]DIR\f[R]
 Initial working directory for the parsed commands.

@@ -18,6 +18,10 @@ entries with an existing `compile_commands.json` instead of overwriting it.
   the new entries (no error)
 - Without append mode, the output file is overwritten with only the new
   entries (the default behavior)
+- Overwriting can also be requested explicitly, so a caller can state the
+  behavior it depends on instead of relying on the default
+- Requesting appending and overwriting in the same invocation is a usage
+  error: Bear reports it and runs no build
 - When the existing file cannot be opened (e.g. permission denied), Bear
   returns an error and does not write output
 - When the existing file opens but contains invalid JSON or invalid entries,
@@ -46,6 +50,16 @@ Given an existing `compile_commands.json` with an entry for file1.c:
 
 > When the user runs `bear -- <compiler> -c file2.c` (no `--append`),
 > then `compile_commands.json` contains only the entry for file2.c.
+
+Given an existing `compile_commands.json` with an entry for file1.c:
+
+> When the user runs `bear --overwrite -- <compiler> -c file2.c`,
+> then `compile_commands.json` contains only the entry for file2.c.
+
+Given any invocation that writes a compilation database:
+
+> When the user asks for both appending and overwriting at once,
+> then Bear reports a usage error and does not run the build.
 
 Given an existing `compile_commands.json` with corrupted JSON content:
 
@@ -78,3 +92,4 @@ compiler invocations:
 ## Rationale
 
 - [Latest compilation wins for a rebuilt file](../rationale/duplicate-latest-flags-win.md)
+- [Naming the overwrite behaviour before it stops being the default](../rationale/append-default-migration.md)
