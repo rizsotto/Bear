@@ -56,6 +56,7 @@ Bear is a tool that generates a compilation database for clang tooling.
 | `-c, --config <FILE>` | Path of the config file | - |
 | `-o, --output <FILE>` | Path of the result file | `compile_commands.json` |
 | `-a, --append` | Append result to an existing output file | - |
+| `--overwrite` | Overwrite an existing output file (the default) | - |
 | `-h, --help` | Print help | - |
 | `-V, --version` | Print version | - |
 
@@ -95,6 +96,7 @@ bear semantic [OPTIONS]
 | `-i, --input <FILE>` | Path of the event file to read | `-` |
 | `-o, --output <FILE>` | Path of the result file | `compile_commands.json` |
 | `-a, --append` | Append result to an existing output file | - |
+| `--overwrite` | Overwrite an existing output file (the default) | - |
 | `--print-compilers` | Print the compilers Bear recognizes and exit | - |
 | `-h, --help` | Print help | - |
 
@@ -119,6 +121,7 @@ bear parse-sh [OPTIONS]
 | `-i, --input <FILE>` | Path of the shell text to parse | `-` |
 | `-o, --output <FILE>` | Path of the result file | `compile_commands.json` |
 | `-a, --append` | Append result to an existing output file | - |
+| `--overwrite` | Overwrite an existing output file (the default) | - |
 | `-C, --directory <DIR>` | Initial working directory for the parsed commands | - |
 | `-h, --help` | Print help | - |
 

@@ -230,6 +230,10 @@ impl TryFrom<&ArgMatches> for BuildSemantic {
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
         let path =
             matches.get_one::<String>("output").map(std::path::PathBuf::from).expect("output is defaulted");
+        // `--overwrite` is deliberately not read here. It names the behaviour
+        // that is already the default, so today it only has to be accepted and
+        // to conflict with `--append`. It becomes load-bearing when appending
+        // turns into the default.
         let append = *matches.get_one::<bool>("append").unwrap_or(&false);
         Ok(BuildSemantic { path, append })
     }
@@ -294,6 +298,9 @@ pub fn cli() -> Command {
                         .default_value(DEFAULT_OUTPUT_FILE)
                         .hide_default_value(false),
                     arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
+                    arg!(--overwrite "Overwrite an existing output file (the default)")
+                        .action(ArgAction::SetTrue)
+                        .conflicts_with("append"),
                     arg!(--"print-compilers" "Print the compilers Bear recognizes and exit")
                         .action(ArgAction::SetTrue),
                 ])
@@ -315,6 +322,9 @@ pub fn cli() -> Command {
                         .default_value(DEFAULT_OUTPUT_FILE)
                         .hide_default_value(false),
                     arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
+                    arg!(--overwrite "Overwrite an existing output file (the default)")
+                        .action(ArgAction::SetTrue)
+                        .conflicts_with("append"),
                     arg!(-C --directory <DIR> "Initial working directory for the parsed commands"),
                 ])
                 .arg_required_else_help(false)
@@ -335,6 +345,9 @@ pub fn cli() -> Command {
                 .default_value(DEFAULT_OUTPUT_FILE)
                 .hide_default_value(false),
             arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
+            arg!(--overwrite "Overwrite an existing output file (the default)")
+                .action(ArgAction::SetTrue)
+                .conflicts_with("append"),
         ])
 }
 
@@ -580,6 +593,57 @@ mod test {
                 },
             }
         );
+    }
+
+    // Requirements: output-append
+    //
+    // `--overwrite` names the behaviour that is already the default, so it
+    // parses everywhere `--append` does and leaves the outcome untouched.
+    #[test]
+    fn test_overwrite_is_accepted_in_every_output_mode() {
+        let executions = vec![
+            vec!["bear", "--overwrite", "--", "make", "all"],
+            vec!["bear", "semantic", "--overwrite"],
+            vec!["bear", "parse-sh", "--overwrite"],
+        ];
+
+        for execution in executions {
+            let matches = cli().try_get_matches_from(&execution).expect("--overwrite is accepted");
+            let arguments = Arguments::try_from(matches).unwrap();
+
+            let output = match &arguments.mode {
+                Mode::Combined { output, .. } => output,
+                Mode::Semantic { output, .. } => output,
+                Mode::ParseSh { output, .. } => output,
+                other => panic!("unexpected mode {:?} for {:?}", other, execution),
+            };
+            assert_eq!(output, &BuildSemantic { path: "compile_commands.json".into(), append: false });
+        }
+    }
+
+    // Requirements: output-append
+    //
+    // Asking to accumulate and to overwrite in one invocation is a script
+    // bug, and it is worth reporting now rather than after the default flips.
+    #[test]
+    fn test_overwrite_conflicts_with_append() {
+        // Both orders, because a script that gets this wrong may well pass
+        // the flags in either one.
+        let executions = vec![
+            vec!["bear", "-a", "--overwrite", "--", "make", "all"],
+            vec!["bear", "--overwrite", "-a", "--", "make", "all"],
+            vec!["bear", "semantic", "--append", "--overwrite"],
+            vec!["bear", "semantic", "--overwrite", "--append"],
+            vec!["bear", "parse-sh", "--append", "--overwrite"],
+            vec!["bear", "parse-sh", "--overwrite", "--append"],
+        ];
+
+        for execution in executions {
+            let result = cli().try_get_matches_from(&execution);
+
+            let error = result.expect_err(&format!("case {execution:?} must be rejected"));
+            assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict, "case {execution:?}");
+        }
     }
 
     #[test]
