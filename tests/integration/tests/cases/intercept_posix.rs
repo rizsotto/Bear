@@ -727,7 +727,14 @@ int main(void) {{
     ])?;
 
     let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("cat"))?;
+    // Bear's interposed popen reports the `sh -c` execution itself, so this
+    // holds even where /bin/sh cannot load the preload library (a static
+    // busybox in the nix sandbox) and the grandchild goes unrecorded.
+    events.assert_contains(&EventMatcher::new().executable_name("sh").arguments(vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        CAT_PATH.to_string(),
+    ]))?;
 
     Ok(())
 }
@@ -763,11 +770,13 @@ int main() {{
     ])?;
 
     let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        ECHO_PATH.to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
+    // Same contract as popen_interception: assert the `sh -c` execution that
+    // the interposed system() reports, not the grandchild a static /bin/sh
+    // would never let the preload library see.
+    events.assert_contains(&EventMatcher::new().executable_name("sh").arguments(vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        format!("{} arg1 arg2 arg3", ECHO_PATH),
     ]))?;
 
     Ok(())

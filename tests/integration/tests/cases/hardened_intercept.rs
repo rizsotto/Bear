@@ -22,35 +22,15 @@
 //! Simulates issue #660: a C program (standing in for a build orchestrator like
 //! perl) calls `unsetenv("LD_PRELOAD")` then `system("gcc ...")`.
 //!
-//! The concern is that `system()` and `popen()` use the process's `environ`
-//! internally and do not accept an explicit envp we could doctor. On some glibc
-//! versions their internal `fork+execve` path bypasses the PLT, so our
-//! LD_PRELOAD override of `execve` never fires and the child starts without
-//! the preload library.
-//!
-//! **Why this currently passes (glibc ≥ 2.34 on x86-64):**
-//!
-//! glibc 2.34+ rewrote `system()` to call `posix_spawn` internally
-//! (`do_system` → `posix_spawn@@GLIBC_2.15` → `__spawni` → `__spawnix`).
-//! `__spawni` loads the address of the `execve` *symbol* (not `__execve`) and
-//! passes it as a function pointer to `__spawnix`, which runs it in the child
-//! after `clone(CLONE_VM | CLONE_VFORK)`. Because the child shares the
-//! parent's virtual memory (including GOT/PLT entries patched by LD_PRELOAD),
-//! the function pointer resolves to **our** overridden `execve`, not libc's
-//! raw syscall wrapper. Our override doctors the environment, so the shell
-//! child gets `LD_PRELOAD` and `BEAR_INTERCEPT` back.
-//!
-//! **When this would fail:**
-//!
-//! - glibc < 2.34 where `system()` uses `fork()` + a direct internal
-//!   `__execve()` call that bypasses the PLT entirely.
-//! - Any libc (musl, bionic) that calls the `execve` syscall directly
-//!   in its `system()` implementation.
-//! - Statically linked programs that don't load shared libraries at all.
-//!
-//! If these tests start failing on a new platform, the fix is to have
-//! `rust_system` / `rust_popen` restore `LD_PRELOAD` and `BEAR_INTERCEPT`
-//! in the process's `environ` (via `setenv`) before calling the real function.
+//! The preload library does not call the real `system()`/`popen()` (whose
+//! internal fork+exec path is libc-version-dependent); it reimplements both
+//! via `posix_spawnp` with a doctored envp, so the call itself is always
+//! intercepted. What still depends on the platform is which descendant exec
+//! reaches the database: where /bin/sh cannot load the preload library (a
+//! static busybox in the nix build sandbox), the shell's children go
+//! unrecorded and the first captured event comes from a later dynamic
+//! process (the compiler wrapper script's interpreter). The assertions
+//! therefore pin the compiled file rather than the exact compiler argv.
 //!
 //! ### Competing LD_PRELOAD libraries (HI-8)
 //!
@@ -345,18 +325,8 @@ fn hardened_wrapper_exec_env_clear() -> Result<()> {
 ///
 /// Simulates issue #660: a build orchestrator strips Bear's environment
 /// variables from its own `environ`, then spawns compilation via `system()`.
-///
-/// On glibc ≥ 2.34 (x86-64), `system()` calls `posix_spawn` internally.
-/// The `__spawni` helper loads the address of the `execve` *symbol* and
-/// passes it to the child via `clone(CLONE_VM)`. Because the child shares
-/// the parent's GOT/PLT (patched by LD_PRELOAD), the call resolves to our
-/// overridden `execve`, which doctors the environment. This is why the test
-/// passes here.
-///
-/// On older glibc or other libc implementations, `system()` may call an
-/// internal `__execve` that bypasses the PLT — in that case this test would
-/// fail, proving the need for `rust_system` to restore the session variables
-/// in `environ` before calling the real `system()`.
+/// Bear's interposed `system()` spawns the shell itself with a doctored
+/// envp, so the call is recorded regardless of libc internals.
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -396,27 +366,25 @@ int main() {{
 
     let db = env.load_compilation_database("compile_commands.json")?;
 
-    // The compiler invocation inside system() should be captured.
-    // NOTE: not asserting exact count because ccache may produce extra entries.
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: env.test_dir().to_str().unwrap().to_string(),
-        arguments: vec![
-            COMPILER_C_PATH.to_string(),
-            "-c".to_string(),
-            "hello.c".to_string(),
-            "-o".to_string(),
-            "hello.o".to_string(),
-        ]
-    ))?;
+    // The compiler invocation inside system() must be captured. Pin the
+    // compiled file rather than the argv: where /bin/sh cannot load the
+    // preload library (a static busybox in the nix sandbox), the first
+    // recorded exec is the wrapper script's interpreter execing the real
+    // compiler - with the distribution's injected flags - not the wrapper
+    // invocation itself.
+    db.assert_contains(
+        &CompilationEntryMatcher::new()
+            .file("hello.c".to_string())
+            .directory(env.test_dir().to_str().unwrap().to_string())
+            .output("hello.o".to_string()),
+    )?;
 
     Ok(())
 }
 
 /// HI-7: C program that unsets LD_PRELOAD+BEAR_INTERCEPT, then uses popen() to compile.
 ///
-/// Same mechanism as HI-6 but through `popen()`. See HI-6 docs for the
-/// glibc version dependency.
+/// Same mechanism as HI-6 but through `popen()`.
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -462,19 +430,14 @@ int main() {{
 
     let db = env.load_compilation_database("compile_commands.json")?;
 
-    // The compiler invocation inside popen() should be captured.
-    // NOTE: not asserting exact count because ccache may produce extra entries.
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: env.test_dir().to_str().unwrap().to_string(),
-        arguments: vec![
-            COMPILER_C_PATH.to_string(),
-            "-c".to_string(),
-            "hello.c".to_string(),
-            "-o".to_string(),
-            "hello.o".to_string(),
-        ]
-    ))?;
+    // The compiler invocation inside popen() must be captured; see HI-6 for
+    // why the assertion pins the compiled file rather than the argv.
+    db.assert_contains(
+        &CompilationEntryMatcher::new()
+            .file("hello.c".to_string())
+            .directory(env.test_dir().to_str().unwrap().to_string())
+            .output("hello.o".to_string()),
+    )?;
 
     Ok(())
 }
