@@ -27,6 +27,14 @@ intercept:
 "#
 );
 
+/// PATH payload for the empty-environment phases of the PATH-searching
+/// (`*p`) tests below. With PATH unset, the real exec falls back to libc's
+/// built-in default search path, which provides no echo in a nix sandbox.
+#[cfg(has_executable_echo)]
+fn path_with_echo() -> String {
+    format!("PATH={}", std::path::Path::new(ECHO_PATH).parent().unwrap().display())
+}
+
 /// Test execl system call interception with multiple arguments
 ///
 /// execl(path, arg0, arg1, ..., NULL) - variadic, no PATH search, inherited env
@@ -150,6 +158,7 @@ int main() {
             "--",
             ENV_PATH,
             "-",
+            &path_with_echo(),
             "./test_execlp",
         ])?;
 
@@ -424,6 +433,7 @@ int main() {
             "--",
             ENV_PATH,
             "-",
+            &path_with_echo(),
             "./test_execvp",
         ])?;
 
@@ -493,6 +503,7 @@ int main() {
             "--",
             ENV_PATH,
             "-",
+            &path_with_echo(),
             "./test_execvpe",
         ])?;
 
@@ -589,7 +600,7 @@ int main() {{
 /// Test posix_spawnp interception (searches PATH)
 #[test]
 #[cfg(has_symbol_posix_spawnp)]
-#[cfg(has_executable_compiler_c)]
+#[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn posix_spawnp_interception() -> Result<()> {
     let env = TestEnvironment::new("posix_spawnp_intercept")?;
     env.create_config(CONFIG)?;
@@ -646,6 +657,7 @@ int main() {
             "--",
             ENV_PATH,
             "-",
+            &path_with_echo(),
             "./test_posix_spawnp",
         ])?;
 
