@@ -159,18 +159,19 @@ fn parallel_command_interception() -> Result<()> {
     // Load and verify events
     let events = env.load_events_file("events.json")?;
 
-    // Should have captured all 4 parallel compiler invocations
-    let compiler_matcher = event_matcher!(executable_name: filename_of(COMPILER_C_PATH));
-    events.assert_count_matching(&compiler_matcher, 4)?;
-
-    // Verify each individual compiler invocation was captured
+    // Each of the 4 parallel compiler invocations must be captured exactly
+    // once. Match the full argument vector rather than the executable name:
+    // where `gcc` is a wrapper script (nixpkgs, ccache), the wrapper's exec
+    // of the real compiler shows up under the same name and doubles a
+    // name-only count.
     for i in 1..=4 {
-        let specific_compiler_matcher = EventMatcher::new().arguments(vec![
-            filename_of(COMPILER_C_PATH).to_string(),
-            "-c".to_string(),
-            format!("test_{}.c", i),
-        ]);
-        events.assert_contains(&specific_compiler_matcher)?;
+        let specific_compiler_matcher =
+            EventMatcher::new().executable_name(filename_of(COMPILER_C_PATH)).arguments(vec![
+                filename_of(COMPILER_C_PATH).to_string(),
+                "-c".to_string(),
+                format!("test_{}.c", i),
+            ]);
+        events.assert_count_matching(&specific_compiler_matcher, 1)?;
     }
 
     Ok(())
