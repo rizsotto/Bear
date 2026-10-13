@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::IteratorWriter;
+use crate::output::WriterError;
 use crate::output::clang;
 use crate::output::clang::serialization::JsonCompilationDatabase;
 use crate::output::formats::SerializationFormat;
 use crate::output::statistics::OutputStatistics;
-use crate::output::{WriterCreationError, WriterError};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::{fs, io, path};
@@ -22,15 +22,9 @@ pub(crate) struct ClangOutputWriter {
 }
 
 impl ClangOutputWriter {
-    pub(crate) fn create(
-        path: &path::Path,
-        stats: Arc<OutputStatistics>,
-    ) -> Result<Self, WriterCreationError> {
-        let output = fs::File::create(path)
-            .map(io::BufWriter::new)
-            .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
-
-        Ok(Self { output, path: path.to_path_buf(), stats })
+    /// Wraps an open `file`; `path` labels its errors.
+    pub(crate) fn new(file: fs::File, path: &path::Path, stats: Arc<OutputStatistics>) -> Self {
+        Self { output: io::BufWriter::new(file), path: path.to_path_buf(), stats }
     }
 }
 
@@ -79,7 +73,7 @@ mod tests {
             clang::Entry::from_arguments_str("file3.c", vec!["gcc", "-c"], "/project", Some("file3.o")),
         ];
 
-        let writer = ClangOutputWriter::create(&path, Arc::clone(&stats)).unwrap();
+        let writer = ClangOutputWriter::new(fs::File::create(&path).unwrap(), &path, Arc::clone(&stats));
         writer.write(entries.into_iter()).unwrap();
 
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 3);
@@ -93,29 +87,12 @@ mod tests {
     }
 
     #[test]
-    fn test_create_failure_invalid_path() {
-        let stats = OutputStatistics::new();
-        let result = ClangOutputWriter::create(
-            path::Path::new("/nonexistent/directory/output.json"),
-            Arc::clone(&stats),
-        );
-
-        assert!(result.is_err());
-        match result {
-            Err(WriterCreationError::Io(p, _)) => {
-                assert_eq!(p, path::PathBuf::from("/nonexistent/directory/output.json"));
-            }
-            _ => panic!("Expected WriterCreationError::Io"),
-        }
-    }
-
-    #[test]
     fn test_entries_written_counter_matches_actual() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("output.json");
         let stats = OutputStatistics::new();
 
-        let writer = ClangOutputWriter::create(&path, Arc::clone(&stats)).unwrap();
+        let writer = ClangOutputWriter::new(fs::File::create(&path).unwrap(), &path, Arc::clone(&stats));
         writer.write(std::iter::empty()).unwrap();
 
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 0);

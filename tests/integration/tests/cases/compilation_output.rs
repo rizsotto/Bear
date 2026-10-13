@@ -793,7 +793,7 @@ fn info_only_invocation_produces_no_entries() -> Result<()> {
 }
 
 /// Given a successful build, Bear's atomic-write step removes the deterministic
-/// temp file (output extension replaced with `.tmp`) so only the final
+/// temp file (a hidden, randomly named file next to it) so only the final
 /// compile_commands.json remains in the output directory.
 // Requirements: output-atomic-write
 #[test]
@@ -809,10 +809,70 @@ fn atomic_write_cleans_up_temp_file_on_success() -> Result<()> {
     env.run_bear_success(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
 
     assert!(env.file_exists("compile_commands.json"));
-    assert!(
-        !env.file_exists("compile_commands.tmp"),
-        "temp file compile_commands.tmp must not remain after successful write"
-    );
+    assert_no_temp_files(&env)?;
+
+    Ok(())
+}
+
+/// When the build command cannot start, the run ends in Bear's own error:
+/// neither the compilation database nor the events file may be published,
+/// an existing one must stay as it was, and no temp file may remain (#718).
+// Requirements: output-atomic-write, interception-events-format
+#[test]
+fn atomic_write_publishes_nothing_when_build_cannot_start() -> Result<()> {
+    let cases: [(&[&str], &str); 2] = [
+        (&["--output", "compile_commands.json", "--", "nosuchcmd"], "compile_commands.json"),
+        (&["intercept", "--output", "events.json", "--", "nosuchcmd"], "events.json"),
+    ];
+
+    for (args, output) in cases {
+        let env = TestEnvironment::new("atomic_write_no_publish_on_start_failure")?;
+
+        env.run_bear(args)?.assert_failure()?;
+        assert!(!env.file_exists(output), "{output}: must not be created");
+        assert_no_temp_files(&env)?;
+
+        env.create_source_files(&[(output, "previous content")])?;
+        env.run_bear(args)?.assert_failure()?;
+        assert_eq!(env.read_file(output)?, "previous content", "{output}: must stay unchanged");
+        assert_no_temp_files(&env)?;
+    }
+
+    Ok(())
+}
+
+/// The events file is staged like the compilation database: written to a
+/// temp file during the build and renamed into place at the end.
+// Requirements: output-atomic-write, interception-events-format
+#[test]
+#[cfg(has_executable_true)]
+fn atomic_write_publishes_events_file_on_success() -> Result<()> {
+    let env = TestEnvironment::new("atomic_write_events_on_success")?;
+
+    env.run_bear_success(&["intercept", "--output", "events.json", "--", TRUE_PATH])?;
+
+    assert!(env.file_exists("events.json"));
+    assert_no_temp_files(&env)?;
+
+    Ok(())
+}
+
+/// A replay whose input is rejected entirely ends in Bear's own error, so
+/// it must not replace an existing compilation database.
+// Requirements: output-atomic-write
+#[test]
+fn atomic_write_keeps_database_when_replay_fails() -> Result<()> {
+    let env = TestEnvironment::new("atomic_write_keeps_db_on_replay_failure")?;
+    env.create_source_files(&[
+        ("compile_commands.json", "previous content"),
+        ("events.json", "this is not an event\n"),
+    ])?;
+
+    env.run_bear(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?
+        .assert_failure()?;
+
+    assert_eq!(env.read_file("compile_commands.json")?, "previous content");
+    assert_no_temp_files(&env)?;
 
     Ok(())
 }
@@ -830,9 +890,9 @@ fn atomic_write_preserves_existing_object_on_failure() -> Result<()> {
     let env = TestEnvironment::new("atomic_write_preserves_on_failure")?;
     env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
 
-    // Make the output path a non-empty directory. A rename of the temp file
-    // over a non-empty directory fails with EISDIR/ENOTEMPTY even for root,
-    // so this is stable across test environments.
+    // Make the output path a non-empty directory. Bear cannot write a
+    // directory, and that holds even for root, so this is stable across
+    // test environments.
     let out_path = env.test_dir().join("compile_commands.json");
     fs::create_dir(&out_path)?;
     let sentinel = out_path.join("sentinel.txt");
@@ -841,9 +901,8 @@ fn atomic_write_preserves_existing_object_on_failure() -> Result<()> {
     let build = format!("{} -c src.c -o src.o", filename_of(COMPILER_C_PATH));
     let script = env.create_shell_script("build.sh", &build)?;
 
-    // The build compiles, but the database cannot be written (the output
-    // path is a directory), so Bear must exit non-zero even though the
-    // build itself succeeded -- and the pre-existing object must survive.
+    // The database cannot be written (the output path is a directory), so
+    // Bear must exit non-zero, and the pre-existing object must survive.
     let result =
         env.run_bear(&["--output", out_path.to_str().unwrap(), "--", SHELL_PATH, script.to_str().unwrap()])?;
     result.assert_failure()?;
@@ -1149,5 +1208,19 @@ fn append_to_large_database_stays_within_budget() -> Result<()> {
     );
     db.assert_contains(&CompilationEntryMatcher::new().file("new.c"))?;
 
+    Ok(())
+}
+
+/// Fails when a temporary output file (hidden, `.tmp` suffix) is left in the
+/// test directory.
+fn assert_no_temp_files(env: &TestEnvironment) -> Result<()> {
+    let mut leftovers = Vec::new();
+    for entry in std::fs::read_dir(env.test_dir())? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') && name.ends_with(".tmp") {
+            leftovers.push(name);
+        }
+    }
+    assert!(leftovers.is_empty(), "temp files must not be left behind: {leftovers:?}");
     Ok(())
 }

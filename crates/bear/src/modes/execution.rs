@@ -2,6 +2,7 @@
 
 use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
+use crate::output::AtomicFile;
 use crossbeam_channel::{Receiver, bounded, unbounded};
 use intercept_supervisor::SuperviseError;
 use std::process::{ExitCode, ExitStatus};
@@ -27,13 +28,17 @@ pub trait Consumer: Send {
     /// The method returns when the sender side of the channel is dropped
     /// or when an error occurs during processing.
     ///
+    /// The consumer writes its output but does not publish it: only the
+    /// caller knows whether the whole run succeeded, so it commits the
+    /// returned file or drops it to roll it back.
+    ///
     /// # Arguments
     /// * `receiver` - Channel receiver to consume items from
     ///
     /// # Returns
-    /// * `Ok(())` - All items were successfully processed
+    /// * `Ok(AtomicFile)` - All items were written, the output waits for the commit
     /// * `Err(DynError)` - An error occurred during processing
-    fn consume(self: Box<Self>, receiver: Receiver<intercept::Execution>) -> Result<(), DynError>;
+    fn consume(self: Box<Self>, receiver: Receiver<intercept::Execution>) -> Result<AtomicFile, DynError>;
 }
 
 /// A trait for producing events to a channel-based stream.
@@ -149,21 +154,29 @@ impl Interceptor {
             std::thread::spawn(move || consumer.consume(receiver))
         };
 
-        let exit_status = self.build.run(command)?;
+        let build_result = self.build.run(command);
 
-        self.producer.cancel().map_err(RuntimeError::Producer)?;
+        // Stop the interception whatever the build did, so both threads
+        // finish and the output can be committed or rolled back. A failed
+        // cancel may leave the producer running forever, so the threads are
+        // not joined then, and the output is left as it is.
+        if let Err(error) = self.producer.cancel() {
+            // Report the build error first: it is the likelier cause.
+            build_result?;
+            return Err(RuntimeError::Producer(error));
+        }
 
-        // Handle the producer thread result
-        producer_thread
-            .join()
-            .map_err(|_| RuntimeError::Thread("Producer thread panicked"))?
-            .map_err(RuntimeError::Producer)?;
+        let producer_result =
+            producer_thread.join().map_err(|_| RuntimeError::Thread("Producer thread panicked"));
+        let consumer_result =
+            consumer_thread.join().map_err(|_| RuntimeError::Thread("Consumer thread panicked"));
 
-        // Handle the consumer thread result
-        consumer_thread
-            .join()
-            .map_err(|_| RuntimeError::Thread("Consumer thread panicked"))?
-            .map_err(RuntimeError::Consumer)?;
+        // Publish only when nothing failed on Bear's side; every early return
+        // drops the output, which rolls it back. A build that ran and failed
+        // is not such a failure: its exit status is returned below.
+        let exit_status = build_result?;
+        producer_result?.map_err(RuntimeError::Producer)?;
+        commit(consumer_result?.map_err(RuntimeError::Consumer)?)?;
 
         // The exit code is not always available. When the process is killed by a signal,
         // the exit code is not available. In this case, we return the `FAILURE` exit code.
@@ -211,21 +224,24 @@ impl Replayer {
             std::thread::spawn(move || consumer.consume(receiver))
         };
 
-        // Join both threads before propagating either error: returning on
-        // the producer's error alone would leave the consumer thread
-        // finalizing its output while the process exits, making the written
-        // file racy. The producer's error wins when both fail, since the
-        // consumer only saw a truncated stream of it.
+        // Join both threads before propagating either error, then publish
+        // only when both succeeded; every early return drops the output,
+        // which rolls it back. The producer's error wins when both fail,
+        // since the consumer only saw a truncated stream of it.
         let producer_result =
             producer_thread.join().map_err(|_| RuntimeError::Thread("Producer thread panicked"));
         let consumer_result =
             consumer_thread.join().map_err(|_| RuntimeError::Thread("Consumer thread panicked"));
 
         producer_result?.map_err(RuntimeError::Producer)?;
-        consumer_result?.map_err(RuntimeError::Consumer)?;
+        commit(consumer_result?.map_err(RuntimeError::Consumer)?)?;
 
         Ok(ExitCode::SUCCESS)
     }
+}
+
+fn commit(output: AtomicFile) -> Result<(), RuntimeError> {
+    output.commit().map_err(|err| RuntimeError::Consumer(Box::new(err)))
 }
 
 /// Errors that can occur during event processing or running the build.
@@ -389,7 +405,7 @@ mod tests {
             for event in receiver {
                 captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
@@ -457,7 +473,7 @@ mod tests {
             for event in receiver {
                 captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
@@ -482,7 +498,7 @@ mod tests {
             for event in receiver {
                 captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let mut executor_mock = MockExecutor::new();
@@ -511,7 +527,11 @@ mod tests {
     #[test]
     fn test_interceptor_executor_failure() {
         let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
-        let consumer_mock = MockConsumer::new();
+        let mut consumer_mock = MockConsumer::new();
+        consumer_mock.expect_consume().times(1).returning(|receiver| {
+            for _ in receiver {}
+            Ok(AtomicFile::none())
+        });
 
         let mut executor_mock = MockExecutor::new();
         executor_mock.expect_run().times(1).returning(|_| {
@@ -540,7 +560,7 @@ mod tests {
             while receiver.recv().is_ok() {
                 // Consume events until channel is closed
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let mut executor_mock = MockExecutor::new();
@@ -592,7 +612,7 @@ mod tests {
             while receiver.recv().is_ok() {
                 // Consume events until channel is closed
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let mut executor_mock = MockExecutor::new();
@@ -619,7 +639,7 @@ mod tests {
             while receiver.recv().is_ok() {
                 // Consume events until channel is closed
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let mut executor_mock = MockExecutor::new();
@@ -651,7 +671,7 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(5));
                 captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let mut executor_mock = MockExecutor::new();
@@ -711,7 +731,7 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(10));
                 captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
             }
-            Ok(())
+            Ok(AtomicFile::none())
         });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
@@ -724,5 +744,78 @@ mod tests {
         let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
         assert_eq!(*consumed_events, events);
+    }
+
+    /// A consumer that drains the channel and hands back a pending file
+    /// for `final_path`, as the real file-backed consumers do.
+    fn consumer_with_pending_output(final_path: &std::path::Path) -> MockConsumer {
+        let (output, file) = AtomicFile::create(final_path).expect("Failed to create the atomic file");
+        drop(file);
+        let output = Mutex::new(Some(output));
+
+        let mut consumer_mock = MockConsumer::new();
+        consumer_mock.expect_consume().times(1).returning(move |receiver| {
+            for _ in receiver {}
+            Ok(output.lock().expect("Failed to lock output mutex").take().expect("consume runs once"))
+        });
+        consumer_mock
+    }
+
+    // Requirements: output-atomic-write
+    #[test]
+    fn test_interceptor_rolls_back_when_build_cannot_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
+        let consumer_mock = consumer_with_pending_output(&final_path);
+        let mut executor_mock = MockExecutor::new();
+        executor_mock.expect_run().times(1).returning(|_| {
+            Err(SuperviseError::ProcessSpawn {
+                executable: "test_executable".into(),
+                source: std::io::Error::new(std::io::ErrorKind::NotFound, "Test executor failure"),
+            })
+        });
+
+        let sut = Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock))
+            .run(create_test_command());
+
+        assert!(matches!(sut, Err(RuntimeError::Executor(_))));
+        assert_eq!(producer_mock.cancel_call_count(), 1);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0, "nothing may be left behind");
+    }
+
+    // Requirements: output-atomic-write
+    #[test]
+    fn test_interceptor_commits_when_build_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
+        let consumer_mock = consumer_with_pending_output(&final_path);
+        let mut executor_mock = MockExecutor::new();
+        executor_mock.expect_run().times(1).returning(|_| Ok(create_failure_exit_status()));
+
+        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock))
+            .run(create_test_command());
+
+        assert_is_failure(sut.expect("a failing build is not an error of Bear"));
+        assert!(final_path.exists());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "only the output may remain");
+    }
+
+    // Requirements: output-atomic-write
+    #[test]
+    fn test_replayer_rolls_back_when_producer_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let mut producer_mock = MockProducer::new();
+        producer_mock.expect_produce().times(1).returning(|_| {
+            Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "Test failure")))
+        });
+        let consumer_mock = consumer_with_pending_output(&final_path);
+
+        let sut = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock)).run();
+
+        assert!(matches!(sut, Err(RuntimeError::Producer(_))));
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0, "nothing may be left behind");
     }
 }

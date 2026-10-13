@@ -88,6 +88,11 @@ environment.
   no default destination either: the event file must be named
   explicitly, and omitting it is a usage error reported before the
   build runs.
+- The events file is written all or nothing, the same way as the
+  compilation database (see `output-atomic-write`): a build command that
+  cannot start leaves no events file and no temporary file behind. The
+  events file therefore appears only when the run ends; during the build
+  the events go to the temporary file
 
 ## Non-functional constraints
 

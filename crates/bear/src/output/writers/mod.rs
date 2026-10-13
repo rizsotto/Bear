@@ -11,7 +11,6 @@
 //! configuration and returns an opaque writer that accepts semantic commands.
 
 mod append;
-mod atomic;
 mod converter;
 mod file;
 mod filtering;
@@ -20,13 +19,12 @@ mod synthesis;
 mod validating;
 
 use super::statistics::OutputStatistics;
-use super::{WriterCreationError, WriterError};
+use super::{AtomicFile, WriterCreationError, WriterError};
 use crate::args::is_stdio;
 use crate::{args, config};
 use std::sync::Arc;
 
 use append::AppendClangOutputWriter;
-use atomic::AtomicClangOutputWriter;
 use converter::ConverterClangOutputWriter;
 use file::ClangOutputWriter;
 use filtering::{DuplicateEntryFilter, FilteredOutputWriter, SourceEntryFilter};
@@ -56,13 +54,12 @@ type FilteredStack<Base> = FilteredOutputWriter<
 >;
 
 /// The assembled writer pipeline type for Clang compilation databases
-/// written to a file: atomic temp-file write, then optional append.
-type ClangWriterStack = ConverterClangOutputWriter<
-    AppendClangOutputWriter<AtomicClangOutputWriter<FilteredStack<ClangOutputWriter>>>,
->;
+/// written to a file: optional append, then the write to the temp file of
+/// an [`AtomicFile`].
+type ClangWriterStack = ConverterClangOutputWriter<AppendClangOutputWriter<FilteredStack<ClangOutputWriter>>>;
 
 /// The assembled writer pipeline type for Clang compilation databases
-/// streamed to standard output: no atomic write and no append, since
+/// streamed to standard output: no atomic file and no append, since
 /// neither is possible on a stream.
 type ClangWriterStdoutStack = ConverterClangOutputWriter<FilteredStack<ClangStdoutOutputWriter>>;
 
@@ -82,15 +79,23 @@ enum Pipeline {
 /// to construct one.
 pub(crate) struct SemanticCommandWriter {
     inner: Pipeline,
+    output: AtomicFile,
 }
 
 impl SemanticCommandWriter {
     /// Writes semantic commands through the pipeline.
-    pub(crate) fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
+    ///
+    /// Returns the output to commit. On error the output is dropped, which
+    /// rolls it back.
+    pub(crate) fn write(
+        self,
+        semantics: impl Iterator<Item = semantic::Command>,
+    ) -> Result<AtomicFile, WriterError> {
         match self.inner {
-            Pipeline::File(writer) => writer.write(semantics),
-            Pipeline::Stdout(writer) => writer.write(semantics),
+            Pipeline::File(writer) => writer.write(semantics)?,
+            Pipeline::Stdout(writer) => writer.write(semantics)?,
         }
+        Ok(self.output)
     }
 }
 
@@ -125,7 +130,7 @@ fn build_filtered_stack<Base: IteratorWriter<crate::output::clang::Entry>>(
 ///
 /// When `args.path` is the `-` sentinel, the pipeline streams the
 /// compilation database to standard output instead of a file: the atomic
-/// temp-file write and the append step are skipped, since neither applies
+/// file and the append step are skipped, since neither applies
 /// to a stream (see [`ClangWriterStdoutStack`]). `--append` combined with
 /// `-` is rejected up front, since appending to a stream is impossible.
 ///
@@ -133,14 +138,14 @@ fn build_filtered_stack<Base: IteratorWriter<crate::output::clang::Entry>>(
 /// stages:
 /// 1. Convert semantic commands to compilation database entries
 /// 2. Append entries from an existing database (if configured)
-/// 3. Atomic file write (via temp file + rename)
-/// 4. Source file path filtering
-/// 5. Header entry synthesis (if configured; clones a donor translation
+/// 3. Source file path filtering
+/// 4. Header entry synthesis (if configured; clones a donor translation
 ///    unit's arguments onto sibling header files)
-/// 6. Duplicate entry filtering
-/// 7. Entry validation (drop invalid entries with a warning; earlier filters
+/// 5. Duplicate entry filtering
+/// 6. Entry validation (drop invalid entries with a warning; earlier filters
 ///    never see an entry that will be dropped here)
-/// 8. Final file serialization
+/// 7. Serialization to the temp file of an [`AtomicFile`], which the caller
+///    commits once the run succeeded
 pub(crate) fn create_pipeline(
     args: &args::BuildSemantic,
     config: &config::Main,
@@ -156,20 +161,22 @@ pub(crate) fn create_pipeline(
         let formatted_writer =
             ConverterClangOutputWriter::new(source_filter_writer, &config.format, Arc::clone(&stats));
 
-        return Ok(SemanticCommandWriter { inner: Pipeline::Stdout(formatted_writer) });
+        return Ok(SemanticCommandWriter {
+            inner: Pipeline::Stdout(formatted_writer),
+            output: AtomicFile::none(),
+        });
     }
 
     let final_path = &args.path;
-    let temp_path = &args.path.with_extension("tmp");
 
-    let base_writer = ClangOutputWriter::create(temp_path, Arc::clone(&stats))?;
+    let (output, file) = AtomicFile::create(final_path)?;
+    let base_writer = ClangOutputWriter::new(file, final_path, Arc::clone(&stats));
     let source_filter_writer = build_filtered_stack(base_writer, config, Arc::clone(&stats))?;
-    let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
     let append_writer =
-        AppendClangOutputWriter::new(atomic_writer, final_path, args.append, Arc::clone(&stats));
+        AppendClangOutputWriter::new(source_filter_writer, final_path, args.append, Arc::clone(&stats));
     let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format, Arc::clone(&stats));
 
-    Ok(SemanticCommandWriter { inner: Pipeline::File(formatted_writer) })
+    Ok(SemanticCommandWriter { inner: Pipeline::File(formatted_writer), output })
 }
 
 #[cfg(test)]
@@ -235,7 +242,7 @@ mod tests {
 
         let commands = vec![make_compile_command("file1.c"), make_compile_command("file2.c")];
 
-        pipeline.write(commands.into_iter()).unwrap();
+        pipeline.write(commands.into_iter()).unwrap().commit().unwrap();
 
         assert!(output_path.exists());
         let content = std::fs::read_to_string(&output_path).unwrap();
@@ -264,7 +271,7 @@ mod tests {
             make_compile_command("file2.c"),
         ];
 
-        pipeline.write(commands.into_iter()).unwrap();
+        pipeline.write(commands.into_iter()).unwrap().commit().unwrap();
 
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 3);
         assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 1);
@@ -292,7 +299,7 @@ mod tests {
 
         let commands = vec![make_compile_command("src/main.c"), make_compile_command("/usr/include/stdio.h")];
 
-        pipeline.write(commands.into_iter()).unwrap();
+        pipeline.write(commands.into_iter()).unwrap().commit().unwrap();
 
         assert_eq!(stats.entries_filtered_by_source.load(Ordering::Relaxed), 1);
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 1);
@@ -311,7 +318,7 @@ mod tests {
         let stats = OutputStatistics::new();
 
         let pipeline = create_pipeline(&args, &config, Arc::clone(&stats)).unwrap();
-        pipeline.write(std::iter::empty()).unwrap();
+        pipeline.write(std::iter::empty()).unwrap().commit().unwrap();
 
         assert!(output_path.exists());
         assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 0);

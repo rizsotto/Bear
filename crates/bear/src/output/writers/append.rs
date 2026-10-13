@@ -97,7 +97,8 @@ mod tests {
             clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
         let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats));
         sut.write(entries_to_write.into_iter()).unwrap();
 
@@ -121,7 +122,8 @@ mod tests {
             clang::Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer = ClangOutputWriter::create(&input_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&input_path).unwrap(), &input_path, Arc::clone(&stats));
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -129,7 +131,8 @@ mod tests {
             clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
         let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
         sut.write(new_entries.into_iter()).unwrap();
 
@@ -169,7 +172,8 @@ mod tests {
         let new_entries =
             vec![clang::Entry::from_arguments_str("new_file.cpp", vec!["clang", "-c"], "/path/to/dir", None)];
 
-        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
         let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
 
         // Should fail because read_from_compilation_db returns an error for non-JSON
@@ -202,7 +206,8 @@ mod tests {
         let new_entries =
             vec![clang::Entry::from_arguments_str("new_file.cpp", vec!["clang", "-c"], "/path/to/dir", None)];
 
-        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
         let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
         sut.write(new_entries.into_iter()).unwrap();
 
@@ -229,7 +234,8 @@ mod tests {
             clang::Entry::from_arguments_str("old_file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("old_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer = ClangOutputWriter::create(&input_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&input_path).unwrap(), &input_path, Arc::clone(&stats));
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -237,7 +243,8 @@ mod tests {
             clang::Entry::from_arguments_str("new_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let writer =
+            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
         let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats));
         sut.write(new_entries.into_iter()).unwrap();
 

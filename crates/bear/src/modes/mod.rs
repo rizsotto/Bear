@@ -241,7 +241,9 @@ mod impls {
     use super::execution::DynError;
     use crate::args::BuildCommand;
     use crate::environment;
-    use crate::output::{ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError};
+    use crate::output::{
+        AtomicFile, ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError,
+    };
     use crate::{args, config, output, parse_sh};
     use crossbeam_channel::{Receiver, Sender};
     use intercept_supervisor::CollectorOnTcp;
@@ -513,7 +515,8 @@ mod impls {
     /// without any transformation. This can be later replayed to analyze the build.
     pub(super) struct RawEventWriter {
         path: std::path::PathBuf,
-        destination: Box<dyn io::Write + Send>,
+        output: AtomicFile,
+        destination: io::BufWriter<fs::File>,
     }
 
     impl RawEventWriter {
@@ -536,20 +539,22 @@ mod impls {
         }
 
         fn create_file(path: &std::path::Path) -> Result<Self, WriterCreationError> {
-            let destination = fs::File::create(path)
-                .map(io::BufWriter::new)
-                .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
+            let (output, file) = AtomicFile::create(path)?;
 
-            Ok(Self { path: path.to_path_buf(), destination: Box::new(destination) })
+            Ok(Self { path: path.to_path_buf(), output, destination: io::BufWriter::new(file) })
         }
     }
 
     impl execution::Consumer for RawEventWriter {
         /// Using existing file format, write the intercepted executions to the output file.
-        fn consume(self: Box<Self>, executions: Receiver<intercept::Execution>) -> Result<(), DynError> {
-            ExecutionEventDatabase::write(self.destination, executions.into_iter())
-                .map_err(|err| WriterError::Io(self.path.clone(), err))?;
-            Ok(())
+        fn consume(
+            self: Box<Self>,
+            executions: Receiver<intercept::Execution>,
+        ) -> Result<AtomicFile, DynError> {
+            let Self { path, output, destination } = *self;
+            ExecutionEventDatabase::write(destination, executions.into_iter())
+                .map_err(|err| WriterError::Io(path, err))?;
+            Ok(output)
         }
     }
 
@@ -598,7 +603,10 @@ mod impls {
     impl execution::Consumer for SemanticEventWriter {
         /// Consume the intercepted executions, transform them into semantic events,
         /// and write them into the target file (with the right format).
-        fn consume(self: Box<Self>, executions: Receiver<intercept::Execution>) -> Result<(), DynError> {
+        fn consume(
+            self: Box<Self>,
+            executions: Receiver<intercept::Execution>,
+        ) -> Result<AtomicFile, DynError> {
             let stats = Arc::clone(self.writer.statistics());
 
             let semantics =
@@ -614,9 +622,7 @@ mod impls {
                     semantic::RecognizeResult::NotRecognized(_) => None,
                 });
 
-            self.writer.write(semantics)?;
-
-            Ok(())
+            Ok(self.writer.write(semantics)?)
         }
     }
 

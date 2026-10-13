@@ -9,6 +9,7 @@
 //! The `OutputWriter` struct represents the main entry point for writing output.
 //! The input to the `OutputWriter` is a stream of `semantic::Command` instances.
 
+mod atomic;
 pub mod clang;
 mod formats;
 mod intercept;
@@ -20,6 +21,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 // Re-export types for convenience.
+pub use atomic::AtomicFile;
 pub use formats::{SerializationError, SerializationFormat};
 pub use intercept::ExecutionEventDatabase;
 pub use statistics::OutputStatistics;
@@ -52,8 +54,12 @@ impl OutputWriter {
     /// * `semantics` - An iterator of semantic commands to write
     ///
     /// # Returns
-    /// `Ok(())` on success, or a `WriterError` if writing fails.
-    pub fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
+    /// The written output, still to be committed, or a `WriterError` if
+    /// writing fails.
+    pub fn write(
+        self,
+        semantics: impl Iterator<Item = semantic::Command>,
+    ) -> Result<AtomicFile, WriterError> {
         let result = self.writer.write(semantics);
 
         // Log pipeline statistics
@@ -127,7 +133,7 @@ mod tests {
 
         let commands = vec![make_compile_command("main.c"), make_compile_command("util.c")];
 
-        writer.write(commands.into_iter()).unwrap();
+        writer.write(commands.into_iter()).unwrap().commit().unwrap();
 
         assert!(output_path.exists());
         let content = std::fs::read_to_string(&output_path).unwrap();
