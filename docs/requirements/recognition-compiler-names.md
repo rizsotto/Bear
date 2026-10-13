@@ -70,7 +70,6 @@ contains.
 | `mpirun`, `mpiexec` | Launchers: they execute programs, they do not compile. No acceptance path. |
 | `swift` | Subcommand dispatcher (`swift build`, `swift run`, ...), not a compiler invocation; the `zig cc` class of model mismatch. Revisit only with subcommand-aware recognition. |
 | `amdgpu-arch` | Shares the `amd` prefix but is not a compiler driver; it reports target GPU architectures. |
-| `armcl` (legacy TI) | Proprietary dialect; Code Composer Studio generates its own compilation database for it. |
 | `ml`, `ml64` (MASM) | Windows-only, no recorded demand. |
 | `swift-frontend`, `swiftc -frontend` | The Swift driver's internal per-file frontend jobs, not user-facing invocations. |
 
