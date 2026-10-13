@@ -621,6 +621,23 @@ mod tests {
         assert_eq!(sut.recognize(path("./cc")), None);
     }
 
+    // Requirements: recognition-compiler-names
+    #[test]
+    fn test_config_hint_beats_name_recognition_of_another_family() {
+        // `f95` is a gcc name; the hint must override it for both the
+        // configured full path and the bare spelling.
+        let hints = hints_for(&[("/opt/toolchain/f95", Some("flang"))]);
+        let unhinted = CompilerRecognizer::with_probe(CompilerHints::new(), Box::new(NoProbe));
+
+        let sut = CompilerRecognizer::with_probe(hints, Box::new(NoProbe));
+
+        assert_eq!(unhinted.recognize(path("f95")), Some(CompilerType::compiler("gcc")));
+        let cases = ["/opt/toolchain/f95", "f95"];
+        for name in cases {
+            assert_eq!(sut.recognize(path(name)), Some(CompilerType::compiler("flang")), "name: {}", name);
+        }
+    }
+
     // Requirements: recognition-ambiguous-name-probe
     #[test]
     fn test_conflicting_filename_hints_first_entry_wins() {

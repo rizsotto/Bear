@@ -44,6 +44,10 @@ rather than being a fixed list.
   recorded arguments. MPICH's compiler-override options (for example
   `-cc=gcc`) and QNX's variant selector (for example
   `-Vgcc_ntoaarch64le`) are options, never inputs.
+- A compiler the user configures with an explicit family is parsed with
+  that family's flag semantics, even when its name is one Bear already
+  recognizes as another family. This holds whether the build invokes it
+  by the configured full path or by its bare filename.
 - The names in the Deliberately not recognized table yield no entry.
 - Ambiguous names (`cc`, `c++`, `CC`) are neither recognized nor excluded
   here; their classification is owned by
@@ -98,6 +102,14 @@ The assembler, Fortran, and Swift names follow the same pattern with a
 source file and flags from their own toolchain rather than a C source
 and `-c`; the concrete `fasm`, `gfortran`, and `swiftc` scenarios below
 exercise those shapes.
+
+Given a configured compiler at `/opt/toolchain/f95` with the `flang`
+family, and an event file with an `f95 -c hello.f90` execution (or the
+same with the full path):
+
+> When `bear semantic` runs,
+> then the database contains one entry for `hello.f90`,
+> parsed with Flang flag semantics, not GCC's.
 
 Given an event file with a `gfortran -c hello.f90` execution:
 
