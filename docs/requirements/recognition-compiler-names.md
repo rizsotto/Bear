@@ -69,6 +69,7 @@ contains.
 | `as` (GNU assembler) | GCC and Clang spawn it on a temporary `.s` file for every ordinary compile; recognizing it would add one throwaway entry per compilation, keyed on a name that differs every run (`/tmp/cc<random>.s`), which duplicate detection cannot collapse. Likely to be proposed again -- this reasoning is why it stays out. |
 | `mpirun`, `mpiexec` | Launchers: they execute programs, they do not compile. No acceptance path. |
 | `swift` | Subcommand dispatcher (`swift build`, `swift run`, ...), not a compiler invocation; the `zig cc` class of model mismatch. Revisit only with subcommand-aware recognition. |
+| `zig` | Subcommand dispatcher (`zig cc`, `zig c++`, `zig build`, ...): a subcommand, not the executable name, selects the compiler, the same model mismatch as `swift`. Likely to be proposed again; revisit only with subcommand-aware recognition. |
 | `amdgpu-arch` | Shares the `amd` prefix but is not a compiler driver; it reports target GPU architectures. |
 | `ml`, `ml64` (MASM) | Windows-only, no recorded demand. |
 | `swift-frontend`, `swiftc -frontend` | The Swift driver's internal per-file frontend jobs, not user-facing invocations. |
