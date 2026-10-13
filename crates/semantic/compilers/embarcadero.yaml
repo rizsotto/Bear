@@ -1,0 +1,14 @@
+type: compiler
+compiler:
+  id: embarcadero
+  extends: clang
+recognize:
+  - description: "Embarcadero C++Builder (Clang-based)"
+    references:
+      - "https://docwiki.embarcadero.com/RADStudio/Athens/en/Command-Line_Interfaces_of_C++_Compilers"
+      - "https://docwiki.embarcadero.com/RADStudio/Athens/en/BCC64X"
+    executables: ["bcc64x", "bcc64", "bcc32x"]
+    versioned: false
+    cross_compilation: false
+slash_prefix: false
+flags: []

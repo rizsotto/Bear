@@ -1914,6 +1914,22 @@ fn ti_tiarmclang_execution_yields_single_entry() -> Result<()> {
 
 // Requirements: recognition-compiler-names
 //
+// Embarcadero C++Builder's Clang-based drivers share one family and are
+// parsed with Clang flag semantics. Each driver name has to be recognized
+// on its own.
+#[test]
+fn embarcadero_driver_names_yield_single_entry() -> Result<()> {
+    for driver in ["bcc64x", "bcc64", "bcc32x"] {
+        assert_driver_yields_single_entry(
+            &format!("embarcadero_{driver}_execution"),
+            &[driver, "-c", "hello.c"],
+        )?;
+    }
+    Ok(())
+}
+
+// Requirements: recognition-compiler-names
+//
 // TI's classic Code Generation Tools ship one driver per target family,
 // all speaking the same option dialect (`--compile_only` is TI's `-c`).
 // Each driver name has to be recognized on its own.

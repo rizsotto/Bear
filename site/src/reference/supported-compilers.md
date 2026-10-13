@@ -162,6 +162,14 @@ Configuration `as:` value: `cuda`.
 |---|---|---|---|---|
 | `nvcc` | NVIDIA CUDA | `nvcc-12` | `arm-linux-gnueabihf-nvcc` | [docs.nvidia.com](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html) |
 
+#### `embarcadero`
+
+Configuration `as:` value: `embarcadero`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `bcc64x`, `bcc64`, `bcc32x` | Embarcadero C++Builder (Clang-based) | not recognized | not recognized | [docwiki.embarcadero.com](https://docwiki.embarcadero.com/RADStudio/Athens/en/Command-Line_Interfaces_of_C++_Compilers), [docwiki.embarcadero.com](https://docwiki.embarcadero.com/RADStudio/Athens/en/BCC64X) |
+
 #### `fasm`
 
 Configuration `as:` value: `fasm`.

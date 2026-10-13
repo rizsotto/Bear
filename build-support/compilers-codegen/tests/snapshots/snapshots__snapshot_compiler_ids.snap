@@ -4,5 +4,5 @@ assertion_line: 60
 expression: "generate_compiler_ids(&compiler_files, &wrapper_tables).unwrap()"
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
-pub(crate) static KNOWN_IDS: &[&str] = &["arm_flang", "armclang", "cray_cc", "ibm_xl", "intel_cc", "clang", "clang_cl", "cuda", "flang", "mpi", "qnx", "cray_fortran", "fasm", "gcc", "intel_fortran", "msvc", "nasm", "nvidia_hpc", "swift", "ti_cgt", "vala"];
+pub(crate) static KNOWN_IDS: &[&str] = &["arm_flang", "armclang", "cray_cc", "embarcadero", "ibm_xl", "intel_cc", "clang", "clang_cl", "cuda", "flang", "mpi", "qnx", "cray_fortran", "fasm", "gcc", "intel_fortran", "msvc", "nasm", "nvidia_hpc", "swift", "ti_cgt", "vala"];
 pub(crate) static WRAPPER_AS_NAMES: &[&str] = &["ccache", "distcc", "icecc", "sccache"];

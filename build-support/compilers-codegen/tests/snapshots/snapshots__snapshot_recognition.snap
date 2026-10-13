@@ -9,6 +9,7 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = 
     ("arm_flang", &["armflang"], false, false, Some("Arm Compiler for Linux Fortran")),
     ("armclang", &["armclang", "armclang++"], false, true, Some("Arm Compiler 6")),
     ("cray_cc", &["craycc", "crayCC", "craycxx"], false, true, Some("Cray C/C++")),
+    ("embarcadero", &["bcc64x", "bcc64", "bcc32x"], false, false, Some("Embarcadero C++Builder (Clang-based)")),
     ("ibm_xl", &["ibm-clang", "ibm-clang++"], false, true, Some("IBM Open XL C/C++")),
     ("ibm_xl", &["xlclang", "xlclang++"], false, true, Some("IBM XL C/C++")),
     ("intel_cc", &["icx", "icpx"], false, true, Some("Intel oneAPI C/C++")),
