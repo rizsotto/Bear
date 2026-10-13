@@ -217,6 +217,14 @@ Configuration `as:` value: `intel_cc`.
 | `icc`, `icpc` | Intel C++ Compiler Classic | `icc-12` | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) |
 | `mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx` | Intel MPI C/C++ wrapper | not recognized | not recognized | [intel.com](https://www.intel.com/content/www/us/en/developer/tools/oneapi/mpi-library.html) |
 
+#### `intel_cl`
+
+Configuration `as:` value: `intel_cl`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `icx-cl` | Intel oneAPI DPC++/C++ (MSVC mode) | not recognized | not recognized | [intel.com](https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/current/invoke-the-compiler.html), [intel.com](https://www.intel.com/content/www/us/en/docs/dpcpp-cpp-compiler/developer-guide-reference/2026-0/invoke-the-compiler.html) |
+
 #### `intel_fortran`
 
 Configuration `as:` value: `intel_fortran`.

@@ -15,6 +15,7 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = 
     ("intel_cc", &["icx", "icpx"], false, true, Some("Intel oneAPI C/C++")),
     ("intel_cc", &["icc", "icpc"], false, true, Some("Intel C++ Compiler Classic")),
     ("intel_cc", &["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"], false, false, Some("Intel MPI C/C++ wrapper")),
+    ("intel_cl", &["icx-cl"], false, false, Some("Intel oneAPI DPC++/C++ (MSVC mode)")),
     ("clang", &["clang", "clang++"], true, true, Some("Clang")),
     ("clang", &["amdclang", "amdclang++", "hipcc"], false, false, Some("AMD ROCm Clang/HIP")),
     ("clang", &["emcc", "em++", "emcc.py", "em++.py"], false, false, Some("Emscripten")),

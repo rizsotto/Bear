@@ -1975,6 +1975,20 @@ fn ti_cgt_code_composer_studio_command_yields_single_entry() -> Result<()> {
     )
 }
 
+// Requirements: recognition-compiler-names
+//
+// Intel's MSVC-compatible driver `icx-cl` takes `/` options and `-` options
+// alike; both spellings of "compile only" yield one entry.
+#[test]
+fn intel_icx_cl_execution_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry("intel_icx_cl_dash_c", &["icx-cl", "-c", "hello.c"])?;
+    assert_driver_yields_single_entry("intel_icx_cl_slash_c", &["icx-cl", "/c", "hello.c"])?;
+    assert_driver_yields_single_entry(
+        "intel_icx_cl_mixed_options",
+        &["icx-cl", "-fsycl", "/Qiopenmp", "/c", "hello.c"],
+    )
+}
+
 // Requirements: output-compilation-entries
 //
 // Two TI invocations that compile nothing. `--preproc_only` writes

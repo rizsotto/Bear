@@ -1,0 +1,15 @@
+type: compiler
+compiler:
+  id: intel_cl
+  extends: clang_cl
+recognize:
+  - description: "Intel oneAPI DPC++/C++ (MSVC mode)"
+    references:
+      - "https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/current/invoke-the-compiler.html"
+      - "https://www.intel.com/content/www/us/en/docs/dpcpp-cpp-compiler/developer-guide-reference/2026-0/invoke-the-compiler.html"
+    executables: ["icx-cl"]
+    versioned: false
+    cross_compilation: false
+slash_prefix: true
+response_file_syntax: msvc
+flags: []
