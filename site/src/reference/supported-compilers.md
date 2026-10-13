@@ -101,6 +101,14 @@ selects it.
 
 ### Compiler families
 
+#### `arm_flang`
+
+Configuration `as:` value: `arm_flang`.
+
+| Executable names | Recognized as | Version suffix | Cross-compilation prefix | Documentation |
+|---|---|---|---|---|
+| `armflang` | Arm Compiler for Linux Fortran | not recognized | not recognized | [learn.arm.com](https://learn.arm.com/install-guides/acfl/), [support.arm.com](https://support.arm.com/documentation/101380/latest/) |
+
 #### `armclang`
 
 Configuration `as:` value: `armclang`.

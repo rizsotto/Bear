@@ -1,0 +1,14 @@
+type: compiler
+compiler:
+  id: arm_flang
+  extends: flang
+recognize:
+  - description: "Arm Compiler for Linux Fortran"
+    references:
+      - "https://learn.arm.com/install-guides/acfl/"
+      - "https://support.arm.com/documentation/101380/latest/"
+    executables: ["armflang"]
+    versioned: false
+    cross_compilation: false
+slash_prefix: false
+flags: []

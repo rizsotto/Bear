@@ -6,6 +6,7 @@ expression: "generate_recognition_patterns(&raw_tables, &compiler_files,\n&wrapp
 // Generated from compilers/*.yaml -- DO NOT EDIT
 #[allow(clippy::type_complexity)]
 pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = &[
+    ("arm_flang", &["armflang"], false, false, Some("Arm Compiler for Linux Fortran")),
     ("armclang", &["armclang", "armclang++"], false, true, Some("Arm Compiler 6")),
     ("cray_cc", &["craycc", "crayCC", "craycxx"], false, true, Some("Cray C/C++")),
     ("ibm_xl", &["ibm-clang", "ibm-clang++"], false, true, Some("IBM Open XL C/C++")),

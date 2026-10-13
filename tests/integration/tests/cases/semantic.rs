@@ -2064,6 +2064,21 @@ fn gfortran_execution_yields_single_entry() -> Result<()> {
 
 // Requirements: recognition-compiler-names
 //
+// An `armflang -c hello.f90` execution yields one entry for the Fortran
+// source (Arm Compiler for Linux's Fortran driver, parsed with Flang
+// flag semantics), with the invocation's arguments recorded verbatim.
+#[test]
+fn arm_flang_execution_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry_for_source(
+        "arm_flang_execution",
+        &["armflang", "-c", "hello.f90"],
+        "hello.f90",
+        "program hello\nend program hello\n",
+    )
+}
+
+// Requirements: recognition-compiler-names
+//
 // A `nasm -f elf64 -o hello.o hello.asm` execution yields one entry for
 // `hello.asm`, using the NASM driver name directly, with the invocation's
 // arguments recorded verbatim.

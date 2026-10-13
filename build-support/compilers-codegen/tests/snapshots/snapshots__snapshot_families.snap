@@ -4,6 +4,7 @@ assertion_line: 67
 expression: "generate_families(&compiler_files, &raw_tables)"
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
+include!(concat!(env!("OUT_DIR"), "/flags_arm_flang.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_armclang.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
@@ -25,6 +26,7 @@ include!(concat!(env!("OUT_DIR"), "/flags_swift.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_ti_cgt.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
 pub(super) static FAMILIES: &[FamilyDef] = &[
+    FamilyDef { id: "arm_flang", flags: &ARM_FLANG_FLAGS, ignore_executables: &ARM_FLANG_IGNORE_EXECUTABLES, ignore_flags: &ARM_FLANG_IGNORE_FLAGS, slash_prefix: ARM_FLANG_SLASH_PREFIX, env_rules: &ARM_FLANG_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
     FamilyDef { id: "armclang", flags: &ARMCLANG_FLAGS, ignore_executables: &ARMCLANG_IGNORE_EXECUTABLES, ignore_flags: &ARMCLANG_IGNORE_FLAGS, slash_prefix: ARMCLANG_SLASH_PREFIX, env_rules: &ARMCLANG_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
     FamilyDef { id: "cray_cc", flags: &CRAY_CC_FLAGS, ignore_executables: &CRAY_CC_IGNORE_EXECUTABLES, ignore_flags: &CRAY_CC_IGNORE_FLAGS, slash_prefix: CRAY_CC_SLASH_PREFIX, env_rules: &CRAY_CC_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
     FamilyDef { id: "ibm_xl", flags: &IBM_XL_FLAGS, ignore_executables: &IBM_XL_IGNORE_EXECUTABLES, ignore_flags: &IBM_XL_IGNORE_FLAGS, slash_prefix: IBM_XL_SLASH_PREFIX, env_rules: &IBM_XL_ENV_RULES, source_mode: SourceMode::PerSourceStripped, response_file_syntax: Syntax::GnuClang },
