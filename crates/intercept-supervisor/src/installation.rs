@@ -38,9 +38,9 @@ const INTERCEPT_LIBDIR: &str = env!("INTERCEPT_LIBDIR");
 /// Errors that can occur when constructing an [`InstallationLayout`].
 #[derive(Debug, Error)]
 pub enum LayoutError {
-    #[error("Executable path is not absolute: {0:?}")]
+    #[error("executable path is not absolute: {}", .0.display())]
     NotAbsolute(PathBuf),
-    #[error("Executable path has no parent directory: {0:?}")]
+    #[error("executable path has no parent directory: {}", .0.display())]
     NoParent(PathBuf),
 }
 

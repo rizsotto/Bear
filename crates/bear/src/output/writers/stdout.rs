@@ -2,11 +2,11 @@
 
 use super::IteratorWriter;
 use super::file::write_entries;
-use crate::output::WriterError;
+use crate::output::SerializationError;
 use crate::output::clang;
 use crate::output::statistics::OutputStatistics;
+use std::io;
 use std::sync::Arc;
-use std::{io, path};
 
 /// The type represents a writer that writes JSON compilation database
 /// entries directly to standard output, for `bear semantic --output -`.
@@ -26,8 +26,8 @@ impl ClangStdoutOutputWriter {
 }
 
 impl IteratorWriter<clang::Entry> for ClangStdoutOutputWriter {
-    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), SerializationError> {
         let output = io::BufWriter::new(io::stdout());
-        write_entries(output, path::PathBuf::from("-"), entries, self.stats)
+        write_entries(output, entries, self.stats)
     }
 }

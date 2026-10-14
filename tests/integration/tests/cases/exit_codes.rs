@@ -72,7 +72,7 @@ fn exit_code_for_non_existing_command() -> Result<()> {
 
     let result = env.run_bear(&["--", "invalid_command"])?;
     result.assert_failure()?;
-    assert!(result.stderr().contains("Build execution failed: Failed to execute"));
+    assert!(result.stderr().contains("cannot run 'invalid_command': "));
     Ok(())
 }
 

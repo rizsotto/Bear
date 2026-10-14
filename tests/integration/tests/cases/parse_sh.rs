@@ -418,7 +418,7 @@ fn parse_sh_missing_input_file_fails() -> Result<()> {
 
     result.assert_failure()?;
     assert!(
-        result.stderr().contains("Shell text file not found"),
+        result.stderr().contains("cannot read missing.sh: "),
         "stderr must name the missing input file: {}",
         result.stderr()
     );

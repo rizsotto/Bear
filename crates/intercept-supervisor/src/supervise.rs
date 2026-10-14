@@ -533,25 +533,25 @@ mod platform {
 /// Errors that can occur during process supervision.
 #[derive(Error, Debug)]
 pub enum SuperviseError {
-    #[error("Failed to register signal handler for '{executable}': {source}", executable = executable.display())]
+    #[error("cannot register signal handler for '{executable}': {source}", executable = executable.display())]
     SignalRegistration {
         executable: PathBuf,
         #[source]
         source: std::io::Error,
     },
-    #[error("Failed to execute '{executable}': {source}", executable = executable.display())]
+    #[error("cannot run '{executable}': {source}", executable = executable.display())]
     ProcessSpawn {
         executable: PathBuf,
         #[source]
         source: std::io::Error,
     },
-    #[error("Failed to kill process '{executable}': {source}", executable = executable.display())]
+    #[error("cannot kill '{executable}': {source}", executable = executable.display())]
     ProcessKill {
         executable: PathBuf,
         #[source]
         source: std::io::Error,
     },
-    #[error("Failed to wait for process '{executable}': {source}", executable = executable.display())]
+    #[error("cannot wait for '{executable}': {source}", executable = executable.display())]
     ProcessWait {
         executable: PathBuf,
         #[source]

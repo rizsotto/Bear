@@ -40,6 +40,18 @@ output to the developer view.
   error adds an `error:` qualifier after the prefix (`bear: warning: <message>`,
   `bear: error: <message>`).
 
+- Every diagnostic uses this format, including an error that stops Bear
+  before the build starts (a configuration that cannot be loaded, an
+  output that cannot be created, an input that cannot be found). Errors in
+  the command line itself are the exception: they are reported with the
+  usage text, as owned by `cli-exit-codes`.
+
+- An error or warning about a file names that file once, together with
+  what Bear was doing with it and the cause
+  (`bear: error: cannot write <file>: <cause>`). It does not name Bear's
+  internal components or processing stages, and it does not repeat the
+  same failure at several levels.
+
 - When the user opts into diagnostic logging, the format switches to the
   developer view for every line: a timestamp, the severity, the emitting
   process identity together with its process id, and the source location
@@ -54,6 +66,8 @@ output to the developer view.
 ## Non-functional constraints
 
 - All diagnostic text is ASCII.
+- The cause part of a message is the operating system's own text where
+  the failure comes from it, so its wording varies by platform.
 - The format is a user-facing contract on standard error, not the data output;
   changes to it do not affect exit codes or the compilation database.
 
@@ -78,6 +92,32 @@ Given the same run without opting into logging and with no warnings or errors
 to report:
 
 > When the user runs the build, then Bear writes nothing to standard error.
+
+Given an output path in a directory that does not exist:
+
+> When the user runs a build, then before the build runs Bear prints one
+> line, `bear: error: cannot create <output>: <cause>`, and exits non-zero.
+
+Given an output that fails while it is written (e.g. a full device):
+
+> When the user runs Bear, then it prints one line,
+> `bear: error: cannot write <output>: <cause>`, and exits non-zero.
+
+Given a named events input that does not exist:
+
+> When the user runs the analysis, then Bear prints one line,
+> `bear: error: cannot read <input>: <cause>`, and exits non-zero.
+
+Given a build command that cannot be started:
+
+> When the user runs the build, then Bear prints one line,
+> `bear: error: cannot run '<command>': <cause>`, and exits non-zero.
+
+Given append mode and an existing database that is not valid JSON:
+
+> When the user runs a build, then Bear prints a warning,
+> `bear: warning: cannot read previous entries from <database>: <cause>`,
+> and still writes the new entries.
 
 Given a wrapper-mode build in which the wrapper fails to report an execution:
 

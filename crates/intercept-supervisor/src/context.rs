@@ -10,9 +10,9 @@ use std::path::PathBuf;
 /// Errors that can occur when capturing the application context.
 #[derive(Debug, thiserror::Error)]
 pub enum ContextError {
-    #[error("Failed to get current executable path: {0}")]
+    #[error("cannot get the path of the running executable: {0}")]
     CurrentExecutable(std::io::Error),
-    #[error("Failed to get current working directory: {0}")]
+    #[error("cannot get the current working directory: {0}")]
     CurrentDirectory(std::io::Error),
 }
 
@@ -277,7 +277,7 @@ mod tests {
         let error = ContextError::CurrentExecutable(io_error);
 
         assert!(matches!(error, ContextError::CurrentExecutable(_)));
-        assert!(error.to_string().contains("Failed to get current executable path"));
+        assert!(error.to_string().contains("cannot get the path of the running executable"));
         assert!(error.to_string().contains("not found"));
     }
 
@@ -287,7 +287,7 @@ mod tests {
         let error = ContextError::CurrentDirectory(io_error);
 
         assert!(matches!(error, ContextError::CurrentDirectory(_)));
-        assert!(error.to_string().contains("Failed to get current working directory"));
+        assert!(error.to_string().contains("cannot get the current working directory"));
         assert!(error.to_string().contains("permission denied"));
     }
 

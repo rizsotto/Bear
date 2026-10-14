@@ -247,11 +247,11 @@ fn commit(output: AtomicFile) -> Result<(), RuntimeError> {
 /// Errors that can occur during event processing or running the build.
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("Event production failed: {0}")]
+    #[error("{0}")]
     Producer(DynError),
-    #[error("Event processing failed: {0}")]
+    #[error("{0}")]
     Consumer(DynError),
-    #[error("Build execution failed: {0}")]
+    #[error(transparent)]
     Executor(#[from] SuperviseError),
     #[error("Internal error: {0}")]
     Thread(&'static str),

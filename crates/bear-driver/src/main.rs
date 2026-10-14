@@ -18,11 +18,21 @@ use std::env;
 use std::process::ExitCode;
 
 /// Driver function of the application.
-fn main() -> anyhow::Result<ExitCode> {
+fn main() -> ExitCode {
     // Initialize the logging system. `RUST_LOG` is honored when set; when
     // unset, default to `warn` so recoverable anomalies (e.g. parse-sh skip
     // reports) reach stderr without opting in.
     intercept::logging::init("bear");
+
+    // Report a startup error through the logger, so it gets the same
+    // `bear: error:` format as every other diagnostic.
+    run().unwrap_or_else(|error| {
+        log::error!("{error}");
+        ExitCode::FAILURE
+    })
+}
+
+fn run() -> anyhow::Result<ExitCode> {
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");

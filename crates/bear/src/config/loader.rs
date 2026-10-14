@@ -120,18 +120,26 @@ impl Loader {
     }
 }
 
+/// Renders a parse error without the source snippet, which would spread one
+/// diagnostic over several lines.
+fn one_line(error: &serde_saphyr::Error) -> String {
+    let mut options = serde_saphyr::RenderOptions::default();
+    options.snippets = serde_saphyr::SnippetMode::Off;
+    error.render_with_options(options)
+}
+
 /// Represents all possible configuration-related errors.
 #[derive(Debug, Error)]
 pub enum ConfigError {
     /// Error when opening or reading a configuration file.
-    #[error("Failed to access configuration file '{path}': {source}")]
+    #[error("cannot read {path}: {source}", path = path.display())]
     FileAccess {
         path: PathBuf,
         #[source]
         source: std::io::Error,
     },
     /// Error when parsing the configuration file format.
-    #[error("Failed to parse configuration from file '{path}': {source}")]
+    #[error("cannot parse {path}: {}", one_line(source), path = path.display())]
     ParseError {
         path: PathBuf,
         #[source]
@@ -141,7 +149,7 @@ pub enum ConfigError {
     #[error("Unsupported schema version: {found}. Expected: {expected}")]
     UnsupportedSchema { found: String, expected: String },
     /// Error when configuration validation fails.
-    #[error("Configuration validation failed: {source}")]
+    #[error("invalid configuration in {path}: {source}", path = path.display())]
     ValidationError {
         path: PathBuf,
         #[source]

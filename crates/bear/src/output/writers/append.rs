@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::IteratorWriter;
-use crate::output::WriterError;
+use crate::output::WriterCreationError;
 use crate::output::clang;
 use crate::output::clang::serialization::JsonCompilationDatabase;
 use crate::output::formats::{SerializationError, SerializationFormat};
@@ -17,8 +17,9 @@ use std::{fs, io, path};
 /// If the file does not exist and the append option is enabled, it logs a warning
 /// and writes only the new entries.
 ///
-/// # Note
-/// Reading errors will be ignored, and a warning will be logged.
+/// The existing file is opened once when the writer is created, so a file
+/// that cannot be opened fails before the build runs. It is read after the
+/// build, as it is then. Invalid entries in it are skipped with a warning.
 pub(crate) struct AppendClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
     path: Option<path::PathBuf>,
@@ -31,41 +32,37 @@ impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
         input_path: &path::Path,
         append: bool,
         stats: Arc<OutputStatistics>,
-    ) -> Self {
+    ) -> Result<Self, WriterCreationError> {
         let path = if input_path.exists() && append {
+            fs::File::open(input_path)
+                .map_err(|err| WriterCreationError::Read(input_path.to_path_buf(), err))?;
             Some(input_path.to_path_buf())
         } else {
             if append && !input_path.exists() {
-                log::warn!("The output file does not exist, the append option is ignored.");
+                log::warn!(
+                    "cannot read previous entries from {}: the file does not exist",
+                    input_path.display()
+                );
             }
             None
         };
-        Self { writer, path, stats }
-    }
-
-    /// Reads the compilation database from a file.
-    ///
-    /// NOTE: The function is intentionally not getting any `&self` reference,
-    /// because the logic is not bound to the instance.
-    fn read_from_compilation_db(
-        source: &path::Path,
-    ) -> Result<impl Iterator<Item = clang::Entry>, SerializationError> {
-        let file = fs::File::open(source).map(io::BufReader::new)?;
-
-        let entries = JsonCompilationDatabase::read_and_ignore(file, |error| {
-            log::warn!("Problems to read previous entries: {error:?}");
-        });
-        Ok(entries)
+        Ok(Self { writer, path, stats })
     }
 }
 
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AppendClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        if let Some(path) = &self.path {
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), SerializationError> {
+        if let Some(path) = self.path {
             let stats = Arc::clone(&self.stats);
 
+            // Opened before the build already; a failure now means the file
+            // changed during the build.
+            let file = fs::File::open(&path)?;
+
             let entries_from_db =
-                Self::read_from_compilation_db(path).map_err(|err| WriterError::Io(path.clone(), err))?;
+                JsonCompilationDatabase::read_and_ignore(io::BufReader::new(file), move |error| {
+                    log::warn!("cannot read previous entries from {}: {error}", path.display());
+                });
 
             // Count entries read from existing database
             let counted_existing = entries_from_db.inspect(move |_| {
@@ -97,9 +94,8 @@ mod tests {
             clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
-        let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), Arc::clone(&stats));
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats)).unwrap();
         sut.write(entries_to_write.into_iter()).unwrap();
 
         // Verify the result file contains the written entries
@@ -122,8 +118,7 @@ mod tests {
             clang::Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&input_path).unwrap(), &input_path, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&input_path).unwrap(), Arc::clone(&stats));
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -131,9 +126,8 @@ mod tests {
             clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
-        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), Arc::clone(&stats));
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats)).unwrap();
         sut.write(new_entries.into_iter()).unwrap();
 
         // Verify the result file contains both original and new entries
@@ -172,15 +166,10 @@ mod tests {
         let new_entries =
             vec![clang::Entry::from_arguments_str("new_file.cpp", vec!["clang", "-c"], "/path/to/dir", None)];
 
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
-        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), Arc::clone(&stats));
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats)).unwrap();
 
-        // Should fail because read_from_compilation_db returns an error for non-JSON
-        // (the file opens fine, but deserialization fails during iteration —
-        //  however read_and_ignore swallows errors, so the iterator just yields nothing)
-        // Actually: read_from_compilation_db calls read_and_ignore which filters errors.
-        // So it should succeed with zero entries from existing DB.
+        // The invalid content is skipped with a warning, so only the new entry is written.
         sut.write(new_entries.into_iter()).unwrap();
 
         let content = fs::read_to_string(&result_path).unwrap();
@@ -206,9 +195,8 @@ mod tests {
         let new_entries =
             vec![clang::Entry::from_arguments_str("new_file.cpp", vec!["clang", "-c"], "/path/to/dir", None)];
 
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
-        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), Arc::clone(&stats));
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats)).unwrap();
         sut.write(new_entries.into_iter()).unwrap();
 
         let content = fs::read_to_string(&result_path).unwrap();
@@ -234,8 +222,7 @@ mod tests {
             clang::Entry::from_arguments_str("old_file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("old_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&input_path).unwrap(), &input_path, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&input_path).unwrap(), Arc::clone(&stats));
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -243,9 +230,8 @@ mod tests {
             clang::Entry::from_arguments_str("new_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer =
-            ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), &result_path, Arc::clone(&stats));
-        let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&result_path).unwrap(), Arc::clone(&stats));
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats)).unwrap();
         sut.write(new_entries.into_iter()).unwrap();
 
         // Verify the result file contains only new entries (no original entries)

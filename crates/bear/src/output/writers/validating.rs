@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::IteratorWriter;
-use crate::output::WriterError;
+use crate::output::SerializationError;
 use crate::output::clang::Entry;
 use crate::output::statistics::OutputStatistics;
 use std::sync::Arc;
@@ -26,7 +26,7 @@ impl<T: IteratorWriter<Entry>> ValidatingOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for ValidatingOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), SerializationError> {
         let stats = Arc::clone(&self.stats);
 
         let valid_entries = entries.filter_map(move |entry| match entry.validate() {

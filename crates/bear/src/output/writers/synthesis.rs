@@ -22,7 +22,7 @@
 //! [`HeaderCollector`].
 
 use crate::config::{HeaderStrategy, Headers};
-use crate::output::WriterError;
+use crate::output::SerializationError;
 use crate::output::clang::Entry;
 use crate::output::statistics::OutputStatistics;
 use semantic::{is_c_family_source, is_header_file, looks_like_a_source_file};
@@ -69,7 +69,7 @@ impl<T: IteratorWriter<Entry>> HeaderEntrySynthesizer<T> {
         self,
         entries: impl Iterator<Item = Entry>,
         collector: impl HeaderCollector + 'static,
-    ) -> Result<(), WriterError> {
+    ) -> Result<(), SerializationError> {
         let collector = Rc::new(RefCell::new(collector));
         let collector1 = Rc::clone(&collector);
         let collector2 = Rc::clone(&collector);
@@ -91,7 +91,7 @@ impl<T: IteratorWriter<Entry>> HeaderEntrySynthesizer<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for HeaderEntrySynthesizer<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), SerializationError> {
         if !self.config.enabled {
             return self.writer.write(entries);
         }

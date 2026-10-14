@@ -8,11 +8,11 @@ use thiserror::Error;
 /// Represents errors that can occur while working with file formats.
 #[derive(Debug, Error)]
 pub enum SerializationError {
-    #[error("Generic IO error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("Format syntax error: {0}")]
+    #[error(transparent)]
     Syntax(#[from] serde_json::Error),
-    #[error("Format semantic error: {0}")]
+    #[error("invalid entry: {0}")]
     Semantic(#[from] clang::EntryError),
     #[error("line {line}: {source}")]
     AtLine { line: usize, source: serde_json::Error },

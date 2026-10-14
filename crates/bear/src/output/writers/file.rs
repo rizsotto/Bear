@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::IteratorWriter;
-use crate::output::WriterError;
+use crate::output::SerializationError;
 use crate::output::clang;
 use crate::output::clang::serialization::JsonCompilationDatabase;
 use crate::output::formats::SerializationFormat;
 use crate::output::statistics::OutputStatistics;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use std::{fs, io, path};
+use std::{fs, io};
 
 /// The type represents a writer that writes JSON compilation database files from given entries.
 ///
@@ -17,42 +17,38 @@ use std::{fs, io, path};
 /// - Formats the entries to the configured shape.
 pub(crate) struct ClangOutputWriter {
     output: io::BufWriter<fs::File>,
-    path: path::PathBuf,
     stats: Arc<OutputStatistics>,
 }
 
 impl ClangOutputWriter {
-    /// Wraps an open `file`; `path` labels its errors.
-    pub(crate) fn new(file: fs::File, path: &path::Path, stats: Arc<OutputStatistics>) -> Self {
-        Self { output: io::BufWriter::new(file), path: path.to_path_buf(), stats }
+    pub(crate) fn new(file: fs::File, stats: Arc<OutputStatistics>) -> Self {
+        Self { output: io::BufWriter::new(file), stats }
     }
 }
 
 impl IteratorWriter<clang::Entry> for ClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        write_entries(self.output, self.path, entries, self.stats)
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), SerializationError> {
+        write_entries(self.output, entries, self.stats)
     }
 }
 
 /// Serializes `entries` as a JSON compilation database to `output`, counting
-/// each entry via `stats` and labeling any I/O or serialization error with
-/// `path`.
+/// each entry via `stats`. The caller adds the path to an error.
 ///
 /// Shared by the file-backed [`ClangOutputWriter`] and the stdout-backed
 /// `ClangStdoutOutputWriter` (see `writers/stdout.rs`) so both stream through
 /// the identical serialization instead of duplicating it.
 pub(super) fn write_entries(
     output: impl io::Write,
-    path: path::PathBuf,
     entries: impl Iterator<Item = clang::Entry>,
     stats: Arc<OutputStatistics>,
-) -> Result<(), WriterError> {
+) -> Result<(), SerializationError> {
     // Count entries as they are written
     let counted_entries = entries.inspect(move |_| {
         stats.entries_written.fetch_add(1, Ordering::Relaxed);
     });
 
-    JsonCompilationDatabase::write(output, counted_entries).map_err(|err| WriterError::Io(path, err))
+    JsonCompilationDatabase::write(output, counted_entries)
 }
 
 #[cfg(test)]
@@ -73,7 +69,7 @@ mod tests {
             clang::Entry::from_arguments_str("file3.c", vec!["gcc", "-c"], "/project", Some("file3.o")),
         ];
 
-        let writer = ClangOutputWriter::new(fs::File::create(&path).unwrap(), &path, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&path).unwrap(), Arc::clone(&stats));
         writer.write(entries.into_iter()).unwrap();
 
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 3);
@@ -92,7 +88,7 @@ mod tests {
         let path = dir.path().join("output.json");
         let stats = OutputStatistics::new();
 
-        let writer = ClangOutputWriter::new(fs::File::create(&path).unwrap(), &path, Arc::clone(&stats));
+        let writer = ClangOutputWriter::new(fs::File::create(&path).unwrap(), Arc::clone(&stats));
         writer.write(std::iter::empty()).unwrap();
 
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 0);

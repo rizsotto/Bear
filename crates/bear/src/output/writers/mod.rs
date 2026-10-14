@@ -19,9 +19,10 @@ mod synthesis;
 mod validating;
 
 use super::statistics::OutputStatistics;
-use super::{AtomicFile, WriterCreationError, WriterError};
+use super::{AtomicFile, SerializationError, WriterCreationError, WriterError};
 use crate::args::is_stdio;
 use crate::{args, config};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use append::AppendClangOutputWriter;
@@ -41,7 +42,10 @@ pub(crate) trait IteratorWriter<T> {
     /// Writes the iterator as a sequence of elements.
     ///
     /// Consumes the iterator and returns either nothing on success or an error.
-    fn write(self, items: impl Iterator<Item = T>) -> Result<(), WriterError>;
+    ///
+    /// The error carries no path: the writers do not know which file they
+    /// end up in, so the caller adds it.
+    fn write(self, items: impl Iterator<Item = T>) -> Result<(), SerializationError>;
 }
 
 /// The shared validating/deduplicating/synthesizing/source-filtering stack
@@ -79,6 +83,7 @@ enum Pipeline {
 /// to construct one.
 pub(crate) struct SemanticCommandWriter {
     inner: Pipeline,
+    path: PathBuf,
     output: AtomicFile,
 }
 
@@ -86,16 +91,18 @@ impl SemanticCommandWriter {
     /// Writes semantic commands through the pipeline.
     ///
     /// Returns the output to commit. On error the output is dropped, which
-    /// rolls it back.
+    /// rolls it back, and the error names the output path.
     pub(crate) fn write(
         self,
         semantics: impl Iterator<Item = semantic::Command>,
     ) -> Result<AtomicFile, WriterError> {
-        match self.inner {
-            Pipeline::File(writer) => writer.write(semantics)?,
-            Pipeline::Stdout(writer) => writer.write(semantics)?,
+        let Self { inner, path, output } = self;
+        match inner {
+            Pipeline::File(writer) => writer.write(semantics),
+            Pipeline::Stdout(writer) => writer.write(semantics),
         }
-        Ok(self.output)
+        .map_err(|err| WriterError::Io(path, err))?;
+        Ok(output)
     }
 }
 
@@ -163,6 +170,7 @@ pub(crate) fn create_pipeline(
 
         return Ok(SemanticCommandWriter {
             inner: Pipeline::Stdout(formatted_writer),
+            path: PathBuf::from("standard output"),
             output: AtomicFile::none(),
         });
     }
@@ -170,18 +178,18 @@ pub(crate) fn create_pipeline(
     let final_path = &args.path;
 
     let (output, file) = AtomicFile::create(final_path)?;
-    let base_writer = ClangOutputWriter::new(file, final_path, Arc::clone(&stats));
+    let base_writer = ClangOutputWriter::new(file, Arc::clone(&stats));
     let source_filter_writer = build_filtered_stack(base_writer, config, Arc::clone(&stats))?;
     let append_writer =
-        AppendClangOutputWriter::new(source_filter_writer, final_path, args.append, Arc::clone(&stats));
+        AppendClangOutputWriter::new(source_filter_writer, final_path, args.append, Arc::clone(&stats))?;
     let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format, Arc::clone(&stats));
 
-    Ok(SemanticCommandWriter { inner: Pipeline::File(formatted_writer), output })
+    Ok(SemanticCommandWriter { inner: Pipeline::File(formatted_writer), path: final_path.clone(), output })
 }
 
 #[cfg(test)]
 mod fixtures {
-    use super::{IteratorWriter, WriterError};
+    use super::{IteratorWriter, SerializationError};
 
     /// A test writer that collects all entries into a shared vector.
     ///
@@ -203,7 +211,7 @@ mod fixtures {
         fn write(
             self,
             entries: impl Iterator<Item = crate::output::clang::Entry>,
-        ) -> Result<(), WriterError> {
+        ) -> Result<(), SerializationError> {
             let mut collected = self.collected.lock().unwrap();
             collected.extend(entries);
             Ok(())

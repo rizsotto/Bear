@@ -193,7 +193,7 @@ mod tests {
                             }
                         }
                         Err(err) => {
-                            log::error!("Failed to receive execution: {err}");
+                            log::error!("cannot receive an intercepted command: {err}");
                             break;
                         }
                     }

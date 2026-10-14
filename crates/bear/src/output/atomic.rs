@@ -56,13 +56,15 @@ impl AtomicFile {
         prefix.push(final_path.file_name().unwrap_or_default());
         prefix.push(".");
 
-        let mut builder = tempfile::Builder::new();
-        builder.prefix(&prefix).suffix(".tmp");
-        // The default 0600 would carry over to the output; this gives what `File::create` gives.
-        #[cfg(unix)]
-        builder.permissions(std::os::unix::fs::PermissionsExt::from_mode(0o666));
-
-        let (file, temp) = builder.tempfile_in(directory).map_err(error)?.into_parts();
+        // Opening the file here, instead of in `tempfile`, keeps two things as `File::create` has
+        // them: the permissions (`tempfile` uses 0600), and the plain OS error (`tempfile` adds
+        // the random temporary path to it).
+        let (file, temp) = tempfile::Builder::new()
+            .prefix(&prefix)
+            .suffix(".tmp")
+            .make_in(directory, |path| fs::OpenOptions::new().write(true).create_new(true).open(path))
+            .map_err(error)?
+            .into_parts();
 
         Ok((Self(Some(Staged { temp, final_path: final_path.to_path_buf() })), file))
     }

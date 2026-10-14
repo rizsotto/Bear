@@ -10,7 +10,7 @@ pub(crate) mod source;
 pub(crate) mod unique;
 
 use super::IteratorWriter;
-use crate::output::WriterError;
+use crate::output::SerializationError;
 use crate::output::clang::Entry;
 use crate::output::statistics::OutputStatistics;
 use std::sync::Arc;
@@ -48,7 +48,7 @@ impl<T: IteratorWriter<Entry>, F: EntryFilter> FilteredOutputWriter<T, F> {
 }
 
 impl<T: IteratorWriter<Entry>, F: EntryFilter> IteratorWriter<Entry> for FilteredOutputWriter<T, F> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), SerializationError> {
         let mut filter = self.filter;
         let stats = Arc::clone(&self.stats);
         let rejected_counter = self.rejected_counter;

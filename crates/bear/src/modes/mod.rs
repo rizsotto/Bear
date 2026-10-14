@@ -214,15 +214,17 @@ fn compiler_hints(compilers: &[config::Compiler]) -> Result<CompilerHints, Confi
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigurationError {
-    #[error("Failed to create collector: {0}")]
+    #[error("cannot listen for intercepted commands: {0}")]
     CollectorCreation(std::io::Error),
-    #[error("Failed to create executor: {0}")]
+    #[error(transparent)]
     ExecutorCreation(environment::ConfigurationError),
-    #[error("Failed to create consumer: {0}")]
+    #[error(transparent)]
     ConsumerCreation(output::WriterCreationError),
-    #[error("Invalid configuration: {0}")]
+    #[error("cannot read {0}: {1}")]
+    InputAccess(std::path::PathBuf, std::io::Error),
+    #[error("{0}")]
     InvalidConfiguration(String),
-    #[error("Failed to load configuration: {0}")]
+    #[error(transparent)]
     ConfigLoad(Box<config::ConfigError>),
     /// Names the offending entry: serde used to point at the file and line,
     /// and the path is the equivalent locator now that the schema layer no
@@ -282,7 +284,7 @@ mod impls {
                         }
                     }
                     Err(error) => {
-                        log::warn!("Failed to receive execution: {error}");
+                        log::warn!("cannot receive an intercepted command: {error}");
                     }
                 }
             }
@@ -299,10 +301,20 @@ mod impls {
 
     impl execution::CancellableProducer for TcpEventProducer {}
 
+    /// Fails before the run when a named input file cannot be read.
+    fn check_input_file(path: &std::path::Path) -> Result<(), ConfigurationError> {
+        let error = |err| ConfigurationError::InputAccess(path.to_path_buf(), err);
+        let metadata = fs::metadata(path).map_err(error)?;
+        if !metadata.is_file() {
+            return Err(error(io::Error::other("not a regular file")));
+        }
+        Ok(())
+    }
+
     /// Errors raised while reading and replaying a raw event file.
     #[derive(Debug, Error)]
     enum ReplayReadError {
-        #[error("failed to open event file {0:?}: {1}")]
+        #[error("cannot read {0}: {1}")]
         Open(std::path::PathBuf, io::Error),
         #[error("every one of {0} event line(s) was rejected; no events to analyze")]
         AllRejected(usize),
@@ -333,10 +345,8 @@ mod impls {
                          pipe a producer in, or name an event file with --input"
                     );
                 }
-            } else if !path.exists() || !path.is_file() {
-                return Err(ConfigurationError::InvalidConfiguration(format!(
-                    "Event file not found: {path:?}"
-                )));
+            } else {
+                check_input_file(path)?;
             }
 
             Ok(Self { path: path.to_path_buf() })
@@ -399,9 +409,9 @@ mod impls {
     /// Errors raised while reading and interpreting shell command text.
     #[derive(Debug, Error)]
     enum ShellScriptReadError {
-        #[error("failed to read shell text from standard input: {0}")]
+        #[error("cannot read standard input: {0}")]
         ReadStdin(io::Error),
-        #[error("failed to read shell text file {0}: {1}")]
+        #[error("cannot read {0}: {1}")]
         ReadFile(std::path::PathBuf, io::Error),
         #[error("every non-empty line was skipped; no commands parsed (see warnings above)")]
         AllSkipped,
@@ -433,10 +443,8 @@ mod impls {
             working_dir: std::path::PathBuf,
             environment: HashMap<String, String>,
         ) -> Result<Self, ConfigurationError> {
-            if !super::is_stdio(path) && (!path.exists() || !path.is_file()) {
-                return Err(ConfigurationError::InvalidConfiguration(format!(
-                    "Shell text file not found: {path:?}"
-                )));
+            if !super::is_stdio(path) {
+                check_input_file(path)?;
             }
 
             Ok(Self { path: path.to_path_buf(), working_dir, environment })

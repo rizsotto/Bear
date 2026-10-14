@@ -89,16 +89,18 @@ impl OutputWriter {
 /// Represents errors that can occur while creating an output writer.
 #[derive(Error, Debug)]
 pub enum WriterCreationError {
-    #[error("Failed to create the output writer {0}: {1}")]
+    #[error("cannot create {0}: {1}")]
     Io(std::path::PathBuf, std::io::Error),
-    #[error("Failed to configure the output writer: {0}")]
+    #[error("cannot read {0}: {1}")]
+    Read(std::path::PathBuf, std::io::Error),
+    #[error("{0}")]
     Configuration(String),
 }
 
 /// Represents errors that can occur while writing output.
 #[derive(Error, Debug)]
 pub enum WriterError {
-    #[error("Serialization error {0}: {1}")]
+    #[error("cannot write {0}: {1}")]
     Io(std::path::PathBuf, SerializationError),
 }
 

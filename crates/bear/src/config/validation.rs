@@ -23,7 +23,7 @@ pub enum ValidationError {
     PathFormatError { message: &'static str },
     #[error("Invalid glob pattern for field '{field}': {message}")]
     InvalidPattern { field: String, message: String },
-    #[error("Multiple validation errors: {errors:?}")]
+    #[error("{}", errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("; "))]
     Multiple { errors: Vec<ValidationError> },
 }
 

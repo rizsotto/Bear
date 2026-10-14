@@ -2,7 +2,7 @@
 
 use super::IteratorWriter;
 use crate::config;
-use crate::output::WriterError;
+use crate::output::SerializationError;
 use crate::output::clang;
 use crate::output::statistics::OutputStatistics;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), SerializationError> {
         let stats = Arc::clone(&self.stats);
 
         let entries = semantics.flat_map(|cmd| self.converter.convert(&cmd));
