@@ -44,7 +44,7 @@ fn file_kind(extension: &str) -> Option<FileKind> {
         // D
         "d" | "di" | "dd" |
         // Ada
-        "ads" | "abd" |
+        "ads" | "adb" |
         // Vala / Genie (valac translation units; .vapi/.gir are bindings, not TUs)
         "vala" | "gs" |
         // Swift
