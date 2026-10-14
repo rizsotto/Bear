@@ -390,6 +390,26 @@ mod tests {
         }
 
         #[test]
+        fn ada_compilation() {
+            let sut = CompilerInterpreter::default();
+
+            for source in ["main.adb", "sensor.ads"] {
+                let execution =
+                    create_execution("gcc", vec!["gcc", "-c", "-x", "ada", "-gnatA", source], "/project");
+                assert_command(
+                    sut.recognize(execution),
+                    vec![
+                        (Compiler, vec!["gcc"]),
+                        (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                        (configures(CompilerPass::Compiling), vec!["-x", "ada"]),
+                        (configures(CompilerPass::Compiling), vec!["-gnatA"]),
+                        (Source { binary: false }, vec![source]),
+                    ],
+                );
+            }
+        }
+
+        #[test]
         fn combined_flags() {
             let sut = CompilerInterpreter::default();
             let execution = create_execution(
