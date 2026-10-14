@@ -4,9 +4,10 @@
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
+typos
 ```
 
-Do not commit unless all three pass. Fix issues before committing.
+Do not commit unless all four pass. Fix issues before committing.
 
 ## Build
 

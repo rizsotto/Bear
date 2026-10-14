@@ -10,6 +10,9 @@ ENV RUSTUP_HOME=/root/.rustup \
 # mdbook is pinned (--locked) to build the docs site under site/. Keep this
 # version identical to the one the Pages CI workflow installs.
 #
+# typos is pinned the same way; keep it identical to the version the rust CI
+# workflow installs. It runs as a pre-commit check.
+#
 # beads (bd) is pinned to a release tarball, checked against its sha256.
 # It tracks local development work; GitHub issues stay for user reports.
 # BD_DISABLE_METRICS keeps its usage metrics (on by default) switched off.
@@ -23,6 +26,7 @@ RUN dnf -y install curl ca-certificates git gh pandoc time bc file which \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile default \
     && curl -fsSL https://claude.ai/install.sh | sh \
     && cargo install mdbook --version 0.5.4 --locked \
+    && cargo install typos-cli --version 1.51.1 --locked \
     && curl -fsSLo /tmp/beads.tar.gz https://github.com/gastownhall/beads/releases/download/v${BEADS_VERSION}/beads_${BEADS_VERSION}_linux_amd64.tar.gz \
     && echo "${BEADS_SHA256}  /tmp/beads.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/beads.tar.gz -C /usr/local/bin bd \

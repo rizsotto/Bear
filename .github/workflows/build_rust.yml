@@ -6,6 +6,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Keep identical to the typos version the devcontainer installs.
+  TYPOS_VERSION: 1.51.1
 
 permissions:
   contents: read
@@ -80,10 +82,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install Codespell
-        run: pip install codespell
-      - name: Run Codespell
-        run: codespell
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: typos@${{ env.TYPOS_VERSION }}
+      - run: typos
 
   audit:
     name: Audit

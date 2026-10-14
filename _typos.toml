@@ -1,0 +1,24 @@
+[files]
+extend-exclude = ["*.lock", "man/*.1"]
+
+# abd -> source matcher for ADA files
+# exect -> the exect(2) libc call
+# fo -> MSVC output flag /Fo
+# ot -> MSVC optimization flag /Ot
+# gir -> GObject-Introspection .gir binding files (Vala)
+# hpe -> HPE, the Cray compiler vendor
+# iinclude -> the -Iinclude compiler flag
+# mak -> config.mak, the ffmpeg/nasm configure output
+# mis -> the "mis-" prefix (mis-handle, mis-recognize)
+# nto -> QNX ntoARCH-prefixed compilers
+[default.extend-words]
+abd = "abd"
+exect = "exect"
+fo = "fo"
+ot = "ot"
+gir = "gir"
+hpe = "hpe"
+iinclude = "iinclude"
+mak = "mak"
+mis = "mis"
+nto = "nto"

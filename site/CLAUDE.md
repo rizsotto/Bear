@@ -315,6 +315,6 @@ minimalism applies to documentation tooling too. Do not add one.
 - Every command was run, or an integration test is cited.
 - Every flag, key, and default was checked against `man/bear.1.md`.
 - Every compiler name was checked against the recognition snapshot.
-- ASCII only; the repository-wide `codespell` job also reads these
+- ASCII only; the repository-wide `typos` job also reads these
   files.
 - Links to related pages, and back to the recipe index.
