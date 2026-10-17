@@ -67,6 +67,22 @@ jobs:
         env:
           RUST_LOG: debug
 
+  test-musl:
+    name: Test (Alpine, musl)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    container: alpine:latest
+    steps:
+      - name: Install build dependencies
+        run: apk add --no-cache git build-base lld rust cargo ccache
+      - uses: actions/checkout@v7
+      - name: Run integration tests
+        run: |
+          cargo build --verbose
+          cargo test --verbose
+        env:
+          RUST_LOG: debug
+
   doc:
     name: Generate Documentation
     runs-on: ubuntu-latest
