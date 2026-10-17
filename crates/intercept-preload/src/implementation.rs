@@ -496,7 +496,7 @@ pub unsafe extern "C" fn rust_posix_spawnp(
 /// - Returns a raw pointer to a FILE structure
 ///
 /// The caller must ensure that `command` and `mode` are valid null-terminated C strings.
-#[cfg(has_symbol_popen)]
+#[cfg(all(has_symbol_popen, not(target_os = "android")))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char) -> *mut libc::FILE {
     if command.is_null() || mode.is_null() {
@@ -659,7 +659,7 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
 ///
 /// # Safety
 /// This function is unsafe because it dereferences a raw FILE pointer.
-#[cfg(has_symbol_popen)]
+#[cfg(all(has_symbol_popen, not(target_os = "android")))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_pclose(stream: *mut libc::FILE) -> c_int {
     if stream.is_null() {
@@ -717,7 +717,7 @@ pub unsafe extern "C" fn rust_pclose(stream: *mut libc::FILE) -> c_int {
 /// - Spawns child processes and manipulates signal masks
 ///
 /// The caller must ensure that `command` is a valid null-terminated C string.
-#[cfg(has_symbol_system)]
+#[cfg(all(has_symbol_system, not(target_os = "android")))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
     // system(NULL) returns non-zero to indicate a command processor is available

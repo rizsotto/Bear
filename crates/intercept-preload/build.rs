@@ -53,6 +53,15 @@ fn main() {
             intercept_symbols.push("__execvpe");
         }
 
+        // Our popen and system run the shell through the posix_spawn helper
+        // functions (posix_spawnattr_init, ...), which the libc crate does not
+        // bind for Android. Leave these calls to bionic there; the matching
+        // Rust implementations are gated off in src/implementation.rs.
+        let is_android = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android");
+        if is_android {
+            intercept_symbols.retain(|s| !matches!(*s, "popen" | "pclose" | "system"));
+        }
+
         // Compile the C shim for all intercepted functions
         // This handles variadic arguments properly (execl family) and provides
         // a clean separation between C exports and Rust implementation.

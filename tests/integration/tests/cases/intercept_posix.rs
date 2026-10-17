@@ -675,7 +675,7 @@ int main() {
 
 /// Test popen system call interception
 #[test]
-#[cfg(has_symbol_popen)]
+#[cfg(all(has_symbol_popen, not(target_os = "android")))]
 #[cfg(all(has_executable_compiler_c, has_executable_cat))]
 fn popen_interception() -> Result<()> {
     let env = TestEnvironment::new("popen_intercept")?;
@@ -741,7 +741,7 @@ int main(void) {{
 
 /// Test system() call interception
 #[test]
-#[cfg(has_symbol_system)]
+#[cfg(all(has_symbol_system, not(target_os = "android")))]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn system_interception() -> Result<()> {
     let env = TestEnvironment::new("system_intercept")?;
