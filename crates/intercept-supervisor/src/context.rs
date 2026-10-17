@@ -144,7 +144,8 @@ fn is_sip_enabled() -> bool {
 ///
 /// On Unix systems, this queries the system configuration for the standard
 /// utility search path. Falls back to `/usr/bin:/bin` if unavailable.
-#[cfg(unix)]
+/// Android (bionic) has no `confstr`, so it takes the fallback.
+#[cfg(all(unix, not(target_os = "android")))]
 fn get_confstr_cs_path() -> String {
     use std::ffi::CStr;
 
@@ -164,7 +165,7 @@ fn get_confstr_cs_path() -> String {
         .unwrap_or_else(|_| "/usr/bin:/bin".to_string())
 }
 
-#[cfg(not(unix))]
+#[cfg(any(not(unix), target_os = "android"))]
 fn get_confstr_cs_path() -> String {
     "/usr/bin:/bin".to_string()
 }
