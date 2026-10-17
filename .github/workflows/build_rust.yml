@@ -48,6 +48,9 @@ jobs:
         toolchain:
           - stable
           - nightly
+        include:
+          - os: ubuntu-26.04-arm
+            toolchain: stable
     runs-on: ${{ matrix.os }}
     needs: [lint]
     steps:
