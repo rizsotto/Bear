@@ -15,7 +15,7 @@ The library is split into a C shim (`src/c/shim.c`) and Rust implementation (`sr
 
 | Platform | Mechanism | Symbol visibility |
 |---|---|---|
-| Linux, FreeBSD, OpenBSD, NetBSD, DragonFly BSD | `LD_PRELOAD` | ELF version scripts |
+| Linux, Android, FreeBSD, OpenBSD, NetBSD, DragonFly BSD | `LD_PRELOAD` | ELF version scripts |
 | macOS | `DYLD_INSERT_LIBRARIES` | `-exported_symbols_list` |
 
 On unsupported platforms (e.g. Windows), the build displays a warning and skips library generation.
@@ -23,6 +23,7 @@ On unsupported platforms (e.g. Windows), the build displays a warning and skips 
 ## Features
 
 - Intercepts `exec` family calls, `posix_spawn`, `popen`, and `system`
+  (not `popen` and `system` on Android)
 - Automatically "doctors" child process environments to maintain interception across `exec` calls
 - Reports intercepted executions to a TCP collector
 - Platform capability detection at build time (only intercepts functions available on the host)

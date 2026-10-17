@@ -72,8 +72,8 @@ platform- and toolchain-specific usage.
 Limitations
 -----------
 
-Bear works on Linux, macOS, FreeBSD, OpenBSD, NetBSD, DragonFly BSD,
-and Windows.
+Bear works on Linux, Android, macOS, FreeBSD, OpenBSD, NetBSD,
+DragonFly BSD, and Windows.
 
 Each operating system and build system imposes constraints on how Bear can
 run and which interception method is available, and those affect the final

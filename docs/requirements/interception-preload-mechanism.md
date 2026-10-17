@@ -18,7 +18,7 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
 ## Acceptance criteria
 
 - `exec` family calls, `posix_spawn`, `popen`, and `system` are
-  intercepted
+  intercepted (on Android, see Known limitations)
 - Child processes inherit the interception environment even when the
   build system clears or replaces the environment
 - Intercepted commands are reported back to Bear for analysis
@@ -32,7 +32,7 @@ On macOS the same mechanism uses `DYLD_INSERT_LIBRARIES` instead of
 
 - Must not alter build output or exit codes
 - Must handle concurrent builds (parallel make) without losing reports
-- Platform: Linux and BSD systems (`LD_PRELOAD`), macOS
+- Platform: Linux (including Android) and BSD systems (`LD_PRELOAD`), macOS
   (`DYLD_INSERT_LIBRARIES`)
 - Not supported on Windows (no equivalent mechanism)
 - Not supported on macOS when SIP is enabled (see Known limitations)
@@ -72,6 +72,11 @@ re-assert its own preload variable downstream in the exec chain and drop
 Bear's entry, so a grandchild past that point is not intercepted. Bear
 cannot prevent this without refusing to delegate to the other library,
 which would disable the sandbox and alter the build.
+
+**`popen` and `system` on Android**: on Android these two calls are
+not intercepted, so a compiler launched through them is missing from
+the compilation database. The `exec` family and `posix_spawn` are
+intercepted as on other Linux systems.
 
 **Affects all child processes** (issue #444): `LD_PRELOAD` applies to
 every process spawned during the build, not just compilers, which can
