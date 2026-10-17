@@ -35,6 +35,8 @@ pub mod environment_arguments;
 pub mod exit_codes;
 #[cfg(has_preload_library)]
 pub mod hardened_intercept;
+#[cfg(unix)]
+pub mod install;
 pub mod intercept;
 #[cfg(has_preload_library)]
 pub mod intercept_posix;

@@ -32,14 +32,15 @@ impl InstallEnvironment {
         }
     }
 
-    fn install_via_script(destdir: &Path) -> Result<()> {
+    /// Run `scripts/install.sh` with `prefix` as `PREFIX`.
+    pub fn install_via_script(prefix: &Path) -> Result<()> {
         let source_dir = Path::new(DRIVER_EXECUTABLE_PATH)
             .parent()
             .with_context(|| "cannot determine artifact directory from DRIVER_EXECUTABLE_PATH")?;
 
         let output = std::process::Command::new("sh")
             .arg(INSTALL_SCRIPT_PATH)
-            .env("PREFIX", destdir)
+            .env("PREFIX", prefix)
             .env("INTERCEPT_LIBDIR", INTERCEPT_LIBDIR)
             .env("SRCDIR", source_dir)
             .output()

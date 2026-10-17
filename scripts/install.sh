@@ -108,7 +108,7 @@ install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR$PREFIX/libexec/bear/bin/bear-wra
 # preload library (Unix only)
 if [ "$HAS_PRELOAD" = true ] && [ -f "$SRCDIR/$PRELOAD_NAME" ]; then
     mkdir -p "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR"
-    install -m 644 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
+    install -m 755 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
 fi
 
 # bear entry script
