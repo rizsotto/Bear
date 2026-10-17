@@ -6,6 +6,7 @@
 # Environment variables:
 #   DESTDIR          - staging directory prepended to all paths (default: empty)
 #   PREFIX           - installation prefix (default: /usr/local if root, $HOME/.local otherwise)
+#   LIBEXECDIR       - absolute directory that holds bear/ (default: $PREFIX/libexec)
 #   INTERCEPT_LIBDIR - library directory name (default: lib)
 #   SRCDIR           - directory containing build artifacts (default: target/release)
 #
@@ -14,6 +15,7 @@
 #
 #   PREFIX=/usr INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
 #   DESTDIR=/tmp/staging PREFIX=/usr ./scripts/install.sh
+#   DESTDIR=/tmp/staging PREFIX=/usr LIBEXECDIR=/usr/lib ./scripts/install.sh
 
 set -eux
 
@@ -33,6 +35,7 @@ fi
 # Resolve to absolute path
 PREFIX="$(cd "$PREFIX" 2>/dev/null && pwd || echo "$PREFIX")"
 
+LIBEXECDIR="${LIBEXECDIR:-$PREFIX/libexec}"
 INTERCEPT_LIBDIR="${INTERCEPT_LIBDIR-lib}"
 DESTDIR="${DESTDIR:-}"
 
@@ -55,6 +58,20 @@ if [ -n "$DESTDIR" ]; then
             ;;
     esac
 fi
+
+# The entry script embeds LIBEXECDIR as a runtime path
+case "$LIBEXECDIR" in
+    /)
+        echo "error: refusing to operate with LIBEXECDIR=/ (would install into /bear)" >&2
+        exit 1
+        ;;
+    /*) ;;
+    *)
+        echo "error: LIBEXECDIR must be an absolute path, got: $LIBEXECDIR" >&2
+        exit 1
+        ;;
+esac
+LIBEXECDIR="${LIBEXECDIR%/}"
 
 # Reject empty or whitespace-only INTERCEPT_LIBDIR
 if [ -z "$(echo "$INTERCEPT_LIBDIR" | tr -d '[:space:]')" ]; then
@@ -101,14 +118,14 @@ esac
 # --- install ------------------------------------------------------------------
 
 # bear-driver and bear-wrapper
-mkdir -p "$DESTDIR$PREFIX/libexec/bear/bin"
-install -m 755 "$SRCDIR/bear-driver" "$DESTDIR$PREFIX/libexec/bear/bin/bear-driver"
-install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR$PREFIX/libexec/bear/bin/bear-wrapper"
+mkdir -p "$DESTDIR$LIBEXECDIR/bear/bin"
+install -m 755 "$SRCDIR/bear-driver" "$DESTDIR$LIBEXECDIR/bear/bin/bear-driver"
+install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR$LIBEXECDIR/bear/bin/bear-wrapper"
 
 # preload library (Unix only)
 if [ "$HAS_PRELOAD" = true ] && [ -f "$SRCDIR/$PRELOAD_NAME" ]; then
-    mkdir -p "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR"
-    install -m 755 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
+    mkdir -p "$DESTDIR$LIBEXECDIR/bear/$INTERCEPT_LIBDIR"
+    install -m 755 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR$LIBEXECDIR/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
 fi
 
 # bear entry script
@@ -117,7 +134,7 @@ tmp_bear_sh="$(mktemp)"
 trap 'rm -f "$tmp_bear_sh"' EXIT
 cat > "$tmp_bear_sh" <<ENTRY_SCRIPT
 #!/bin/sh
-exec $PREFIX/libexec/bear/bin/bear-driver "\$@"
+exec $LIBEXECDIR/bear/bin/bear-driver "\$@"
 ENTRY_SCRIPT
 install -m 755 "$tmp_bear_sh" "$DESTDIR$PREFIX/bin/bear"
 rm -f "$tmp_bear_sh"

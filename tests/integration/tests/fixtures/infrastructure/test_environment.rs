@@ -28,8 +28,11 @@ pub struct TestEnvironment {
 impl TestEnvironment {
     /// Create a new test environment
     pub fn new(test_name: &str) -> Result<Self> {
-        let install = InstallEnvironment::new()?;
+        Self::with_install(test_name, InstallEnvironment::new()?)
+    }
 
+    /// Create a test environment that runs Bear from the given installation
+    pub fn with_install(test_name: &str, install: InstallEnvironment) -> Result<Self> {
         let test_dir = tempfile::TempDir::new()
             .with_context(|| format!("Failed to create temp dir for test: {}", test_name))?;
 
