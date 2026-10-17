@@ -64,8 +64,9 @@ sudo PREFIX=/usr ./scripts/install.sh
 
 `scripts/install.sh` accepts two different path variables, and they are
 not interchangeable. `PREFIX` is the final, on-system path; the `bear`
-entry script it installs embeds that path literally, so `PREFIX` must
-match where the package actually runs, not where it is being built.
+entry script it installs embeds the driver path under it literally, so
+`PREFIX` must match where the package actually runs, not where it is
+being built.
 `DESTDIR`, when set, is a staging root prepended to every install path
 on top of `PREFIX`, for building a package without touching the real
 system; it must be an absolute path. Building a distribution package
@@ -74,6 +75,22 @@ sets both together:
 ```sh
 DESTDIR=/tmp/pkgroot PREFIX=/usr ./scripts/install.sh
 ```
+
+## `LIBEXECDIR` for distributions without `libexec`
+
+By default the helper binaries and the preload library go into
+`$PREFIX/libexec/bear/`. Distributions without a `libexec` directory set
+`LIBEXECDIR` to the directory that should hold `bear/` instead. The
+entry script then embeds the driver path under `LIBEXECDIR` rather than
+`PREFIX`, so it is an on-system path too, and `DESTDIR` still goes on
+top:
+
+```sh
+DESTDIR=/tmp/pkgroot PREFIX=/usr LIBEXECDIR=/usr/lib ./scripts/install.sh
+```
+
+It needs no matching build-time setting: `bear-driver` finds its
+siblings relative to its own location.
 
 ## `INTERCEPT_LIBDIR` must match between build and install
 

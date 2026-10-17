@@ -108,8 +108,21 @@ By default, Bear is installed to `/usr/local` (when run as root) or
    ```
 
 `PREFIX` is the final install location (e.g., `/usr`, `/usr/local`,
-`$HOME/.local`). Binaries go into `$PREFIX/bin/`, libraries into
-`$PREFIX/libexec/bear/`, and so on.
+`$HOME/.local`). The `bear` entry script goes into `$PREFIX/bin/`, the
+helper binaries and the preload library into `$PREFIX/libexec/bear/`, and
+so on.
+
+On distributions without a `libexec` directory (Arch Linux uses `/usr/lib`),
+set `LIBEXECDIR` to the directory that should hold `bear/`:
+
+   ```sh
+   sudo PREFIX=/usr LIBEXECDIR=/usr/lib ./scripts/install.sh
+   ```
+
+Like `PREFIX`, `LIBEXECDIR` is an absolute, on-system path: `DESTDIR` is
+prepended to it, and the `bear` entry script embeds it. It needs no
+build-time setting, because `bear-driver` finds its siblings relative to
+itself.
 
 The preload library directory name defaults to `lib`. On systems where a
 different directory is needed, set `INTERCEPT_LIBDIR` at both build and
@@ -163,8 +176,14 @@ If you are a package maintainer for a distribution:
 
   `DESTDIR` is the staging root prepended to all install paths. `PREFIX` is
   the final on-system prefix (e.g. `/usr`). Do not combine them into
-  `PREFIX` - the entry script embeds `PREFIX` as a literal runtime path,
-  so it must match the installed system, not the build chroot.
+  `PREFIX` - the entry script embeds the driver path
+  (`$LIBEXECDIR/bear/bin/bear-driver`, under `PREFIX` by default) as a
+  literal runtime path, so it must match the installed system, not the
+  build chroot.
+
+  If the distribution has no `libexec` directory, add `LIBEXECDIR` (for
+  example `LIBEXECDIR=/usr/lib`). It defaults to `$PREFIX/libexec`. The
+  same rule applies: give the on-system path, never one under `DESTDIR`.
 
 - The preload library is only built on Unix: `libexec.so` on Linux and
   the BSDs, `libexec.dylib` on macOS. Windows builds only produce
@@ -180,7 +199,7 @@ If you are a package maintainer for a distribution:
   $PREFIX/
   |-- bin/
   |   `-- bear                              (shell script)
-  |-- libexec/
+  |-- libexec/                             ($LIBEXECDIR)
   |   `-- bear/
   |       |-- bin/
   |       |   |-- bear-driver
