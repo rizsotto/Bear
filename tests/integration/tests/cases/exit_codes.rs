@@ -337,15 +337,6 @@ fn signal_tears_down_build_process_tree() -> Result<()> {
         .stderr(Stdio::null());
     let mut child = cmd.spawn().expect("failed to spawn bear");
 
-    // `kill -0` probes liveness without sending a signal.
-    let is_alive = |pid: i32| {
-        std::process::Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    };
-
     // Wait for the build to start and record the grandchild pid.
     let gpid = {
         let deadline = Instant::now() + std::time::Duration::from_secs(2);
@@ -418,15 +409,6 @@ fn signal_tears_down_cgroup_even_when_grandchild_detaches() -> Result<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     let mut child = cmd.spawn().expect("failed to spawn bear");
-
-    // `kill -0` probes liveness without sending a signal.
-    let is_alive = |pid: i32| {
-        std::process::Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    };
 
     // Wait for the build to start and record the detached grandchild pid.
     let gpid = {
@@ -594,6 +576,26 @@ fn signal_tears_down_nested_wrapper_supervision() -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Whether `pid` is still running. `kill -0` probes without sending a
+/// signal, but it also succeeds on a zombie. In a container whose PID 1
+/// does not reap orphans (GitHub Actions container jobs), a killed
+/// grandchild stays a zombie forever, so on Linux a zombie counts as dead.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
+fn is_alive(pid: i32) -> bool {
+    #[cfg(target_os = "linux")]
+    if let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        && let Some((_, rest)) = stat.rsplit_once(')')
+        && rest.trim_start().starts_with('Z')
+    {
+        return false;
+    }
+    std::process::Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 /// Block until the supervised build reports it is ready (it creates `path`),
