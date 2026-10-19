@@ -22,7 +22,7 @@ not need to read any other document to use it.
 | `src/tutorials/` | The tutorial pages. |
 | `src/guides/` | `troubleshooting.md`, plus `recipes/` below it. |
 | `src/guides/recipes/` | Task pages plus `index.md`, the recipe index. |
-| `src/reference/` | `configuration.md` and `supported-compilers.md`. |
+| `src/reference/` | `command-line.md`, `configuration.md`, `exit-status.md` and `supported-compilers.md`. |
 | `src/reference/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/semantic/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
 | `src/understanding/` | The explanation pages. |
 | `src/platforms/` | One page per operating system. |
@@ -233,7 +233,7 @@ matches its declared type:
 | (ungrouped, first) | `installation.md`, which precedes anything a reader can do. |
 | Tutorials | The tutorial pages. |
 | Guides | How-to pages: the recipes, and troubleshooting. |
-| Reference | `configuration.md` and `supported-compilers.md`. |
+| Reference | `command-line.md`, `configuration.md`, `exit-status.md` and `supported-compilers.md`. |
 | Understanding Bear | The explanation pages. |
 | Platform notes | How-to pages shelved by operating system instead. |
 

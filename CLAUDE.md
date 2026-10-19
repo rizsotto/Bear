@@ -83,7 +83,8 @@ configuration keys; the site is the user guide.
 The workspace builds in three layers before linking the user-facing binaries:
 
 1. `compilers-codegen` runs from `crates/semantic/build.rs` to emit interpreter
-   tables. See `build-support/compilers-codegen/CLAUDE.md`.
+   tables, and from `crates/intercept/build.rs` to emit the compiler
+   environment keys. See `build-support/compilers-codegen/CLAUDE.md`.
 2. `build-support/platform-checks/build.rs` probes the host once for headers
    and symbols. Consumers replay the results via
    `platform_checks::emit_cfg()` / `emit_check_cfg()`. See

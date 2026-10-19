@@ -39,9 +39,10 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo build --verbose          # integration tests need a debug build
 cargo test
+typos
 ```
 
-All four must pass before tagging.
+All five must pass before tagging.
 
 Then verify the release metadata:
 

@@ -28,7 +28,7 @@ its stem, and emits the recognition row, the `KNOWN_IDS` entry (so
 
 1. Create `mycompiler.yaml` in this directory
 2. Add `type: compiler`, a `compiler:` block (`id:`, optionally `extends:`), `recognize:`, `flags:` entries (optionally `ignore_when:`, `environment:`, `slash_prefix:`, `source_mode:`, `response_file_syntax:`). `id:` must be unique across this directory (checked at codegen) and is the only accepted config `as:` spelling for this family -- no aliases.
-3. Run `cargo build && cargo test`, then accept the snapshot diff (`cargo insta accept`)
+3. Run `cargo build && cargo test`, then accept the snapshot diff (`cargo insta accept`), and regenerate `site/src/reference/supported-compilers.md` with `scripts/generate-supported-compilers.py`
 4. When the compiler requires extra plumbing for interception, write the family's page under `site/src/guides/recipes/` in the same release, and list it in `site/src/SUMMARY.md` and `site/src/guides/recipes/index.md`. Otherwise the generated `site/src/reference/supported-compilers.md` already names it, and a page that only says "put it on `PATH` and run Bear" adds nothing. See `site/CLAUDE.md` for the authoring rules, and use the family's `id:` when the page shows an `as:` value.
 
 ## Adding a new wrapper

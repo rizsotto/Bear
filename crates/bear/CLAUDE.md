@@ -20,7 +20,7 @@ interception (supervise, TCP collector, build environment) lives in
 
 ## Before modifying
 
-- **CLI arguments** (`src/args.rs`): uses `clap` derive macros. Update man page -- see `man/CLAUDE.md` for instructions.
+- **CLI arguments** (`src/args.rs`): uses `clap` derive macros. Update man page -- see `man/CLAUDE.md` for instructions. Regenerate `site/src/reference/command-line.md` with `scripts/generate-command-line-reference.py`.
 - **Compiler interpreters**: they are not here. See `crates/semantic/CLAUDE.md`, and `crates/semantic/compilers/CLAUDE.md` before editing YAML.
 - **Output format**: check existing integration tests in `tests/integration/` to avoid regressions.
 - **Configuration types** (`src/config/types.rs`): changes here affect YAML config parsing. Update validation in `src/config/validation.rs`.
@@ -46,7 +46,8 @@ which is where `installation.rs` lives and reads them.
 
 ## Shell completions
 
-Generated from `clap` definitions at build time:
+Not generated at build time. The `generate-completions` binary
+(`crates/bear-completions`) writes them from the `clap` definitions when run:
 
 ```sh
 target/release/generate-completions target/release/completions

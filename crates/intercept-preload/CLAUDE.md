@@ -62,6 +62,6 @@ own entry in all three places.
 ## Before modifying
 
 - Changes here affect all intercepted builds on supported Unix platforms
-- Test on multiple platforms if possible (CI covers Linux, macOS, Windows)
+- Test on multiple platforms if possible (CI covers Linux and macOS; on Windows the crate compiles to an empty library)
 - The "doctor" logic that maintains interception across `exec` calls is subtle - read it fully before changing
-- Reports go to a TCP collector - do not change the protocol without updating the collector in `bear`
+- Reports go to a TCP collector - do not change the protocol without updating the collector in `crates/intercept-supervisor`
