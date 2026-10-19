@@ -6,8 +6,9 @@ description: Write, modify, or review a requirement file under docs/requirements
 # Write and maintain requirement files
 
 `docs/requirements/CLAUDE.md` owns the format: the template, file naming,
-status lifecycle, test-tag convention, and the list of what does not
-belong. Read it first and follow it; this skill operationalizes it.
+status lifecycle, and the list of what does not belong;
+`tests/integration/CLAUDE.md` owns the test-tag convention. Read the
+first one before starting and follow it; this skill operationalizes it.
 
 This skill adds the method. Every check below traces to a real cleanup
 this directory needed: duplicated passages that drifted into apparent
@@ -62,7 +63,7 @@ never a re-narration. If a re-narration can drift, it will.
 
 ## 4. Keep the body contract-only
 
-`docs/requirements/CLAUDE.md` ends with the list of what does not
+`docs/requirements/CLAUDE.md` opens with the list of what does not
 belong; this check is how to apply it. For every sentence ask: is this
 what the user can expect (keep), why we chose it (rationale entry), or
 how it is built (code comment)? Beyond that list, remove on sight:
@@ -114,10 +115,12 @@ untestable (rewrite the criterion) or a coverage hole (write the
 scenario). Scenarios are canonical; tests implement them and cite the
 requirement ID.
 
-Status discipline: a new requirement starts at `proposed` and waits for
-approval (see the decision protocol in the root `CLAUDE.md`); the full
-lifecycle is the status table in `docs/requirements/CLAUDE.md`. Set
-`implemented` only after step 8 passes.
+Status discipline: a new requirement, or a changed contract, is at
+`proposed` and waits for approval (see the decision protocol in the root
+`CLAUDE.md`). Never set `accepted` or `rejected` without the user's
+approval; the full lifecycle is the status table in
+`docs/requirements/CLAUDE.md`. Set `implemented` only after step 8
+passes.
 
 ## 8. Verify before finishing
 

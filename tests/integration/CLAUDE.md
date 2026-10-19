@@ -50,6 +50,7 @@ Rules:
   override file-level tags.
 - A test may cite multiple requirements when it legitimately exercises more
   than one.
+- Unit tests in `crates/` use the same convention.
 
 To find tests for a requirement:
 
@@ -57,8 +58,12 @@ To find tests for a requirement:
 grep -rn "Requirements:.*<requirement-id>" crates/ tests/
 ```
 
-See `docs/requirements/CLAUDE.md` for the coverage-check script that verifies every
-`implemented` requirement has at least one tagged test.
+To verify every `implemented` requirement has at least one tagged test
+(exits non-zero if any lacks coverage):
+
+```sh
+./scripts/check-requirements-coverage.sh
+```
 
 ## Debugging
 
@@ -81,9 +86,8 @@ locally carry full diagnostic context without a re-run.
 
 Integration tests are the primary regression protection mechanism for Bear.
 When a bug is fixed, add a test that reproduces the original failure; give
-platform-specific behaviour platform-specific tests with `#[cfg(...)]`. See
-`docs/requirements/CLAUDE.md` for the requirement-to-test linkage and the
-coverage model.
+platform-specific behaviour platform-specific tests with `#[cfg(...)]`. Tag
+it with the requirement it protects (see above).
 
 ## Organization
 

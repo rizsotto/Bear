@@ -5,12 +5,20 @@ Requirements are the source of truth for what Bear should do. Tests (integration
 and unit) verify that implemented requirements work correctly.
 
 Requirements are **contract-only**: they describe what the user can expect, not
-where the bits live and not why the design was chosen. Keep literal config keys,
-CLI flag names, and schema fragments out of a requirement body - describe the
-behaviour ("a configuration option toggles inlining") and let the man page
-(`man/bear.1.md`) name the key. The *why* belongs in
+where the bits live and not why the design was chosen. The *why* belongs in
 [`../rationale/`](../rationale/) (link it from a `## Rationale` section); the
 *how* belongs in the code and its comments.
+
+### Things that do NOT belong here
+
+- Literal config keys, CLI flag names, or schema fragments - describe the
+  behaviour ("a configuration option toggles inlining") and let the man page
+  (`man/bear.1.md`) name the key.
+- Step-by-step implementation guides, algorithm walkthroughs, error-handling
+  tables - those go in code comments next to the implementation.
+- Design rationale, trade-offs, or rejected alternatives - those go in
+  [`../rationale/`](../rationale/); link them from a `## Rationale` section.
+- Bug reports or to-dos - those belong in the issue tracker.
 
 ## File naming
 
@@ -20,7 +28,7 @@ behaviour ("a configuration option toggles inlining") and let the man page
 
 The filename (without extension) is the requirement's unique identifier. Use it
 for cross-references in other requirement files and as the value tests cite in
-their `Requirements:` tag (see below).
+their `Requirements:` tag (see Linking tests to requirements).
 
 Examples (see existing files in this directory):
 - `output-json-compilation-database.md`
@@ -79,61 +87,22 @@ label per link, no prose. Omit the section when there is nothing to link.
 
 | Status | Meaning |
 |---|---|
-| `proposed` | Idea captured, not yet reviewed |
-| `accepted` | Reviewed, approved for implementation |
-| `in-progress` | Implementation started |
+| `proposed` | Drafted, waiting for the user's review |
+| `accepted` | Approved by the user for implementation |
 | `implemented` | Code complete, tests passing |
-| `deferred` | Accepted but postponed (add reason in Notes) |
-| `rejected` | Reviewed and declined (add reason in Notes) |
+| `rejected` | Declined by the user, or withdrawn (add reason in Notes) |
+
+Only the user moves a requirement out of `proposed`. Agents may create and
+edit requirements, but never set `accepted` or `rejected` on their own. When
+the user approves or declines a requirement in the current session, the agent
+may set the status for them.
 
 ## Linking tests to requirements
 
-Tests cite the requirements they protect using a `Requirements:` tag. The tag
-lives in the test source, not in this directory's frontmatter, so renaming or
-deleting a test updates the link in the same edit.
-
-Format:
-
-```rust
-// Requirements: output-json-compilation-database, output-append
-#[test]
-fn append_works_as_expected() -> Result<()> { ... }
-```
-
-Rules:
-
-- Value is a comma-separated list of requirement IDs (filenames without `.md`).
-- Place the tag on the line(s) directly above `#[test]` (or the test macro).
-- For a whole file covering a single requirement, use `//! Requirements: <id>`
-  at the top of the file. Test-level tags override file-level tags.
-- Unit tests in `crates/` (e.g. `crates/bear/`, `crates/intercept-preload/`)
-  use the same convention.
-
-## Reverse lookup
-
-To find every test that protects a requirement:
-
-```sh
-grep -rn "Requirements:.*<requirement-id>" crates/ tests/
-```
-
-For example, to find tests for `output-append`:
-
-```sh
-grep -rn "Requirements:.*output-append" crates/ tests/
-```
-
-## Coverage check
-
-`scripts/check-requirements-coverage.sh` scans every requirement file and
-verifies that each `implemented` requirement has at least one `Requirements:`
-tag referencing it. Run it from the repo root:
-
-```sh
-./scripts/check-requirements-coverage.sh
-```
-
-The script exits non-zero if any `implemented` requirement lacks coverage.
+Tests cite the requirements they protect with a `Requirements:` tag in the
+test source. The format, the reverse-lookup grep, and the coverage script
+are in [`../../tests/integration/CLAUDE.md`](../../tests/integration/CLAUDE.md);
+unit tests in `crates/` use the same convention.
 
 ## How agents should use this
 
@@ -141,33 +110,10 @@ The script exits non-zero if any `implemented` requirement lacks coverage.
    create one with status `proposed` and await approval before coding.
 2. **Before modifying behavior**: find the requirement that governs it. Read
    acceptance criteria to understand what must not break.
-3. **After implementing**: set status to `implemented` and add a
+3. **When the contract changes**: edit the requirement first, set its status
+   back to `proposed`, and await approval before changing code or tests.
+   Git history keeps the previous version.
+4. **After implementing**: set status to `implemented` and add a
    `Requirements: <id>` tag to the test(s) that protect the requirement.
-4. **When fixing a bug**: check if the bug violates an existing requirement. If
+5. **When fixing a bug**: check if the bug violates an existing requirement. If
    so, add a test that reproduces the bug and tag it with the requirement ID.
-
-## Incubating new features
-
-Features that are not yet ready for implementation stay at `proposed` or
-`accepted`. Use the requirement file to capture:
-
-- User-facing intent (what problem does this solve?)
-- Acceptance criteria (how do we know it works?)
-- Open questions (what needs to be decided?)
-
-This allows features to mature before code is written. The status field tracks
-how far along the feature is. Multiple conversations can incrementally refine
-a requirement before it reaches `accepted`.
-
-## Things that do NOT belong here
-
-- Literal config keys, CLI flag names, or schema fragments - describe the
-  behaviour and let the man page (`man/bear.1.md`) name the key.
-- Step-by-step implementation guides, algorithm walkthroughs, error-handling
-  tables - those go in code comments next to the implementation.
-- Design rationale, trade-offs, or rejected alternatives - those go in
-  [`../rationale/`](../rationale/); link them from a `## Rationale` section.
-- Bug reports or to-dos - those belong in the issue tracker.
-
-A requirement captures **what the software must do**, not how it is built, not
-why we built it that way, and not what we wish it did some day.

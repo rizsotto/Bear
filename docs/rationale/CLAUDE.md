@@ -47,7 +47,7 @@ Keep entries short. Most need four parts, in this order:
   external docs. Link source files only when unavoidable; paths drift and
   these entries are meant to outlast them.
 
-Copy the shape from an existing entry rather than a separate template.
+Start with a `# Title` heading and no front matter.
 
 ## Linking
 
@@ -61,5 +61,5 @@ A decision that was **only ever considered and declined** is born here as
 a rationale entry - it never became a contract, so it does not belong
 under [`../requirements/`](../requirements/). A requirement that shipped a
 real contract and was **later withdrawn** stays under `../requirements/`
-with `status: rejected` or `deferred` as a tombstone, and may link here
-for the full reasoning.
+with `status: rejected` as a tombstone, and may link here for the full
+reasoning.

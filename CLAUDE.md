@@ -59,12 +59,17 @@ These files contain rules, context, and constraints specific to that area.
 | Edit the test-tooling comparator or normalization | `tests/tools/CLAUDE.md` (behavior in `tests/tools/SPEC.md`) |
 | Edit or regenerate the man page | `man/CLAUDE.md` |
 | Write or modify a docs site page | `site/CLAUDE.md` |
-| Find project documentation or how it is organized | `docs/CLAUDE.md` |
 | Add, modify, or review a requirement (contract) | `docs/requirements/CLAUDE.md` |
 | Record or look up a design decision, or a rejected option | `docs/rationale/CLAUDE.md` |
 | Run an operational procedure (release, ...) | invocable skills in `.claude/skills/` |
 
 Do not skip these reads. They contain constraints that prevent regressions.
+
+Keep the roles separate. A requirement says *what*; a rationale entry
+says *why*; the code says *how*. Reasoning does not belong in a
+requirement body, and a contract does not belong in a rationale entry.
+The man page is the user-facing reference for CLI flags and
+configuration keys; the site is the user guide.
 
 ## Architecture (data flow)
 
@@ -107,7 +112,8 @@ reads it back, and `tests/integration/build.rs`.
 
 ## Decision protocol
 
-For a new feature or architectural change: write a requirement first (see
+For a new feature, an architectural change, or a change to an existing
+contract: write or edit the requirement first, at status `proposed` (see
 `docs/requirements/CLAUDE.md`), present a short decision log (approach,
 alternatives considered, trade-offs), and wait for approval before
 implementing. Develop it test-first (TDD): write the failing test that
