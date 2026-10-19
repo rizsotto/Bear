@@ -1,27 +1,8 @@
-## Pre-commit checks (mandatory)
-
-```sh
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-typos
-```
-
-Do not commit unless all four pass. Fix issues before committing.
-
-## Build
-
-```sh
-cargo build --verbose          # debug
-cargo build --release          # release (LTO, stripped)
-```
-
-Integration tests require a debug build to exist before running `cargo test`.
-
 ## Project overview
 
 Bear generates JSON compilation databases (`compile_commands.json`) for Clang tooling.
-It intercepts compiler invocations during a build and records them.
+It intercepts compiler invocations during a build (preload library or wrapper),
+keeps the ones it recognizes as compiler calls, and writes them out.
 
 ### Workspace crates
 
@@ -39,6 +20,8 @@ It intercepts compiler invocations during a build and records them.
 | `build-support/compilers-codegen` | Code generator for compiler flag tables |
 | `tests/tools` | Shared test tooling; library + `cdb-compare` binary (package `bear-test-tools`) |
 | `tests/integration` | End-to-end tests (package `integration-tests`) |
+
+Build prerequisites (C compiler, linker) are in `INSTALL.md`.
 
 ## Routing - read before modifying
 
@@ -66,65 +49,39 @@ These files contain rules, context, and constraints specific to that area.
 Do not skip these reads. They contain constraints that prevent regressions.
 
 Keep the roles separate. A requirement says *what*; a rationale entry
-says *why*; the code says *how*. Reasoning does not belong in a
-requirement body, and a contract does not belong in a rationale entry.
-The man page is the user-facing reference for CLI flags and
-configuration keys; the site is the user guide.
+says *why*; the code says *how*. The man page is the user-facing
+reference for CLI flags and configuration keys; the site is the user guide.
 
-## Architecture (data flow)
+## Workflow
 
-1. **Interception** - capture compiler invocations via `LD_PRELOAD` (Linux/macOS) or wrapper executable (other platforms)
-2. **Semantic analysis** - filter non-compiler commands using interpreter YAML definitions
-3. **Configuration** - apply user config for output formatting
-4. **Output** - write `compile_commands.json`
+1. **Start the task.** Pick it up in the task tracker.
+2. **Classify the change.** A new feature, an architectural change, or a
+   change to an existing contract takes every step. A
+   bug fix that does not change a contract skips steps 3 and 7, and cites
+   the governing requirement if one exists.
+3. **Requirement and approval.** Write or edit the requirement at status
+   `proposed` (`docs/requirements/CLAUDE.md`, `requirements` skill).
+   Present a short decision log (approach, alternatives considered,
+   trade-offs) and wait for approval. Record the why in
+   `docs/rationale/` (`docs/rationale/CLAUDE.md`).
+4. **Test first.** Write the failing test that cites the requirement
+   (`.claude/rules/testing.md`, `tests/integration/CLAUDE.md`).
+5. **Implement.** Read the routing table above first. Rust conventions
+   are in `.claude/rules/rust.md`.
+6. **Checks.** All four must pass before committing:
 
-## Build pipeline
+   ```sh
+   cargo fmt --check
+   cargo clippy --all-targets -- -D warnings
+   cargo test
+   typos
+   ```
 
-The workspace builds in three layers before linking the user-facing binaries:
-
-1. `compilers-codegen` runs from `crates/semantic/build.rs` to emit interpreter
-   tables, and from `crates/intercept/build.rs` to emit the compiler
-   environment keys. See `build-support/compilers-codegen/CLAUDE.md`.
-2. `build-support/platform-checks/build.rs` probes the host once for headers
-   and symbols. Consumers replay the results via
-   `platform_checks::emit_cfg()` / `emit_check_cfg()`. See
-   `build-support/platform-checks/CLAUDE.md`.
-3. `crates/intercept-preload/build.rs` cc-compiles `src/c/shim.c` and emits
-   cdylib link directives. See `crates/intercept-preload/CLAUDE.md`.
-
-`INTERCEPT_LIBDIR` is the one cross-cutting build-time env var
-(relative path to the install location of `libexec.so` /
-`libexec.dylib`; defaults to `lib`). Validated and forwarded by both
-`crates/intercept-supervisor/build.rs`, which is where `installation.rs`
-reads it back, and `tests/integration/build.rs`.
-
-## Host requirements
-
-- `cc` toolchain (gcc or clang).
-- `lld` or `mold` linker (ELF platforms, and only when the Rust
-  toolchain does not bundle rust-lld; rustup toolchains do). rustc
-  injects its own linker version script into the cdylib link next to
-  Bear's, and GNU ld refuses to combine the two. The build script
-  picks the first available of: bundled rust-lld, system lld, system
-  mold (see `docs/rationale/preload-linker-selection.md`). macOS uses
-  the system linker.
-- `ccache` (optional). When present and on PATH, the integration tests
-  exercise a ccache-masquerade-aware test path.
-
-## Decision protocol
-
-For a new feature, an architectural change, or a change to an existing
-contract: write or edit the requirement first, at status `proposed` (see
-`docs/requirements/CLAUDE.md`), present a short decision log (approach,
-alternatives considered, trade-offs), and wait for approval before
-implementing. Develop it test-first (TDD): write the failing test that
-cites the requirement, then the code. Before committing a change of this
-size, have a review subagent on a different model check it (the `Agent`
-tool with a different `model`).
-
-A bug fix that does not change a contract skips straight to test + fix,
-citing the governing requirement if one exists. The different-model review
-is reserved for feature and architectural changes, not routine fixes.
+   Integration tests need a debug build (`cargo build`) before `cargo test`.
+7. **Different-model review.** Have a review subagent on a different
+   model check the change (the `Agent` tool with a different `model`).
+8. **Commit.** See "Commit messages" below.
+9. **Close the task** in the task tracker, citing the commit.
 
 ## Code guidelines
 
@@ -135,11 +92,9 @@ Always-on, language-agnostic standards for every workspace crate:
   not convenience.
 - No speculative features or over-engineering.
 
-Rust file conventions (edition, SPDX header, error handling, module
-structure) live in `.claude/rules/rust.md`, and test conventions in
-`.claude/rules/testing.md`. Both are path-scoped to `.rs` files, so they
-load when Claude edits Rust. The per-crate `CLAUDE.md` files add only
-crate-specific constraints on top of these.
+Rust file conventions live in `.claude/rules/rust.md`, and test
+conventions in `.claude/rules/testing.md`. Both are path-scoped to `.rs`
+files. The per-crate `CLAUDE.md` files add only crate-specific constraints.
 
 ## Commit messages
 

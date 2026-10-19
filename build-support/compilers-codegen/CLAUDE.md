@@ -7,7 +7,9 @@ and recognition rules.
 
 - A regular library, not a `build.rs` itself.
 - Invoked from `crates/semantic/build.rs` via
-  `compilers_codegen::generate(flags_dir, out_dir)`.
+  `compilers_codegen::generate(flags_dir, out_dir)`, and from
+  `crates/intercept/build.rs` via `generate_env_keys_only` (compiler
+  environment keys only).
 - Reads `crates/semantic/compilers/*.yaml` (compiler definitions) and
   writes generated Rust source into the consumer's `OUT_DIR`.
 - The `semantic` crate pulls in the generated code via `include!()` in
