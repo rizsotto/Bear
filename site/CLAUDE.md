@@ -1,15 +1,14 @@
 # CLAUDE.md - `site/` guide
 
 This directory is Bear's user-facing documentation site: an
-[mdBook](https://rust-lang.github.io/mdBook/) book that is published to
-GitHub Pages at `https://rizsotto.github.io/Bear/`. It is the canonical
-user documentation and it replaces the project wiki, whose pages are
-being reduced to one-line pointers here. CI checks the build on every
-push and pull request; the deploy job runs from `master` only, so
-nothing goes live from a topic branch.
+[mdBook](https://rust-lang.github.io/mdBook/) book published to GitHub
+Pages at `https://rizsotto.github.io/Bear/`. The deploy job runs from
+`master` only. The site is for users; `docs/` (requirements and
+rationale) is for contributors, and the two do not overlap.
 
-This file is the complete set of rules for writing pages here. You do
-not need to read any other document to use it.
+The site follows [Diataxis](https://diataxis.fr/): every page except the
+three landing pages is one of four types (tutorial, how-to, reference,
+explanation), and the rules below apply it.
 
 ## What lives where
 
@@ -18,43 +17,32 @@ not need to read any other document to use it.
 | `book.toml` | Book configuration. Title "Bear"; `site-url = "/Bear/"`. |
 | `src/SUMMARY.md` | The table of contents. Every page must be listed. |
 | `src/index.md`, `src/installation.md` | The only pages at the root: the home page, and installing, which sits above the sections. |
-| `src/404.md` | The not-found page. Deliberately NOT in `SUMMARY.md`: mdBook renders it specially, and listing it would put it in the navigation. Its links are absolute (`/Bear/...`) because GitHub Pages serves it for any missing path, including deep ones, and relative links would resolve against that path. Keep them in step with `site-url` in `book.toml`, and with the directories below. |
+| `src/404.md` | The not-found page. Deliberately NOT in `SUMMARY.md` (listing it would put it in the navigation). Its links are absolute (`/Bear/...`), because GitHub Pages serves it for any missing path. Keep them in step with `site-url` and the directories below. |
 | `src/tutorials/` | The tutorial pages. |
 | `src/guides/` | `troubleshooting.md`, plus `recipes/` below it. |
 | `src/guides/recipes/` | Task pages plus `index.md`, the recipe index. |
-| `src/reference/` | `command-line.md`, `configuration.md`, `exit-status.md` and `supported-compilers.md`. |
-| `src/reference/supported-compilers.md` | Partly generated. `scripts/generate-supported-compilers.py` renders the compiler-family tables from `crates/semantic/compilers/*.yaml` into the block between its `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` markers. Everything outside those markers is hand-written prose, edited here directly. |
+| `src/reference/` | `command-line.md`, `configuration.md`, `exit-status.md` and `supported-compilers.md`. `command-line.md` and `supported-compilers.md` are partly generated: only the block between the `BEGIN GENERATED` and `END GENERATED` markers comes from the script; the prose outside it is edited here. |
 | `src/understanding/` | The explanation pages. |
 | `src/platforms/` | One page per operating system. |
-| `theme/head.hbs` | Site-wide, static `<head>` content, injected by mdBook into every page. It holds the Google Search Console ownership token and nothing else; removing the tag un-verifies the property. Per-page `<head>` content does not go here (see the file's own comment). |
-| `book/` | Build output. Generated, git-ignored, never edited. |
+| `theme/head.hbs` | Site-wide static `<head>` content: the Google Search Console token and nothing else. Removing it un-verifies the property. |
+| `book/` | Build output. Git-ignored, never edited. |
 
-The directory layout mirrors the `SUMMARY.md` sections, so a page's
-folder tells you which section it belongs to and therefore which Diataxis
-type it must declare. A new page goes in the folder for its type; moving
-a page between sections means moving its file too.
-
-The site does not overlap with `docs/`, which holds requirements
-(contracts) and rationale (decision records) for contributors. The site
-is for users.
+A page's folder matches its `SUMMARY.md` section and therefore its
+Diataxis type. Moving a page between sections means moving its file too.
 
 ## Authoritative sources - never document from memory
 
-- **Command-line flags, configuration keys, and their defaults**:
-  `man/bear.1.md`. It is the reference; the site does not duplicate it,
-  it links to it. Every flag or key that appears on a site page must
-  exist there or in `bear --help` output.
-- **Recognized compiler and launcher executable names**:
-  `build-support/compilers-codegen/tests/snapshots/snapshots__snapshot_recognition.snap`.
-  This snapshot is generated from the compiler definitions, so it is the
-  only correct source for toolchain pages. Do not copy such a list from
-  the wiki, from an old release note, or from memory.
+- **Command-line flags, configuration keys, and their defaults**: check
+  them against `man/bear.1.md` or `bear --help`. Pages link the site's
+  `src/reference/` pages, not the man page.
+- **Recognized compiler and launcher names**:
+  `build-support/compilers-codegen/tests/snapshots/snapshots__snapshot_recognition.snap`,
+  or `bear semantic --print-compilers` for the live form. Do not copy
+  such a list from the wiki, an old release note, or memory.
 - **Behaviour of a command**: a scratch install of a debug build, or a
   named integration test under `tests/integration/`. There is no
-  `target/debug/bear` binary to run: `bear` is a shell wrapper that
-  `scripts/install.sh` generates around `bear-driver`, and it embeds
-  the install prefix as a literal path. Build, then install to a
-  throwaway prefix and run that copy:
+  `target/debug/bear`; `bear` is a shell wrapper that
+  `scripts/install.sh` generates with the install prefix baked in:
 
   ```sh
   cargo build
@@ -63,258 +51,143 @@ is for users.
   /tmp/bear-review/bin/bear --version
   ```
 
-  `bear semantic --print-compilers` prints every recognized compiler
-  name with the `as:` value it maps to, which is the live form of the
-  recognition snapshot above.
-
 ## Content rules
 
-1. **One page per search intent, not per feature.** A page exists to
-   answer one question a user types into a search engine. If a page
-   answers two, split it.
+1. **One page per search intent, not per feature.** If a page answers
+   two questions, split it.
 2. **The H1 and the chapter name are phrased as the user asks the
-   question**, not as the codebase names the feature: "Generate
-   compile_commands.json for a Makefile project", not "Combined mode".
-   mdBook renders a page title as "<chapter name> - <book title>", so
-   the chapter name in `SUMMARY.md` is the HTML title element. Keep the
-   `SUMMARY.md` entry and the H1 in agreement.
+   question**: "Generate compile_commands.json for a Makefile project",
+   not "Combined mode". The `SUMMARY.md` entry becomes the HTML title,
+   so keep it and the H1 in agreement.
 3. **The first paragraph gives the working answer**, normally the
-   command to run. Background, caveats, and mechanism come after. This
-   is what earns search snippets and citations from AI assistants, and
-   it is the rule most easily lost by opening with two paragraphs about
-   `LD_PRELOAD`. It is also mechanized, not just good practice:
-   `scripts/postprocess-docs-site.sh` lifts this exact paragraph, tags
-   stripped, as the page's `<meta name="description">`, truncated to
-   about 155 characters on a word boundary. Keep it a real,
-   self-contained sentence, since one that only makes sense after the
-   heading reads as a broken snippet in search results.
+   command to run. Background and mechanism come after.
+   `scripts/postprocess-docs-site.sh` lifts this paragraph as the page's
+   `<meta name="description">` (about 155 characters), so make it a
+   real, self-contained sentence.
 4. **Every shell command shown must be verified.** Run it against a
-   debug build, or cite the integration test that exercises it. An
-   unverified command does not ship. Verification is a precondition for
-   writing a claim, never a thing the page tells the reader about: no
-   "Verified:", no "tested against", and no note about what could not be
-   checked while writing. State the behaviour as fact, or leave it out.
-   A page that hedges its own commands teaches the reader to distrust
-   all of them. Put the evidence in the commit message or the pull
-   request, where it belongs.
+   debug build, or cite the integration test that exercises it. The page
+   never says so: no "Verified:", no "tested against", no note about what
+   could not be checked. State the behaviour as fact, or leave it out.
+   Put the evidence in the commit message or pull request.
 5. **Wiki-migrated text is a source, not a truth.** Verify each claim
-   against current 4.x behaviour before it lands. The wiki carries
-   3.x-era statements that are simply wrong now.
+   against current 4.x behaviour.
 6. **ASCII only.** No em dashes, smart quotes, or Unicode bullets. Use
    hyphens, straight quotes, three dots, and `-` or `*` for bullets.
 7. **Kebab-case file names that match the query**, for example
    `compile-commands-for-makefile.md`.
 8. **Cross-link related pages, and link back to the recipe index.**
-   Every recipe links to `recipes/index.md`; other pages link to the
-   recipes, platform pages, or explanation pages a reader needs next.
-   The link runs both ways: `recipes/index.md` lists every recipe. It
-   and `SUMMARY.md` are two hand-maintained lists of the same pages, and
-   `check-docs-site.sh` only checks the second, so a recipe added to
-   `SUMMARY.md` alone reaches nobody who browses the index. Keep the two
-   in the same order.
+   Every recipe links to `recipes/index.md`, and `recipes/index.md`
+   lists every recipe in the same order as `SUMMARY.md`. The check
+   script only verifies `SUMMARY.md`.
 9. **Exactly one Diataxis type per page, declared and obeyed.** The
-   first line of every source file is an HTML comment naming its type:
+   first line of every source file names its type:
 
    ```markdown
    <!-- Diataxis type: how-to -->
    ```
 
-   The page then stays inside that type. A how-to does not explain
-   mechanism; it links to `how-it-works.md`. An explanation page carries
-   no commands to copy; it links to the recipe. This rule is what keeps
-   rule 3 honest.
+   A how-to does not explain mechanism; it links to `how-it-works.md`.
+   An explanation page carries no commands to copy; it links to the
+   recipe.
 10. **A page states facts about Bear, never facts about itself.** No
-    roadmap of the headings the reader can already see ("The rest of
-    this page covers ..."), no announcement of what the page is for
-    ("This page explains how that matching works"), no description of
-    its relationship to another document ("this page mirrors it,
-    organized one section at a time"), and no defending a writing
-    decision to the reader ("this page takes it as the starting point,
-    not something to reprove"). The rules this file states about a
-    collection of pages are for the writer; do not restate one on the
-    page it governs. This is rule 4 generalized, and it is enforced by
-    rule 3: the opening paragraph is the working answer, and a roadmap
-    spends it on the table of contents instead, which is then what
-    `scripts/postprocess-docs-site.sh` lifts into the page's
-    `<meta name="description">`.
+    roadmap of the headings ("The rest of this page covers ..."), no
+    statement of what the page is for, no description of its relation to
+    another document, no defending a writing decision. The rules in this
+    file are for the writer; do not restate one on a page. Two forms stay,
+    because they send the reader somewhere:
 
-    Two forms of self-reference stay, because both do work for the
-    reader rather than for the author:
-
-    - a tutorial's "By the end of this page you will have ..." opening,
-      which promises an outcome and lets someone decide whether to spend
-      the time;
-    - a scope boundary that routes, as `troubleshooting.md` opens: the
-      empty-database recipe works through those causes one by one, and
-      this page collects the rest. It stops a reader on the wrong page.
+    - a tutorial's "By the end of this page you will have ..." opening;
+    - a scope boundary that routes, as `troubleshooting.md` opens by
+      pointing at the empty-database recipe.
 
     The test is direction. A sentence that sends the reader somewhere
     stays; a sentence that describes where they already are goes.
 
 ## Code-block tags
 
-mdBook 0.5.4's bundled highlight.js resolves a fence's tag to a specific
-grammar, so the tag is a functional choice, not decoration. Three cases:
+mdBook's bundled highlight.js picks a grammar from the fence tag, so the
+tag matters:
 
-1. **Commands with no output shown** are tagged ```` ```sh ````. It is the
-   Bash grammar: it highlights quoted strings, variables, comments, and
-   builtins, and it carries no `$` prompt, so the block stays copyable as
-   a unit. This is the common case: one or more commands the reader runs,
-   nothing else.
-2. **A command together with the output it produced** is a transcript,
-   not something to copy-paste, so it becomes a SINGLE fence tagged
-   ```` ```shell ````, the "Shell Session" grammar. Its only rule
-   highlights a leading `$`, `#`, `>`, or `%` prompt, so prefix every
-   command line with `$ ` and leave the output lines that follow it
-   unprefixed. Do not use `shell` on a block with no prompt in it.
-3. **Output alone, or a file's contents, with no command** stays a bare
-   fence: a JSON entry, a log excerpt, an error message shown as a
-   symptom. No language means no highlighting, which is correct here
-   since there is nothing to highlight.
+1. **Commands with no output shown**: ```` ```sh ````. No `$` prompt,
+   so the block stays copyable.
+2. **A command together with its output**: a SINGLE fence tagged
+   ```` ```shell ````. Prefix every command line with `$ ` and leave
+   output lines unprefixed. Do not use `shell` on a block with no prompt.
+3. **Output alone, or a file's contents**: a bare fence, no tag.
 
-`yaml`, `json`, `dockerfile`, and similar are unaffected by this; they
-name their own grammar already.
+`yaml`, `json`, `dockerfile`, and similar name their own grammar.
 
-## The page-type map
+## Page types
 
 | Type | Purpose | Where |
 |---|---|---|
-| tutorial | One narrow path from start to finish, for a first-timer. Expensive to read and to write, so there are few. | `src/tutorials/` |
+| tutorial | One narrow path from start to finish, for a first-timer. Few of them. | `src/tutorials/` |
 | how-to | The paths a reader can take through a task, dwelling only where attention is needed. | `src/guides/`, `src/platforms/` |
 | reference | Enumeration, looked up rather than read. Must be exactly correct. | `src/reference/` |
 | explanation | Mechanism and design. No commands. | `src/understanding/` |
 
-Reference is the cornerstone: everything else points at it. Two of its
-pages are generated from the thing they describe, so they cannot drift;
-prefer generating a new reference page over writing one. `man/bear.1.md`
-remains the offline copy of the same contract, and on-site pages link the
-site's reference rather than the man page.
+Prefer generating a new reference page over writing one.
 
-## What a how-to owes the reader
+`src/index.md`, `src/guides/recipes/index.md` and `src/404.md` are the
+only files allowed to declare `<!-- Diataxis type: landing (navigation
+page, not one of the four types) -->`. Do not add a fourth.
 
-A how-to is not a tutorial with the narrative removed, and it is not a
-reference with prose around it. The distinction is what earns its length:
+### What a how-to owes the reader
 
-- **Cover the paths, not one path.** A tutorial walks a single route
-  because the reader has none of their own. A how-to reader arrives with a
-  situation, so the page has to admit the branches that situation can
-  take, and say which one they are on.
-- **Dwell only where attention is needed.** The parts of a task that just
-  work need a sentence, not a section. Spend the page on the step that
-  fails, surprises, or has to be decided. A page that narrates the easy
-  parts at the same length as the hard one gives the reader no way to
-  judge what matters.
-- **Point at reference, constantly.** Every flag, configuration key,
-  compiler name, and exit status has exactly one correct home under
-  `src/reference/`. Name it and link it; do not restate it. Restating is
-  how the page grows long, and how it goes stale when the reference
-  changes.
-- **Do not send the reader to the FAQ or troubleshooting instead.** Those
-  are for a reader who already has a symptom. They are not where a fact
-  lives, and linking them in place of reference is the habit this rule
-  exists to break.
+- **Cover the paths, not one path.** Admit the branches the reader's
+  situation can take, and say which one they are on.
+- **Dwell only where attention is needed.** The parts that just work get
+  a sentence; spend the page on the step that fails, surprises, or needs
+  a decision.
+- **Point at reference, constantly.** Every flag, key, compiler name and
+  exit status has one home under `src/reference/`. Link it; do not
+  restate it.
+- **Do not send the reader to troubleshooting instead of reference.**
 
-A how-to that, stripped of everything the reference already says, has
-nothing left is not a how-to. Merge it into a sibling, or give it the
-failure mode that justifies it.
+A how-to with nothing left once the reference facts are stripped is not
+a how-to. Merge it into a sibling, or give it the failure mode that
+justifies it.
 
-Three pages are navigation rather than content: `src/index.md` (the home
-page), `src/guides/recipes/index.md`, and `src/404.md`. They are the only files
-allowed to declare `<!-- Diataxis type: landing (navigation page, not one
-of the four types) -->`. Do not add a fourth.
+## Navigation sections
 
-## Navigation separates the types, without naming them Diataxis's way
-
-`SUMMARY.md` has these sections, and a new page belongs in the one that
-matches its declared type:
+A new page goes in the `SUMMARY.md` section that matches its type:
 
 | Section | Holds |
 |---|---|
-| (ungrouped, first) | `installation.md`, which precedes anything a reader can do. |
+| (ungrouped, first) | `installation.md` |
 | Tutorials | The tutorial pages. |
 | Guides | How-to pages: the recipes, and troubleshooting. |
-| Reference | `command-line.md`, `configuration.md`, `exit-status.md` and `supported-compilers.md`. |
+| Reference | The `src/reference/` pages. |
 | Understanding Bear | The explanation pages. |
-| Platform notes | How-to pages shelved by operating system instead. |
+| Platform notes | How-to pages shelved by operating system. |
 
-Do not rename "Guides" to "How-to guides" or "Understanding Bear" to
-"Explanation". Those two Diataxis names describe a document to its
-author; "Tutorials" and "Reference" are words a reader applies to
-themselves. Section names are also load-bearing for search, because
-mdBook renders a page title as "<chapter name> - <book title>". And do
-not leave a page in a section that does not match its type comment: a
-reference page among the how-tos is a mismatch a reader notices. The
-reasoning, including what this decision used to say, is in
+Do not rename the sections. Why they are named this way is in
 [`../docs/rationale/docs-site-over-wiki.md`](../docs/rationale/docs-site-over-wiki.md).
 
-## The build-and-link check
+## Before committing
 
-Before committing any change under `site/`, run:
+Run `./scripts/check-docs-site.sh`. It must print `OK`; its header lists
+what it checks. CI runs it from `.github/workflows/pages.yml`, which pins
+the mdBook version to install locally. Two habits it depends on:
 
-```sh
-./scripts/check-docs-site.sh
-```
+- Write intra-book links inline, `[text](../recipes/index.md)`, and keep
+  reference-style definitions for external URLs. The link scan reads
+  inline links only, and it also reads fenced code, so an
+  example link to a missing page needs a non-`.md` name.
+- Regenerate the generated reference pages with their source change:
+  `scripts/generate-supported-compilers.py` after a compiler YAML edit,
+  `scripts/generate-command-line-reference.py` after a CLI change (needs
+  the scratch install above).
 
-It must print `OK` and exit 0. The check has seven parts:
-
-1. `mdbook build site` must succeed and print no `WARN` or `ERROR` log
-   line. Warnings are fatal on purpose: mdBook reports preprocessor and
-   include failures that way, and they would otherwise ship silently. A
-   chapter listed in `SUMMARY.md` whose file is missing is a hard error,
-   because `book.toml` sets `build.create-missing = false` (the default
-   would quietly create an empty page instead).
-2. Every inline Markdown link to a `.md` target must resolve to an
-   existing file. mdBook does not check this itself: verified against
-   mdBook 0.5.4, a link to a nonexistent page builds clean. A link title
-   and an `#anchor` are both allowed and are stripped before the lookup.
-   Because the scan looks at inline links only, write intra-book links
-   inline, `[text](../recipes/index.md)`, and keep reference-style
-   definitions for external URLs. The scan is textual and does not skip
-   fenced code blocks, so an example link to a file that is meant not to
-   exist will be reported as broken; use a non-`.md` name in such an
-   example.
-3. Every page under `src/` must be listed in `SUMMARY.md`. mdBook
-   silently ignores files that are not listed, so such a page would
-   never be served. `404.md` is the one exception, for the reason in the
-   table above.
-4. Every absolute `/Bear/<page>.html` link in `404.md` must have a
-   matching `<page>.md`. Part 2 only follows `.md` targets, so without
-   this the not-found page could ship a dead link.
-5. `src/reference/supported-compilers.md` must match what
-   `scripts/generate-supported-compilers.py` produces from the current
-   `crates/semantic/compilers/*.yaml`. After changing a compiler YAML file,
-   or the generator, run it and commit its output with the YAML change.
-6. No configuration key named on `src/reference/configuration.md` may be
-   absent from `man/bear.1.md`, which owns the configuration contract.
-   The check compares a key's last segment only; see the script header
-   for what that does and does not catch.
-7. `src/reference/command-line.md` must match what
-   `scripts/generate-command-line-reference.py` produces from the
-   installed binary. Unlike part 5, this one needs a built and installed
-   `bear`, which CI and a contributor may not have, so it SKIPS with a
-   notice when no binary is found rather than failing. After changing
-   `crates/bear/src/args.rs`, build, install to a throwaway prefix, run
-   the generator, and commit its output with the code change.
-
-`.github/workflows/pages.yml` runs the same script on every push and
-pull request, and it is the single source of truth for the pinned mdBook
-version. Install that same version locally
-(`cargo install mdbook --version <pinned> --locked`).
-
-There are no mdBook plugins, including `mdbook-linkcheck`. Dependency
-minimalism applies to documentation tooling too. Do not add one.
+Do not add mdBook plugins.
 
 ## Writing checklist
 
-- The page is listed in `SUMMARY.md` and the file exists, and a recipe
-  is listed on `recipes/index.md` too.
+- The page is listed in `SUMMARY.md`, and a recipe on `recipes/index.md` too.
 - The type comment is on the first line and the page stays inside it.
 - The first paragraph answers the question.
-- No sentence describes the page itself, except a tutorial's outcome
-  promise or a scope boundary that routes the reader elsewhere.
+- No sentence describes the page itself.
 - Every command was run, or an integration test is cited.
 - Every flag, key, and default was checked against `man/bear.1.md`.
 - Every compiler name was checked against the recognition snapshot.
-- ASCII only; the repository-wide `typos` job also reads these
-  files.
 - Links to related pages, and back to the recipe index.
