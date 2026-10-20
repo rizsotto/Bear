@@ -5,76 +5,46 @@ status: implemented
 
 ## Intent
 
-Compilers read part of their effective configuration from the
-environment rather than from argv. The GCC/Clang family treats
-`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`, and
-`OBJC_INCLUDE_PATH` as additional header search paths; MSVC reads
-`CL` and `_CL_` as implicit leading and trailing options. A build
-that relies on these variables compiles correctly, but a tool reading
-`compile_commands.json` sees only the literal argv and misses the
-search paths the compiler actually used.
+Compilers read part of their configuration from the environment, not
+from argv. GCC and Clang take extra header search paths from `CPATH`
+and its siblings. MSVC reads `CL` and `_CL_` as extra leading and
+trailing options. A build that relies on these compiles fine, but a
+tool that reads the database sees only argv and misses what the
+compiler really used.
 
-To keep entries self-contained, Bear translates these environment
-variables into the equivalent explicit flags and folds them into each
-entry's `arguments`. This is on by default, matching what the compiler
-did. Some users prefer entries that reflect argv alone; a single
-configuration option turns the translation off.
+Bear turns these variables into the explicit flags they stand for and
+adds them to each entry's `arguments`, so the entry stands on its own.
+This is on by default. A configuration option turns it off for users
+who want argv alone.
 
-This behaviour is observable in `compile_commands.json` only. The
-intercepted event record already captures the full environment (see
-`interception-events-format`); this requirement does not change it.
+Flags carried inside a compiler variable such as `CC="gcc -std=c11"`,
+seen by the wrapper mechanism, are a separate contract, owned by
+`interception-cc-env-var-flags`.
 
 ## Acceptance criteria
 
-### A configuration option toggles environment-derived flags
-
-- A single configuration option enables or disables folding compiler
-  environment variables into the generated entries.
-- The default is enabled.
-- When disabled, recognized environment variables contribute nothing:
-  each entry's `arguments` contain only the flags that came from argv
-  (after any response-file inlining; see
-  `output-response-file-inlining`).
-
-### Enabled translation follows the compiler family
-
-- When enabled, each environment variable Bear recognizes for the
-  entry's compiler family is translated into that family's equivalent
-  flags, preserving the order the variable lists its values, and the
-  resulting flags are folded into the entry's `arguments`.
+- **Given** a build that runs `cc -c src.c -o src.o` with `CPATH` set to
+  `/opt/first:/opt/second`, **when** Bear runs with the default
+  configuration, **then** the entry's `arguments` hold an include flag
+  for `/opt/first` followed by one for `/opt/second`, in the order
+  `CPATH` lists them.
+- **Given** the same build and environment, **when** Bear runs with
+  environment-derived flags turned off, **then** the entry's `arguments`
+  hold exactly the command-line arguments, after any response-file
+  inlining (owned by `output-response-file-inlining`), and neither path
+  appears.
+- **Given** an MSVC or clang-cl compilation with `CL` and `_CL_` set,
+  **when** Bear runs with the default configuration, **then** the
+  compiler stays first in `arguments`, the words of `CL` go after the
+  compiler and before the command-line flags, and the words of `_CL_`
+  go after the command-line flags.
+- The compiler YAML of each family owns which variables are recognized,
+  the flag each one becomes, and whether its words go before or after
+  the command-line flags. This file owns the toggle, its default, and
+  the rule that a variable's values keep their order.
 
 ## Non-functional constraints
 
-- The toggle changes only the contents of `compile_commands.json`.
-  The interception layer and the recorded event environment are not
+- The toggle changes only the database. The interception layer and the
+  recorded event environment (`interception-events-format`) are not
   affected.
-
-## Testing
-
-Given a build that runs `cc -c src.c -o src.o` with `CPATH` set to
-`/opt/first:/opt/second` in the environment:
-
-> When the user runs Bear with environment flags enabled (the
-> default),
-> then the entry for `src.c` has `arguments` that include an explicit
-> include flag for `/opt/first` followed by an explicit include flag
-> for `/opt/second`, in the order `CPATH` lists them.
-
-Given the same build and environment:
-
-> When the user runs Bear with environment flags disabled,
-> then the entry for `src.c` has `arguments` that contain neither
-> `/opt/first` nor `/opt/second`,
-> and the arguments are exactly those that appeared on the command
-> line.
-
-## Notes
-
-- The set of variables recognized for each family, and the flag each
-  maps to, is defined per compiler family; this requirement governs
-  only the on/off switch, not the mapping.
-- Related: `output-compilation-entries` -- the per-source
-  transformation these flags participate in.
-- Related: `output-response-file-inlining` -- the sibling option.
-- Related: `interception-cc-env-var-flags` -- wrapper-mode splitting
-  of a `CC="gcc -std=c11"` value, a separate mechanism.
