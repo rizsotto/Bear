@@ -37,6 +37,15 @@ caught, with no per-distro path table to maintain. The cost is missing
 a masquerade installed as a shell script or hard copy, which no major
 distro ships.
 
+The set of wrapper names is fixed, and no subprocess is spawned to
+identify a wrapper. Detection stays a cheap filesystem check that runs
+nothing untrusted. The cost is missing uncommon or locally built
+wrappers.
+
+While Bear observes a build, the wrapped compilers bypass the
+masquerade wrapper, so ccache and its kin do not run for them. That is
+intended: Bear observes the build, it does not speed it up.
+
 The rejected alternatives were each narrower or more fragile:
 
 - **Set `CCACHE_COMPILER` in the wrapper's child environment** (the
@@ -61,9 +70,9 @@ The rejected alternatives were each narrower or more fragile:
 
 ## References
 
-- Requirement: `interception-wrapper-recursion`
-- Related requirement: `interception-wrapper-mechanism`
-- Issue #445 - original PATH-ordering report
-- Issue #686 - bare-name CC resolution
-- ccache 4.x manual: https://ccache.dev/manual/4.10.2.html
+- [interception-wrapper-recursion](../requirements/interception-wrapper-recursion.md), the requirement this supports
+- [interception-wrapper-mechanism](../requirements/interception-wrapper-mechanism.md), a related requirement
+- [Issue #445](https://github.com/rizsotto/Bear/issues/445) - original PATH-ordering report
+- [Issue #686](https://github.com/rizsotto/Bear/issues/686) - bare-name CC resolution
+- [ccache 4.x manual](https://ccache.dev/manual/4.10.2.html)
 - icecream masquerade setup: https://github.com/icecc/icecream

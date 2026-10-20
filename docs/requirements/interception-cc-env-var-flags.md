@@ -5,118 +5,61 @@ status: implemented
 
 ## Intent
 
-Compiler environment variables often carry not just the compiler path but
-a simple trailing flag or two. This is a GNU Make convention and shows
-up in configure scripts, Makefiles, and Dockerfiles:
-
-- `CC="gcc -std=c11"`
-- `CXX="clang++ -stdlib=libc++"`
-- `CC="/usr/local/bin/gcc -m32"`
-
-When the user runs `bear -- make` with a value of this shape, Bear's
-wrapper mode registers a wrapper for the real program and rewrites the
-env var so the build still receives the flags.
-
-Anything more elaborate -- flags with embedded whitespace, shell
-quoting, metacharacters, command substitutions -- belongs in `CFLAGS` /
-`CXXFLAGS` / `LDFLAGS`. Bear splits the env var value on whitespace
-and goes no further. The man page points users at `CFLAGS` for
-anything that does not fit that shape.
+Compiler environment variables often carry the compiler and a simple
+trailing flag or two, as in `CC="gcc -std=c11"` or
+`CXX="clang++ -stdlib=libc++"`. This is a GNU Make convention seen in
+configure scripts, Makefiles, and Dockerfiles. When the user runs a
+build under Bear with the wrapper mechanism and such a value, Bear wraps
+the real program and rewrites the variable so the build still gets the
+flags.
 
 ## Acceptance criteria
 
-- Wrapper mode splits a compiler env var into `(program, flags)` on
-  whitespace before resolution.
-- The program token, whether a bare name or an absolute path, follows
-  the ordinary wrapper-mode resolution (masquerade handling of the
-  token included, see `interception-wrapper-recursion`), and the flag
-  tokens are preserved.
-- The rewritten env var value is the wrapper path followed by the
-  original flag tokens, joined with single spaces and without shell
-  quoting. When there are no flags, the override is the wrapper path
-  as a bare string, with no quoting added.
-- An empty or whitespace-only value is skipped with a warning.
+- **Given** `CC="fake-cc -std=c11"` and `fake-cc` on PATH, **when** Bear
+  sets up the wrapper mechanism, **then** the wrapper for `fake-cc` runs
+  the real compiler, and the build sees `CC` as
+  `<wrapper path> -std=c11`.
+- **Given** `CC="/abs/path/my-gcc -m32"`, **when** Bear sets up the
+  wrapper mechanism, **then** the wrapped program is `/abs/path/my-gcc`,
+  and the rewritten value keeps `-m32`.
+- **Given** a C source file, a build script that runs `$CC -c test.c`,
+  and `CC="<compiler> -DBEAR_TEST_FLAG=1"`, **when** Bear finishes,
+  **then** the build succeeds, and the database holds exactly one entry
+  whose arguments contain `-DBEAR_TEST_FLAG=1`.
+- **Given** a value with flags, **when** Bear rewrites it, **then** the
+  new value is the wrapper path and the original flag tokens, joined by
+  single spaces, with no shell quoting added. With no flags, the new
+  value is the wrapper path alone, with no quoting added.
+- **Given** a value with quotes, shell metacharacters, or a command
+  substitution, **when** Bear reads it, **then** none of these has a
+  special meaning: the value is split on whitespace only.
+- **Given** a ccache masquerade directory on PATH and a real compiler
+  past it, **when** `CC="gcc -std=c11"`, **then** the wrapper runs the
+  real compiler past the masquerade directory, and the rewritten `CC`
+  still holds `-std=c11`. Masquerade handling is owned by
+  `interception-wrapper-recursion`.
+- **Given** a Unix-like shell on Windows with forward-slash paths,
+  **when** `CC="C:/tools/fake-cc.exe -DBEAR_TEST=1"`, **then** a wrapper
+  is registered for `fake-cc.exe`, and the rewritten `CC` still holds
+  `-DBEAR_TEST=1`.
+- **Given** `CC=""` or `CC="   "`, **when** Bear sets up the wrapper
+  mechanism, **then** the variable is not rewritten, and a warning is
+  logged.
+
+A value without flags, or an unset variable, follows the ordinary
+resolution owned by `interception-wrapper-mechanism`.
 
 ## Non-functional constraints
 
-- Platform support: Unix and Unix-like environments -- Linux, macOS,
-  BSD, and the Unix-like shells hosted on Windows (MSYS2, Git Bash,
-  WSL). The `CC`/`CXX` convention is a Unix / GNU Make inheritance.
-- A flagless value (a bare name such as `CC=gcc` or an absolute path
-  such as `CC=/usr/bin/gcc`) and an unset variable follow the ordinary
-  wrapper-mode resolution owned by `interception-wrapper-mechanism`;
-  the whitespace split is observable only when flag tokens are present.
+- Platform support: Unix and Unix-like environments: Linux, macOS, BSD,
+  and the Unix-like shells hosted on Windows (MSYS2, Git Bash, WSL).
 
 ## Known limitations
 
-- No observable effect on a native Windows build: native Windows build
-  tooling (MSBuild, `nmake`, `cmd`, PowerShell) does not read
-  `CC`/`CXX` from the environment.
-
-## Testing
-
-### Unit tests
-
-Given a wrapper-mode setup with a fake compiler on PATH:
-
-> When `CC="fake-cc -std=c11"`,
-> then the wrapper config is keyed by the compiler basename and points
-> at the real compiler,
-> and the override value for `CC` equals
-> `"<wrapper_path> -std=c11"`.
-
-Given a wrapper-mode setup with a fake compiler at an absolute path:
-
-> When `CC="/abs/path/my-gcc -m32"`,
-> then the resolved program is `/abs/path/my-gcc`,
-> and the override preserves `-m32`.
-
-Given a wrapper-mode setup with no flags (regression guard):
-
-> When `CC=/usr/bin/gcc`,
-> then the override value equals the wrapper path verbatim (no shell
-> quoting introduced).
-
-Given an empty or whitespace-only value:
-
-> When `CC=""` or `CC="   "`,
-> then no `CC` override appears in the build environment,
-> and a warning is emitted.
-
-Given a ccache masquerade directory on PATH and a real compiler past it:
-
-> When `CC="gcc -std=c11"`,
-> then the wrapper config entry points at the real compiler past the
-> masquerade directory,
-> and the override for `CC` still contains `-std=c11`.
-
-Given a Unix-like shell on Windows producing forward-slash paths:
-
-> When `CC="C:/tools/fake-cc.exe -DBEAR_TEST=1"`,
-> then the wrapper is registered for `fake-cc.exe`,
-> and the override for `CC` still contains `-DBEAR_TEST=1`.
-
-### Integration test
-
-Given a C source file and a build script that runs `$CC -c test.c`:
-
-> When the user runs `bear` in wrapper mode with
-> `CC="<compiler> -DBEAR_TEST_FLAG=1"`,
-> then the build succeeds,
-> and `compile_commands.json` has exactly one entry,
-> and the `arguments` array contains `-DBEAR_TEST_FLAG=1`.
-
-## Notes
-
-- Issue #686 -- bare-name CC resolution.
-- Related: `interception-wrapper-mechanism` -- the wrapper mode this
-  feature extends.
-- Related: `interception-wrapper-recursion` -- masquerade handling of
-  the program token.
-- Related: `output-env-derived-flags` -- folding include/option env
-  vars into entries, a separate output-side mechanism.
+- No effect on a native Windows build: native Windows build tooling
+  (MSBuild, `nmake`, `cmd`, PowerShell) does not read `CC`/`CXX` from
+  the environment.
 
 ## Rationale
 
-- [Whitespace split, no shell parser](../rationale/compiler-env-flag-parsing.md) -
-  why the env-var value is split on whitespace instead of shell-parsed.
+- [Whitespace split, no shell parser](../rationale/compiler-env-flag-parsing.md)

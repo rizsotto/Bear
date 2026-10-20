@@ -39,7 +39,7 @@ fn basic_command_interception() -> Result<()> {
 /// Test shell command interception. Running without any interception
 /// configuration on a Unix host also exercises the default mode
 /// selection: only the preload mechanism can observe the shell process.
-// Requirements: interception-preload-mechanism, interception-mode-selection
+// Requirements: interception-preload-mechanism, interception-mechanism-selection
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo, has_executable_shell))]
@@ -330,7 +330,7 @@ fn libtool_command_interception() -> Result<()> {
 /// returns the directory is gone. The config forces wrapper mode on a host
 /// whose default is preload, so the observed `.bear/` directory is also
 /// evidence that the configuration override selected the wrapper mechanism.
-// Requirements: interception-wrapper-mechanism, interception-mode-selection
+// Requirements: interception-wrapper-mechanism, interception-mechanism-selection
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]

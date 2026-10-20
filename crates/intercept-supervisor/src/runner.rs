@@ -766,7 +766,7 @@ mod test {
         assert!(sut._wrapper_directory.is_none());
     }
 
-    // Requirements: interception-mode-selection
+    // Requirements: interception-mechanism-selection
     #[test]
     fn test_create_preload_rejected_when_preload_unsupported() {
         // The fixture defaults to preload_supported=false, modelling a host

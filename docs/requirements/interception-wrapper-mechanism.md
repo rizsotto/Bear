@@ -5,147 +5,93 @@ status: implemented
 
 ## Intent
 
-When the user runs `bear -- make` in wrapper mode (which mode runs and
-when is owned by `interception-mode-selection`), Bear intercepts
-compiler invocations by placing wrapper executables on PATH ahead of the
-real compilers. The build system invokes the wrapper instead of the real
-compiler; the wrapper reports the execution to Bear and then forwards
-the call to the real compiler. The build completes normally and the user
-gets a compilation database without modifying the build system.
+With the wrapper mechanism, Bear puts wrapper executables, named after
+the compilers, in a wrapper directory first on PATH, and points the
+compiler environment variables (`CC`, `CXX`, and similar) at them. The
+build runs the wrapper instead of the real compiler. The wrapper reports
+the execution to Bear and runs the real compiler. The user gets a
+compilation database without changing the build system. Which mechanism
+runs is owned by `interception-mechanism-selection`, and so is the
+promise that interception leaves the build's output alone.
 
 ## Acceptance criteria
 
-- Compiler invocations are intercepted and appear in the compilation
-  database
-- The build process completes normally -- interception does not alter
-  build output or exit codes
-- Bare compiler names in environment variables (e.g. `CC=gcc`) are
-  resolved via PATH before creating wrappers
-- Explicitly configured compilers select what is wrapped: when none is
-  configured for interception, compilers are discovered by scanning
-  PATH; when at least one is, exactly those are wrapped and the scan is
-  skipped. Entries excluded from the database do not count as
-  configured for interception. Compilers named in environment variables
-  are wrapped either way
-- The reported execution names the real compiler by its absolute path,
-  never the wrapper path
-- The `.bear/` directory is created in the current working directory
-- The `.bear/` directory is cleaned up when Bear exits
-- On Windows, executable name lookup is case-insensitive and extension-
-  insensitive (`cl`, `cl.exe`, and `CL.EXE` all match)
-- Reporting failures do not affect the build
+- **Given** a build that runs `cc -c test.c`, **when** Bear finishes,
+  **then** the database holds one entry for `test.c`, and the entry
+  names the real compiler by its absolute path, never the wrapper path.
+- **Given** a wrapped compiler that runs another wrapped compiler by its
+  bare name, **when** the build runs, **then** the wrapper directory is
+  still first on PATH for that process, and the inner call is
+  intercepted too.
+- **Given** `CC=gcc` (a bare name) or `CC=/usr/bin/gcc` (an absolute
+  path), **when** the build runs, **then** Bear resolves the bare name
+  via PATH to `/usr/bin/gcc`, wraps `gcc` in both cases, and the entry
+  names `/usr/bin/gcc` as the compiler. Values that carry flags are
+  owned by `interception-cc-env-var-flags`.
+- **Given** a configuration that lists no compiler for interception
+  (entries excluded from the database do not count), **when** Bear
+  starts, **then** it scans PATH and wraps every compiler it recognizes
+  there. Which names it recognizes, cross-compilation prefixes included,
+  is owned by `recognition-compiler-names`.
+- **Given** a configuration that lists at least one compiler for
+  interception, **when** Bear starts, **then** it wraps exactly the
+  listed paths, whatever their names (an unusual cross-compiler
+  included), and skips the PATH scan.
+- **Given** a compiler named in a compiler environment variable,
+  **when** Bear starts, **then** it is wrapped, whether or not the
+  configuration lists compilers.
+- **Given** a build that runs `/opt/custom/bin/mycc -c test.c` directly,
+  with `mycc` not named in a compiler variable and not listed in the
+  configuration, **when** Bear finishes, **then** that invocation is not
+  intercepted.
+- **Given** a build under Bear, **when** the build runs, **then** the
+  wrapper directory `.bear/` exists in the working directory, and
+  **when** Bear exits, **then** it is removed and no wrapper artifacts
+  remain.
+- **Given** two Bear runs in the same working directory, **when** each
+  runs its build, **then** each uses the same wrapper directory path.
+- **Given** one Bear invocation that runs `./configure` and then `make`
+  (`sh -c './configure && make'`), **when** `./configure` records a
+  path into the wrapper directory, **then** that path stays valid for
+  `make`.
+- **Given** a Windows build with `CC=cl` (no `.exe` extension), **when**
+  the build compiles `test.c`, **then** the wrapper directory holds
+  exactly one wrapper for `cl`, which `cl`, `cl.exe`, and `CL.EXE` all
+  match, and the entry names the real `cl.exe` by absolute path.
 
 ## Non-functional constraints
 
-- Must not alter build output or exit codes
-- Must handle concurrent builds (parallel make) without losing reports
 - Platform: works on all supported platforms (Linux, macOS, FreeBSD,
-  Windows)
-- The wrapper binary path must be discoverable at runtime, not baked in
-  at build time (issue #668)
-- The `.bear/` directory name is deterministic so that paths written
-  during `./configure` survive into the `make` phase
+  Windows).
+- Bear finds the wrapper binary at run time, not at a path fixed when
+  Bear was built (issue #668).
 
 ## Known limitations
 
-**Only intercepts known compilers**: Unlike preload mode, which
-intercepts all `exec` calls regardless of the executable, wrapper mode
-only intercepts compilers that Bear knows about. If the build uses a
-compiler that is not in a recognized environment variable or not on
-PATH at Bear startup time, it will not be intercepted.
+**Only wrapped compilers are intercepted**: the wrapper mechanism sees
+only the compilers it wrapped at startup, and only when the build finds
+them through PATH or a compiler variable. A compiler that is not on
+PATH, not in a compiler variable, and not listed in the configuration
+is not intercepted.
 
-**PATH ordering conflicts** (issue #445): The `.bear/` directory must
-be first in PATH. If another tool (e.g. ccache's masquerade directory)
-is also first in PATH, the ordering can cause conflicts. See
-`interception-wrapper-recursion` for the specific ccache recursion
-problem and its solution.
+**Unrecognized compiler names** (issue #561): a compiler whose name
+Bear does not recognize is skipped by the PATH scan. It is wrapped only
+when a compiler variable names it, or when the configuration lists it.
+Listing it turns the PATH scan off, so the other compilers must be
+listed too.
 
-**Wrapper directory lifetime** (issue #654): If the user runs
-`bear -- ./configure` and `bear -- make` as separate commands, the
-`.bear/` directory is cleaned up after `./configure` exits. The
-Makefile may have recorded paths into `.bear/` (e.g. as the compiler
-path), causing "No such file or directory" errors during `make`. The
-workaround is to combine both steps under a single Bear invocation:
-`bear -- sh -c './configure && make'`. Using separate Bear invocations
-will always fail because the directory is removed when the first exits.
+**PATH ordering conflicts** (issue #445): the wrapper directory must be
+first in PATH. A masquerade directory such as ccache's can conflict
+with it. Resolving past masquerade wrappers is owned by
+`interception-wrapper-recursion`.
 
-**Cross-compilers may not be discovered** (issue #561): Bear discovers
-compilers from environment variables and common names. Cross-compilers
-with unusual names (e.g. `arm-none-eabi-gcc`) are only intercepted if
-they appear in `CC`, `CXX`, or similar variables.
-
-## Testing
-
-Given a project with a single C source file:
-
-> When the user configures wrapper mode and runs `bear -- cc -c test.c`,
-> then `compile_commands.json` is created with one entry for `test.c`,
-> and the compiler path in the entry is an absolute path to the real
-> compiler (not `.bear/cc`),
-> and the build exit code is preserved.
-
-Given `CC=gcc` (a bare name) or `CC=/usr/bin/gcc` (an absolute path) in
-the environment:
-
-> When the user runs `bear -- make`,
-> then Bear resolves the bare name via PATH to `/usr/bin/gcc` (the
-> absolute path needs no resolution),
-> creates `.bear/gcc` as the wrapper in both cases,
-> and the compilation database entry names `/usr/bin/gcc` as the
-> compiler.
-
-Given a wrapper that cannot reach the collector:
-
-> When the build invokes the wrapper for `cc -c test.c`,
-> then the wrapper still launches the real compiler,
-> the compiler's output is produced,
-> and the build's exit code is the real compiler's exit code -- the
-> failed report costs one database entry, never the build.
-
-Given a parallel build with multiple source files:
-
-> When the user runs `bear -- make -j4` with wrapper mode,
-> then all compilations are intercepted,
-> and the compilation database contains one entry per source file.
-
-Given a build that fails partway through:
-
-> When the user runs `bear -- make` and one compilation fails,
-> then Bear's exit code matches the build's exit code,
-> and the compilation database still contains entries for all attempted
-> compilations.
-
-Given a Windows build with `CC=cl` (no `.exe` extension):
-
-> When Bear sets up wrapper mode and the build compiles `test.c`,
-> then the wrapper directory contains exactly one wrapper for `cl` --
-> `cl`, `cl.exe`, and `CL.EXE` all match it, case- and extension-
-> insensitively --
-> and the database entry names the real `cl.exe` by absolute path.
-
-Given a build where the compiler is not in any environment variable:
-
-> When the build script directly invokes `/opt/custom/bin/mycc -c test.c`
-> without setting `CC`,
-> then the invocation is **not** intercepted in wrapper mode
-> (this is a known limitation -- preload mode would catch it).
-
-Given a successful build:
-
-> When `bear -- make` completes,
-> then the `.bear/` directory is removed automatically,
-> and no wrapper artifacts remain in the working directory.
-
-## Notes
-
-- Related requirement: `interception-preload-mechanism` (alternative
-  interception mode using `LD_PRELOAD`).
-- Related requirement: `interception-wrapper-recursion` (ccache
-  recursion prevention in wrapper mode).
-- The default mode per platform and the configuration override are
-  owned by `interception-mode-selection`.
+**Wrapper directory lifetime** (issue #654): Bear removes the wrapper
+directory when it exits. If the configure step runs under Bear and a
+later build step runs without Bear, a path recorded into the directory
+(for example as the compiler path) no longer exists, and the build
+fails with "No such file or directory". Running every step that uses
+the recorded path under Bear avoids this.
 
 ## Rationale
 
-- [Hard links, deterministic directory, resolve-at-startup](../rationale/wrapper-mode-design-decisions.md) -
-  why each wrapper-setup choice was made.
+- [Hard links, fixed directory, resolve at startup](../rationale/wrapper-mode-design-decisions.md)
