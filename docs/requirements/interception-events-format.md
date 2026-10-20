@@ -5,178 +5,98 @@ status: implemented
 
 ## Intent
 
-Bear's `intercept` mode writes a JSON Lines file of captured executions
-to a file the user names, and Bear's `semantic` mode reads the same
-file to produce a compilation database. The two modes already
-ship and work today. What is missing is a written contract: users and
-third-party tooling cannot tell which fields are stable, what guarantees
-the format makes, or how to produce a synthetic events file (for example,
-to convert an existing build log into a compilation database without
-re-running the build).
-
-The user expects the events file to be a documented interchange format:
-schema, encoding rules, and stability promise written down so external
-tools can produce or consume it without reverse-engineering Bear's
-sources.
-
-## Event schema
-
-Each event object has exactly these four keys. All four are required:
-a line missing any of them, or carrying one with the wrong JSON type, is
-a non-conforming line. The source-of-truth type is `intercept::Execution`
-in `crates/intercept/src/lib.rs`.
-
-| JSON key      | Type                     | Meaning                                                                    |
-|---------------|--------------------------|----------------------------------------------------------------------------|
-| `executable`  | string (filesystem path) | Path to the program run. May be absolute or a bare name, as the caller spelled it. |
-| `arguments`   | array of strings         | The argument vector; element zero is the program name (`argv[0]`).         |
-| `working_dir` | string (filesystem path) | Absolute working directory the program ran in.                             |
-| `environment` | object (string->string)  | Environment variables in effect for the program.                           |
-
-The stable subset is the four key names and their JSON types: changing
-any of them requires a major-version bump of the format, and across
-major versions compatibility is explicitly allowed to break. Within that
-promise, the *contents* of `environment` are advisory, not stable. Every
-Bear producer applies one shared filter before writing an event: the
-captured variables are reduced to the build-relevant subset - those that
-can influence which build tool runs or how it compiles. Which variables
-qualify is an implementation detail that may change between releases,
-with one fixed guarantee: `PATH`, when present in the captured
-environment, survives the filter, so bare executable names remain
-resolvable by the consumer. Beyond that, a consumer must not assume any
-particular variable is present, and a third-party producer may include
-or omit variables freely. Bear's own semantic analysis never resolves a
-bare `executable` -- the recorded compiler keeps the observed spelling --
-so a consumer that needs the concrete binary resolves the name in its own
-environment.
+Intercept mode writes the executions it captures to an events file the
+user names. Semantic mode reads an events file and produces a
+compilation database. The user expects the events file to be a
+documented interchange format: its schema, encoding, and stability are
+written down, so outside tools can produce or consume it without
+reading Bear's sources. One use is to turn an existing build log into a
+compilation database without running the build again.
 
 ## Acceptance criteria
 
-- One line of the events file is one JSON object describing a single
-  execution event, conforming to the schema above. Lines are
-  newline-terminated (`\n`); no comments; no trailing comma; UTF-8
-  encoded.
-- `bear semantic`, reading a named events file, accepts any file
-  conforming to the documented schema. The producer of the file does not
-  need to be Bear.
-- `bear semantic` is order-independent across event lines: the
-  same set of events in any order yields a `compile_commands.json` with
-  the same set of entries (modulo append-order semantics defined by
-  `output-append`).
-- A non-conforming line (invalid JSON, missing required field, wrong
-  type) is reported with line number and reason, and processing
-  continues with subsequent lines. Empty input yields an empty database.
-  Whether a run succeeds or exits non-zero -- in particular, that
-  non-empty input in which every line was rejected exits non-zero -- is
-  the exit-code contract's concern; see
-  [`cli-exit-codes`](cli-exit-codes.md). (A mode that reconstructs
-  executions from other input - shell text parsing - applies the same
-  skip-and-continue rule to that input; see
-  [`interception-shell-text-parsing`](interception-shell-text-parsing.md).)
-- `bear semantic` reads the event stream from standard input by default
-  (naming an input file is the explicit case), and any non-executing
-  producer may write the stream to standard output, so the format is
-  pipeable with no flags. Diagnostics go
-  to stderr, keeping stdout machine-readable. An interactive or empty
-  event stream produces a stderr notice - either one is almost always a
-  plumbing mistake.
-- A mode that runs the build does not accept the standard stream as the
-  event-file destination: the intercepted build's own output shares that
-  stream and would corrupt it (a non-atomic write can split a JSON
-  line), so `bear intercept` writes events only to a file - and because
-  no stream fallback exists, it has
-  no default destination either: the event file must be named
-  explicitly, and omitting it is a usage error reported before the
-  build runs.
-- The events file is written all or nothing, the same way as the
-  compilation database (see `output-atomic-write`): a build command that
-  cannot start leaves no events file and no temporary file behind. The
-  events file therefore appears only when the run ends; during the build
-  the events go to the temporary file
+Format rules:
+
+- One line of the events file is one JSON object that describes one
+  execution. Lines end with `\n`. The file is UTF-8, with no comments
+  and no trailing commas.
+- Each event object has exactly these four keys, all required. A line
+  that misses one, or holds one with the wrong JSON type, does not
+  conform.
+
+  | JSON key      | Type                     | Meaning                                                                    |
+  |---------------|--------------------------|----------------------------------------------------------------------------|
+  | `executable`  | string (filesystem path) | Path to the program run. Absolute, or a bare name as the caller spelled it. |
+  | `arguments`   | array of strings         | The argument vector. Element zero is the program name (`argv[0]`).         |
+  | `working_dir` | string (filesystem path) | Absolute working directory the program ran in.                             |
+  | `environment` | object (string->string)  | Environment variables in effect for the program.                           |
+
+- The stable part is the four key names and their JSON types. Changing
+  any of them needs a major-version bump of the format. Across major
+  versions, compatibility may break.
+- The contents of `environment` are advisory, not stable. Every Bear
+  producer keeps only the variables that can change which build tool
+  runs or how it compiles. Which variables those are may change between
+  releases, with one fixed rule: `PATH`, when captured, is kept, so a
+  consumer can resolve bare executable names. A consumer must not assume
+  any other variable is present. A third-party producer may include or
+  leave out variables freely. The database records the compiler as
+  spelled, never resolved (owned by
+  [`output-json-compilation-database`](output-json-compilation-database.md)).
+
+Scenarios:
+
+- **Given** an events file from a third-party tool that conforms to the
+  schema, **when** semantic mode reads it, **then** the database holds
+  one entry per recognized compiler call in the file.
+- **Given** an events file from a successful intercept mode run, by the
+  same Bear or by an earlier release in the same major version of the
+  format, **when** semantic mode reads it, **then** the run succeeds and
+  the database equals the one combined mode gives for the same build.
+- **Given** the same three compiler events written to one file in order
+  and to a second file reversed, **when** semantic mode reads each file,
+  **then** both databases hold the same three entries. Only their order
+  may differ. Order rules when appending are owned by
+  [`output-append`](output-append.md).
+- **Given** an events file with one malformed line (invalid JSON, a
+  missing key, a wrong type) in the middle, **when** semantic mode reads
+  it, **then** Bear reports the line number and the reason, keeps
+  reading the lines after it, and writes a database from the valid
+  lines. Whether the run fails, for example when every line is rejected,
+  is owned by [`cli-exit-codes`](cli-exit-codes.md). Parse-sh mode uses
+  the same skip-and-continue rule for its own input
+  ([`interception-shell-text-parsing`](interception-shell-text-parsing.md)).
+- **Given** a producer piped into semantic mode with no input file
+  named, **when** semantic mode runs, **then** it reads the events from
+  standard input, and the database holds one entry per recognized
+  compiler call. Diagnostics go to standard error.
+- **Given** semantic mode reading an empty input, from a named file or
+  from standard input, **when** it runs, **then** it exits `0`, writes
+  an empty database, and prints a warning on standard error that the
+  input held no events.
+- **Given** semantic mode reading standard input that is a terminal,
+  **when** it starts, **then** it prints a warning on standard error.
+  Both warnings are shown by default; levels are owned by
+  [`cli-diagnostic-format`](cli-diagnostic-format.md).
+- **Given** intercept mode with no events file named, **when** the user
+  runs it, **then** Bear exits with a usage error before the build runs.
+  There is no default events file.
+- **Given** a mode that runs the build (intercept mode, combined mode)
+  asked to write its output to standard output, **when** the user runs
+  it, **then** Bear exits with an error before the build runs, the error
+  says the output cannot go to standard output, and no file named `-`
+  is created. The build's own output shares that stream.
+- The events file is written all or nothing, as owned by
+  [`output-atomic-write`](output-atomic-write.md).
 
 ## Non-functional constraints
 
-- The format must round-trip: events produced by `bear intercept` must
-  always be accepted by `bear semantic`. A regression in either
-  direction is a bug.
-- The format must remain JSON Lines, not a single JSON array. This
-  matters for streaming producers and for fault-tolerant readers
-  (a truncated file still yields N-1 valid events).
-- The wire schema documented in this requirement is normative for the
-  events file format.
-
-## Testing
-
-Given a synthetic events file produced by a third-party tool that
-conforms to the schema:
-
-> When the user runs `bear semantic --input synthetic.json -o cdb.json`,
-> then `cdb.json` contains one compilation entry per recognizable
-> compiler invocation in the synthetic file.
-
-Given a Bear-produced events file from a successful `bear intercept`
-run -- produced by the same Bear, or by any earlier Bear release within
-the same major-version line of the format (the schema section above owns
-that stability promise):
-
-> When the user runs `bear semantic --input events.json` against it,
-> then the run succeeds and the resulting compilation database is
-> identical to the one produced by an equivalent `bear -- <build>` run.
-
-Given the same three compilation events written to one file in order and
-to a second file reversed:
-
-> When the user runs `bear semantic` over each file,
-> then the two compilation databases contain the same set of three
-> entries; only their order may differ.
-
-Given an events file with one malformed line in the middle:
-
-> When the user runs `bear semantic --input broken.json`,
-> then Bear reports the line number and parse reason,
-> processes the surrounding valid lines,
-> and writes a compilation database from the valid subset.
-
-Given a producer piped directly into `bear semantic` with no input
-file named:
-
-> When the user runs `<producer> | bear semantic -o cdb.json`,
-> then the event stream is read from standard input and `cdb.json`
-> contains one entry per recognizable compiler invocation.
-
-Given `bear semantic` reading standard input with nothing piped in:
-
-> When the user runs `bear semantic -o cdb.json` on the empty stream,
-> then `bear` exits `0`,
-> `cdb.json` is written as an empty database,
-> and a stderr notice reports that the stream contained no events.
-
-Given `bear intercept` invoked without naming an event file:
-
-> When the user runs `bear intercept -- <build>`,
-> then Bear exits with a usage error before running the build.
-
-Given `bear intercept` asked to write events to the standard stream:
-
-> When the user runs `bear intercept --output - -- <build>`,
-> then Bear exits with a usage error before running the build,
-> the error explains that events cannot go to standard output,
-> and no file literally named `-` is created.
-
-## Notes
-
-- Issue #644 -- the demand signal for a documented interchange
-  contract. Bear's shell-text parsing
-  ([`interception-shell-text-parsing`](interception-shell-text-parsing.md))
-  reconstructs executions on the same execution model but produces the
-  compilation database directly and does not write this file; the events
-  file is the interchange surface for `bear intercept` and third-party
-  producers.
-- A build-log parser is out of scope *for this requirement* - it defines
-  only the interchange contract.
+- The format round-trips: events written by intercept mode are always
+  accepted by semantic mode. A break in either direction is a bug.
+- The format stays JSON Lines, not a single JSON array, so a producer
+  can stream it and a truncated file still yields its complete lines.
+- The schema in this file is normative for the events file.
 
 ## Rationale
 
-- [`event-file-defaults`](../rationale/event-file-defaults.md) - why
-  `intercept` has no default event-file name and `semantic` reads
-  standard input by default.
+- [event-file-defaults](../rationale/event-file-defaults.md)

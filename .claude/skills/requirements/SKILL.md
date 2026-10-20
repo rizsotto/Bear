@@ -80,8 +80,7 @@ mechanism is worse than no link.
 ```
 
 Both must exit 0. The `REVIEW` lines are prompts, not verdicts. A hit in
-Intent or acceptance criteria almost always needs a fix. A type named
-on purpose as the source of truth for an interchange format stays.
+Intent or acceptance criteria almost always needs a fix.
 
 Then read the touched file once more against steps 1 to 4 and
 `TEMPLATE.md`.
