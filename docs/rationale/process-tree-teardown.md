@@ -1,130 +1,91 @@
-# Process-tree teardown and event-driven supervision
+# Tear down the whole build tree: process group, then cgroup, with real-signal forwarding
 
 ## Context
 
 When Bear supervises a build (`bear -- make`) and a termination signal
-arrives, the whole process subtree underneath the build must stop, within
-the sub-one-second budget the signal-forwarding requirement sets, and Bear
-should still be able to write the partial `compile_commands.json` it has
-collected so far. The original `supervise()` only `child.kill()`ed the
-direct child with `SIGKILL`, which (a) left grandchildren reparented to
-init and running, and (b) being un-trappable, gave neither a build's own
-trap nor in-flight compilers any chance to wind down.
+arrives, the whole process tree under the build must stop within the
+budget that [cli-signal-forwarding](../requirements/cli-signal-forwarding.md)
+sets. Bear should still write the partial `compile_commands.json` it has
+collected. The first `supervise()` only sent `SIGKILL` to the direct
+child. Grandchildren were reparented to init and kept running. And
+`SIGKILL` cannot be trapped, so neither the build's own trap nor running
+compilers got a chance to wind down.
 
-Three mechanisms can terminate an entire subtree, one per platform family:
+Three mechanisms can stop a whole tree:
 
-| Platform | Mechanism | A child can escape it? |
+| Platform | Mechanism | Can a child escape? |
 |---|---|---|
-| any unix | process group (`setsid`/`setpgid`) + `killpg` | yes - by calling `setsid` itself |
-| Linux | cgroup v2 `cgroup.kill` | no - unprivileged moves are denied |
+| any unix | process group (`setpgid`/`setsid`) + `killpg` | yes, by calling `setsid` itself |
+| Linux | cgroup v2 `cgroup.kill` | no, unprivileged moves are denied |
 | Windows | Job Object (`KILL_ON_JOB_CLOSE`) | no |
 
-Process groups are portable across unix and need no new dependency (`libc`
-is already present); the same group-kill *technique* is already proven in
-the version-probe watchdog (`semantic/src/interpreters/compilers/probe.rs`),
-though Stage 1 uses the lighter `Command::process_group(0)` (safe std, keeps
-the session) rather than the watchdog's `unsafe` `setsid`. Their one gap is
-a child that
-deliberately `setsid`s away to daemonize. cgroups close that gap but require
-cgroup v2, a writable/delegated cgroup directory, and
-`clone3(CLONE_INTO_CGROUP)` or a `pre_exec` write to `cgroup.procs` - none
-exposed by `std::process::Command` - plus a runtime fallback. Job Objects
-need a `windows-sys` dependency, and Bear has too few Windows users to
-justify designing that path yet.
+Process groups work on every unix and need no new dependency (`libc` is
+already there). Their one gap is a child that calls `setsid` to
+daemonize. cgroups close that gap, but they need cgroup v2, a writable
+(delegated) cgroup directory, and a way to start the child inside it.
+`std::process::Command` exposes none of that, so it takes a `pre_exec`
+write to `cgroup.procs` and a runtime fallback. Job Objects need a
+`windows-sys` dependency, and Bear has too few Windows users to justify
+that path.
 
-Two further forces shaped the design:
+The group is made with the safe `Command::process_group(0)`. The
+compiler version probe uses `setsid` instead. The two are not
+interchangeable: the probe needs its own session, and the reason is in
+a comment next to the probe code.
 
-- **Waiting without polling.** `std::process::Child::wait()` blocks
-  uninterruptibly and cannot watch for a signal at the same time, which is
-  why the original loop polled with `try_wait()` + `sleep(100ms)`. A
-  SIGCHLD-driven blocking loop (portable, reuses the already-present
-  `signal-hook`) removes the poll and its latency; a Linux-only `poll()`
-  over a `pidfd` + `signalfd` would be strictly nicer but Linux-5.3+ and
-  more `libc` code.
+Waiting was the second problem. `Child::wait()` blocks and cannot watch
+for a signal at the same time, so the old loop polled with `try_wait()`
+and a 100ms sleep. Options:
 
-- **Nested supervisors.** In wrapper mode the chain is `bear-driver` ->
-  `make` -> `bear-wrapper` -> real `cc` (the wrapper is a Rust binary on the
-  same `supervise()` path, not a shell script). If *every* level created a
-  new process group, the build would fragment into many groups and a
-  top-level `killpg` would miss the deeper processes - re-opening the very
-  escape hole grouping is meant to close.
+- Keep polling. Rejected: it adds up to 100ms latency to every signal.
+- A `poll()` over a `pidfd` and a `signalfd`. Rejected: nicer, but
+  Linux 5.3+ only and more `libc` code.
+- A blocking loop on `SIGCHLD` plus the termination signals, using the
+  `signal-hook` crate Bear already has. Chosen: portable and no poll.
+
+Nesting was the third. In wrapper mode the chain is `bear-driver` ->
+`make` -> `bear-wrapper` -> real `cc`, and the wrapper runs the same
+`supervise()`. If every level made a new process group, the build would
+split into many groups. A top-level `killpg` would then miss the deeper
+processes, which reopens the hole grouping is meant to close.
 
 ## Decision
 
-- **Two-stage tree teardown.** Stage 1 puts each supervised build in its
-  own process group and signals the group -- portable across unix and
-  needing no new dependency. Stage 2, on Linux only, additionally places
-  the build in a fresh cgroup v2 and reaps it with `cgroup.kill`, catching
-  a descendant that `setsid`s out of the process group; it is best-effort
-  and falls back to Stage 1 when cgroup v2 is unavailable or its directory
-  is not delegated. Both go through the leader's single grace-then-force
-  escalation; the graceful phase stays group-based because `cgroup.kill`
-  can only `SIGKILL`. A Windows Job Object is a possible later third path;
-  non-unix keeps single-process kill.
-- **Only the outermost supervisor groups.** The driver creates the group
-  and owns the authoritative group-kill; nested wrappers inherit the group
-  and merely forward, so a single top-level kill reaches the whole tree.
-  Grouping is a per-caller policy, not baked unconditionally into shared
-  supervision.
-- **Graceful, real-signal forwarding.** Forward the signal Bear actually
-  received (not a hardcoded one) to the group, give the tree a grace window
-  to wind down and let Bear write the partial database, then escalate to
-  `SIGKILL`.
-- **Event-driven wait** replaces the poll: a signal-driven blocking wait
-  reacts at signal speed, and the grace-then-`SIGKILL` escalation runs off
-  a deadline inside that loop.
+The outermost supervisor puts the build in its own process group and,
+on Linux, also in a fresh cgroup. On a signal it forwards the real
+signal to the group, waits a short grace window, then sends `SIGKILL` to
+the group, or kills the cgroup when there is one. Nested supervisors
+stay in the inherited group and only relay the signal to their child.
 
 ## Consequences
 
-- No new dependency for Stage 1: the primitives it needs are already in the
-  tree, and the group-kill technique is borrowed from the existing watchdog.
-- The poll and its up-to-100ms latency are gone; teardown reacts at signal
-  speed, inside the budget.
-- Build drivers such as `make -j`, `ninja`, and `cmake --build` install
-  their own handlers to stop their workers on termination; forwarding the
-  real signal leaves that behaviour intact, so Bear relies on it rather
-  than re-implementing per-tool worker teardown. This is why the
-  requirement constrains Bear not to interfere with the build tool's own
-  signal handling.
-- The child leaves Bear's process group, so the tty no longer delivers
-  Ctrl-C to the build directly - Bear becomes the sole conduit. This is what
-  makes reliable tree-kill and real-signal forwarding possible and fixes
-  trap support in the non-tty (CI `SIGTERM`) case; the trade-off is that any
-  gap in Bear's forwarding loses the tty backstop. Accepted.
-- Stage 2 closes the `setsid`-escape hole on Linux hosts with a usable
-  cgroup; where none is available the hole remains and the documented
-  process-group fallback applies. A descendant that detaches gets no grace
-  window (it left the group the graceful signal targets) - only the final
-  `cgroup.kill`. Accepted: a daemon that deliberately detaches forfeits the
-  graceful wind-down.
-- Each supervised build creates and removes one cgroup directory; a normal
-  build leaves nothing behind, and the kill path's directory cleanup retries
-  briefly because killed processes are reaped asynchronously by init.
-- The "only the outermost supervisor groups" rule keeps wrapper-mode nesting
-  correct and keeps the wrapper's supervision simple (forward + propagate
-  exit code); the wrapper inherits the leader's cgroup through the child, so
-  one `cgroup.kill` reaches the whole tree.
-- The cgroup stays a Linux-only, runtime-detected layer; a Windows Job
-  Object and a pidfd-based wait remain possible later additions.
-
-## Rejected: unifying the probe watchdog on `process_group(0)`
-
-It is tempting to drop the `unsafe setsid` in the version-probe watchdog
-(`semantic/src/interpreters/compilers/probe.rs`) and reuse Stage 1's safe
-`Command::process_group(0)`, on the theory that `setsid`'s extra
-controlling-terminal detach is a no-op once `stdin` is null and
-`stdout`/`stderr` are pipes. Testing refutes it: under the parallel probe
-suite, `process_group(0)` produced intermittent misclassification (3 of 8
-runs failed) while `setsid` did not (0 of 13). `setsid` gives each
-short-lived probe its own session with no controlling terminal;
-`process_group(0)` leaves it a background group inside the test runner's
-session and terminal, and under concurrency that difference is observable.
-The two calls are therefore *not* interchangeable in general - the lighter
-one is right for a single supervised build (Stage 1) but wrong for the
-probe. The probe keeps `setsid`.
+- No new dependency. The wait reacts at signal speed, inside the budget.
+- Build tools such as `make -j`, `ninja` and `cmake --build` stop their
+  own workers when signaled. Forwarding the real signal keeps that
+  working, so Bear does not reimplement worker teardown per tool. This
+  is why the requirement says Bear must not interfere with the build
+  tool's own signal handling.
+- The graceful phase is group-based because `cgroup.kill` can only send
+  `SIGKILL`. A descendant that detached with `setsid` gets no grace
+  window, only the final `cgroup.kill`. Accepted: a daemon that detaches
+  on purpose gives up the graceful wind-down.
+- Without a usable cgroup (not Linux, no cgroup v2, no delegated
+  directory, kernel without `cgroup.kill`) the `setsid` hole stays open
+  and teardown falls back to the process group.
+- The build leaves Bear's process group, so the terminal no longer sends
+  Ctrl-C to the build directly. Bear is the only path for the signal.
+  This is what makes tree teardown and real-signal forwarding reliable,
+  and it fixes traps in the non-terminal case (CI `SIGTERM`). The cost is
+  that a gap in Bear's forwarding has no terminal backstop. Accepted.
+- Each build creates and removes one cgroup directory. Killed processes
+  are reaped by init later, so removal after a kill retries briefly.
+- The wrapper stays simple (forward and pass the exit code back). It
+  inherits the leader's cgroup through its parent, so one `cgroup.kill`
+  reaches the whole tree.
+- Outside unix, Bear still kills only the direct child. Revisit with a
+  Job Object if Windows users report builds that outlive Bear.
 
 ## References
 
-- Requirement: `cli-signal-forwarding`
-- Prior art in-tree: the version-probe watchdog's `setsid` + `killpg`
-  teardown (`semantic/src/interpreters/compilers/probe.rs`)
+- [cli-signal-forwarding](../requirements/cli-signal-forwarding.md), the requirement this supports
+- [#713](https://github.com/rizsotto/Bear/issues/713), the starved CI runner that sized the grace window

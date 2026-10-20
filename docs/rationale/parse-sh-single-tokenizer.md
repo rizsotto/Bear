@@ -2,91 +2,73 @@
 
 ## Context
 
-The first parse-sh implementation (the 4.2.0-rc branch) split lexical
-knowledge across several independent scanners: the lexer's word reader
-owned quotes, escapes, and comments; the interpreter re-scanned the raw
-line with its own quote rules to detect here-documents and again to read
-the here-doc delimiter; and a separate pre-pass joined backslash-newline
-continuations, duplicating the lexer's own continuation stripping. That
-structure produced a whole bug class from those scanners drifting apart:
-the here-doc detector did not understand comments, so a `<<` inside a
-trailing `#` comment silently swallowed all subsequent lines; its
-delimiter reader used a different word-break set
-than the lexer, so a here-doc inside a subshell swallowed the rest of
-the input; and a redirect-target reader dropped the unterminated-quote
-signal the word reader had already computed, fabricating executions from
-quoted text. Point fixes close each hole, but the shape guarantees more:
-any two scanners over the same text will disagree eventually.
+The first parse-sh (the 4.2.0-rc branch) split its lexical rules across
+several scanners. The lexer's word reader owned quotes, escapes and
+comments. The interpreter scanned the raw line again, with its own quote
+rules, to find here-documents and to read their delimiters. A separate
+pre-pass joined backslash-newline continuations, which the lexer also
+did.
 
-Alternatives on the table for a structural fix:
+The scanners drifted apart, and each drift was a bug. The here-doc
+detector did not know about comments, so a `<<` in a trailing `#`
+comment swallowed every later line. Its delimiter reader broke words
+differently from the lexer, so a here-doc inside a subshell swallowed
+the rest of the input. A redirect-target reader dropped the
+unterminated-quote signal the word reader had already found, and so
+made up executions from quoted text. Any two scanners over the same
+text will disagree in the end.
 
-- Keep the multi-scanner shape, point-fix each divergence as found.
-  Rejected: it treats symptoms; the next divergence is a matter of time,
-  and each fix must be re-discovered by review rather than prevented.
-- Rebuild the parser on a parser-combinator library (nom or winnow),
-  producing an AST walked by a visitor to emit executions. Rejected on
-  three grounds. First, combinators restructure the scanner but do not
-  encode POSIX; the bugs found were missing grammar knowledge (the `>|`
-  operator, comment boundaries) and would survive a mechanical rewrite.
-  Second, shell is hostile to combinator parsing: a here-doc body binds
-  at the next newline, not at the `<<` operator, forcing stateful
-  two-phase lexing that fights the combinator model (real shells
-  hand-write their lexers for this reason). Third, a full AST inverts
-  the contract: the requirement defines a supported subset with loud
-  skips and "never guesses"; certifying that property means auditing
-  what the lexer recognizes, which is easy, not what a general parser
-  accepts, which is not. It would also add a dependency against the
-  workspace's minimal-dependency rule for no removed complexity.
-- Adopt a complete POSIX shell parser crate (yash-syntax). Rejected for
-  the same contract inversion, in stronger form: it parses all of shell,
-  so every construct it accepts needs either semantics or a mapping back
-  to a skip reason, and the deliberately small subset stops being small.
-- One hand-written tokenizer owning every lexical rule, feeding a
-  token-consuming parser that owns the interpreter state. Chosen.
+Options considered:
+
+- Keep the scanners and fix each drift as it is found. Rejected: it
+  treats symptoms, and each fix has to be found by review instead of
+  being prevented.
+- Rebuild on a parser-combinator crate (nom or winnow), producing an AST
+  that a visitor turns into executions. Rejected for three reasons.
+  Combinators change the scanner but do not add POSIX knowledge, and the
+  bugs were missing grammar knowledge (the `>|` operator, comment
+  bounds). Shell fights combinators: a here-doc body starts at the next
+  newline, not at `<<`, which needs stateful two-phase lexing (real
+  shells hand-write their lexers for this reason). And a full AST
+  inverts the contract: the requirement is a small subset with loud
+  skips that never guesses, and that is easy to audit in a lexer but
+  hard in a general parser. It would also add a dependency that removes
+  no complexity.
+- Use a complete POSIX shell parser crate (yash-syntax). Rejected for
+  the same contract inversion, only stronger. It parses all of shell, so
+  every construct it accepts needs either semantics or a mapping to a
+  skip reason, and the small subset stops being small.
+- One hand-written tokenizer that owns every lexical rule, feeding a
+  parser that owns the interpreter state. Chosen.
 
 ## Decision
 
-parse-sh is split into a single streaming tokenizer and a token-stream
-parser: the tokenizer is the only code that reads characters (quotes and
-escapes, comments, backslash-newline continuations, redirect operators
-and their targets, here-documents, and the recursive-make directory
-markers) and emits a small token set plus recoverable skip items for
-unsupported constructs, while the parser consumes those tokens and owns
-all interpreter state (working directory, the marker-driven directory
-stack, and the positional `VAR=value` environment overlay).
+The tokenizer is the only code that reads characters: quotes, escapes,
+comments, continuations, redirections, here-documents and the
+recursive-make directory markers. The parser reads its tokens and skip
+items and owns all interpreter state: the working directory, the
+directory stack, and the `VAR=value` overlay.
 
-Both stages are incremental state machines that hold at most one logical
-line, so a skip anywhere on a line can still poison the whole line while
-memory stays bounded by the longest line. Three invariants keep the
-split sound: the tokenizer keeps scanning a line after a skip (so a later
-`<<` on the same line is still seen) and the parser discards to the next
-newline; quote state resets at every newline, matching the line-oriented
-contract; and the tokenizer does no ambient I/O, surfacing read failures
-in-band as the stream's last item so the caller cannot lose them.
+After a skip the tokenizer keeps scanning the line, so a later `<<` is
+still seen, and the parser discards up to the next newline. Quote state
+resets at every newline, to match the line-oriented contract.
 
 ## Consequences
 
-- The reviewed bug class becomes unrepresentable rather than patched:
-  there is no second scanner to drift. Comment, quote, and word-break
-  rules exist in exactly one place.
-- A skip cannot be silently dropped; `Result` forces every consumer to
-  handle it, which is the loud-skip contract expressed in the type.
-- Memory is bounded by the longest logical line for input of any size:
-  a gigabyte build log streams through without being held, and events
-  reach the consumer as they are recognized.
-- The grammar is still hand-maintained. Missing POSIX knowledge (the
-  `>|` class of bug) is not prevented by this shape, only made cheaper
-  to add in one place. The skip path remains the pressure valve; the
-  subset must not grow toward a full shell (see
-  [parse-sh-producer](parse-sh-producer.md)).
+- The drift bugs cannot happen, because there is no second scanner.
+  Comment, quote and word-break rules live in one place.
+- A skip cannot be dropped silently. Tokens come as a `Result`, so every
+  consumer must handle it. This is the loud-skip contract in the type.
+- Both stages are streaming state machines that hold at most one
+  logical line. A gigabyte build log streams through, and events reach
+  the consumer as each line completes.
+- The grammar is still written by hand. Missing POSIX knowledge (the
+  `>|` kind of bug) is not prevented, only cheaper to add in one place.
+  The skip path stays the pressure valve, and the subset must not grow
+  toward a full shell (see [parse-sh-producer](parse-sh-producer.md)).
 
 ## References
 
-- Requirement:
-  [`interception-shell-text-parsing`](../requirements/interception-shell-text-parsing.md)
-  (the contract whose loud-skip clause drives the design).
-- Rationale: [parse-sh-producer](parse-sh-producer.md) (why the
-  producer exists and stays quarantined; this entry governs only its
-  internal shape).
-- Considered and rejected crates: nom / winnow (parser combinators),
-  yash-syntax (complete POSIX shell parser).
+- [interception-shell-text-parsing](../requirements/interception-shell-text-parsing.md), the contract whose loud-skip clause drives the design
+- [parse-sh-producer](parse-sh-producer.md), why the producer exists; this entry covers only its internal shape
+- [nom](https://crates.io/crates/nom), [winnow](https://crates.io/crates/winnow) and [yash-syntax](https://crates.io/crates/yash-syntax), the rejected crates
