@@ -31,8 +31,8 @@ for file in "${repo_root}/docs/requirements"/*.md; do
     [ -e "${file}" ] || continue
     base="$(basename "${file}" .md)"
 
-    # Skip the CLAUDE.md (not a requirement file)
-    if [ "${base}" = "CLAUDE" ]; then
+    # Skip the non-requirement files
+    if [ "${base}" = "CLAUDE" ] || [ "${base}" = "TEMPLATE" ]; then
         continue
     fi
 

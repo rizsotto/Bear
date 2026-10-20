@@ -52,13 +52,17 @@ Keep the roles separate. A requirement says *what*; a rationale entry
 says *why*; the code says *how*. The man page is the user-facing
 reference for CLI flags and configuration keys; the site is the user guide.
 
+Each rule lives in one file. Other files link to it and never restate it.
+
 ## Workflow
 
 1. **Start the task.** Pick it up in the task tracker.
 2. **Classify the change.** A new feature, an architectural change, or a
    change to an existing contract takes every step. A
    bug fix that does not change a contract skips steps 3 and 7, and cites
-   the governing requirement if one exists.
+   the governing requirement if one exists. Any other change (refactor,
+   performance, internal) skips step 3. Every change finds its governing
+   requirement and keeps its acceptance criteria passing.
 3. **Requirement and approval.** Write or edit the requirement at status
    `proposed` (`docs/requirements/CLAUDE.md`, `requirements` skill).
    Present a short decision log (approach, alternatives considered,
@@ -80,7 +84,9 @@ reference for CLI flags and configuration keys; the site is the user guide.
    Integration tests need a debug build (`cargo build`) before `cargo test`.
 7. **Different-model review.** Have a review subagent on a different
    model check the change (the `Agent` tool with a different `model`).
-8. **Commit.** See "Commit messages" below.
+8. **Commit.** If the change implements a requirement, set it to
+   `implemented` first (`docs/requirements/CLAUDE.md`). See "Commit
+   messages" below.
 9. **Close the task** in the task tracker, citing the commit.
 
 ## Code guidelines

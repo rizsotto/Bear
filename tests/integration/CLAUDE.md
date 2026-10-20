@@ -42,8 +42,8 @@ fn append_works_as_expected() -> Result<()> { ... }
 
 Rules:
 
-- Value is a comma-separated list of requirement IDs (filenames in
-  `docs/requirements/` without the `.md` extension).
+- Value is a comma-separated list of requirement IDs (see
+  `docs/requirements/CLAUDE.md`).
 - Place the tag on the line(s) directly above `#[test]` (or the test macro).
 - If every test in a file covers the same requirement, a file-level
   `//! Requirements: <id>` near the top is sufficient. Test-level tags
