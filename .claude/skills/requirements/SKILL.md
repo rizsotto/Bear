@@ -69,7 +69,7 @@ the list in `docs/requirements/CLAUDE.md`, strike:
 A link is two claims: the target exists, and the gloss describes it.
 The script below checks the first. For the second, read the target and
 confirm the sentence around the link matches what that file owns. A
-gloss describing env-derived flags that links the wrapper-mode
+gloss describing env-derived flags that links the wrapper
 mechanism is worse than no link.
 
 ## 5. Verify before finishing

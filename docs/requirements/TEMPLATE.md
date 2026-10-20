@@ -13,7 +13,7 @@ What the user expects to happen, from the user's point of view.
 
 Given-When-Then scenarios. Each one is a single observable outcome that a
 test can verify. Use plain rules or a table only where there is no natural
-Given, such as a format rule or a list of recognized names.
+Given, such as a format rule or a list of deliberately excluded names.
 
 - **Given** a build that compiles one source file, **when** Bear finishes,
   **then** the output holds one entry for that file.
