@@ -42,17 +42,8 @@ the release, posting the announcement).
 
 ## 2. Pre-flight checklist
 
-Run from the repo root on `next`:
-
-```sh
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo build --verbose          # integration tests need a debug build
-cargo test
-typos
-```
-
-All five must pass before tagging.
+Run the checks in root `CLAUDE.md` (Workflow step 6) from the repo root
+on `next`. All must pass before tagging.
 
 Then verify the release metadata:
 
@@ -61,17 +52,14 @@ Then verify the release metadata:
 | Workspace version | `Cargo.toml` (`[workspace.package]`) | matches `X.Y.Z` |
 | Lockfile in sync | `Cargo.lock` | `bear`, `compilers-codegen`, etc. show `X.Y.Z`; clean `cargo build` does not modify it |
 | Man page date | `man/bear.1.md` line 3 | set to today (e.g. `April 25, 2026`) |
-| Man page generated | `man/bear.1` | regenerated from `.md` (see below) |
+| Man page generated | `man/bear.1` | regenerated from `.md` (`man/CLAUDE.md`) |
 
 If the workspace version does not match, commit
 `chore(release): bump version to X.Y.Z` on `next` with the refreshed
 `Cargo.lock`, push, and let CI run.
 
-If the man page date or content changed, regenerate `bear.1`:
-
-```sh
-cd man && pandoc -s -t man bear.1.md -o bear.1
-```
+If the man page date or content changed, regenerate `bear.1` as
+`man/CLAUDE.md` describes.
 
 Commit any pre-flight fixups to `next` and let CI run again.
 

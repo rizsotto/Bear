@@ -81,7 +81,7 @@ Each rule lives in one file. Other files link to it and never restate it.
    typos
    ```
 
-   Integration tests need a debug build (`cargo build`) before `cargo test`.
+   Run `cargo build` before `cargo test` (`tests/integration/CLAUDE.md`).
 7. **Different-model review.** Have a review subagent on a different
    model check the change (the `Agent` tool with a different `model`).
 8. **Commit.** If the change implements a requirement, set it to

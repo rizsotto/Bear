@@ -24,9 +24,6 @@ the generated output against accidental schema drift.
 
 ## Adding a compiler
 
-Read `crates/semantic/compilers/CLAUDE.md`. After editing YAML, run
-`cargo build` to regenerate, then `cargo test` to validate (the
-snapshot tests will diff the generated tables). Every `recognize:`
-entry needs a `description` and a `references` list -- see
-`crates/semantic/compilers/CLAUDE.md` for the schema; both are validated
-in `yaml_types.rs::RecognizeEntry::validate`.
+The steps are in `crates/semantic/compilers/CLAUDE.md`. The
+`recognize:` checks it lists live in
+`yaml_types.rs::RecognizeEntry::validate`.

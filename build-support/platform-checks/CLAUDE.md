@@ -43,7 +43,7 @@ proper is dependency-free.
 
 ## What this crate does NOT decide
 
-It detects host capabilities, not consumer behavior. The list of
-symbols that the preload C shim actually exports lives in
-`crates/intercept-preload/build.rs::INTERCEPT_FAMILY`; the source of
-truth is `crates/intercept-preload/src/c/shim.c`.
+It detects host capabilities, not consumer behavior. Which symbols the
+preload shim exports is decided in `crates/intercept-preload`. Adding an
+intercepted function touches `SYMBOL_PROBES` here as one of three edits;
+`crates/intercept-preload/CLAUDE.md` lists them.

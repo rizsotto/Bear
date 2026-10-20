@@ -4,7 +4,7 @@
 
 ## Generating the man page
 
-After editing `bear.1.md`, regenerate:
+After editing `bear.1.md`, regenerate from the `man/` directory:
 
 ```sh
 pandoc -s -t man bear.1.md -o bear.1

@@ -71,8 +71,7 @@ Diataxis type. Moving a page between sections means moving its file too.
    Put the evidence in the commit message or pull request.
 5. **Wiki-migrated text is a source, not a truth.** Verify each claim
    against current 4.x behaviour.
-6. **ASCII only.** No em dashes, smart quotes, or Unicode bullets. Use
-   hyphens, straight quotes, three dots, and `-` or `*` for bullets.
+6. **ASCII only**, as root `CLAUDE.md` ("Output format") says.
 7. **Kebab-case file names that match the query**, for example
    `compile-commands-for-makefile.md`.
 8. **Cross-link related pages, and link back to the recipe index.**

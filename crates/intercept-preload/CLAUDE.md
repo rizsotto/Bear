@@ -33,9 +33,12 @@ supported platforms:
    `exports.txt` on macOS) into `OUT_DIR`.
 4. Emits cdylib link args:
    - Linux: `-Wl,--whole-archive`, `-Wl,--version-script=...`,
-     `-Wl,-rpath,$ORIGIN`, plus a linker selection (bundled rust-lld,
-     then system lld, then mold; GNU ld cannot link this library --
-     see `docs/rationale/preload-linker-selection.md`).
+     `-Wl,-rpath,$ORIGIN`, plus a `-fuse-ld` choice from
+     `emit_elf_linker_selection()`. The order and why GNU ld is out are
+     in `docs/rationale/preload-linker-selection.md`; the user-facing
+     linker prerequisite is in `INSTALL.md`. If the linker set or order
+     changes, update the code and the rationale. If the set changes,
+     update `INSTALL.md` too.
    - macOS: `-Wl,-force_load,...`,
      `-Wl,-exported_symbols_list,...`, `-Wl,-rpath,@loader_path`.
 

@@ -21,6 +21,7 @@ Build, lint, and test with:
    cargo fmt --check
    cargo clippy --all-targets -- -D warnings
    cargo test
+   typos
    ```
 
 Integration tests require a debug build (`cargo build`) to be present before
@@ -28,7 +29,7 @@ running `cargo test`.
 
 ## Reporting bugs
 
-- Please read the documentation — it may be a known limitation of the current
+- Please read the documentation. It may be a known limitation of the current
   release. This might also help to clear false expectations about the tool, or
   help you classify your request not as a bug but as an enhancement.
 
@@ -37,7 +38,7 @@ running `cargo test`.
 
 - If you have not found an open issue addressing the problem, open a new one.
   Be sure to include a title and clear description, with as much relevant
-  information as possible. Attach the output of the tool — try running in
+  information as possible. Attach the output of the tool. Try running in
   verbose mode.
 
 ## Suggesting enhancements
@@ -64,4 +65,5 @@ running `cargo test`.
 - [ ] `cargo fmt --check` passes
 - [ ] `cargo clippy --all-targets -- -D warnings` passes
 - [ ] `cargo test` passes (including integration tests)
+- [ ] `typos` passes
 - [ ] Documentation updated if behavior changed

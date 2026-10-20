@@ -16,7 +16,6 @@ same library. Do not fork a second comparator - extend this one.
 
 ## Constraints
 
-- ASCII only; SPDX header on every `.rs` file (see `.claude/rules/rust.md`).
-- Keep dependencies minimal; prefer crates already in the workspace.
+- Prefer crates already in the workspace over new ones.
 - Tests are host-independent: they operate on in-memory or small fixture CDB
   JSON, never a live build or container.

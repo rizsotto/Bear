@@ -6,7 +6,9 @@ sources for the full API and platform-specific patterns.
 
 ## Before writing tests
 
-- A debug build must exist: run `cargo build` first
+- A debug build must exist: run `cargo build` first. The tests run the
+  driver, wrapper, and preload library that `build.rs` finds in the
+  profile directory, so those must be built before `cargo test`.
 - Check `build.rs` for platform capability detection flags
 - Use conditional compilation for platform-specific tests: `#[cfg(has_executable_make)]`
 

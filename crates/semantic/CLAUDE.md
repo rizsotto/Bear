@@ -46,8 +46,8 @@ the two drift.
 
 Recognition patterns, flag tables, the family registry, and the accepted
 `as:` spellings are all generated from `compilers/*.yaml` by
-`build.rs`. Adding a compiler family or a launcher is a YAML file plus
-accepted snapshots, with no Rust edit. Read `compilers/CLAUDE.md` before
-editing YAML, and `build-support/compilers-codegen/CLAUDE.md` before
-changing what is generated. Hand-writing a compiler id as a Rust literal
-is guarded by `compiler_id_literals_are_known`; keep it that way.
+`build.rs`. Read `compilers/CLAUDE.md` before editing YAML (it owns the
+steps to add a compiler or launcher), and
+`build-support/compilers-codegen/CLAUDE.md` before changing what is
+generated. Hand-writing a compiler id as a Rust literal is guarded by
+`compiler_id_literals_are_known`; keep it that way.
