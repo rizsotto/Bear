@@ -77,6 +77,8 @@ error lists every accepted value.
 
 - [recognition-compiler-names](../requirements/recognition-compiler-names.md),
   the contract over whatever the data defines
+- [recognition-compiler-launchers](../requirements/recognition-compiler-launchers.md),
+  the launcher contract over the launcher data
 - [workspace-crate-layout](workspace-crate-layout.md), why the
   conversion from config string to compiler identity lives in the
   application crate
