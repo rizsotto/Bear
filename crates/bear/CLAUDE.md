@@ -1,14 +1,5 @@
 ## Bear crate
 
-This is the application layer. It contains the CLI definitions, configuration,
-the modes of operation, and output generation. Compiler recognition and flag
-parsing live in `crates/semantic`, which this crate depends on. The
-`bear-driver` and `bear-wrapper` binaries live in their own crates
-(`crates/bear-driver`, `crates/bear-wrapper`); the shared/agent-side
-interception runtime lives in `crates/intercept`, and the driver-side
-interception (supervise, TCP collector, build environment) lives in
-`crates/intercept-supervisor`.
-
 ## Key directories
 
 | Directory | Responsibility |
@@ -20,9 +11,7 @@ interception (supervise, TCP collector, build environment) lives in
 
 ## Before modifying
 
-- **CLI arguments** (`src/args.rs`): uses `clap` derive macros. Update man page -- see `man/CLAUDE.md` for instructions. Regenerate `site/src/reference/command-line.md` with `scripts/generate-command-line-reference.py`.
-- **Compiler interpreters**: they are not here. See `crates/semantic/CLAUDE.md`, and `crates/semantic/compilers/CLAUDE.md` before editing YAML.
-- **Output format**: check existing integration tests in `tests/integration/` to avoid regressions.
+- **CLI arguments** (`src/args.rs`): uses `clap` derive macros. Update the man page; `man/CLAUDE.md` says how. Regenerate `site/src/reference/command-line.md` with `scripts/generate-command-line-reference.py`.
 - **Configuration types** (`src/config/types.rs`): changes here affect YAML config parsing. Update validation in `src/config/validation.rs`.
 
 ## The config-to-semantic boundary (load-bearing)
@@ -35,20 +24,3 @@ identity. This crate is the single place that sees both sides, and
 `docs/rationale/compiler-family-definition.md`). Do not resolve a spelling in
 `config`, and do not hand a config type to `semantic`. Rationale in
 `docs/rationale/workspace-crate-layout.md`.
-
-## Build script
-
-This crate has none. Compiler-table codegen belongs to `crates/semantic`.
-
-The install-layout name vars (`DRIVER_NAME`, `WRAPPER_NAME`, `PRELOAD_NAME`,
-`INTERCEPT_LIBDIR`) are emitted by `crates/intercept-supervisor/build.rs`,
-which is where `installation.rs` lives and reads them.
-
-## Shell completions
-
-Not generated at build time. The `generate-completions` binary
-(`crates/bear-completions`) writes them from the `clap` definitions when run:
-
-```sh
-target/release/generate-completions target/release/completions
-```

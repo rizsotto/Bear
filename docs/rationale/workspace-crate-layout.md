@@ -52,7 +52,9 @@ command-line arguments, no serde. The schema stores `as:` as the string
 the user wrote; the analysis crate resolves it, and the application
 layer, the only code that sees both, is the single conversion point.
 Test factories sit behind an off-by-default `testing` feature that
-dependents enable only as a dev-dependency.
+dependents enable only as a dev-dependency. The module is gated on
+`any(test, feature = "testing")`, not `cfg(test)`, so a dependent's
+tests can see it.
 
 ## Consequences
 

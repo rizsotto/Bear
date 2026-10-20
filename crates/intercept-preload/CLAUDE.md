@@ -20,27 +20,13 @@ async-signal-safe handlers). Annotate it consistently:
   reasoning is not already covered by the enclosing function's `# Safety`
   section.
 
-## Build script duties
+## Build script
 
-`build.rs` is platform-gated to `cfg(target_family = "unix")` and on
-supported platforms:
-
-1. Replays `platform-checks` results via `platform_checks::emit_cfg()`
-   and `emit_check_cfg()`.
-2. cc-compiles `src/c/shim.c` into `libshim.a` with `-Dhas_symbol_X`
-   for each detected intercept-family symbol.
-3. Writes the symbol export list (`exports.map` on Linux,
-   `exports.txt` on macOS) into `OUT_DIR`.
-4. Emits cdylib link args:
-   - Linux: `-Wl,--whole-archive`, `-Wl,--version-script=...`,
-     `-Wl,-rpath,$ORIGIN`, plus a `-fuse-ld` choice from
-     `emit_elf_linker_selection()`. The order and why GNU ld is out are
-     in `docs/rationale/preload-linker-selection.md`; the user-facing
-     linker prerequisite is in `INSTALL.md`. If the linker set or order
-     changes, update the code and the rationale. If the set changes,
-     update `INSTALL.md` too.
-   - macOS: `-Wl,-force_load,...`,
-     `-Wl,-exported_symbols_list,...`, `-Wl,-rpath,@loader_path`.
+On ELF platforms, `build.rs` picks the linker. The order and why GNU ld is out
+are in `docs/rationale/preload-linker-selection.md`; the user-facing
+linker prerequisite is in `INSTALL.md`. If the linker set or order
+changes, update the code and the rationale. If the set changes, update
+`INSTALL.md` too.
 
 `INTERCEPT_FAMILY` in `build.rs` lists the symbols `src/c/shim.c`
 exports. Source of truth is `src/c/shim.c` itself.
@@ -64,7 +50,5 @@ own entry in all three places.
 
 ## Before modifying
 
-- Changes here affect all intercepted builds on supported Unix platforms
-- Test on multiple platforms if possible (CI covers Linux and macOS; on Windows the crate compiles to an empty library)
 - The "doctor" logic that maintains interception across `exec` calls is subtle - read it fully before changing
-- Reports go to a TCP collector - do not change the protocol without updating the collector in `crates/intercept-supervisor`
+- Reports go to the TCP collector in `crates/intercept-supervisor`, in the wire format from `crates/intercept` (`tcp.rs`) - do not change the protocol without updating the collector

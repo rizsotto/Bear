@@ -8,24 +8,31 @@ sources for the full API and platform-specific patterns.
 
 - A debug build must exist: run `cargo build` first. The tests run the
   driver, wrapper, and preload library that `build.rs` finds in the
-  profile directory, so those must be built before `cargo test`.
-- Check `build.rs` for platform capability detection flags
-- Use conditional compilation for platform-specific tests: `#[cfg(has_executable_make)]`
+  profile directory.
+- Gate platform-specific tests on the `cfg` keys that `build.rs` emits,
+  for example `#[cfg(has_executable_make)]`.
+- `build.rs` probes a fixed list of host tools. To gate a test on a tool
+  that is not in the list, add the probe there first.
 
 ## Test pattern
 
 ```rust
-bear_test!(test_name, |env| {
+// Requirements: output-json-compilation-database
+#[test]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn single_file_compilation() -> Result<()> {
+    let env = TestEnvironment::new("single_file_compilation")?;
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
-    env.create_build_script("gcc -c test.c")?;
+    let build = format!("{} -c test.c", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
 
-    let output = env.run_bear(&["--output", "db.json", "--", "sh", "build.sh"])?;
+    let output = env.run_bear(&["--output", "db.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+    output.assert_success()?;
+
     let db = env.load_compilation_database("db.json")?;
-
     db.assert_count(1)?;
-    db.assert_contains_file("test.c")?;
     Ok(())
-});
+}
 ```
 
 ## Linking tests to requirements
@@ -52,7 +59,6 @@ Rules:
   override file-level tags.
 - A test may cite multiple requirements when it legitimately exercises more
   than one.
-- Unit tests in `crates/` use the same convention.
 
 To find tests for a requirement:
 
@@ -84,32 +90,8 @@ RUST_LOG=debug BEAR_TEST_PRESERVE_FAILURES=1 cargo test  # both
 CI sets `RUST_LOG=debug` so failures on platforms that can't be reproduced
 locally carry full diagnostic context without a re-run.
 
-## Regression protection role
-
-Integration tests are the primary regression protection mechanism for Bear.
-When a bug is fixed, add a test that reproduces the original failure; give
-platform-specific behaviour platform-specific tests with `#[cfg(...)]`. Tag
-it with the requirement it protects (see above).
-
 ## Organization
 
 - `tests/cases/` - test implementations grouped by feature area
 - `tests/fixtures/` - test infrastructure (TestEnvironment, assertions, constants)
 - `tests/integration.rs` - test entry point
-
-## Build script duties
-
-`build.rs` does:
-
-- Forwards `INTERCEPT_LIBDIR` and emits paths to the driver, wrapper,
-  and preload artifacts as `cargo:rustc-env=` vars (consumed via
-  `env!()` from the test fixtures).
-- Replays `platform-checks` results via `emit_cfg()` /
-  `emit_check_cfg()`.
-- Probes a fixed list of host executables (see `build.rs`) via
-  `which`, emitting `cargo:rustc-cfg=has_executable_<name>` for
-  single tools and `has_executable_<group>` for grouped lookups
-  (`shell`, `make`, `compiler_c`, `compiler_cxx`, `compiler_fortran`,
-  `compiler_cuda`). Tests gate on these via `#[cfg(has_executable_*)]`.
-- Searches well-known paths for a `ccache` masquerade directory,
-  emitting `cargo:rustc-cfg=host_has_ccache_masquerade` when found.

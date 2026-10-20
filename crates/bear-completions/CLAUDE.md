@@ -1,14 +1,7 @@
 ## bear-completions
 
-Standalone crate housing the `generate-completions` binary.
-
-## Why a separate crate
-
-`generate-completions` is the only consumer of `clap_complete`
-(~0.5s of compile time). Keeping it inside `bear` would put
-`clap_complete` in `bear`'s dependency graph for every build,
-including the user-facing driver and wrapper binaries that don't
-need it.
+The reason this is a separate crate is in
+`docs/rationale/completions-own-crate.md`.
 
 ## How it's invoked
 

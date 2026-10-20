@@ -1,9 +1,5 @@
 ## intercept-supervisor
 
-Driver-side half of the interception runtime: supervises the build,
-collects executions over TCP, and sets up the build environment
-(wrapper directory or preload library).
-
 The per-module `//!` docs hold the details; this file lists only the
 cross-cutting constraints that are easy to violate.
 
@@ -23,13 +19,10 @@ install paths; `INTERCEPT_LIBDIR` is the one build-time knob.
 
 `build.rs` reads `INTERCEPT_LIBDIR` (default `lib`), trims it, rejects
 an empty or absolute value, accepts the literal `$LIB`, and passes it to
-`installation.rs` through `env!()`. The preload library sits at
-`../$INTERCEPT_LIBDIR/` from the driver's `bin/` directory.
-`tests/integration/build.rs` reads the same variable with the same
-default and forwards it to the tests. Its own check rejects an empty or
-absolute value, but it does not trim first and has no `$LIB` case
-(`$LIB` passes as a relative path). Keep the two in step. The
-user-facing side (`$LIB`, matching the install step) is in `INSTALL.md`.
+`installation.rs` through `env!()`. `tests/integration/build.rs` reads the
+same variable and default and rejects an empty or absolute value. It does
+not trim before the absolute check and has no `$LIB` case. Keep the two
+in step. The user-facing side is in `INSTALL.md`.
 
 ## Process-group nesting
 
