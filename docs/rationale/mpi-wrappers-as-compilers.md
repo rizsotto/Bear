@@ -50,12 +50,12 @@ would mis-parse.
 - Wrapper-info invocations (`-showme`, `-show`, `-compile_info`,
   `-link_info`) classify as info-and-exit, so probing the wrapper does
   not pollute the database.
-- In preload mode the wrapper's child compiler exec is intercepted too;
+- With the preload mechanism the wrapper's child compiler exec is intercepted too;
   the default duplicate filter (directory+file) collapses the pair and
   the wrapper entry wins because its event comes first.
 
 ## References
 
-- Requirement: `recognition-compiler-names`
-- Open MPI wrapper docs: <https://docs.open-mpi.org/en/main/building-apps/customizing-wrappers.html>
-- MPICH wrapper docs: `mpicc(1)`, `-show`/`-compile_info`/`-link_info`
+- [recognition-compiler-names](../requirements/recognition-compiler-names.md), the requirement this supports
+- [Open MPI wrapper docs](https://docs.open-mpi.org/en/main/building-apps/customizing-wrappers.html), how the wrappers carry their flags
+- [MPICH `mpicc(1)`](https://www.mpich.org/static/docs/latest/www1/mpicc.html), the `-show`, `-compile_info` and `-link_info` options

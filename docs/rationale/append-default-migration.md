@@ -68,4 +68,4 @@ behaviour it selects.
 
 ## References
 
-- Requirements: `output-append`
+- [output-append](../requirements/output-append.md), the requirement this supports

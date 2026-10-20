@@ -62,4 +62,4 @@ resolution owned by `interception-wrapper-mechanism`.
 
 ## Rationale
 
-- [Whitespace split, no shell parser](../rationale/compiler-env-flag-parsing.md)
+- [Compiler env var parsing: whitespace split, no shell parser](../rationale/compiler-env-flag-parsing.md)

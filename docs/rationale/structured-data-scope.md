@@ -64,4 +64,3 @@ because Bear collects no such data.
 
 - [docs-site-over-wiki](docs-site-over-wiki.md), the decision to have a site, and the "no lift is assumed" stance this extends
 - [Google search gallery](https://developers.google.com/search/docs/appearance/structured-data/search-gallery), the rich results Google supports
-- [scripts/postprocess-docs-site.sh](../../scripts/postprocess-docs-site.sh), the pass that emits the JSON-LD

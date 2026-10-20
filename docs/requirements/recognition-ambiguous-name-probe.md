@@ -90,4 +90,4 @@ unrecognized.
 
 ## Rationale
 
-- [Cached version probe as sole classifier](../rationale/ambiguous-cc-version-probe.md)
+- [Disambiguating cc/c++: a cached version probe as sole classifier](../rationale/ambiguous-cc-version-probe.md)

@@ -9,6 +9,10 @@
 # without a ./ prefix), or a relative Markdown link to ../rationale/*.md.
 # Area prefixes are taken from the existing filenames.
 #
+# In a rationale entry every reference is a Markdown link. A backticked ID
+# that names an existing requirement (`output-append`) outside a link label
+# is an unlinked reference and fails the check, printed as file:line.
+#
 # Review hints do not affect the exit code. They are heuristic: an ID written
 # with a .md suffix, and possible implementation leakage (Rust paths, source
 # file names, crate names).
@@ -17,8 +21,9 @@
 #     ./scripts/check-requirements-references.sh
 #
 # Exit codes:
-#   0 - every cross-reference resolves
-#   1 - at least one cross-reference points to a missing file
+#   0 - every cross-reference resolves, and every rationale reference is linked
+#   1 - at least one cross-reference points to a missing file, or a
+#       rationale entry names a requirement without linking it
 #   2 - invocation error (e.g. script run from wrong directory)
 
 set -eu
@@ -111,6 +116,20 @@ for link in ${rat_links}; do
     fi
 done
 
+unlinked=0
+for file in ${rat_files}; do
+    # Drop every Markdown link on the line, then look for backticked IDs.
+    found="$(sed -E 's/\[[^]]*\]\([^)]*\)//g' "${file}" | grep -noE "\`(${prefixes})-[a-z0-9-]+\`" || true)"
+    for hit in ${found}; do
+        line="${hit%%:*}"
+        id="$(printf '%s' "${hit#*:}" | tr -d '`')"
+        if [ -f "${req_dir}/${id}.md" ]; then
+            echo "UNLINKED (from rationale): $(basename "${file}"):${line}: ${id}"
+            unlinked=$((unlinked + 1))
+        fi
+    done
+done
+
 # shellcheck disable=SC2086
 grep -nE "\`(${prefixes})-[a-z0-9-]+\.md\`" ${files} | sed "s|^${req_dir}/|REVIEW (write the ID without .md): |" || true
 
@@ -120,8 +139,8 @@ grep -nE '::|\.(rs|yaml|yml)\b|\bcrate\b' ${files} | sed "s|^${req_dir}/|REVIEW 
 checked="$(printf '%s\n' "${ids}" "${rationale}" "${rat_links}" | grep -c . || true)"
 
 echo
-echo "Checked ${checked} cross-reference(s); ${dangling} dangling."
+echo "Checked ${checked} cross-reference(s); ${dangling} dangling, ${unlinked} unlinked."
 
-if [ "${dangling}" -gt 0 ]; then
+if [ "${dangling}" -gt 0 ] || [ "${unlinked}" -gt 0 ]; then
     exit 1
 fi

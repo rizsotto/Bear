@@ -97,4 +97,4 @@ disturb tools that are sensitive to preloaded libraries.
 ## Rationale
 
 - [Linker selection for the preload library](../rationale/preload-linker-selection.md)
-- [Chain to co-resident preload libraries](../rationale/preload-chains-to-co-resident-libraries.md)
+- [Preload chains to co-resident preload libraries](../rationale/preload-chains-to-co-resident-libraries.md)

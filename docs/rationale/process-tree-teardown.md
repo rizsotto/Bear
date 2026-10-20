@@ -43,7 +43,7 @@ and a 100ms sleep. Options:
 - A blocking loop on `SIGCHLD` plus the termination signals, using the
   `signal-hook` crate Bear already has. Chosen: portable and no poll.
 
-Nesting was the third. In wrapper mode the chain is `bear-driver` ->
+Nesting was the third. With the wrapper mechanism the chain is `bear-driver` ->
 `make` -> `bear-wrapper` -> real `cc`, and the wrapper runs the same
 `supervise()`. If every level made a new process group, the build would
 split into many groups. A top-level `killpg` would then miss the deeper

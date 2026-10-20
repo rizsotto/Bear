@@ -104,7 +104,7 @@ is owned by `interception-mechanism-selection`.
 
 ## Rationale
 
-- [MPI wrappers as compilers](../rationale/mpi-wrappers-as-compilers.md)
-- [Swift whole-module entries](../rationale/swift-whole-module-entries.md)
-- [Compiler family definition](../rationale/compiler-family-definition.md)
-- [Names deliberately not recognized](../rationale/names-deliberately-not-recognized.md)
+- [MPI wrappers are recorded as compilers, not expanded](../rationale/mpi-wrappers-as-compilers.md)
+- [Swift whole-module entries: one per source, full arguments](../rationale/swift-whole-module-entries.md)
+- [A compiler family is defined by its YAML file](../rationale/compiler-family-definition.md)
+- [Some compiler-adjacent names are deliberately not recognized](../rationale/names-deliberately-not-recognized.md)

@@ -4,7 +4,8 @@
 
 Bear is often run with `--append` for partial or incremental builds:
 each run adds the freshly compiled files to an existing
-`compile_commands.json`. GitHub discussion #712 reported that when a
+`compile_commands.json`. GitHub discussion
+[#712](https://github.com/rizsotto/Bear/discussions/712) reported that when a
 file's compiler flags change between runs, the database ends up with two
 entries for that file - the stale one from the previous run and the new
 one - because the two behaviours in place at the time worked against the
@@ -21,7 +22,8 @@ The build system could not force a clean rebuild, and deleting
 appending. Two options were on the table:
 
 - **Opt-in `--update` flag** (the reporter's original request, and the
-  shape of the withdrawn GitHub PR #497): keep the current defaults and
+  shape of the withdrawn
+  [PR #497](https://github.com/rizsotto/Bear/pull/497)): keep the current defaults and
   add a flag that replaces matching entries. Preserves today's behaviour
   for everyone, but every affected user has to discover and set it, and
   the stale-duplicate default is rarely what anyone actually wants.
@@ -59,6 +61,7 @@ the dedup default.
 
 ## References
 
-- Requirements: `output-duplicate-detection`, `output-append`
-- GitHub discussion #712
-- GitHub PR #497
+- [output-duplicate-detection](../requirements/output-duplicate-detection.md), a requirement this supports
+- [output-append](../requirements/output-append.md), a requirement this supports
+- [#712](https://github.com/rizsotto/Bear/discussions/712), the discussion that reported the stale duplicates
+- [PR #497](https://github.com/rizsotto/Bear/pull/497), the withdrawn opt-in `--update` flag

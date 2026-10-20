@@ -38,5 +38,5 @@ shows glob matching to be a real cost.
 
 ## References
 
-- Requirement: `output-generated-file-filter`
-- Related: `source-filter-last-match-wins`
+- [output-generated-file-filter](../requirements/output-generated-file-filter.md), the requirement this supports
+- [source-filter-last-match-wins](source-filter-last-match-wins.md), the directory rules whose semantics this mirrors

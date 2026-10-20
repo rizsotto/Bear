@@ -220,5 +220,5 @@ dry-run text itself. The man page must state them too.
 
 ## Rationale
 
-- [parse-sh-producer](../rationale/parse-sh-producer.md)
-- [parse-sh-single-tokenizer](../rationale/parse-sh-single-tokenizer.md)
+- [parse-sh: a quarantined, best-effort parser whose only product is the database](../rationale/parse-sh-producer.md)
+- [A single streaming tokenizer for parse-sh](../rationale/parse-sh-single-tokenizer.md)

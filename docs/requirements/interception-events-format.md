@@ -102,4 +102,4 @@ Scenarios:
 
 ## Rationale
 
-- [event-file-defaults](../rationale/event-file-defaults.md)
+- [No implicit event-file name: intercept names it, semantic reads stdin](../rationale/event-file-defaults.md)

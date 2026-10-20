@@ -48,4 +48,4 @@ is off by default.
 
 ## Rationale
 
-- [Header entry synthesis by sibling cloning](../rationale/header-synthesis-sibling-clone.md)
+- [Header entries: clone a sibling by default, read dependency files on request](../rationale/header-synthesis-sibling-clone.md)

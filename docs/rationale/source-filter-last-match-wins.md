@@ -4,7 +4,7 @@
 
 Bear can include or exclude source files from the compilation database by
 directory rules (`sources.directories`). The original feature request
-(GitHub issue #261) raised the question of precedence: when a file matches
+([#261](https://github.com/rizsotto/Bear/issues/261)) raised the question of precedence: when a file matches
 several rules with conflicting actions, which one decides?
 
 Two policies were on the table:
@@ -30,9 +30,10 @@ cost is that precedence is now positional: reordering rules changes
 behaviour, so the rule list is order-sensitive and the user owns getting
 the order right. Matching itself is literal prefix matching
 (`Path::starts_with`), so rule paths must use the same path format the
-entries are written in (`output-path-format`).
+entries are written in
+([output-path-format](../requirements/output-path-format.md)).
 
 ## References
 
-- Requirement: `output-source-directory-filter`
-- GitHub issue #261
+- [output-source-directory-filter](../requirements/output-source-directory-filter.md), the requirement this supports
+- [#261](https://github.com/rizsotto/Bear/issues/261), the feature request

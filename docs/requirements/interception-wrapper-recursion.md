@@ -63,4 +63,4 @@ a compiler variable gets the warning.
 
 ## Rationale
 
-- [Filter Bear's lookup PATH, not the alternatives](../rationale/wrapper-recursion-ccache-alternatives.md)
+- [Wrapper recursion: why filter Bear's lookup PATH, not the alternatives](../rationale/wrapper-recursion-ccache-alternatives.md)

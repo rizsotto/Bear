@@ -59,5 +59,5 @@ basename does not make it recognized either.
 
 ## Rationale
 
-- [Names deliberately not recognized](../rationale/names-deliberately-not-recognized.md)
-- [Compiler family definition](../rationale/compiler-family-definition.md)
+- [Some compiler-adjacent names are deliberately not recognized](../rationale/names-deliberately-not-recognized.md)
+- [A compiler family is defined by its YAML file](../rationale/compiler-family-definition.md)

@@ -81,4 +81,4 @@ owned by
 
 ## Rationale
 
-- [process-tree teardown and graceful forwarding](../rationale/process-tree-teardown.md)
+- [Tear down the whole build tree: process group, then cgroup, with real-signal forwarding](../rationale/process-tree-teardown.md)

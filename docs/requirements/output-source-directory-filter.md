@@ -64,4 +64,4 @@ their source file.
 
 ## Rationale
 
-- [Last matching rule wins](../rationale/source-filter-last-match-wins.md)
+- [Source filter: last matching rule wins](../rationale/source-filter-last-match-wins.md)

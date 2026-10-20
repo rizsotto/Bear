@@ -9,7 +9,7 @@
 `valac` and the internal `cc`.
 
 The consumer behind the request
-([#709](https://github.com/rizsotto/Bear/issues/709)) is
+([#709](https://github.com/rizsotto/Bear/discussions/709)) is
 [vala-language-server](https://github.com/vala-lang/vala-language-server)
 (VLS). It takes an entry as Vala only when `command[0]` contains
 `valac`. It reads only the `command` string form and skips an entry
@@ -68,5 +68,5 @@ internal `cc` entries. `.vala` and `.gs` are source extensions, and
 
 - [output-compilation-entries](../requirements/output-compilation-entries.md), the requirement this supports
 - [compilation-entry-shapes](compilation-entry-shapes.md), the entry shapes per compiler kind
-- [#709](https://github.com/rizsotto/Bear/issues/709), the feature request
+- [#709](https://github.com/rizsotto/Bear/discussions/709), the feature request discussion
 - [vala-language-server](https://github.com/vala-lang/vala-language-server), its `src/projects/ccproject.vala` holds the `valac` filter and the command-string rule

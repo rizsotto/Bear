@@ -96,5 +96,5 @@ every compiler family.
 ## Rationale
 
 - [Entry shapes for clang tooling](../rationale/compilation-entry-shapes.md)
-- [Recording Vala (valac) builds](../rationale/vala-transpiler-database.md)
-- [Swift whole-module entries](../rationale/swift-whole-module-entries.md)
+- [Recording Vala (valac) builds in the compilation database](../rationale/vala-transpiler-database.md)
+- [Swift whole-module entries: one per source, full arguments](../rationale/swift-whole-module-entries.md)

@@ -94,4 +94,4 @@ the recorded path under Bear avoids this.
 
 ## Rationale
 
-- [Hard links, fixed directory, resolve at startup](../rationale/wrapper-mode-design-decisions.md)
+- [Wrapper mechanism: hard links, deterministic directory, resolve-at-startup](../rationale/wrapper-mode-design-decisions.md)

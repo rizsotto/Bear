@@ -6,32 +6,35 @@
 Clang on the BSDs and macOS. Misclassifying them corrupts the database
 silently, because GCC and Clang have different flag-arity tables (e.g.
 Clang's `-Xclang <arg>` consumes the next argv slot and GCC's does not),
-so source/output detection mis-parses. Several designs were weighed:
+so source/output detection mis-parses.
 
-- **Per-OS defaults** - hard-code "cc means Clang on BSD/macOS, GCC
-  elsewhere". Wrong whenever a host installs the other toolchain under
-  `cc`, which is exactly the case users hit.
-- **Regex with a probe fallback (probe-then-regex)** - the original
-  implementation. On probe failure it fell back to the recognition regex,
-  which defaulted `cc` to GCC.
-- **Per-invocation probe** (PR #695) - run `--version` on every
-  invocation.
-- **Cached version probe as the sole classifier** - run the executable
+A masquerade link (`/usr/lib/ccache/cc` -> `ccache`) adds a twist. It
+canonicalizes to the wrapper, but the recognition regex sees only the
+invoked basename (`cc`), and the launcher interpreter cannot unwrap it,
+because argv has no inner compiler token. If the probe does not classify
+it, the event is dropped. A masquerade binary answers `--version` in the
+name it was called by and passes the flag through to the underlying
+compiler. Its own banner appears only when it is invoked as itself,
+which is never an ambiguous name.
+
+Options considered:
+
+- **Per-OS defaults**: hard-code "cc means Clang on BSD/macOS, GCC
+  elsewhere". Rejected: wrong whenever a host installs the other
+  toolchain under `cc`, which is exactly the case users hit.
+- **Regex with a probe fallback (probe-then-regex)**: on probe failure,
+  fall back to the recognition regex, which defaults `cc` to GCC.
+  Rejected: it re-introduced the very bug on the platforms the probe was
+  meant to fix.
+- **Per-invocation probe** ([PR #695](https://github.com/rizsotto/Bear/pull/695)):
+  run `--version` on every invocation. Rejected: it costs a `fork+exec`
+  per compiler call, where a cache costs one or two per build.
+- **Do not probe masquerade links**, for fear of the wrapper's own
+  banner. Rejected: the fear is unfounded (see above), and the events
+  would be silently dropped.
+- **Cached version probe as the sole classifier**: run the executable
   once with `--version`, cache the result per canonical path, and do not
-  fall back to the regex for ambiguous names.
-
-A later question (Bear 4.2.0): what to do when an ambiguous name
-canonicalizes to a masquerade wrapper (`/usr/lib/ccache/cc` ->
-`ccache`)? An early guard refused to probe these, fearing the wrapper's
-own version banner, and expected the regex to classify the path as a
-wrapper for unwrapping. Both assumptions were wrong: the regex only sees
-the invoked basename (`cc`, deliberately unlisted), and the launcher
-interpreter cannot unwrap a masquerade invocation (there is no inner
-compiler token in argv). So these events were silently dropped. The
-fear was also empirically unfounded: a masquerade binary answers
-`--version` in the name it was called by, passing the flag through to
-the underlying compiler; the wrapper's own banner appears only when it
-is invoked as itself, which is never an ambiguous name.
+  fall back to the regex for ambiguous names. Chosen.
 
 ## Decision
 
@@ -45,29 +48,25 @@ because its answer depends on the name it was called by.
 ## Consequences
 
 - The failure mode is **loud, not wrong**: a missing entry is visible and
-  debuggable; a mis-classified entry corrupts the database silently. The
-  probe-then-regex fallback re-introduced the very bug on the platforms
-  the probe was meant to fix, which is why there is no regex fallback for
-  ambiguous names. `gcc.yaml` carries a comment recording why `cc`/`c++`
+  debuggable; a mis-classified entry corrupts the database silently.
+  The GCC compiler definition carries a comment recording why `cc`/`c++`
   are absent from its recognize list.
 - The user override is per-path and explicit: declaring a path under
   `compilers:` takes priority over the probe and is the only way to
   recover recognition for a quirky `cc` whose `--version` output the
   probe cannot read. There is no process-wide off switch, by request.
 - Caching per canonical path keeps the cost at one or two `fork+exec`
-  pairs per clean build rather than per invocation - the reason the
-  per-invocation probe (PR #695) was not taken. Masquerade links are the
+  pairs per clean build rather than per invocation. Masquerade links are the
   one exception: the canonical key would collapse different masquerade
   names (`cc`, `c++`) onto the wrapper binary whose behavior depends on
   argv[0], so those cache under the invoked path.
-- Probing through masquerade converts silent drops into classifications
-  without weakening the loud-not-wrong property: unrecognizable
-  passthrough output (an exotic wrapper printing its own banner) still
-  declines, which is exactly the pre-change outcome.
+- Probing through a masquerade link keeps the loud-not-wrong property:
+  unrecognizable passthrough output (an exotic wrapper printing its own
+  banner) still declines.
 - The ambiguous-names list is intentionally minimal (`cc`, `c++`, `CC`).
   Cross-prefixed variants like `aarch64-linux-gnu-cc` are not probed and
-  not recognized: the probe matches the exact name, and `gcc.yaml` does
-  not list `cc`. The user sets their family in the configuration. The
+  not recognized: the probe matches the exact name, and the GCC
+  definition does not list `cc`. The user sets their family in the configuration. The
   list can grow if a real cross-toolchain case appears.
 - The HPE Cray PrgEnv wrapper `CC` is probed for the same reason as
   `cc`. A static mapping would be wrong in every programming environment
@@ -76,5 +75,5 @@ because its answer depends on the name it was called by.
 
 ## References
 
-- Requirement: [`recognition-ambiguous-name-probe`](../requirements/recognition-ambiguous-name-probe.md)
-- [PR #695](https://github.com/rizsotto/Bear/pull/695) - the per-invocation probe variant, not taken
+- [recognition-ambiguous-name-probe](../requirements/recognition-ambiguous-name-probe.md), the requirement this supports
+- [PR #695](https://github.com/rizsotto/Bear/pull/695), the per-invocation probe variant, not taken
