@@ -114,7 +114,7 @@ fn escape(s: &str) -> String {
 /// `KNOWN_IDS` (every real compiler family's `compiler.id`, in discovery
 /// order) and `WRAPPER_AS_NAMES` (the launcher basenames that also resolve to
 /// the one wrapper kind). Both are the sole accepted `as:` spellings; there
-/// are no aliases (see `compiler-as-no-aliases`).
+/// are no aliases (see `compiler-family-definition`).
 ///
 /// Emitted as `pub(crate)` statics for the semantic analysis module to
 /// `include!`, so `CompilerType`'s spelling resolution validates against

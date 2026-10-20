@@ -38,8 +38,8 @@ The configuration schema depends on nothing. It stores a configured
 `as:` value as the string the user wrote. The analysis core owns the
 resolution of that string onto a compiler identity, next to the
 generated data it validates against. The application layer is the only
-place that sees both, so it is the single conversion point, and it
-converts once at startup before any build runs.
+place that sees both, so it is the single conversion point. The timing
+is in [compiler-family-definition](compiler-family-definition.md).
 
 ## Consequences
 
@@ -120,9 +120,8 @@ blocks it, and the analysis crate is unaffected either way.
 
 - No requirement. The split changed no user-observable contract; the two
   diagnostic deltas above are the whole visible difference.
-- Related rationale: [`compiler-as-no-aliases`](compiler-as-no-aliases.md)
-  (the one-spelling-per-family `as:` contract whose mechanism this
-  relocated) and
+- Related rationale:
   [`compiler-family-definition`](compiler-family-definition.md) (why the
-  family set is generated data rather than a hand-written enum).
+  family set is generated data, and the one-spelling-per-family `as:`
+  contract whose mechanism this relocated).
 - Crate roles and per-area routing: the root `CLAUDE.md`.

@@ -15,7 +15,7 @@ use std::str::FromStr;
 // Generated compiler-id data (KNOWN_IDS, WRAPPER_AS_NAMES) from
 // compilers/*.yaml. These are the sole accepted config `as:` spellings; the
 // resolution below validates against them instead of a hand-maintained
-// mirror of the family set. See compiler-as-no-aliases.
+// mirror of the family set. See compiler-family-definition.
 include!(concat!(env!("OUT_DIR"), "/compiler_ids.rs"));
 
 /// A compiler family's identity: the `compiler.id` declared in its YAML
@@ -99,7 +99,7 @@ impl FromStr for CompilerType {
 
     fn from_str(spelling: &str) -> Result<Self, Self::Err> {
         // The four launchers share one runtime kind: "wrapper" plus each
-        // launcher basename all resolve to it (see compiler-as-no-aliases).
+        // launcher basename all resolve to it (see compiler-family-definition).
         if spelling == "wrapper" || WRAPPER_AS_NAMES.contains(&spelling) {
             return Ok(CompilerType::Wrapper);
         }
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn every_launcher_spelling_resolves_to_the_wrapper_kind() {
         // The wrapper kind: "wrapper" plus every launcher basename resolve to
-        // the one runtime CompilerType::Wrapper (see compiler-as-no-aliases).
+        // the one runtime CompilerType::Wrapper (see compiler-family-definition).
         for spelling in std::iter::once("wrapper").chain(WRAPPER_AS_NAMES.iter().copied()) {
             let sut = spelling.parse::<CompilerType>().unwrap();
 

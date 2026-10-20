@@ -31,8 +31,8 @@ interception (supervise, TCP collector, build environment) lives in
 codegen output, and it stores a configured `as:` spelling as the string the
 user wrote. `semantic` owns the resolution of that spelling onto a compiler
 identity. This crate is the single place that sees both sides, and
-`Mode::configure` is the single conversion point, which is why an unknown
-spelling fails at startup in every mode. Do not resolve a spelling in
+`Mode::configure` is the single conversion point (startup resolution:
+`docs/rationale/compiler-family-definition.md`). Do not resolve a spelling in
 `config`, and do not hand a config type to `semantic`. Rationale in
 `docs/rationale/workspace-crate-layout.md`.
 

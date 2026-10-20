@@ -2,82 +2,81 @@
 
 ## Context
 
-Bear recognizes roughly nineteen compiler families and four launchers,
-defined in per-family YAML and compiled to static tables at build time.
-The YAML always held the flag tables, but the rest of a family was spread
-across hand-maintained Rust: an array listing each file and its generated
-static names, a nineteen-variant `CompilerType` enum (the config `as:`
-surface), a string-to-enum map that panicked on an unknown value, a
-per-family interpreter constructor, a registration call, and per-family
-`source_mode`/response-file-syntax baked into those constructors. Adding a
-family meant six edits across two crates, and forgetting one failed a
-different way each time: a silent drop, a compile error, or a runtime
-panic.
+Bear defines each compiler family and launcher in a YAML file, and
+codegen turns the files into static tables at build time. The YAML
+always held the flag tables. The rest of a family was spread across
+hand-written Rust: a list of the files, a `CompilerType` enum with one
+variant per family (the config `as:` surface), a string-to-enum map that
+panicked on an unknown value, a constructor and a registration call per
+family, and the `source_mode` and response-file syntax set inside those
+constructors. Adding a family took six edits across two crates. Each
+missed edit failed in its own way: a silent drop, a compile error, or a
+runtime panic.
 
-The recognized set and each family's flag semantics were already meant to
-live in the data (see `recognition-compiler-names`); the *enumeration of
-families* was not.
+The config `as:` value had its own problem. The enum took many spellings
+per family through hand-written serde aliases, plus whatever
+`rename_all = "lowercase"` made of a variant name (`clangcl` for
+`ClangCl`). Nobody designed that surface. It grew as families were
+added, and there was no record of who used which spelling.
+
+Options we did not take:
+
+- **Keep the per-family enum.** It was a hand-synced copy of the ids
+  codegen already emits. Its one reason to exist was the alias surface,
+  which this decision drops. Dispatch never relied on Rust
+  exhaustiveness: it is a runtime registry with a completeness test.
+- **Generate the enum from the data.** Codegen would learn an
+  id-to-variant mapping, and the enum would keep its per-variant
+  ceremony while still copying the data. Dropping the type is simpler.
+- **A YAML `aliases:` list per family.** It generates a bigger copy of
+  a surface nobody designed. No user had asked for any alias.
+- **Hyphenated ids for display** (`clang-cl` for `clang_cl` in
+  `--print-compilers`). Once there are no aliases, any other display
+  prints a value that differs from the one users must type.
+- **A recognition `priority` field.** The only real order rule is
+  "a specialization before its base", and that is the `extends` link a
+  vendor variant declares anyway for flag inheritance. A separate number
+  would be one more thing to forget.
 
 ## Decision
 
-A compiler family is defined solely by its YAML file. Codegen discovers
-the files by scanning the directory and peeking each file's kind; every
-generated name derives from the file stem; and generated registries (the
-family registry and the id list) replace the hand-maintained enum, map,
-constructors, and registration.
+A compiler family is defined only by its YAML file. Codegen finds the
+files by scanning the directory, derives every generated name from the
+file stem, and emits the family registry and the id list. `CompilerType`
+has two variants: a compiler carrying an id checked against the
+generated list, or a wrapper. A family that `extends` another is
+recognized before it. `source_mode` and `response_file_syntax` are YAML
+data; what each value means stays in code.
 
-The runtime type mirrors the YAML schema, not the family list:
-`CompilerType` is a two-variant kind (compiler-carrying-an-id, or
-wrapper), where the id is a static string validated against the generated
-id list. There is no per-family variant.
-
-Recognition order -- which family a name resolves to when patterns overlap
--- derives from the `extends` graph: a family that extends another is a
-specialization of it, so it is recognized first. There is no hand-set
-priority number.
-
-Two per-family selectors that used to be factory-set, `source_mode` and
-`response_file_syntax`, become YAML data (their semantics stay in code).
-This reverses the earlier "set in the factory, not the YAML" guidance.
+Each family accepts one `as:` spelling: its `compiler.id`, verbatim, in
+the YAML, the generated data, `--print-compilers`, and config parsing. A
+launcher has no `compiler.id`, so its basename is the accepted spelling.
+The basenames are generated from the launcher YAML too, and resolve to
+the wrapper kind like `wrapper` does. The config
+schema keeps the string the user wrote. Bear resolves it once at
+startup, in every mode that reads configuration, against the generated
+ids. So a typo fails before any build runs or input is read, and the
+error lists every accepted value.
 
 ## Consequences
 
-- Adding a family is a YAML file plus accepting snapshots -- no Rust edit,
-  nothing to forget. Adding a launcher is likewise YAML-only.
-- The six sync points and their three failure modes are removed, not
-  converted: there is no parallel list left to drift from the data.
-- The public config surface (`as:`) accepts exactly each family's id,
-  verbatim (see `compiler-as-no-aliases`); the spelling is resolved at
-  startup against the generated data, and the error names every
-  accepted value.
-- What stays code, by design: the meaning of each `source_mode` and
-  response-file-syntax value, the `cc`/`c++` version probe and its
-  gcc/clang verdicts, the ambiguous-name set, and the source-extension
-  table. These are behavior, reviewed as code, not per-family data.
-
-### Rejected alternatives
-
-- **Keep the nineteen-variant `CompilerType`.** It was a hand-synced
-  mirror of ids codegen already emits; its original justification (a
-  curated `as:` alias surface) was dropped separately
-  (`compiler-as-no-aliases`), and Rust-level exhaustiveness was never
-  relied on -- dispatch is a runtime registry with a completeness test.
-  Someone will propose re-adding a per-family variant; this entry is why
-  it is gone.
-- **Generate the enum from the data.** Purity without leverage: codegen
-  would learn an id-to-variant mapping and the enum would keep its
-  per-variant ceremony while still mirroring the data. Dissolving the
-  type into the data is the simpler inverse.
-- **A recognition `priority` field.** Drafted, then dropped: the only
-  real ordering constraint (specialization before base) is exactly the
-  `extends` relationship, so a separate number is redundant, and a new
-  vendor variant of clang/gcc would have to remember to set it.
-  `extends` -- which such a family declares anyway for flag inheritance
-  -- gives correct order for free.
+- Adding a family or a launcher is a YAML file plus accepted snapshots.
+  No Rust edit, and no parallel list left to drift.
+- The `as` column of `--print-compilers` is exactly what a user types
+  in `as:`. There is no display transform to keep in sync.
+- Configs that used a dropped alias (`llvm`, `gnu`, `clangcl`,
+  `intel-cc`, and others) now fail at startup.
+- What stays code, on purpose: the meaning of each `source_mode` and
+  response-file syntax value, the `cc`/`c++` version probe, the
+  ambiguous-name set, and the source-extension table. These are
+  behavior, not per-family data.
+- Revisit only with real user demand for a second spelling. Both
+  aliases and display spellings were drafted in full and dropped.
 
 ## References
 
-- Requirement: `recognition-compiler-names` (the behavioral contract over
-  whatever the data defines).
-- `compiler-as-no-aliases` (the one-spelling-per-family `as:` decision
-  this builds on).
+- [recognition-compiler-names](../requirements/recognition-compiler-names.md),
+  the contract over whatever the data defines
+- [workspace-crate-layout](workspace-crate-layout.md), why the
+  conversion from config string to compiler identity lives in the
+  application crate
