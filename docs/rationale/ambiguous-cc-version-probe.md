@@ -27,7 +27,7 @@ own version banner, and expected the regex to classify the path as a
 wrapper for unwrapping. Both assumptions were wrong: the regex only sees
 the invoked basename (`cc`, deliberately unlisted), and the launcher
 interpreter cannot unwrap a masquerade invocation (there is no inner
-compiler token in argv) -- so these events were silently dropped. The
+compiler token in argv). So these events were silently dropped. The
 fear was also empirically unfounded: a masquerade binary answers
 `--version` in the name it was called by, passing the flag through to
 the underlying compiler; the wrapper's own banner appears only when it
@@ -64,12 +64,17 @@ because its answer depends on the name it was called by.
   without weakening the loud-not-wrong property: unrecognizable
   passthrough output (an exotic wrapper printing its own banner) still
   declines, which is exactly the pre-change outcome.
-- The ambiguous-names list is intentionally minimal (`cc`, `c++`).
-  Cross-prefixed variants like `aarch64-linux-gnu-cc` are left to the
-  regex because cross-toolchains are overwhelmingly GCC; the list can
-  grow if a real BSD cross-toolchain case appears.
+- The ambiguous-names list is intentionally minimal (`cc`, `c++`, `CC`).
+  Cross-prefixed variants like `aarch64-linux-gnu-cc` are not probed and
+  not recognized: the probe matches the exact name, and `gcc.yaml` does
+  not list `cc`. The user sets their family in the configuration. The
+  list can grow if a real cross-toolchain case appears.
+- The HPE Cray PrgEnv wrapper `CC` is probed for the same reason as
+  `cc`. A static mapping would be wrong in every programming environment
+  but the one it picked, and on a case-insensitive filesystem it would
+  shadow `cc`.
 
 ## References
 
-- Requirement: `recognition-ambiguous-name-probe`
-- PR #695 - the per-invocation probe variant, not taken
+- Requirement: [`recognition-ambiguous-name-probe`](../requirements/recognition-ambiguous-name-probe.md)
+- [PR #695](https://github.com/rizsotto/Bear/pull/695) - the per-invocation probe variant, not taken
