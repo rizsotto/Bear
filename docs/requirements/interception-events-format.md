@@ -71,21 +71,24 @@ Scenarios:
   standard input, and the database holds one entry per recognized
   compiler call. Diagnostics go to standard error.
 - **Given** semantic mode reading an empty input, from a named file or
-  from standard input, **when** it runs, **then** it exits `0`, writes
-  an empty database, and prints a warning on standard error that the
-  input held no events.
+  from standard input, **when** it runs, **then** it writes an empty
+  database and prints a warning on standard error that the input held
+  no events. The exit code is owned by
+  [`cli-exit-codes`](cli-exit-codes.md).
 - **Given** semantic mode reading standard input that is a terminal,
   **when** it starts, **then** it prints a warning on standard error.
   Both warnings are shown by default; levels are owned by
   [`cli-diagnostic-format`](cli-diagnostic-format.md).
 - **Given** intercept mode with no events file named, **when** the user
-  runs it, **then** Bear exits with a usage error before the build runs.
-  There is no default events file.
-- **Given** a mode that runs the build (intercept mode, combined mode)
-  asked to write its output to standard output, **when** the user runs
-  it, **then** Bear exits with an error before the build runs, the error
-  says the output cannot go to standard output, and no file named `-`
-  is created. The build's own output shares that stream.
+  runs it, **then** Bear rejects the command line before the build runs.
+  There is no default events file. The exit code is owned by
+  [`cli-exit-codes`](cli-exit-codes.md).
+- **Given** intercept mode with standard output as the events file,
+  **when** the user runs it, **then** Bear exits with an error before
+  the build runs, the error says the events cannot go to standard
+  output, and no file named `-` is created. Standard output as the
+  database destination is owned by
+  [`output-json-compilation-database`](output-json-compilation-database.md).
 - The events file is written all or nothing, as owned by
   [`output-atomic-write`](output-atomic-write.md).
 

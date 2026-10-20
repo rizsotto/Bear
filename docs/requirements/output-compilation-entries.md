@@ -25,8 +25,8 @@ The compiler family definition sets which entry shape applies:
 | Single translation unit (Vala) | `valac a.vala b.vala` | 1 | the first source in argument order | all N |
 | Whole module (Swift) | `swiftc -module-name App a.swift b.swift` | N | each source in turn | all N |
 
-Sources are identified by extension: each compiler family defines which
-file extensions name its sources.
+Sources are identified by extension, from one built-in list shared by
+every compiler family.
 
 - **Given** a build that runs `cc -c src1.c src2.c src3.c` in one
   invocation, **when** Bear finishes, **then** the database holds three
@@ -82,10 +82,8 @@ file extensions name its sources.
 
 - The same rules apply to every compiler family Bear recognizes. The
   flags and extensions named here are examples, not the full sets.
-- Source-extension recognition follows the file system's rules: on
-  Linux and BSD `foo.C` is a C++ source because the extension is `.C`,
-  while on Windows and typical macOS configurations the same file also
-  matches extension lists written in lowercase.
+- Extensions match exactly, case included, on every platform. `foo.C`
+  is a source because `.C` is in the list, not because `.c` is.
 - Response-file (`@file`) arguments are owned by
   `output-response-file-inlining`.
 

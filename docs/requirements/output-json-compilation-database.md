@@ -65,12 +65,27 @@ keep is owned by `output-duplicate-detection`, and how the `file`,
     unterminated quote in `cc -c "src.c`).
 - **Given** a build whose entries are all valid but one with an empty
   `directory`, **when** Bear writes the output, **then** the valid
-  entries appear unchanged, and the drop does not change the exit code
-  (owned by `cli-exit-codes`).
+  entries appear unchanged. The exit code is owned by `cli-exit-codes`.
 - **Given** a build where every candidate entry fails validation,
   **when** Bear writes the output, **then** the database is written as
   an empty JSON array `[]`, each drop has its `WARN` line, and a single
   `ERROR` line reports that every entry was dropped.
+- **Given** combined mode with standard output as the database
+  destination, **when** the user runs it, **then** Bear exits with an
+  error before the build runs, the error says the database cannot go to
+  standard output, and no file named `-` is created.
+- **Given** semantic mode or parse-sh mode with standard output as the
+  database destination, **when** the user runs it, **then** the JSON
+  database appears on standard output, diagnostics stay on standard
+  error, and no file is created, neither one named `-` nor the default
+  destination. The database equals the one the same input gives when
+  written to a file.
+- The streamed write is not atomic. The all-or-nothing rule of
+  `output-atomic-write` covers files only.
+- **Given** standard output as the database destination and appending
+  requested, **when** the user runs semantic mode or parse-sh mode,
+  **then** Bear exits with an error before any input is read, and the
+  error says it cannot append to standard output.
 
 ## Non-functional constraints
 

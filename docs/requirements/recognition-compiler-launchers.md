@@ -54,7 +54,8 @@ with that compiler's flag semantics, not the launcher's.
 
 **Fixed set of launcher names**: Bear recognizes a launcher by its
 basename against a fixed set. A locally built or uncommon launcher with
-another name is not recognized.
+another name is not recognized. Configuring a launcher at another
+basename does not make it recognized either.
 
 ## Rationale
 

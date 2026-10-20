@@ -37,10 +37,10 @@ their source file.
   path, **then** `src/main.c` is kept. Paths are compared as written in
   the entry, with no normalization, so rule paths must match the path
   format in use (`output-path-format`).
-- **Given** a Unix host and a rule that excludes `src`, **when** a build
-  compiles `src/main.c`, `Src/main.c`, and `SRC/main.c`, **then** only
-  `src/main.c` is dropped. Case sensitivity follows the OS path
-  comparison: always on Unix, depending on the file system on Windows.
+- **Given** a rule that excludes `src`, **when** a build compiles
+  `src/main.c`, `Src/main.c`, and `SRC/main.c`, **then** only
+  `src/main.c` is dropped. Matching is case-sensitive on every platform,
+  Windows and macOS included.
 - **Given** an entry that stands for a whole invocation as one
   translation unit (`output-compilation-entries`), **when** the rules are
   applied, **then** the entry is kept or dropped as a unit, by the one

@@ -35,11 +35,8 @@ page and the known limitations below must say so.
   [`output-append`](output-append.md),
   [`output-atomic-write`](output-atomic-write.md), and the rest of the
   `output-` set). The default destination is `compile_commands.json`.
-- **Given** a request to stream the database, **when** the user directs
-  it to standard output, **then** the JSON database appears there,
-  diagnostics stay on standard error, and no file is created. The
-  streamed write is not atomic. Streaming together with appending is a
-  usage error.
+- Streaming the database to standard output is owned by
+  [`output-json-compilation-database`](output-json-compilation-database.md).
 - **Given** an existing database and new shell text, **when** the user
   runs the mode against the same destination while appending, **then**
   the result is the merged set owned by [`output-append`](output-append.md).
@@ -76,8 +73,7 @@ page and the known limitations below must say so.
   line, and the database is written empty. The exit code is owned by
   [`cli-exit-codes`](cli-exit-codes.md).
 - A candidate's executable is the first word that is not a leading
-  assignment, taken as written. Bare names stay bare (owned by
-  [`output-json-compilation-database`](output-json-compilation-database.md)).
+  assignment, taken as written. Bare names stay bare.
 - A candidate's environment is the mode's own environment at parse time,
   with that command's leading `VAR=value` words laid over it. It reaches
   semantic analysis as an intercepted execution's environment does,

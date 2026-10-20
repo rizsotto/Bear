@@ -135,7 +135,7 @@ error, and both ends can be standard streams.
 **-i, \-\-input** *FILE*
 : Path of the event file to read (default: `-`, standard input). Any
 producer of a conforming event stream can pipe into it. When standard
-input is a terminal, or the stream turns out to be empty, a notice is
+input is a terminal, or the stream turns out to be empty, a warning is
 printed on standard error.
 
 **-o, \-\-output** *FILE*
@@ -357,7 +357,9 @@ is recognized wrongly:
 omitted, Bear guesses the family from the executable's filename and
 falls back to `gcc` when nothing matches. The accepted values are the
 `as` names shown by `bear semantic --print-compilers`, plus `wrapper`
-for a compiler launcher.
+for a compiler launcher. A launcher is recognized only by its own
+basename, such as `ccache` or `distcc`, so `wrapper` on a path with
+another basename does not make it recognized.
 - **ignore**: Exclude this executable's invocations from the database.
 Optional, default `false`.
 
@@ -464,13 +466,16 @@ entry, so a header with a real compilation entry is not duplicated.
 
 In combined and intercept mode, Bear exits with the build command's exit
 code: 0 when the build succeeds, the same non-zero code when it fails.
+When the build is killed by a signal, Bear exits non-zero. When the
+build handles the signal and exits on its own, Bear exits with the
+build's code, 0 included.
 
 In semantic mode, Bear exits 0 on success and non-zero when the analysis
 fails.
 
 In parse-sh mode, Bear exits 0 when the input could be parsed - even
 when the database comes out empty because the text named no compiler
-invocations - and also on empty input (with a notice on standard
+invocations - and also on empty input (with a warning on standard
 error). It exits non-zero when every non-empty input line was skipped,
 so a run that understood nothing cannot pass for a successful one.
 

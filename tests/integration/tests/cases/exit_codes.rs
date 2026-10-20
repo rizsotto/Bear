@@ -192,7 +192,7 @@ fn exit_code_when_signaled() -> Result<()> {
 /// `--output -` for the same reason `bear intercept --output -` does: the
 /// build's own stdout shares the stream and a non-atomic write could split
 /// a JSON line.
-// Requirements: interception-events-format
+// Requirements: output-json-compilation-database
 #[test]
 #[cfg(has_executable_true)]
 fn combined_output_dash_is_rejected() -> Result<()> {

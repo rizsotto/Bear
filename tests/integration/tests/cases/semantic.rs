@@ -2861,7 +2861,7 @@ fn semantic_output_stdout_deduplicates_entries() -> Result<()> {
     Ok(())
 }
 
-// Requirements: output-append
+// Requirements: output-json-compilation-database, output-append
 //
 // Appending means reading back the existing output before writing, which is
 // impossible for a stream: `--append` combined with `--output -` must be

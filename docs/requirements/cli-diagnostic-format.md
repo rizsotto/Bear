@@ -20,8 +20,9 @@ does it.
 ## Acceptance criteria
 
 - Diagnostics go to standard error. Standard output carries only the
-  tool's data (the compilation database or the event stream), so the two
-  never mix.
+  tool's data, so the two never mix. When the database may go there is
+  owned by
+  [`output-json-compilation-database`](output-json-compilation-database.md).
 - Every line names the process that emitted it. The names are stable:
   the driver is `bear`, the wrapper is `wrapper`, and the preloaded
   library is `preload`.

@@ -136,7 +136,7 @@ standard error, and both ends can be standard streams.
 Path of the event file to read (default: \f[CR]\-\f[R], standard input).
 Any producer of a conforming event stream can pipe into it.
 When standard input is a terminal, or the stream turns out to be empty,
-a notice is printed on standard error.
+a warning is printed on standard error.
 .TP
 \f[B]\-o, \-\-output\f[R] \f[I]FILE\f[R]
 Path of the compilation database to write (default:
@@ -377,6 +377,9 @@ filename and falls back to \f[CR]gcc\f[R] when nothing matches.
 The accepted values are the \f[CR]as\f[R] names shown by
 \f[CR]bear semantic \-\-print\-compilers\f[R], plus \f[CR]wrapper\f[R]
 for a compiler launcher.
+A launcher is recognized only by its own basename, such as
+\f[CR]ccache\f[R] or \f[CR]distcc\f[R], so \f[CR]wrapper\f[R] on a path
+with another basename does not make it recognized.
 .IP \(bu 2
 \f[B]ignore\f[R]: Exclude this executable\(cqs invocations from the
 database.
@@ -503,13 +506,16 @@ entry, so a header with a real compilation entry is not duplicated.
 In combined and intercept mode, Bear exits with the build command\(cqs
 exit code: 0 when the build succeeds, the same non\-zero code when it
 fails.
+When the build is killed by a signal, Bear exits non\-zero.
+When the build handles the signal and exits on its own, Bear exits with
+the build\(cqs code, 0 included.
 .PP
 In semantic mode, Bear exits 0 on success and non\-zero when the
 analysis fails.
 .PP
 In parse\-sh mode, Bear exits 0 when the input could be parsed \- even
 when the database comes out empty because the text named no compiler
-invocations \- and also on empty input (with a notice on standard
+invocations \- and also on empty input (with a warning on standard
 error).
 It exits non\-zero when every non\-empty input line was skipped, so a
 run that understood nothing cannot pass for a successful one.

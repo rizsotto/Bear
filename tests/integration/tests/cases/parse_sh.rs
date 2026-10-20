@@ -74,7 +74,7 @@ fn parse_sh_file_input_and_output() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-shell-text-parsing
+// Requirements: interception-shell-text-parsing, output-json-compilation-database
 //
 // The database itself may stream to standard output: parse-sh runs no
 // build, so stdout is free. Diagnostics stay on stderr, and no file is
@@ -99,7 +99,7 @@ fn parse_sh_stdout_streaming_emits_database() -> Result<()> {
     Ok(())
 }
 
-// Requirements: interception-shell-text-parsing
+// Requirements: interception-shell-text-parsing, output-json-compilation-database
 //
 // A streamed database cannot be combined with appending; the combination
 // is rejected before any parsing happens.
