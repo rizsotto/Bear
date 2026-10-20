@@ -11,13 +11,14 @@ Does not belong here:
   (`-c`, `--version`) are subject matter and do appear.
 - Implementation guides, algorithm walkthroughs, error-handling tables.
 - Design reasons, trade-offs, rejected alternatives.
-- Bug reports and to-dos. Those go in the issue tracker.
+- Bug reports and to-dos. Those go in the task tracker.
 
 ## Files and IDs
 
 A file is named `<area>-<short-name>.md`, for example `output-append.md`.
 The name without `.md` is the requirement ID. Write it that way, in
-backticks, in cross-references (`output-append`) and in test tags.
+backticks, in cross-references between requirement files
+(`output-append`) and in test tags.
 
 Fill [`TEMPLATE.md`](TEMPLATE.md) for the format. Tests cite IDs with the
 `Requirements:` tag described in
@@ -36,3 +37,6 @@ Only the user sets `accepted` or `rejected`. When the user approves or
 declines a requirement in the current session, the agent may set the
 status for them. The agent sets `implemented` once the code is done and
 the tagged tests pass. A changed contract goes back to `proposed`.
+
+Whether a declined idea keeps a `rejected` file or becomes a rationale
+entry is settled in [`../rationale/CLAUDE.md`](../rationale/CLAUDE.md).

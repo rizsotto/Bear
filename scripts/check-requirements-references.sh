@@ -1,7 +1,8 @@
 #!/bin/sh
 # Verify that every cross-reference in a requirement file resolves to an
-# existing requirement or rationale entry, then print review hints for text
-# that may not belong in a contract.
+# existing requirement or rationale entry, and that every link in a rationale
+# entry to another entry or to a requirement file resolves, then print review
+# hints for text that may not belong in a contract.
 #
 # A cross-reference is a backticked ID with a known area prefix (`output-append`),
 # a relative Markdown link to a .md file in the same directory (with or
@@ -82,13 +83,41 @@ for name in ${rationale}; do
     fi
 done
 
+rat_files=""
+for file in "${rat_dir}"/*.md; do
+    [ -e "${file}" ] || continue
+    base="$(basename "${file}" .md)"
+
+    # Skip the non-entry files
+    if [ "${base}" = "CLAUDE" ] || [ "${base}" = "TEMPLATE" ]; then
+        continue
+    fi
+
+    rat_files="${rat_files} ${file}"
+done
+
+rat_links=""
+if [ -n "${rat_files}" ]; then
+    # shellcheck disable=SC2086
+    rat_links="$(grep -hoE '\]\((\./|\.\./requirements/)?[a-z0-9-]+\.md(#[^)]*)?\)' ${rat_files} | sed 's/^](//; s/^\.\///; s/[#)].*//' | sort -u || true)"
+fi
+
+for link in ${rat_links}; do
+    if [ ! -f "${rat_dir}/${link}" ]; then
+        echo "DANGLING (from rationale): ${link}"
+        # shellcheck disable=SC2086
+        grep -nE "\]\((\./)?$(printf '%s' "${link}" | sed 's/\./\\./g')" ${rat_files} | sed "s|^${rat_dir}/|    |"
+        dangling=$((dangling + 1))
+    fi
+done
+
 # shellcheck disable=SC2086
 grep -nE "\`(${prefixes})-[a-z0-9-]+\.md\`" ${files} | sed "s|^${req_dir}/|REVIEW (write the ID without .md): |" || true
 
 # shellcheck disable=SC2086
 grep -nE '::|\.(rs|yaml|yml)\b|\bcrate\b' ${files} | sed "s|^${req_dir}/|REVIEW (implementation detail?): |" || true
 
-checked="$(printf '%s\n' "${ids}" "${rationale}" | grep -c . || true)"
+checked="$(printf '%s\n' "${ids}" "${rationale}" "${rat_links}" | grep -c . || true)"
 
 echo
 echo "Checked ${checked} cross-reference(s); ${dangling} dangling."

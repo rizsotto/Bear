@@ -141,7 +141,8 @@ git log --pretty="%s" PREV..X.Y.Z
 
 # rationale entries added since the previous tag; their Consequences
 # sections name the user-visible deltas the subjects above will not
-git log --diff-filter=A --name-only --pretty=format: PREV..X.Y.Z -- docs/rationale/
+git log --diff-filter=A --name-only --pretty=format: PREV..X.Y.Z -- docs/rationale/ \
+    ':!docs/rationale/CLAUDE.md' ':!docs/rationale/TEMPLATE.md'
 
 # external contributors since the previous tag
 git log --pretty="%an <%ae>" PREV..X.Y.Z | sort -u
