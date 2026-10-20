@@ -5,206 +5,75 @@ status: implemented
 
 ## Intent
 
-When the user runs Bear wrapping a build command, Bear produces a JSON file
-(`compile_commands.json` by default) that lists every compilation command
-invoked during the build. Each entry contains the working directory, the
-source file, and the compilation command or arguments.
+When the user runs Bear on a build, Bear writes a JSON compilation
+database (`compile_commands.json` by default) that lists the compiler
+calls of the build. Each entry holds the working directory, the source
+file, and the compile command. Which calls produce entries, and in what
+shape, is owned by `output-compilation-entries`. One malformed entry
+never costs the user the rest of the database.
 
-## Format specification
-
-Bear's output conforms to the Clang JSON Compilation Database
-specification, which defines the array-of-command-objects structure and
-the `directory`, `file`, `arguments`, `command`, and `output` fields:
-<https://clang.llvm.org/docs/JSONCompilationDatabase.html>
-
-Two aspects of that format are specific to how Bear writes it and are
-described below: how Bear escapes the `command` field, and how it spells
-the compiler path in `arguments[0]`. Whether an entry carries the
-optional `output` field, and its value, is owned by
-`output-compilation-entries`.
-
-### The `command` field in detail
-
-When Bear emits the `command` field instead of `arguments`, it joins the
-argument list into a single string using POSIX shell quoting conventions,
-which may produce either single-quoted or double-quoted output depending
-on the argument content. Both forms are valid per the specification.
-
-The content therefore has two layers of escaping:
-
-1. **Shell escaping** -- arguments containing spaces, quotes, or backslashes
-   are quoted.
-2. **JSON escaping** -- the shell-escaped string is then JSON-encoded, so
-   `"` becomes `\"` and `\` becomes `\\` at the JSON level.
-
-For example, compiling with `-DNAME=\"hello\"`:
-- `arguments` form: `[..., "-DNAME=\"hello\"", ...]` (no shell escaping,
-  only JSON encoding of the raw argument)
-- `command` form: `"... '-DNAME=\"hello\"' ..."` or
-  `"... \"-DNAME=\\\"hello\\\"\" ..."` (shell-quoted, then JSON-encoded)
-
-### The compiler path (`arguments[0]`)
-
-The specification states that `arguments[0]` should be the executable name
-(e.g. `clang++`), but does not prescribe whether it must be an absolute
-path, a relative path, or a bare command name. Bear writes the compiler
-exactly as the interception layer observed it; the output stage never
-resolves, absolutizes, or otherwise rewrites the path.
-
-What "observed" means depends on the interception mode:
-
-- Preload mode observes the literal `exec` call: if the build invoked
-  `gcc`, Bear writes `gcc`; if it invoked `/usr/bin/gcc`, Bear writes
-  `/usr/bin/gcc`.
-- Wrapper mode cannot observe the name the build used -- by construction
-  the build executed the wrapper -- so the report names the real
-  compiler by its absolute path (see `interception-wrapper-mechanism.md`),
-  and the database shows that absolute path.
-- Shell-text parsing observes the command line as the build system wrote
-  it, so the database shows exactly that spelling: a bare `gcc` in the
-  text stays `gcc` (see `interception-shell-text-parsing`). No
-  command ran, so no resolved path exists to report.
+Related contracts have their own owners: how many entries one file may
+keep is owned by `output-duplicate-detection`, and how the `file`,
+`directory`, and `output` paths are spelled is owned by
+`output-path-format`.
 
 ## Acceptance criteria
 
-- Output file is valid JSON
-- Each entry contains `directory`, `file`, and at least one of `command` or `arguments`
-- The `command` and `arguments` fields are mutually exclusive in each entry
-- A `command` field that cannot be parsed by POSIX shell-word splitting is
-  rejected during validation
-- Empty `file` or `directory` fields are rejected during validation
-- An entry that fails validation is dropped from the output, logged at
-  `WARN` level with the reason, and counted in the run summary; it
-  never aborts processing of subsequent entries
-- When every entry that would otherwise have been written is dropped due to
-  validation failures, Bear emits a single `ERROR`-level summary line so
-  the empty compilation database is never silent
-- Entries correspond to actual compiler invocations observed during the
-  build; which invocations produce entries is owned by
-  `output-compilation-entries`
-- The output path is configurable
-- Default output format uses `arguments` (array form)
-- When `command` format is selected, arguments are shell-escaped
-  following POSIX shell quoting conventions
-
-## Validation failure handling
-
-When an entry fails validation:
-
-- The entry is dropped and does not appear in `compile_commands.json`.
-- A `WARN`-level log line names the `file`, `directory`, and the specific
-  validation reason (e.g. empty `directory`, unparsable `command`).
-- The run summary counts the dropped entry.
-- Processing of subsequent entries continues unaffected.
-
-This contract ensures a single malformed entry cannot destroy the usable
-output produced from the rest of a build.
-
-When every entry that would otherwise have been written is dropped, Bear
-emits a single `ERROR`-level summary line stating so. The compilation
-database is still written (as an empty array) so downstream tooling sees a
-valid file, but the log makes the empty result impossible to miss.
-
-Validation drops never affect the exit code; the exit-code contract
-across modes is owned by [`cli-exit-codes`](cli-exit-codes.md).
+- **Given** a build that compiles one C source file, **when** Bear
+  finishes, **then** the output is valid JSON with exactly one entry,
+  whose `directory` is the working directory, whose `file` is the
+  source, and whose `arguments` start with the compiler.
+- **Given** a build script that compiles several C and C++ sources,
+  **when** Bear finishes, **then** the output holds one entry per
+  source, each with the right compiler (C or C++) in `arguments[0]`.
+- **Given** a build that runs no compiler, **when** Bear finishes,
+  **then** the output is an empty JSON array `[]`.
+- **Given** a build where some sources compile and some fail, **when**
+  Bear finishes, **then** the output holds an entry for every attempted
+  compilation. The exit code is owned by `cli-exit-codes`.
+- **Given** the user sets the output path to `build/commands.json`,
+  **when** Bear finishes, **then** that file holds the entries, and no
+  `compile_commands.json` is written in the working directory.
+- **Given** the default configuration, **when** Bear writes an entry,
+  **then** the entry carries the `arguments` array and no `command`
+  field.
+- **Given** the command-string format is selected and a compiler call
+  with the argument `-DNAME="hello"`, **when** Bear writes the entry,
+  **then** the entry carries `command` and no `arguments`. The value is
+  the argument list joined with POSIX shell quoting (single- or
+  double-quoted, both are valid) and then JSON-encoded, so in the file
+  that argument reads `'-DNAME=\"hello\"'` or
+  `\"-DNAME=\\\"hello\\\"\"`. JSON-decoding and then shell-word
+  splitting gives back the original argument list.
+- **Given** an execution whose compiler is spelled `gcc` (a bare name)
+  or `/usr/bin/gcc` (a path), **when** Bear writes the entry, **then**
+  `arguments[0]` is that spelling, unchanged. The output stage never
+  resolves, absolutizes, or rewrites the compiler path. What spelling
+  each source observes is owned elsewhere. For the preload mechanism,
+  `interception-events-format` says the recorded path is absolute or a
+  bare name as the caller spelled it. The others are owned by
+  `interception-wrapper-mechanism` and
+  `interception-shell-text-parsing`.
+- **Given** an entry that fails validation, **when** Bear writes the
+  output, **then** the entry is dropped, a `WARN` log line names its
+  `file`, its `directory`, and the reason, the run summary counts it,
+  and the entries after it are still written. An entry fails validation
+  when:
+  - its `file` or `directory` is empty;
+  - it has both `command` and `arguments`, or neither;
+  - its `command` cannot be split as POSIX shell words (for example the
+    unterminated quote in `cc -c "src.c`).
+- **Given** a build whose entries are all valid but one with an empty
+  `directory`, **when** Bear writes the output, **then** the valid
+  entries appear unchanged, and the drop does not change the exit code
+  (owned by `cli-exit-codes`).
+- **Given** a build where every candidate entry fails validation,
+  **when** Bear writes the output, **then** the database is written as
+  an empty JSON array `[]`, each drop has its `WARN` line, and a single
+  `ERROR` line reports that every entry was dropped.
 
 ## Non-functional constraints
 
-- Output must conform to the Clang JSON Compilation Database specification
-- Must work on Linux, macOS, and Windows
-
-## Testing
-
-Given a project with a single C source file:
-
-> When the user runs `bear -- <compiler> -c source.c`
-> then `compile_commands.json` is created,
-> it contains valid JSON with exactly one entry,
-> the entry has `directory` equal to the working directory,
-> `file` equal to "source.c",
-> and `arguments` starting with the compiler path.
-
-Given a project with multiple C and C++ source files:
-
-> When the user runs `bear -- sh build.sh` where build.sh compiles all files,
-> then `compile_commands.json` contains one entry per source file,
-> and each entry has the correct compiler (C or C++) in `arguments[0]`.
-> Note: exact entry count may vary when a caching compiler wrapper
-> (ccache) is in the path.
-
-Given a build command that produces no compiler invocations:
-
-> When the user runs `bear -- true`,
-> then `compile_commands.json` contains an empty JSON array `[]`.
-
-Given a build that partially fails (some files compile, some do not):
-
-> When the user runs `bear -- sh build.sh`,
-> then `compile_commands.json` still contains entries for all attempted
-> compilations, and Bear's exit code reflects the build failure.
-
-Given a compiler invocation with `-DNAME=\"hello\"`:
-
-> When Bear writes the `command` field,
-> the value is shell-escaped (either single- or double-quoted form is valid),
-> the JSON encoding adds another layer,
-> JSON-decoding followed by shell-word splitting recovers the original argv,
-> and the entry has no `arguments` field (the two forms are mutually
-> exclusive).
-
-Given a compiler invoked as a bare name (e.g. `gcc`), intercepted in
-preload mode:
-
-> When Bear writes the entry,
-> then `arguments[0]` is `gcc` (not resolved to an absolute path).
-
-Given a compiler invoked with a full path (e.g. `/usr/bin/gcc`):
-
-> When Bear writes the entry,
-> then `arguments[0]` is `/usr/bin/gcc`.
-
-Given a build that produces a mix of valid entries and one entry that
-fails validation (for example, an empty `directory` field):
-
-> When Bear writes the output,
-> then the valid entries appear in `compile_commands.json` unchanged,
-> a `WARN` log line names the dropped entry and the validation reason,
-> the run summary reports one dropped entry,
-> and the process exit code is not affected by the drop.
-
-Given an entry presented for output whose `command` field contains an
-unterminated quote (e.g. `cc -c "src.c`):
-
-> When Bear validates entries while writing the output,
-> then the entry is dropped from `compile_commands.json`,
-> and a `WARN` log line names the entry and the unparsable `command` as
-> the validation reason.
-
-Given a project with a single C source file:
-
-> When the user runs Bear configured to write the database to
-> `build/commands.json` instead of the default path,
-> then `build/commands.json` is created and contains the entry,
-> and no `compile_commands.json` is written in the working directory.
-
-Given a build where every candidate entry fails validation:
-
-> When Bear writes the output,
-> then `compile_commands.json` is written as an empty JSON array `[]`,
-> a `WARN` log line is emitted for each dropped entry,
-> and a single `ERROR`-level summary line reports that every entry was
-> dropped.
-
-## Notes
-
-- The specification allows multiple entries for the same file (different
-  configurations). By default one entry per `directory` and `file` pair
-  survives -- arguments are ignored by the match, so differing
-  configurations of the same file collapse; keeping several requires
-  widening the fields entries are matched on (owned by
-  `output-duplicate-detection`).
-- Path formatting for the `file` and `directory` fields is configurable;
-  see `output-path-format` for details.
-- The `arguments[0]` spelling contract responds to issues #240, #678,
-  and #671.
-- The validation-drop contract responds to issue #692.
+- The output conforms to the
+  [Clang JSON Compilation Database specification](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
+- Works on Linux, macOS, and Windows.

@@ -5,98 +5,46 @@ status: implemented
 
 ## Intent
 
-Editors and linters that consume `compile_commands.json` frequently look up
-compile flags for header files, not only for translation units, so that
-features like "jump to definition" or "find references" work when a header is
-open. A user can opt in to having header files receive a synthesized entry
-derived from a compiled translation unit. This is off by default: with no
-such configuration the output is unchanged.
+Editors and linters often look up compile flags for a header file, not
+only for translation units, so that features like "jump to definition"
+work when a header is open. The user can opt in to a synthesized entry
+for each header, with flags taken from a compiled translation unit. It
+is off by default.
 
 ## Acceptance criteria
 
-- A configuration option enables header entries and selects a discovery
-  strategy. When enabled, header files receive a synthesized entry whose flags
-  are derived from a compiled translation unit.
-- Two discovery strategies are available, chosen by configuration:
-  - A default strategy considers header files that sit in the same directory
-    as a compiled source.
-  - An opt-in strategy reads the dependency files the build already emitted
-    to find the exact headers each translation unit included, scoped to those
-    that resolve inside the compilation's own working directory.
-- A synthesized entry clones a compiled translation unit's arguments with the
-  source path replaced by the header path and the output-file flag removed;
-  the synthesized entry has no output field.
-- Only translation units for C, C++, and Objective-C sources are eligible to
-  donate their arguments to a synthesized header entry.
-- Synthesized entries are subject to duplicate detection and validation like
-  any other entry (owned by `output-duplicate-detection`); a header that
-  already has a real entry in the database is not duplicated.
-- When the option is disabled (the default), no synthesized entries appear in
-  the output.
-
-## Testing
-
-Given a build that compiles `src/main.c`, which sits next to an uncompiled
-`src/util.h`:
-
-> When Bear generates the database with header entries disabled (the default),
-> then the database contains an entry for `src/main.c` only.
-
-Given the same build:
-
-> When Bear generates the database with header entries enabled using the
-> default (same-directory) strategy,
-> then the database also contains an entry for `src/util.h`
-> whose arguments are `src/main.c`'s with the source path swapped for the
-> header path and the output-file flag removed,
-> and which has no output field.
-
-For that second scenario, the source entry and its synthesized header entry
-are a pair like:
-
-```json
-[
-  {
-    "directory": "/home/user/project",
-    "file": "src/main.c",
-    "arguments": ["cc", "-c", "src/main.c", "-o", "src/main.o"]
-  },
-  {
-    "directory": "/home/user/project",
-    "file": "src/util.h",
-    "arguments": ["cc", "-c", "src/util.h"]
-  }
-]
-```
-
-Given a build whose compilation emitted a dependency file listing the headers
-it included, some inside the compilation's working directory and some (system
-headers) outside it:
-
-> When Bear generates the database with the dependency-files strategy,
-> then the database contains a synthesized entry for exactly the in-scope
-> headers that dependency file lists, and no others.
-
-Given a build that compiles `thing.swift` with `swiftc -c thing.swift`, which
-sits next to an uncompiled `util.h`:
-
-> When Bear generates the database with header entries enabled using the
-> default (same-directory) strategy,
-> then the database contains no entry for `util.h`:
-> only C, C++, and Objective-C translation units donate their arguments.
-
-Given a build that compiles both `src/util.h` directly (`cc -c src/util.h`)
-and `src/main.c` beside it:
-
-> When Bear generates the database with header entries enabled using the
-> default (same-directory) strategy,
-> then the database contains exactly one entry for `src/util.h`
-> (the real entry from the build; no synthesized duplicate is added).
-
-## Notes
-
-- The set of file extensions that count as headers is built-in and
-  deliberately not user-configurable.
+- **Given** a build that compiles `src/main.c`, next to an uncompiled
+  `src/util.h`, **when** Bear finishes with header entries off (the
+  default), **then** the database holds an entry for `src/main.c` only.
+- **Given** the same build, **when** Bear finishes with header entries
+  on and the default strategy, which considers headers in the same
+  directory as a compiled source, **then** the database also holds an
+  entry for `src/util.h`. It copies the arguments of `src/main.c` with
+  the source path replaced by the header path and the output flag
+  removed, and it has no `output` field. For example
+  `["cc", "-c", "src/main.c", "-o", "src/main.o"]` gives
+  `["cc", "-c", "src/util.h"]`.
+- **Given** a build whose compilation emitted a dependency file that
+  lists headers inside the compilation's working directory and system
+  headers outside it, **when** Bear finishes with the dependency-file
+  strategy, **then** the database holds a synthesized entry for exactly
+  the listed headers inside the working directory, and no others.
+- **Given** a build that runs `swiftc -c thing.swift`, next to an
+  uncompiled `util.h`, **when** Bear finishes with header entries on,
+  **then** the database holds no entry for `util.h`. Only C, C++, and
+  Objective-C translation units give their arguments to a header entry.
+- **Given** a build that compiles `src/util.h` directly
+  (`cc -c src/util.h`) and `src/main.c` next to it, **when** Bear
+  finishes with header entries on and the default duplicate detection,
+  **then** the database holds exactly one entry for `src/util.h`: the
+  real one from the build.
+- A synthesized entry never displaces a real one. It is dropped when the
+  key of duplicate detection (owned by `output-duplicate-detection`)
+  matches a real entry; with a key or path format under which the two
+  differ, both appear. Synthesized entries are validated like any other
+  entry (owned by `output-json-compilation-database`).
+- The set of file extensions that count as headers is built in. No
+  configuration changes it.
 
 ## Rationale
 
