@@ -4,100 +4,70 @@
 
 Through Bear 4.1.x, `bear intercept` wrote its event stream to
 `events.json` by default and `bear semantic` read `events.json` by
-default. The paired defaults made the split two-step workflow flagless,
-at the price of a magic rendezvous filename in the current working
-directory: the two subcommands coordinated through a name neither the
-user chose nor any external tool consumes. That carried a real hazard -
-a stale `events.json` from an earlier run could be silently reprocessed
-by a bare `bear semantic` - and a hidden coupling: nothing in either
-invocation said the two commands were connected.
+default. The paired defaults made the split two-step workflow flagless.
+The price was a magic rendezvous file in the current directory: the two
+subcommands met at a name the user never chose and no outside tool
+reads. A stale `events.json` from an earlier run could be silently
+processed again by a bare `bear semantic`. Nothing in either command
+line showed that the two were connected. Piping a producer into
+`bear semantic` also failed, with "Event file not found: events.json",
+unless the user passed `--input -`.
 
-Shipping `bear parse-sh` in 4.2.0 changed the balance. The pipe
-`bear parse-sh | bear semantic` becomes a primary way to feed
-`semantic`, and the `events.json` default fought it: forgetting
-`--input -` died with a baffling "Event file not found: events.json".
-Viewed as a UNIX tool, `semantic`
-is a pure filter - no build, stdout free - and filters read standard
-input when no file is named. `intercept` is the opposite case: it can
-never use standard output (the build owns that stream), so no natural
-default exists for it at all.
+Seen as a UNIX tool, `semantic` is a pure filter: it runs no build, and
+stdout is free. Filters read standard input when no file is named.
+`intercept` is the opposite case. It can never use standard output,
+because the build owns that stream, so it has no natural default at all.
 
-The two file names in play are not equivalent. `compile_commands.json`
-is an ecosystem contract - Clang tooling finds the database by that
-exact name - so defaulting to it carries meaning. `events.json` was a
-name Bear invented; no third-party contract depends on it.
+The two file names are not equal. `compile_commands.json` is an
+ecosystem contract: Clang tooling finds the database by that exact name,
+so a default to it carries meaning. `events.json` was a name Bear made
+up, and no outside contract depends on it.
 
-Alternatives considered:
+Options considered:
 
-- Keep the paired defaults and only improve the missing-file error with
-  a "reading from a pipe? pass --input -" hint. Rejected: it treats the
-  symptom and keeps both the magic-filename coupling and the stale-file
-  hazard.
+- Keep the paired defaults and add a "reading from a pipe? pass
+  --input -" hint to the missing-file error. Rejected: it treats the
+  symptom and keeps both the coupling and the stale-file hazard.
 - Default `semantic --input` to `-` only when stdin is not a TTY.
-  Rejected: isatty-dependent semantics make the identical command line
-  behave differently in a terminal and in CI, and CI stdin is often an
-  empty pipe even when the user meant a file - a silent
-  empty-database path.
-- Give `intercept` a stream default by redirecting the build's own
-  stdout to stderr, freeing standard output for the event stream.
-  Rejected: it silently changes observable build behavior - tools that
-  detect a tty or write results to stdout would break - for a pipeline
-  no producer needs.
-- Mandate `--input` on `semantic` too, symmetric with `intercept`.
-  Rejected: a pure filter refusing to read stdin by default fights the
-  convention this redesign invokes, permanently bakes `--input -` into
-  the flagship parse-sh pipeline, and diverges from `parse-sh`, whose
-  input already defaults to `-`. The asymmetry with `intercept` is
-  principled: require the flag where no natural default exists; use the
-  conventional default where one does.
+  Rejected: the same command line would behave differently in a
+  terminal and in CI. CI stdin is often an empty pipe even when the user
+  meant a file, which gives a silent empty database.
+- Give `intercept` a stream default by sending the build's stdout to
+  stderr. Rejected: it changes how the build behaves. Tools that detect a
+  tty or write results to stdout would break.
+- Require `--input` on `semantic` too, to match `intercept`. Rejected: a
+  filter that will not read stdin by default fights the convention, and
+  it would differ from `parse-sh`, whose input also defaults to `-`.
+  Require the flag where no natural default exists; use the usual
+  default where one does.
 - A positional file operand (`bear semantic [FILE]`, stdin when
-  omitted), the purest filter spelling. Not taken: `-i/--input`
-  defaulting to `-` is equally conventional and keeps `semantic`
-  consistent with `parse-sh`'s existing flags.
+  omitted). Not taken: `-i/--input` defaulting to `-` is just as
+  conventional and matches the `parse-sh` flags.
 
 ## Decision
 
-`bear intercept` requires an explicit `--output`; there is no default
-event-file name. `bear semantic --input` defaults to `-`, reading the
-event stream from standard input like any filter. The
+`bear intercept` requires an explicit `--output`, and `-` is not
+accepted. There is no default event-file name. `bear semantic --input`
+defaults to `-` and reads the event stream from standard input. The
 `compile_commands.json` output default stays everywhere. Two guards
-soften the filter footguns: `semantic` prints a stderr notice when it
-is about to read events from a terminal, and warns when the event
-stream turned out empty.
-
-*Update (pre-4.2.0 release):* `parse-sh` later stopped emitting the
-event stream and produces the database directly
-([parse-sh-database-product](parse-sh-database-product.md)), so the
-parse-sh pipeline this entry cites no longer exists. The decision
-stands on its remaining grounds: the stale-rendezvous hazard, and
-`semantic` as the filter fed by `bear intercept` event files and
-third-party producers.
+soften the filter footguns: `semantic` warns on stderr when it is about
+to read events from a terminal, and when the event stream is empty.
 
 ## Consequences
 
-- Piping a producer into `bear semantic` is flagless. The confusing
-  missing-file failure dissolves instead of being papered over with a
-  hint. (At the time of the decision the flagship pipe was
-  `bear parse-sh | bear semantic`; see the update note above.)
-- The stale-`events.json` hazard is gone; an event file is only ever
-  read because the user named it.
+- Piping a producer into `bear semantic` needs no flags. The confusing
+  missing-file failure goes away instead of getting a hint.
+- The stale-`events.json` hazard is gone. An event file is only read
+  because the user named it.
 - The old two-step habit breaks loudly and early: `bear intercept`
-  without `--output` is a usage error before the build runs, the best
-  available failure mode.
-- Scripts written for 4.1.x split workflows must add `--output` /
-  `--input`. This is a deliberate breaking change shipped in 4.2.0,
-  before parse-sh examples ossify; it only gets more expensive later.
-- A bare `bear semantic` on a terminal blocks reading stdin like `sort`
-  or `jq` would; the TTY notice names the way out.
+  without `--output` is a usage error before the build runs.
+- Scripts written for the 4.1.x split workflow must add `--output` and
+  `--input`. This is a deliberate breaking change in 4.2.0. It only gets
+  more expensive later.
+- A bare `bear semantic` on a terminal blocks on stdin, as `sort` or
+  `jq` would. The terminal warning names the way out.
 
 ## References
 
-- Requirement:
-  [`interception-events-format`](../requirements/interception-events-format.md)
-  (the seam whose endpoints this names).
-- Related rationale:
-  [`parse-sh-producer`](parse-sh-producer.md) (the producer that made
-  the pipe a first-class feed).
-- The footgun this supersedes: a bare `bear semantic` fed from a pipe
-  failed with "Event file not found: events.json" instead of reading
-  standard input.
+- [interception-events-format](../requirements/interception-events-format.md), the seam whose endpoints this names
+- [parse-sh-producer](parse-sh-producer.md), the other mode whose input defaults to stdin

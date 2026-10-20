@@ -160,7 +160,7 @@ Deliberate exclusion, likely to be proposed again:
   non-compiler commands (`ar`, `ln`, a linker line) appear nowhere. The
   skip diagnostics on standard error are the only window into the
   reconstruction. The reasoning is recorded in
-  [parse-sh-database-product](../rationale/parse-sh-database-product.md);
+  [parse-sh-producer](../rationale/parse-sh-producer.md);
   a public execution-stream output can be added compatibly if real
   demand appears.
 
@@ -320,4 +320,3 @@ Given an existing compilation database and new dry-run text:
 
 - [parse-sh-producer](../rationale/parse-sh-producer.md)
 - [parse-sh-single-tokenizer](../rationale/parse-sh-single-tokenizer.md)
-- [parse-sh-database-product](../rationale/parse-sh-database-product.md)
