@@ -1140,9 +1140,8 @@ fn recognized_ids_come_from_the_verdict_not_the_execution_dump() {
 }
 
 /// Regression guard for #532: --append was unusable on large projects in the
-/// 3.x C++ implementation. The Rust rewrite (output-append.md) made it linear
-/// but no test enforces the scaling property -- the requirement file cites
-/// #532 in Notes only. This test synthesizes a large existing database and
+/// 3.x C++ implementation. output-append states no time bound, so this test
+/// guards the linear scaling. It synthesizes a large existing database and
 /// asserts the append completes well inside a linear time budget. An O(N^2)
 /// regression in the read/merge path would blow past the budget.
 // Requirements: output-append
