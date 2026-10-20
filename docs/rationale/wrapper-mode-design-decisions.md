@@ -8,10 +8,13 @@ Each wrapper reports the call and then runs the real compiler. Three
 setup questions follow, and each has a force that is not obvious from
 the code.
 
-How a wrapper file is made. Tools like ccache detect symlinks to
-themselves and skip them, but do not detect hard links. A symlink to
-`bear-wrapper` was rejected for that reason: ccache could skip Bear's
-wrapper entirely.
+How a wrapper file is made. The wrapper takes the compiler name from
+the file name of its own executable, and reads `wrappers.cfg` from the
+directory that holds it. It gets that path from the OS, and on Linux the
+OS resolves symlinks. A symlink to `bear-wrapper` was rejected for that
+reason: the wrapper would see itself as `bear-wrapper` in the install
+directory, find neither its compiler name nor its config, and fail. On
+Windows the wrapper file is a copy.
 
 Where the wrapper directory lives. Autotools-style builds record the
 compiler path during `./configure` and use it again during `make`. A
@@ -28,7 +31,9 @@ self-contained configuration.
 
 ## Decision
 
-- Wrappers are **hard links** to `bear-wrapper`, not symlinks.
+- Wrappers are **hard links** to `bear-wrapper`, not symlinks. On
+  Windows they are copies, and elsewhere a copy is the fallback when the
+  hard link fails.
 - The wrapper directory is a **deterministic** `.bear/` in the current
   working directory, not a random temp dir.
 - Bare compiler names are **resolved to absolute paths once at startup**,
@@ -36,8 +41,13 @@ self-contained configuration.
 
 ## Consequences
 
-- **Hard links, not symlinks.** ccache does not skip Bear's wrapper.
-  The cost is the ccache recursion problem, handled separately in
+- **Hard links, not symlinks.** Each wrapper sees its own name and its
+  own directory, so it finds its compiler and its config. A copy works
+  the same way, and covers Windows and file systems where hard links
+  fail, such as overlay file systems in containers. The cost of a copy
+  is disk space. The link type does not fix the ccache recursion
+  problem: ccache does not recognize Bear's wrapper as itself. That is
+  handled in
   [interception-wrapper-recursion](../requirements/interception-wrapper-recursion.md).
 - **Deterministic directory.** Paths recorded during `./configure` stay
   valid during `make`, provided both run under the same Bear invocation.
@@ -49,6 +59,6 @@ self-contained configuration.
 ## References
 
 - [interception-wrapper-mechanism](../requirements/interception-wrapper-mechanism.md), the requirement this supports
-- [interception-wrapper-recursion](../requirements/interception-wrapper-recursion.md), the ccache recursion this choice causes
+- [interception-wrapper-recursion](../requirements/interception-wrapper-recursion.md), the ccache recursion the wrapper mechanism must avoid
 - [wrapper-recursion-ccache-alternatives](wrapper-recursion-ccache-alternatives.md), how the recursion is fixed
 - [#654](https://github.com/rizsotto/Bear/issues/654), temp directories break multi-step builds
