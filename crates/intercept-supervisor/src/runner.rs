@@ -110,7 +110,7 @@ impl BuildEnvironment {
         // rewritten override so the build still receives them.
         let mut environment_overrides = HashMap::new();
         for (key, value) in &context.environment {
-            if !intercept::environment::program_env(key) || value.is_empty() {
+            if !intercept::environment::program_env(key) {
                 continue;
             }
             let Some((program, flags)) = parse_program_env_value(value) else {
@@ -1286,14 +1286,18 @@ mod test {
         }
 
         #[test]
-        fn whitespace_only_cc_is_skipped() {
-            let fx = fixture::Fixture::new().with_path_string("/usr/bin").with_env("CC", "   ");
+        fn empty_or_whitespace_only_cc_is_not_rewritten() {
+            for value in ["", "   ", "\t\n"] {
+                let fx = fixture::Fixture::new().with_path_string("/usr/bin").with_env("CC", value);
 
-            let sut =
-                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                let sut =
+                    BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| {
+                        false
+                    })
                     .unwrap();
 
-            assert!(!sut.environment_overrides.contains_key("CC"));
+                assert!(!sut.environment_overrides.contains_key("CC"), "CC={value:?} must not be rewritten");
+            }
         }
 
         /// Covers the intersection of `interception-wrapper-recursion` and

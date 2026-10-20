@@ -994,6 +994,52 @@ intercept:
     Ok(())
 }
 
+/// An empty and a whitespace-only `CC` are treated the same way: Bear
+/// warns and leaves the variable alone.
+// Requirements: interception-cc-env-var-flags
+#[test]
+#[cfg(has_executable_shell)]
+fn wrapper_mode_warns_on_empty_or_whitespace_only_cc() -> Result<()> {
+    for (name, cc_value) in [("wrapper_cc_empty", ""), ("wrapper_cc_whitespace", "   ")] {
+        let env = TestEnvironment::new(name)?;
+
+        let script_path = env.create_shell_script("build.sh", "true")?;
+
+        let config = r#"
+schema: "4.2"
+
+intercept:
+  mode: wrapper
+"#;
+        let config_path = env.test_dir().join("config.yaml");
+        std::fs::write(&config_path, config)?;
+
+        let mut cmd = env.command_bear();
+        cmd.current_dir(env.test_dir()).env("RUST_LOG", "warn").env("CC", cc_value).args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            script_path.to_str().unwrap(),
+        ]);
+
+        let output = cmd.output()?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(output.status.success(), "bear failed for CC={:?}:\n{}", cc_value, stderr);
+        assert!(
+            stderr.contains("Skipping compiler env var CC="),
+            "Bear should warn about CC={:?}, got:\n{}",
+            cc_value,
+            stderr,
+        );
+    }
+
+    Ok(())
+}
+
 /// When a ccache masquerade directory is first on PATH (the default on
 /// Fedora/Arch/Gentoo and on the CI Ubuntu job after `apt-get install
 /// ccache`), wrapper mode must resolve past it to the real compiler. Before
