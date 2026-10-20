@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut a release of Bear -- verify metadata, run the full check set, fast-forward to master, tag, and publish a GitHub release plus discussion announcement. Use when the user asks to release, cut a version, tag a release, or ship a new Bear version.
+description: Cut a release of Bear. Verify metadata, run the full check set, fast-forward to master, tag, and publish a GitHub release plus discussion announcement. Use when the user asks to release, cut a version, tag a release, or ship a new Bear version.
 ---
 
 # Release Bear
@@ -9,7 +9,7 @@ This skill captures the release process. The goal is that running through it
 mechanically produces a tagged, published release with consistent metadata.
 
 Replace `X.Y.Z` with the version being released (e.g. `4.1.2`). The release
-branch is `X.Y.Z-rc`; the destination branch is `master`.
+branch is `next`; the destination branch is `master`.
 
 Pushing the tag and publishing the GitHub release are outward-facing and hard
 to undo. Drive the steps below and confirm with the user before any
@@ -18,21 +18,31 @@ the release, posting the announcement).
 
 ## 1. Preconditions
 
-- All work for the release is on `X.Y.Z-rc`, branched from `master`.
-- `master` has no commits the rc branch is missing:
+- All work for the release is on `next`.
+- Local `next` matches `origin/next`, so the CI result covers what gets
+  merged:
   ```sh
+  git checkout next
   git fetch origin
-  git log --oneline HEAD..origin/master   # must be empty
+  git status                              # must be up to date with origin/next
   ```
-  If non-empty, rebase the rc branch onto `master` first.
-- Latest CI run on `X.Y.Z-rc` is green:
+  If you have local commits, push them first and wait for CI.
+- `master` has no commits `next` is missing:
   ```sh
-  gh run list --branch X.Y.Z-rc --limit 1
+  git log --oneline next..origin/master   # must be empty
+  ```
+  `master` only moves by fast-forward from `next`, so a non-empty result
+  means someone pushed to `master` directly. Stop and ask the user. Do not
+  rebase or force-push a shared branch on your own. If the user agrees,
+  merging `master` into `next` fixes it without rewriting history.
+- Latest CI run on `origin/next` is green:
+  ```sh
+  gh run list --branch next --limit 1
   ```
 
 ## 2. Pre-flight checklist
 
-Run from the repo root on the rc branch:
+Run from the repo root on `next`:
 
 ```sh
 cargo fmt --check
@@ -53,13 +63,17 @@ Then verify the release metadata:
 | Man page date | `man/bear.1.md` line 3 | set to today (e.g. `April 25, 2026`) |
 | Man page generated | `man/bear.1` | regenerated from `.md` (see below) |
 
+If the workspace version does not match, commit
+`chore(release): bump version to X.Y.Z` on `next` with the refreshed
+`Cargo.lock`, push, and let CI run.
+
 If the man page date or content changed, regenerate `bear.1`:
 
 ```sh
 cd man && pandoc -s -t man bear.1.md -o bear.1
 ```
 
-Commit any pre-flight fixups to `X.Y.Z-rc` and let CI run again.
+Commit any pre-flight fixups to `next` and let CI run again.
 
 ## 3. Merge to master
 
@@ -69,11 +83,12 @@ is the convention the 4.x series follows.
 ```sh
 git checkout master
 git pull --ff-only origin master
-git merge --ff-only X.Y.Z-rc
+git merge --ff-only next
 ```
 
-Do not create a merge commit. If `--ff-only` fails, the rc branch is behind
-master - rebase it and start over.
+Do not create a merge commit. If `--ff-only` fails, `master` has commits
+`next` lacks. Stop and ask the user, as in the preconditions. Do not
+rebase or force-push `next` on your own.
 
 ## 4. Tag
 
@@ -210,14 +225,12 @@ Alternatively, paste through the web UI.
 - Notify downstream packagers if the release contains packaging-relevant
   changes (install layout, prerequisites, breaking flags). Past channels:
   Homebrew, Arch, Debian/Fedora maintainers.
-- Open a new branch `<next>-rc` when work for the next version begins, and
-  bump `Cargo.toml` (`[workspace.package].version`) on that branch.
 
 ## Conventions reference
 
 | Item | Convention |
 |---|---|
-| Release branch name | `X.Y.Z-rc` |
+| Release branch name | `next` |
 | Tag name | `X.Y.Z` (no `v` prefix) |
 | Tag type | annotated, SSH-signed |
 | Tag message | `vX.Y.Z` |
