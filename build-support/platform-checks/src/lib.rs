@@ -11,22 +11,23 @@
 
 use std::io::Write;
 use std::path::Path;
+use std::process::Stdio;
 
-const SYMBOL_PROBES: &[(&str, &str)] = &[
-    ("execve", "unistd.h"),
-    ("execv", "unistd.h"),
-    ("execvpe", "unistd.h"),
-    ("execvp", "unistd.h"),
-    ("execvP", "unistd.h"),
-    ("exect", "unistd.h"),
-    ("execl", "unistd.h"),
-    ("execlp", "unistd.h"),
-    ("execle", "unistd.h"),
-    ("posix_spawn", "spawn.h"),
-    ("pclose", "stdio.h"),
-    ("posix_spawnp", "spawn.h"),
-    ("popen", "stdio.h"),
-    ("system", "stdlib.h"),
+const SYMBOL_PROBES: &[&str] = &[
+    "execve",
+    "execv",
+    "execvpe",
+    "execvp",
+    "execvP",
+    "exect",
+    "execl",
+    "execlp",
+    "execle",
+    "posix_spawn",
+    "pclose",
+    "posix_spawnp",
+    "popen",
+    "system",
 ];
 
 /// Feature macros that autoconf's `AC_USE_SYSTEM_EXTENSIONS` defines
@@ -71,8 +72,8 @@ pub fn detect() -> Vec<&'static str> {
 
     let detected: Vec<&'static str> = SYMBOL_PROBES
         .iter()
-        .filter(|(symbol, header)| check_symbol_exists(symbol, header, probe_dir.path()))
-        .map(|(symbol, _)| *symbol)
+        .copied()
+        .filter(|symbol| check_symbol_exists(symbol, probe_dir.path()))
         .collect();
 
     if !detected.contains(&"execve") {
@@ -99,7 +100,7 @@ pub fn emit_cfg(symbols: &[&str]) {
 /// rustc accepts them in `cfg(...)` attributes regardless of detection
 /// outcome. Call this from a consumer's `build.rs`.
 pub fn emit_check_cfg() {
-    for (symbol, _) in SYMBOL_PROBES {
+    for symbol in SYMBOL_PROBES {
         println!("cargo:rustc-check-cfg=cfg(has_symbol_{symbol})");
     }
 }
@@ -119,19 +120,19 @@ fn emit_rerun_if_env_changed() {
     }
 }
 
-fn check_symbol_exists(symbol: &str, header: &str, probe_dir: &Path) -> bool {
+/// Autoconf's `AC_LANG_FUNC_LINK_TRY`: declare the function ourselves and
+/// link, so the probe passes only if the target libc exports the symbol.
+fn check_symbol_exists(symbol: &str, probe_dir: &Path) -> bool {
     let check_code = format!(
         r#"
-        #include <stddef.h>
-        #include <{header}>
-
-        // Use a function pointer to avoid unused function warnings,
-        // and ensure the linker must find the symbol.
-        int main() {{
-            void *ptr = (void*){symbol};
-            (void)ptr; // Suppress unused variable warning
-            return 0;
-        }}
+        #define {symbol} innocuous_{symbol}
+        #include <limits.h>
+        #undef {symbol}
+        char {symbol}(void);
+        #if defined __stub_{symbol} || defined __stub___{symbol}
+        choke me
+        #endif
+        int main(void) {{ return {symbol}(); }}
         "#
     );
 
@@ -150,23 +151,25 @@ fn check_symbol_exists(symbol: &str, header: &str, probe_dir: &Path) -> bool {
     for (name, value) in SYSTEM_EXTENSIONS {
         build.define(name, *value);
     }
-    let result = build
+    let compiler = build
         .cargo_metadata(false)
         .cargo_output(false)
         .cargo_warnings(false)
         .inherit_rustflags(true)
-        .file(path)
-        .out_dir(probe_dir)
-        .try_compile(&format!("check_{symbol}"));
+        .get_compiler();
 
-    match result {
-        Ok(_) => {
-            println!("cargo:warning=Checking for symbol: {symbol} ... found");
-            true
-        }
-        Err(_) => {
-            println!("cargo:warning=Checking for symbol: {symbol} ... missing");
-            false
-        }
-    }
+    let found = compiler
+        .to_command()
+        .arg("-fno-builtin")
+        .arg(&path)
+        .arg("-o")
+        .arg(probe_dir.join(format!("check_{symbol}")))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+
+    let outcome = if found { "found" } else { "missing" };
+    println!("cargo:warning=Checking for symbol: {symbol} ... {outcome}");
+    found
 }

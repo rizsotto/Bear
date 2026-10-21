@@ -19,7 +19,8 @@ for probes and consumer C sources.
 
 ## Adding a probe
 
-1. Add an entry to `SYMBOL_PROBES` in `src/lib.rs`.
+1. Add the symbol name to `SYMBOL_PROBES` in `src/lib.rs`. The probe links a
+   program that calls it, so it passes only if the target libc exports it.
 2. Reference the resulting `cfg(has_symbol_X)` from consumer source.
 3. Provided the consumer's `build.rs` calls
    `platform_checks::emit_check_cfg()`, the lint allowlist is covered
