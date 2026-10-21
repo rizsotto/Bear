@@ -4,8 +4,8 @@ use std::io::Write;
 
 // Symbols that the C shim (src/c/shim.c) actually exports for LD_PRELOAD
 // interception. The cc -D defines and the version script / exports list
-// are restricted to this family, even though `platform_checks::DETECTED_SYMBOLS`
-// also includes auxiliary probes (dlopen, RTLD_NEXT, EACCES, ...).
+// are restricted to this family, so any probe in
+// `platform_checks::DETECTED_SYMBOLS` outside this family is not exported.
 const INTERCEPT_FAMILY: &[&str] = &[
     "execve",
     "execv",

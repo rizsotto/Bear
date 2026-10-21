@@ -5,8 +5,8 @@
 // (since this crate is a [build-dependencies] of the consumers, Cargo
 // schedules it before any consumer's build.rs).
 //
-// Output: writes OUT_DIR/detected.rs containing four constants
-// (DETECTED_HEADERS, DETECTED_SYMBOLS, KNOWN_HEADERS, KNOWN_SYMBOLS)
+// Output: writes OUT_DIR/detected.rs containing two constants
+// (DETECTED_SYMBOLS, KNOWN_SYMBOLS)
 // that lib.rs pulls in via include!(). Consumer build scripts call
 // platform_checks::emit_cfg() / emit_check_cfg() to apply the
 // cargo:rustc-cfg / cargo:rustc-check-cfg directives to their own crate.
@@ -17,23 +17,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-const HEADER_PROBES: &[(&str, &str)] = &[
-    ("dlfcn.h", "dlfcn_h"),
-    ("errno.h", "errno_h"),
-    ("unistd.h", "unistd_h"),
-    ("spawn.h", "spawn_h"),
-    ("stdio.h", "stdio_h"),
-    ("stdlib.h", "stdlib_h"),
-];
-
 const SYMBOL_PROBES: &[(&str, &str)] = &[
-    ("dlopen", "dlfcn.h"),
-    ("dlsym", "dlfcn.h"),
-    ("dlerror", "dlfcn.h"),
-    ("dlclose", "dlfcn.h"),
-    ("RTLD_NEXT", "dlfcn.h"),
-    ("EACCES", "errno.h"),
-    ("ENOENT", "errno.h"),
     ("execve", "unistd.h"),
     ("execv", "unistd.h"),
     ("execvpe", "unistd.h"),
@@ -55,13 +39,6 @@ fn main() {
 
     let out_dir: PathBuf = std::env::var("OUT_DIR").expect("OUT_DIR not set").into();
 
-    let mut detected_headers: BTreeSet<&str> = BTreeSet::new();
-    for (header, define) in HEADER_PROBES {
-        if check_include_file(header, define, &out_dir) {
-            detected_headers.insert(define);
-        }
-    }
-
     let mut detected_symbols: BTreeSet<&str> = BTreeSet::new();
     for (symbol, header) in SYMBOL_PROBES {
         if check_symbol_exists(symbol, header, &out_dir) {
@@ -71,9 +48,7 @@ fn main() {
 
     let path = out_dir.join("detected.rs");
     let mut file = File::create(&path).expect("Failed to create detected.rs");
-    write_const(&mut file, "DETECTED_HEADERS", detected_headers.iter().copied());
     write_const(&mut file, "DETECTED_SYMBOLS", detected_symbols.iter().copied());
-    write_const(&mut file, "KNOWN_HEADERS", HEADER_PROBES.iter().map(|(_, d)| *d));
     write_const(&mut file, "KNOWN_SYMBOLS", SYMBOL_PROBES.iter().map(|(s, _)| *s));
 }
 
@@ -83,37 +58,6 @@ fn write_const<'a, I: Iterator<Item = &'a str>>(file: &mut File, name: &str, ite
         write!(file, "\"{item}\", ").expect("write failed");
     }
     writeln!(file, "];").expect("write failed");
-}
-
-fn check_include_file(header: &str, define: &str, out_dir: &std::path::Path) -> bool {
-    let result = cc::Build::new()
-        .cargo_metadata(false)
-        .cargo_output(false)
-        .cargo_warnings(false)
-        .inherit_rustflags(true)
-        .file(
-            tempfile::Builder::new()
-                .prefix("check_include_")
-                .suffix(".c")
-                .tempfile_in(out_dir)
-                .expect("Failed to create temp file for include check")
-                .keep()
-                .expect("Failed to keep temp file")
-                .1,
-        )
-        .include(header)
-        .try_compile(define);
-
-    match result {
-        Ok(_) => {
-            println!("cargo:warning=Checking for include file: {header} ... found");
-            true
-        }
-        Err(_) => {
-            println!("cargo:warning=Checking for include file: {header} ... missing");
-            false
-        }
-    }
 }
 
 fn check_symbol_exists(symbol: &str, header: &str, out_dir: &std::path::Path) -> bool {

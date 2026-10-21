@@ -1,6 +1,6 @@
 ## platform-checks
 
-Build-time helper crate. Probes the host for headers and symbols once
+Build-time helper crate. Probes the host for symbols once
 per workspace build and exposes the results to consumer build scripts.
 The probe lists are in `build.rs`; the API is in `src/lib.rs`.
 
@@ -14,9 +14,8 @@ The probe lists are in `build.rs`; the API is in `src/lib.rs`.
 
 ## Adding a probe
 
-1. Add an entry to `HEADER_PROBES` or `SYMBOL_PROBES` in `build.rs`.
-2. Reference the resulting `cfg(has_header_X)` or `cfg(has_symbol_X)`
-   from consumer source.
+1. Add an entry to `SYMBOL_PROBES` in `build.rs`.
+2. Reference the resulting `cfg(has_symbol_X)` from consumer source.
 3. Provided the consumer's `build.rs` calls
    `platform_checks::emit_check_cfg()`, the lint allowlist is covered
    automatically; no `Cargo.toml` `[lints.rust]` editing needed.
