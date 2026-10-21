@@ -45,14 +45,7 @@ static REAL_EXECVE: AtomicPtr<libc::c_void> = {
 
 #[ctor(unsafe)]
 static REAL_EXECVPE: AtomicPtr<libc::c_void> = {
-    // On musl, execvpe is only a weak alias of the namespace-reserved
-    // __execvpe. On some arches (e.g. s390x) dlsym may not resolve the weak
-    // alias, so fall back to __execvpe. Harmless on glibc/BSD, where the first
-    // lookup already succeeds.
-    let mut ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvpe".as_ptr() as *const _) };
-    if ptr.is_null() {
-        ptr = unsafe { libc::dlsym(RTLD_NEXT, c"__execvpe".as_ptr() as *const _) };
-    }
+    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvpe".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 

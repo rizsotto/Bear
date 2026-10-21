@@ -265,23 +265,6 @@ EXPORT int execvpe(const char *file, char *const argv[], char *const envp[])
 #endif
 
 //
-// __execvpe - musl-internal strong symbol behind execvpe
-//
-// On musl, execvpe is a weak alias of the namespace-reserved __execvpe. On some
-// arches (notably s390x) callers bind to __execvpe directly, bypassing our
-// execvpe export, so the nested exec goes uninterposed. Exporting __execvpe too
-// lets us intercept those calls. Routed through the same rust_execvpe, so
-// reporting and environment doctoring are identical. The has_symbol___execvpe
-// define is set by build.rs only for musl targets (see INTERCEPT_FAMILY).
-//
-#if defined(has_symbol___execvpe)
-EXPORT int __execvpe(const char *file, char *const argv[], char *const envp[])
-{
-    return rust_execvpe(file, argv, envp);
-}
-#endif
-
-//
 // execvP - execute a file with custom search path (BSD extension)
 //
 #if defined(has_symbol_execvP)
