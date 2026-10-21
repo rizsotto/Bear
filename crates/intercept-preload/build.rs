@@ -55,6 +55,9 @@ fn main() {
         // We use cargo_metadata(false) to prevent cc from emitting its own
         // cargo:rustc-link-lib directive, which would link without --whole-archive
         let mut shim = cc::Build::new();
+        for (name, value) in platform_checks::SYSTEM_EXTENSIONS {
+            shim.define(name, *value);
+        }
         for symbol in &intercept_symbols {
             let flag = format!("has_symbol_{}", symbol);
             shim.define(flag.as_str(), None);

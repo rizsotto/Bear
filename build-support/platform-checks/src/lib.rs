@@ -29,6 +29,29 @@ const SYMBOL_PROBES: &[(&str, &str)] = &[
     ("system", "stdlib.h"),
 ];
 
+/// Feature macros that autoconf's `AC_USE_SYSTEM_EXTENSIONS` defines
+/// unconditionally on every system, as (name, value). Consumers pass them to
+/// the C compiler so their C sources need no `#define` of their own.
+pub const SYSTEM_EXTENSIONS: &[(&str, &str)] = &[
+    ("_ALL_SOURCE", "1"),
+    ("_COSMO_SOURCE", "1"),
+    ("_DARWIN_C_SOURCE", "1"),
+    ("_GNU_SOURCE", "1"),
+    ("_HPUX_ALT_XOPEN_SOCKET_API", "1"),
+    ("_NETBSD_SOURCE", "1"),
+    ("_OPENBSD_SOURCE", "1"),
+    ("_POSIX_PTHREAD_SEMANTICS", "1"),
+    ("__STDC_WANT_IEC_60559_ATTRIBS_EXT__", "1"),
+    ("__STDC_WANT_IEC_60559_BFP_EXT__", "1"),
+    ("__STDC_WANT_IEC_60559_DFP_EXT__", "1"),
+    ("__STDC_WANT_IEC_60559_EXT__", "1"),
+    ("__STDC_WANT_IEC_60559_FUNCS_EXT__", "1"),
+    ("__STDC_WANT_IEC_60559_TYPES_EXT__", "1"),
+    ("__STDC_WANT_LIB_EXT2__", "1"),
+    ("__STDC_WANT_MATH_SPEC_FUNCS__", "1"),
+    ("_TANDEM_SOURCE", "1"),
+];
+
 /// Probe the target C toolchain and return the symbols it provides. Call
 /// this once from a consumer's `build.rs`.
 ///
@@ -123,12 +146,15 @@ fn check_symbol_exists(symbol: &str, header: &str, probe_dir: &Path) -> bool {
     file.write_all(check_code.as_bytes()).expect("Failed to write to temp file");
     file.flush().expect("Failed to flush temp file");
 
-    let result = cc::Build::new()
+    let mut build = cc::Build::new();
+    for (name, value) in SYSTEM_EXTENSIONS {
+        build.define(name, *value);
+    }
+    let result = build
         .cargo_metadata(false)
         .cargo_output(false)
         .cargo_warnings(false)
         .inherit_rustflags(true)
-        .define("_GNU_SOURCE", "1")
         .file(path)
         .out_dir(probe_dir)
         .try_compile(&format!("check_{symbol}"));

@@ -3,7 +3,8 @@
 Build-time helper library. Each consumer calls it from its own
 `build.rs`, and it probes the C toolchain of that consumer's target for
 symbols. Probes run once per consumer. The probe list and the API are in
-`src/lib.rs`.
+`src/lib.rs`. `SYSTEM_EXTENSIONS` there is the feature-macro list
+for probes and consumer C sources.
 
 ## Constraints
 

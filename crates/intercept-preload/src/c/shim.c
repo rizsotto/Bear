@@ -18,10 +18,6 @@
 // 2. Second pass: copy arguments into a stack-allocated VLA
 //
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
