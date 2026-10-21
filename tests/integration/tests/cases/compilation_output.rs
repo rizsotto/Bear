@@ -877,9 +877,9 @@ fn atomic_write_keeps_database_when_replay_fails() -> Result<()> {
     Ok(())
 }
 
-/// Given a write failure (the output path exists as a non-empty directory, so
-/// the final rename cannot succeed), Bear's atomic-write step must leave the
-/// pre-existing filesystem object untouched.
+/// Given an output path that exists as a non-empty directory, Bear fails
+/// before the build runs (the destination cannot be written), exits non-zero,
+/// and leaves the pre-existing filesystem object untouched.
 // Requirements: output-atomic-write, cli-exit-codes
 #[test]
 #[cfg(target_family = "unix")]
@@ -913,6 +913,55 @@ fn atomic_write_preserves_existing_object_on_failure() -> Result<()> {
         "untouched",
         "pre-existing content inside output path must not be modified on write failure"
     );
+
+    Ok(())
+}
+
+/// Given a destination that becomes unwritable during the build (the build
+/// itself makes a non-empty directory at the output path), the final rename
+/// fails: Bear exits non-zero although the build succeeded, the destination
+/// is untouched, and the temporary file is kept for debugging.
+// Requirements: output-atomic-write, cli-exit-codes
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell, has_executable_mkdir))]
+fn atomic_write_keeps_temp_file_when_final_rename_fails() -> Result<()> {
+    use std::fs;
+
+    let env = TestEnvironment::new("atomic_write_rename_fails")?;
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    let out_path = env.test_dir().join("compile_commands.json");
+    let sentinel = out_path.join("sentinel.txt");
+    let build = format!(
+        "{} -c src.c -o src.o\n{} '{}'\necho untouched > '{}'",
+        filename_of(COMPILER_C_PATH),
+        MKDIR_PATH,
+        out_path.display(),
+        sentinel.display()
+    );
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    let result =
+        env.run_bear(&["--output", out_path.to_str().unwrap(), "--", SHELL_PATH, script.to_str().unwrap()])?;
+    result.assert_failure()?;
+
+    assert!(env.file_exists("src.o"), "the build must have compiled the source");
+    assert!(out_path.is_dir(), "output path must still be the directory the build made");
+    assert_eq!(fs::read_to_string(&sentinel)?, "untouched\n");
+    assert!(
+        result.stderr().contains(out_path.to_str().unwrap()),
+        "the error must name the output path: {}",
+        result.stderr()
+    );
+    let mut kept = Vec::new();
+    for entry in fs::read_dir(env.test_dir())? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        if name.starts_with(".compile_commands.json.") && name.ends_with(".tmp") {
+            kept.push(name);
+        }
+    }
+    assert_eq!(kept.len(), 1, "the temporary file must be kept next to the output: {kept:?}");
 
     Ok(())
 }
