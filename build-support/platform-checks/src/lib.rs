@@ -85,26 +85,27 @@ pub fn detect() -> Detected {
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
     let probe_dir = tempfile::tempdir_in(out_dir).expect("Failed to create probe directory");
 
-    let symbols: Vec<&'static str> = SYMBOL_PROBES
-        .iter()
-        .copied()
-        .filter(|symbol| check_symbol_exists(symbol, probe_dir.path()))
-        .collect();
+    let mut symbols: Vec<&'static str> = Vec::new();
+    for symbol in SYMBOL_PROBES {
+        match check_symbol_exists(symbol, probe_dir.path()) {
+            Ok(()) => symbols.push(symbol),
+            Err(error) if *symbol == "execve" => {
+                let target = std::env::var("TARGET").unwrap_or_default();
+                let compiler = cc::Build::new().get_compiler().path().display().to_string();
+                panic!(
+                    "symbol `execve` not found for target {target} with compiler {compiler}: \
+                     the target C toolchain is broken or missing\n{error}"
+                );
+            }
+            Err(_) => {}
+        }
+    }
 
     let headers: Vec<&'static str> = HEADER_PROBES
         .iter()
         .copied()
-        .filter(|header| check_header_exists(header, probe_dir.path()))
+        .filter(|header| check_header_exists(header, probe_dir.path()).is_ok())
         .collect();
-
-    if !symbols.contains(&"execve") {
-        let target = std::env::var("TARGET").unwrap_or_default();
-        let compiler = cc::Build::new().get_compiler().path().display().to_string();
-        panic!(
-            "symbol `execve` not found for target {target} with compiler {compiler}: \
-             the target C toolchain is broken or missing"
-        );
-    }
     Detected { symbols, headers }
 }
 
@@ -149,7 +150,7 @@ fn emit_rerun_if_env_changed() {
 
 /// Autoconf's `AC_LANG_FUNC_LINK_TRY`: declare the function ourselves and
 /// link, so the probe passes only if the target libc exports the symbol.
-fn check_symbol_exists(symbol: &str, probe_dir: &Path) -> bool {
+fn check_symbol_exists(symbol: &str, probe_dir: &Path) -> Result<(), String> {
     let check_code = format!(
         r#"
         #define {symbol} innocuous_{symbol}
@@ -163,15 +164,15 @@ fn check_symbol_exists(symbol: &str, probe_dir: &Path) -> bool {
         "#
     );
 
-    let found = run_probe(&format!("check_{symbol}"), &check_code, probe_dir, true);
-    let outcome = if found { "found" } else { "missing" };
+    let result = run_probe(&format!("check_{symbol}"), &check_code, probe_dir, true);
+    let outcome = if result.is_ok() { "found" } else { "missing" };
     println!("cargo:warning=Checking for symbol: {symbol} ... {outcome}");
-    found
+    result
 }
 
 /// Compile a source that includes the header. Compile only: the header may
 /// exist while its functions are not linkable, and that is the symbol probe's job.
-fn check_header_exists(header: &str, probe_dir: &Path) -> bool {
+fn check_header_exists(header: &str, probe_dir: &Path) -> Result<(), String> {
     let check_code = format!(
         r#"
         #include <{header}>
@@ -180,13 +181,15 @@ fn check_header_exists(header: &str, probe_dir: &Path) -> bool {
     );
 
     let name = format!("check_{}", header_cfg_name(header));
-    let found = run_probe(&name, &check_code, probe_dir, false);
-    let outcome = if found { "found" } else { "missing" };
+    let result = run_probe(&name, &check_code, probe_dir, false);
+    let outcome = if result.is_ok() { "found" } else { "missing" };
     println!("cargo:warning=Checking for header: {header} ... {outcome}");
-    found
+    result
 }
 
-fn run_probe(name: &str, code: &str, probe_dir: &Path, link: bool) -> bool {
+/// Run the compiler on `code`. On failure, the error holds the compiler's
+/// output, so a broken toolchain can be reported.
+fn run_probe(name: &str, code: &str, probe_dir: &Path, link: bool) -> Result<(), String> {
     let (mut file, path) = tempfile::Builder::new()
         .prefix(name)
         .suffix(".c")
@@ -214,12 +217,31 @@ fn run_probe(name: &str, code: &str, probe_dir: &Path, link: bool) -> bool {
     if !link {
         command.arg("-c");
     }
-    command
+    let output = command
         .arg(&path)
         .arg("-o")
         .arg(probe_dir.join(name))
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| format!("failed to run {}: {error}", command_line(&command)))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{}\n{}{}",
+            command_line(&command),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
+/// The program and its arguments, without the environment: `Command`'s
+/// `Debug` output lists every variable, secrets included.
+fn command_line(command: &std::process::Command) -> String {
+    std::iter::once(command.get_program())
+        .chain(command.get_args())
+        .map(|part| part.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
