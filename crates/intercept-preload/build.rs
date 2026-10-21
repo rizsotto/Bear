@@ -3,9 +3,9 @@
 use std::io::Write;
 
 // Symbols that the C shim (src/c/shim.c) actually exports for LD_PRELOAD
-// interception. The cc -D defines and the version script / exports list
-// are restricted to this family, so any probe in
-// `platform_checks::detect()` outside this family is not exported.
+// interception. The version script / exports list is restricted to this
+// family, so any probe in `platform_checks::detect()` outside it is not
+// exported. Such probes still reach the shim as -D flags.
 const INTERCEPT_FAMILY: &[&str] = &[
     "execve",
     "execv",
@@ -29,15 +29,15 @@ fn main() {
     println!("cargo:rerun-if-changed=src/c/shim.c");
 
     // Replay platform-checks results as cfg directives for this crate
-    let detected_symbols = platform_checks::detect();
-    platform_checks::emit_cfg(&detected_symbols);
+    let detected = platform_checks::detect();
+    platform_checks::emit_cfg(&detected);
     platform_checks::emit_check_cfg();
 
     if cfg!(target_family = "unix") {
         let out_dir = std::env::var("OUT_DIR").unwrap();
 
         let mut intercept_symbols: Vec<&str> =
-            detected_symbols.iter().copied().filter(|s| INTERCEPT_FAMILY.contains(s)).collect();
+            detected.symbols.iter().copied().filter(|s| INTERCEPT_FAMILY.contains(s)).collect();
 
         // Our popen and system run the shell through the posix_spawn helper
         // functions (posix_spawnattr_init, ...), which the libc crate does not
@@ -58,9 +58,15 @@ fn main() {
         for (name, value) in platform_checks::SYSTEM_EXTENSIONS {
             shim.define(name, *value);
         }
-        for symbol in &intercept_symbols {
+        // Symbols in INTERCEPT_FAMILY that were dropped above stay undefined,
+        // because the shim wrapper would not link without its Rust side.
+        let extra_symbols = detected.symbols.iter().filter(|s| !INTERCEPT_FAMILY.contains(s));
+        for symbol in intercept_symbols.iter().chain(extra_symbols) {
             let flag = format!("has_symbol_{}", symbol);
             shim.define(flag.as_str(), None);
+        }
+        for header in &detected.headers {
+            shim.define(platform_checks::header_cfg_name(header).as_str(), None);
         }
         shim.file("src/c/shim.c")
             .warnings(true)

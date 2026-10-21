@@ -30,11 +30,10 @@
 // Platform-specific environment access
 //
 // When the dynamic linker loads the library, the `environ` variable might not
-// be available yet. This is the case on macOS where we need to use
-// `_NSGetEnviron()` to reliably access the environment during library
-// initialization.
+// be available yet. Where `_NSGetEnviron()` exists (macOS), use it to
+// reliably access the environment during library initialization.
 
-#if defined(__APPLE__)
+#if defined(has_header_crt_externs_h) && defined(has_symbol__NSGetEnviron)
 #include <crt_externs.h>
 #define get_environ() (*_NSGetEnviron())
 #else

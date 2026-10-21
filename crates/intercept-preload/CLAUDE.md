@@ -43,6 +43,10 @@ Adding or removing an intercepted function is a three-place edit:
    enters the `detect()` result, and the `INTERCEPT_FAMILY` filter
    silently drops it, leaving the wrapper hidden by `local: *;`.
 
+A probed symbol outside `INTERCEPT_FAMILY` (e.g. `_NSGetEnviron`) is never
+exported. It reaches the shim only as a `has_symbol_X` -D flag, and detected
+headers arrive as `has_header_X` flags.
+
 Miss any one of the three and the wrapper compiles but is invisible
 to the dynamic linker, so libc handles the call instead of us.
 Pairs that travel together (e.g. `popen`/`pclose`) each need their

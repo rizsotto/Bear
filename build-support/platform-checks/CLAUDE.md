@@ -21,6 +21,10 @@ for probes and consumer C sources.
 
 1. Add the symbol name to `SYMBOL_PROBES` in `src/lib.rs`. The probe links a
    program that calls it, so it passes only if the target libc exports it.
+   For a header, add it to `HEADER_PROBES` instead; the probe compiles an
+   `#include` and the key is `has_header_` plus the name with every
+   non-alphanumeric character as `_` (`crt_externs.h` is
+   `has_header_crt_externs_h`).
 2. Reference the resulting `cfg(has_symbol_X)` from consumer source.
 3. Provided the consumer's `build.rs` calls
    `platform_checks::emit_check_cfg()`, the lint allowlist is covered

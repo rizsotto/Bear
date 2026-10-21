@@ -28,7 +28,10 @@ const SYMBOL_PROBES: &[&str] = &[
     "posix_spawnp",
     "popen",
     "system",
+    "_NSGetEnviron",
 ];
+
+const HEADER_PROBES: &[&str] = &["crt_externs.h"];
 
 /// Feature macros that autoconf's `AC_USE_SYSTEM_EXTENSIONS` defines
 /// unconditionally on every system, as (name, value). Consumers pass them to
@@ -53,30 +56,48 @@ pub const SYSTEM_EXTENSIONS: &[(&str, &str)] = &[
     ("_TANDEM_SOURCE", "1"),
 ];
 
-/// Probe the target C toolchain and return the symbols it provides. Call
-/// this once from a consumer's `build.rs`.
+/// What the target C toolchain provides.
+pub struct Detected {
+    pub symbols: Vec<&'static str>,
+    pub headers: Vec<&'static str>,
+}
+
+/// The `cfg` key, and the C macro name, for a detected header.
+pub fn header_cfg_name(header: &str) -> String {
+    let mangled: String = header.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+    format!("has_header_{mangled}")
+}
+
+/// Probe the target C toolchain and return the symbols and headers it
+/// provides. Call this once from a consumer's `build.rs`.
 ///
 /// Returns an empty list on non-unix targets without probing. Panics on a
 /// unix target when `execve` is not found, because that means the target
 /// toolchain is broken and every other probe would be wrong too.
-pub fn detect() -> Vec<&'static str> {
+pub fn detect() -> Detected {
     emit_rerun_if_env_changed();
 
     let family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_default();
     if !family.split(',').any(|f| f == "unix") {
-        return Vec::new();
+        return Detected { symbols: Vec::new(), headers: Vec::new() };
     }
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
     let probe_dir = tempfile::tempdir_in(out_dir).expect("Failed to create probe directory");
 
-    let detected: Vec<&'static str> = SYMBOL_PROBES
+    let symbols: Vec<&'static str> = SYMBOL_PROBES
         .iter()
         .copied()
         .filter(|symbol| check_symbol_exists(symbol, probe_dir.path()))
         .collect();
 
-    if !detected.contains(&"execve") {
+    let headers: Vec<&'static str> = HEADER_PROBES
+        .iter()
+        .copied()
+        .filter(|header| check_header_exists(header, probe_dir.path()))
+        .collect();
+
+    if !symbols.contains(&"execve") {
         let target = std::env::var("TARGET").unwrap_or_default();
         let compiler = cc::Build::new().get_compiler().path().display().to_string();
         panic!(
@@ -84,15 +105,18 @@ pub fn detect() -> Vec<&'static str> {
              the target C toolchain is broken or missing"
         );
     }
-    detected
+    Detected { symbols, headers }
 }
 
-/// Emit `cargo:rustc-cfg=has_symbol_*` directives
-/// for every detected symbol. Call this from a
+/// Emit `cargo:rustc-cfg=has_symbol_*` and `has_header_*` directives
+/// for everything detected. Call this from a
 /// consumer's `build.rs` so the directives apply to that crate.
-pub fn emit_cfg(symbols: &[&str]) {
-    for symbol in symbols {
+pub fn emit_cfg(detected: &Detected) {
+    for symbol in &detected.symbols {
         println!("cargo:rustc-cfg=has_symbol_{symbol}");
+    }
+    for header in &detected.headers {
+        println!("cargo:rustc-cfg={}", header_cfg_name(header));
     }
 }
 
@@ -102,6 +126,9 @@ pub fn emit_cfg(symbols: &[&str]) {
 pub fn emit_check_cfg() {
     for symbol in SYMBOL_PROBES {
         println!("cargo:rustc-check-cfg=cfg(has_symbol_{symbol})");
+    }
+    for header in HEADER_PROBES {
+        println!("cargo:rustc-check-cfg=cfg({})", header_cfg_name(header));
     }
 }
 
@@ -136,15 +163,39 @@ fn check_symbol_exists(symbol: &str, probe_dir: &Path) -> bool {
         "#
     );
 
+    let found = run_probe(&format!("check_{symbol}"), &check_code, probe_dir, true);
+    let outcome = if found { "found" } else { "missing" };
+    println!("cargo:warning=Checking for symbol: {symbol} ... {outcome}");
+    found
+}
+
+/// Compile a source that includes the header. Compile only: the header may
+/// exist while its functions are not linkable, and that is the symbol probe's job.
+fn check_header_exists(header: &str, probe_dir: &Path) -> bool {
+    let check_code = format!(
+        r#"
+        #include <{header}>
+        int main(void) {{ return 0; }}
+        "#
+    );
+
+    let name = format!("check_{}", header_cfg_name(header));
+    let found = run_probe(&name, &check_code, probe_dir, false);
+    let outcome = if found { "found" } else { "missing" };
+    println!("cargo:warning=Checking for header: {header} ... {outcome}");
+    found
+}
+
+fn run_probe(name: &str, code: &str, probe_dir: &Path, link: bool) -> bool {
     let (mut file, path) = tempfile::Builder::new()
-        .prefix(&format!("check_{symbol}"))
+        .prefix(name)
         .suffix(".c")
         .tempfile_in(probe_dir)
-        .expect("Failed to create temp file for symbol check")
+        .expect("Failed to create temp file for probe")
         .keep()
         .expect("Failed to keep temp file");
 
-    file.write_all(check_code.as_bytes()).expect("Failed to write to temp file");
+    file.write_all(code.as_bytes()).expect("Failed to write to temp file");
     file.flush().expect("Failed to flush temp file");
 
     let mut build = cc::Build::new();
@@ -158,18 +209,17 @@ fn check_symbol_exists(symbol: &str, probe_dir: &Path) -> bool {
         .inherit_rustflags(true)
         .get_compiler();
 
-    let found = compiler
-        .to_command()
-        .arg("-fno-builtin")
+    let mut command = compiler.to_command();
+    command.arg("-fno-builtin");
+    if !link {
+        command.arg("-c");
+    }
+    command
         .arg(&path)
         .arg("-o")
-        .arg(probe_dir.join(format!("check_{symbol}")))
+        .arg(probe_dir.join(name))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .is_ok_and(|status| status.success());
-
-    let outcome = if found { "found" } else { "missing" };
-    println!("cargo:warning=Checking for symbol: {symbol} ... {outcome}");
-    found
+        .is_ok_and(|status| status.success())
 }
