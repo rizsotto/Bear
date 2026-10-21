@@ -198,9 +198,9 @@ pub enum CompilerPass {
 }
 
 /// How the sources named in one invocation map to compilation database
-/// entries. Set per compiler family in the interpreter factory
-/// (`interpreters/compilers/flag_based.rs`), not in the compiler-flag YAML,
-/// because it is consumed at the converter (post-parse), not at parse time.
+/// entries. Set per compiler family by the family YAML's top-level
+/// `source_mode:` key (default `per-source-stripped`). It is not used at
+/// parse time; the converter consumes it (post-parse).
 /// See the `output-compilation-entries` requirement for the full contract.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SourceMode {
