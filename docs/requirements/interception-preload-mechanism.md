@@ -1,6 +1,6 @@
 ---
 title: LD_PRELOAD-based command interception
-status: implemented
+status: proposed
 ---
 
 ## Intent
@@ -87,8 +87,12 @@ Bear's entry. A grandchild past that point is not intercepted.
 
 **`popen` and `system` on Android**: on Android these two calls are not
 intercepted, so a compiler launched through them is missing from the
-database. The `exec` family and `posix_spawn` are intercepted as on
-other Linux systems.
+database. The `exec` family is intercepted as on other Linux systems.
+
+**`posix_spawn` on older Android API levels**: Android has `posix_spawn`
+and `posix_spawnp` from API level 28. A Bear built for an older API
+level does not intercept them, even on a newer device, so a compiler
+launched through them is missing from the database.
 
 **Affects all child processes** (issue #444): the preload variable
 applies to every process the build spawns, not only compilers. This can
@@ -98,3 +102,4 @@ disturb tools that are sensitive to preloaded libraries.
 
 - [Linker selection for the preload library](../rationale/preload-linker-selection.md)
 - [Preload chains to co-resident preload libraries](../rationale/preload-chains-to-co-resident-libraries.md)
+- [How the build finds the functions the preload library wraps](../rationale/preload-symbol-probes.md)
