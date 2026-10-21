@@ -1,20 +1,24 @@
 ## platform-checks
 
-Build-time helper crate. Probes the host for symbols once
-per workspace build and exposes the results to consumer build scripts.
-The probe lists are in `build.rs`; the API is in `src/lib.rs`.
+Build-time helper library. Each consumer calls it from its own
+`build.rs`, and it probes the C toolchain of that consumer's target for
+symbols. Probes run once per consumer. The probe list and the API are in
+`src/lib.rs`.
 
 ## Constraints
 
 - A consumer takes this crate as a `[build-dependencies]` entry and calls
-  both `platform_checks::emit_cfg()` and `platform_checks::emit_check_cfg()`
-  from its own `build.rs`. The `cfg` keys apply only to the calling crate.
-- The library has no dependencies. `cc` and `tempfile` are
-  `[build-dependencies]` only.
+  `platform_checks::detect()`, then `platform_checks::emit_cfg()` with the
+  result and `platform_checks::emit_check_cfg()`, from its own `build.rs`.
+  The `cfg` keys apply only to the calling crate.
+- The crate has no `build.rs`. Probing there would see the host as the
+  target in cross builds.
+- `detect()` returns nothing on non-unix targets and panics on a unix
+  target where `execve` is missing.
 
 ## Adding a probe
 
-1. Add an entry to `SYMBOL_PROBES` in `build.rs`.
+1. Add an entry to `SYMBOL_PROBES` in `src/lib.rs`.
 2. Reference the resulting `cfg(has_symbol_X)` from consumer source.
 3. Provided the consumer's `build.rs` calls
    `platform_checks::emit_check_cfg()`, the lint allowlist is covered
@@ -22,7 +26,7 @@ The probe lists are in `build.rs`; the API is in `src/lib.rs`.
 
 ## What this crate does NOT decide
 
-It detects host capabilities, not consumer behavior. Which symbols the
+It detects target capabilities, not consumer behavior. Which symbols the
 preload shim exports is decided in `crates/intercept-preload`. Adding an
 intercepted function touches `SYMBOL_PROBES` here as one of three edits;
 `crates/intercept-preload/CLAUDE.md` lists them.

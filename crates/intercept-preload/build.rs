@@ -5,7 +5,7 @@ use std::io::Write;
 // Symbols that the C shim (src/c/shim.c) actually exports for LD_PRELOAD
 // interception. The cc -D defines and the version script / exports list
 // are restricted to this family, so any probe in
-// `platform_checks::DETECTED_SYMBOLS` outside this family is not exported.
+// `platform_checks::detect()` outside this family is not exported.
 const INTERCEPT_FAMILY: &[&str] = &[
     "execve",
     "execv",
@@ -29,17 +29,15 @@ fn main() {
     println!("cargo:rerun-if-changed=src/c/shim.c");
 
     // Replay platform-checks results as cfg directives for this crate
-    platform_checks::emit_cfg();
+    let detected_symbols = platform_checks::detect();
+    platform_checks::emit_cfg(&detected_symbols);
     platform_checks::emit_check_cfg();
 
     if cfg!(target_family = "unix") {
         let out_dir = std::env::var("OUT_DIR").unwrap();
 
-        let mut intercept_symbols: Vec<&str> = platform_checks::DETECTED_SYMBOLS
-            .iter()
-            .copied()
-            .filter(|s| INTERCEPT_FAMILY.contains(s))
-            .collect();
+        let mut intercept_symbols: Vec<&str> =
+            detected_symbols.iter().copied().filter(|s| INTERCEPT_FAMILY.contains(s)).collect();
 
         // Our popen and system run the shell through the posix_spawn helper
         // functions (posix_spawnattr_init, ...), which the libc crate does not

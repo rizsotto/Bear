@@ -36,11 +36,11 @@ Adding or removing an intercepted function is a three-place edit:
 1. `src/c/shim.c` - the `EXPORT` wrapper itself (and the matching
    `extern` declaration of the `rust_<name>` implementation).
 2. `intercept-preload/build.rs::INTERCEPT_FAMILY` - so the symbol
-   passes the filter against `platform_checks::DETECTED_SYMBOLS`
+   passes the filter against `platform_checks::detect()`
    and is written into the version script / exports list.
-3. `platform-checks/build.rs::SYMBOL_PROBES` - so the symbol is
-   probed on the host at all. If it is not listed here it never
-   enters `DETECTED_SYMBOLS`, and the `INTERCEPT_FAMILY` filter
+3. `platform-checks/src/lib.rs::SYMBOL_PROBES` - so the symbol is
+   probed on the target at all. If it is not listed here it never
+   enters the `detect()` result, and the `INTERCEPT_FAMILY` filter
    silently drops it, leaving the wrapper hidden by `local: *;`.
 
 Miss any one of the three and the wrapper compiles but is invisible

@@ -34,9 +34,9 @@ Conventions for Rust code across every workspace crate. The per-crate
   recoverable anomalies; `error` for non-fatal failures that are logged and
   swallowed. No `trace!`.
 - **Platform gating**: split OSes with `#[cfg(target_os = "macos")]` /
-  `#[cfg(not(target_os = "macos"))]` / `#[cfg(unix)]`; gate optional host
-  capabilities with the build-probed `#[cfg(has_symbol_X)]` /
-  `#[cfg(has_executable_X)]` keys, never on `target_os = "linux"`.
+  `#[cfg(not(target_os = "macos"))]` / `#[cfg(unix)]`; gate optional
+  capabilities with the build-probed `#[cfg(has_symbol_X)]` (target) /
+  `#[cfg(has_executable_X)]` (host tool) keys, never on `target_os = "linux"`.
 - **Lint suppressions**: only `#[allow(...)]` when there is no better fix,
   always with a trailing `// reason` comment.
 - **Comments** explain *why*, not *what*; default to none unless a subtle

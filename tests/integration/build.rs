@@ -60,7 +60,7 @@ fn main() {
     println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH={}", preload_path);
 
     // Replay platform-checks results as cfg directives for this crate
-    platform_checks::emit_cfg();
+    platform_checks::emit_cfg(&platform_checks::detect());
     platform_checks::emit_check_cfg();
 
     // Perform additional checks for executables
