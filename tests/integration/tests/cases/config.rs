@@ -1208,6 +1208,119 @@ fn all_entries_dropped_emits_error_summary() -> Result<()> {
     Ok(())
 }
 
+fn canonical_directory_config(env: &TestEnvironment) -> Result<std::path::PathBuf> {
+    let config = r#"
+schema: "4.2"
+
+format:
+  paths:
+    directory: canonical
+    file: as-is
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+    Ok(config_path)
+}
+
+/// With `directory: canonical`, an entry whose working directory no longer
+/// exists is dropped under the validation-drop contract: a WARN names the
+/// file, and the run summary counts the drop. Other entries survive.
+// Requirements: output-path-format, output-json-compilation-database
+#[test]
+#[cfg(target_family = "unix")]
+fn canonical_directory_failure_drops_entry_like_validation() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("canonical_directory_drop")?;
+    let valid_dir = env.test_dir().to_str().unwrap().to_string();
+    let missing_dir = env.test_dir().join("removed").to_str().unwrap().to_string();
+
+    let event_missing = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "orphan.c"],
+        "working_dir": missing_dir,
+        "environment": {}
+    });
+    let event_valid = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "main.c"],
+        "working_dir": valid_dir,
+        "environment": {}
+    });
+    let events_content = format!("{}\n{}", event_missing, event_valid);
+    env.create_source_files(&[("events.json", &events_content), ("main.c", "int main() { return 0; }")])?;
+    let config_path = canonical_directory_config(&env)?;
+
+    let output = env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.c"))?;
+
+    let stderr = output.stderr();
+    let warning = stderr
+        .lines()
+        .find(|line| line.contains("WARN") && line.contains("orphan.c"))
+        .unwrap_or_else(|| panic!("expected a WARN naming orphan.c; got:\n{stderr}"));
+    assert_eq!(warning.matches("orphan.c").count(), 1, "warning must name the file once; got: {warning}");
+    assert!(
+        stderr.contains("dropped entries (invalid): 1"),
+        "expected pipeline summary to report 1 dropped entry; got:\n{stderr}"
+    );
+
+    Ok(())
+}
+
+/// With `directory: canonical`, when every entry is dropped because its
+/// working directory cannot be resolved, the all-dropped ERROR fires.
+// Requirements: output-path-format, output-json-compilation-database
+#[test]
+#[cfg(target_family = "unix")]
+fn canonical_directory_failure_for_all_entries_emits_error_summary() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("canonical_directory_all_dropped")?;
+    let missing_dir = env.test_dir().join("removed").to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": COMPILER_C_PATH,
+        "arguments": [COMPILER_C_PATH, "-c", "orphan.c"],
+        "working_dir": missing_dir,
+        "environment": {}
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+    let config_path = canonical_directory_config(&env)?;
+
+    let output = env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    let stderr = output.stderr();
+    assert!(
+        stderr.contains("Compilation database is empty"),
+        "expected ERROR summary line when every entry is dropped; got:\n{stderr}"
+    );
+
+    Ok(())
+}
+
 /// Test invalid configuration handling
 /// Verifies Bear handles invalid config gracefully
 #[test]

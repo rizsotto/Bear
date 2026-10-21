@@ -42,6 +42,15 @@ use semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, Source
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
+/// A command whose working directory cannot be formatted, so none of its
+/// entries can be produced.
+#[derive(Debug)]
+pub struct UnresolvedDirectory {
+    pub directory: PathBuf,
+    pub files: Vec<PathBuf>,
+    pub reason: String,
+}
+
 /// Converts commands into compilation database entries.
 ///
 /// This converter takes format configuration during construction and uses it
@@ -74,19 +83,53 @@ impl CommandConverter {
     }
 
     /// Converts a compiler command into compilation database entries.
+    ///
+    /// Test helper: an unresolvable directory yields no entries.
+    #[cfg(test)]
     pub fn convert(&self, cmd: &Command) -> Vec<Entry> {
+        self.try_convert(cmd).unwrap_or_default()
+    }
+
+    /// Converts a compiler command into compilation database entries.
+    ///
+    /// Fails when the working directory cannot be formatted; the error lists
+    /// the source files whose entries are dropped because of it.
+    pub fn try_convert(&self, cmd: &Command) -> Result<Vec<Entry>, UnresolvedDirectory> {
         // Check if we should skip entry generation for this command
         if self.should_skip_entry_generation(cmd) {
-            return vec![];
+            return Ok(vec![]);
         }
 
-        // Format working directory
-        let Some(formatted_directory) = self.format_working_directory(&cmd.working_dir) else {
-            return vec![];
+        let formatted_directory = match (self.directory_resolver)(&cmd.working_dir, &cmd.working_dir) {
+            Ok(dir) => dir,
+            Err(e) => {
+                return Err(UnresolvedDirectory {
+                    directory: cmd.working_dir.clone(),
+                    files: Self::entry_source_files(cmd),
+                    reason: e.to_string(),
+                });
+            }
         };
+        Ok(self.build_entries(cmd, &formatted_directory))
+    }
 
+    /// The source files that would each produce an entry for `cmd`.
+    fn entry_source_files(cmd: &Command) -> Vec<PathBuf> {
+        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
+        let sources = cmd
+            .arguments
+            .iter()
+            .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
+            .filter_map(|arg| arg.as_file(path_updater));
+        match cmd.source_mode {
+            SourceMode::Combined => sources.take(1).collect(),
+            SourceMode::PerSourceStripped | SourceMode::PerSourceFull => sources.collect(),
+        }
+    }
+
+    fn build_entries(&self, cmd: &Command, formatted_directory: &Path) -> Vec<Entry> {
         // Create output file if needed
-        let output_file = self.create_output_file(&formatted_directory, &cmd.arguments);
+        let output_file = self.create_output_file(formatted_directory, &cmd.arguments);
 
         match cmd.source_mode {
             SourceMode::PerSourceStripped => {
@@ -97,13 +140,7 @@ impl CommandConverter {
                     .enumerate()
                     .filter(|(_, arg)| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
                     .filter_map(|(source_idx, source_arg)| {
-                        self.build_entry(
-                            cmd,
-                            source_arg,
-                            Some(source_idx),
-                            &formatted_directory,
-                            &output_file,
-                        )
+                        self.build_entry(cmd, source_arg, Some(source_idx), formatted_directory, &output_file)
                     })
                     .collect()
             }
@@ -116,7 +153,7 @@ impl CommandConverter {
                     .iter()
                     .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
                     .filter_map(|source_arg| {
-                        self.build_entry(cmd, source_arg, None, &formatted_directory, &output_file)
+                        self.build_entry(cmd, source_arg, None, formatted_directory, &output_file)
                     })
                     .collect()
             }
@@ -134,7 +171,7 @@ impl CommandConverter {
                     return vec![];
                 };
 
-                self.build_entry(cmd, source_arg, None, &formatted_directory, &output_file)
+                self.build_entry(cmd, source_arg, None, formatted_directory, &output_file)
                     .into_iter()
                     .collect()
             }
@@ -178,19 +215,6 @@ impl CommandConverter {
                 formatted_directory,
                 output_file.as_ref(),
             ))
-        }
-    }
-
-    /// Formats the working directory path.
-    ///
-    /// Returns `Some(formatted_path)` on success, `None` on formatting error.
-    fn format_working_directory(&self, working_dir: &Path) -> Option<PathBuf> {
-        match (self.directory_resolver)(working_dir, working_dir) {
-            Ok(dir) => Some(dir),
-            Err(e) => {
-                warn!("Failed to format directory path: {}", e);
-                None
-            }
         }
     }
 

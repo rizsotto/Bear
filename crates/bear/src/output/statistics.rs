@@ -25,7 +25,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 ///
 /// # Fields by Writer
 ///
-/// - **ConverterClangOutputWriter**: `semantic_commands_received`, `compilation_entries_produced`
+/// - **ConverterClangOutputWriter**: `semantic_commands_received`, `compilation_entries_produced`,
+///   `entries_dropped_invalid` (unresolvable directory)
 /// - **AppendClangOutputWriter**: `entries_read_from_existing`
 /// - **UniqueOutputWriter**: `duplicates_detected`
 /// - **SourceFilterOutputWriter**: `entries_filtered_by_source`
@@ -52,7 +53,8 @@ pub struct OutputStatistics {
     /// Number of header entries synthesized from a donor translation unit.
     pub entries_synthesized: AtomicUsize,
 
-    /// Number of entries dropped because they failed validation before serialization.
+    /// Number of entries dropped as invalid: failed validation, or a working
+    /// directory that could not be resolved.
     pub entries_dropped_invalid: AtomicUsize,
 
     /// Total number of entries written to the final output file.
