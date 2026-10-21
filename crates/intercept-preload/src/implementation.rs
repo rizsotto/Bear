@@ -25,6 +25,7 @@
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::path::PathBuf;
+#[cfg(all(any(has_symbol_popen, has_symbol_system), not(target_os = "android")))]
 use std::ptr;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicPtr, Ordering};
@@ -33,7 +34,13 @@ use ctor::ctor;
 use intercept::Execution;
 use intercept::reporter::{Reporter, ReporterFactory};
 use intercept::tcp::ReporterOnTcp;
-use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
+use libc::{RTLD_NEXT, c_char, c_int};
+#[cfg(any(
+    has_symbol_posix_spawn,
+    has_symbol_posix_spawnp,
+    all(any(has_symbol_popen, has_symbol_system), not(target_os = "android"))
+))]
+use libc::{pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
 use crate::session::{DoctoredEnvironment, SESSION_CTX, in_session, init_session_from_envp};
 
@@ -100,6 +107,7 @@ static REAL_PCLOSE: AtomicPtr<libc::c_void> = {
 /// Map from FILE* address to child pid for our popen implementation.
 /// When our `rust_popen` spawns a child, it stores the pid here so
 /// `rust_pclose` can later `waitpid` it.
+#[cfg(all(has_symbol_popen, not(target_os = "android")))]
 static POPEN_CHILDREN: std::sync::LazyLock<std::sync::Mutex<HashMap<usize, pid_t>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
@@ -902,6 +910,7 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
 ///
 /// On Linux/BSD, this is the `extern char **environ` variable.
 /// On macOS, we use `_NSGetEnviron()` for reliable access.
+#[cfg(all(any(has_symbol_popen, has_symbol_system), not(target_os = "android")))]
 fn get_environ() -> *const *const c_char {
     #[cfg(target_os = "macos")]
     {
@@ -923,6 +932,7 @@ fn get_environ() -> *const *const c_char {
 ///
 /// Uses `pipe2(O_CLOEXEC)` on platforms that support it (Linux, FreeBSD),
 /// falls back to `pipe()` + `fcntl(FD_CLOEXEC)` on macOS.
+#[cfg(all(has_symbol_popen, not(target_os = "android")))]
 fn create_pipe_cloexec(fds: *mut c_int) -> c_int {
     #[cfg(not(target_os = "macos"))]
     {
@@ -1038,6 +1048,7 @@ fn set_errno(value: c_int) {
 }
 
 /// Read the thread-local errno value.
+#[cfg(all(any(has_symbol_popen, has_symbol_system), not(target_os = "android")))]
 fn get_errno() -> c_int {
     errno::errno().0
 }

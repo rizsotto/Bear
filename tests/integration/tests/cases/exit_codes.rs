@@ -5,7 +5,7 @@ use crate::fixtures::infrastructure::TestEnvironment;
 #[cfg(all(target_family = "unix", has_executable_compiler_c, has_executable_shell))]
 use crate::fixtures::infrastructure::filename_of;
 use anyhow::Result;
-#[cfg(has_executable_sleep)]
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
 use std::io::Read;
 #[cfg(has_executable_sleep)]
 use std::process::Stdio;

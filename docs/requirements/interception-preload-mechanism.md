@@ -1,6 +1,6 @@
 ---
 title: LD_PRELOAD-based command interception
-status: proposed
+status: implemented
 ---
 
 ## Intent

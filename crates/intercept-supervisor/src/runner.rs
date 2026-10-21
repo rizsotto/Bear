@@ -680,6 +680,7 @@ mod test {
                 self
             }
 
+            #[cfg(unix)]
             pub fn current_dir(&self) -> &Path {
                 self.current_dir.path()
             }

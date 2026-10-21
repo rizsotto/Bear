@@ -62,12 +62,6 @@ pub struct Detected {
     pub headers: Vec<&'static str>,
 }
 
-/// The `cfg` key, and the C macro name, for a detected header.
-pub fn header_cfg_name(header: &str) -> String {
-    let mangled: String = header.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
-    format!("has_header_{mangled}")
-}
-
 /// Probe the target C toolchain and return the symbols and headers it
 /// provides. Call this once from a consumer's `build.rs`.
 ///
@@ -131,6 +125,12 @@ pub fn emit_check_cfg() {
     for header in HEADER_PROBES {
         println!("cargo:rustc-check-cfg=cfg({})", header_cfg_name(header));
     }
+}
+
+/// The `cfg` key, and the C macro name, for a detected header.
+pub fn header_cfg_name(header: &str) -> String {
+    let mangled: String = header.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+    format!("has_header_{mangled}")
 }
 
 /// `cc` is used with `cargo_metadata(false)`, so it does not tell Cargo

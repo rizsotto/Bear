@@ -1208,6 +1208,7 @@ fn all_entries_dropped_emits_error_summary() -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_family = "unix")]
 fn canonical_directory_config(env: &TestEnvironment) -> Result<std::path::PathBuf> {
     let config = r#"
 schema: "4.2"
