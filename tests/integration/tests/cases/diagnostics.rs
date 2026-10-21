@@ -7,7 +7,7 @@
 //! which is the operating system's text and varies by platform.
 
 use crate::fixtures::infrastructure::TestEnvironment;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 /// How a case prepares the test directory before Bear runs.
 type Setup = fn(&TestEnvironment) -> Result<()>;
@@ -141,6 +141,56 @@ fn warning_when_previous_entries_cannot_be_read() -> Result<()> {
         "bear: warning: cannot read previous entries from compile_commands.json: ",
     );
     env.load_compilation_database("compile_commands.json")?.assert_count(1)?;
+    Ok(())
+}
+
+// Requirements: cli-diagnostic-format, output-append
+#[test]
+fn warning_when_previous_entries_are_empty_or_truncated() -> Result<()> {
+    use std::io::{Read, Write};
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    let one_entry = r#"[ {"directory": "/", "file": "/b.c", "arguments": ["gcc", "-c", "/b.c"]} ,"#;
+    for (content, count) in [("", 1), ("[", 1), (one_entry, 2)] {
+        let env = TestEnvironment::new("diagnostics_append_truncated")?;
+        env.create_source_files(&[("compile_commands.json", content)])?;
+
+        // Spawned with a deadline: the reader used to loop on EOF forever.
+        let mut child = Command::new(env.bear_path())
+            .current_dir(env.test_dir())
+            .env("RUST_BACKTRACE", "1")
+            .env_remove("RUST_LOG")
+            .args(["parse-sh", "--append", "--output", "compile_commands.json"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        child.stdin.take().context("stdin is piped")?.write_all(b"gcc -c a.c\n")?;
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let status = loop {
+            if let Some(status) = child.try_wait()? {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                anyhow::bail!("{content:?}: bear did not exit within 10s");
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        let mut stderr = String::new();
+        child.stderr.take().context("stderr is piped")?.read_to_string(&mut stderr)?;
+        let sut: Vec<String> = stderr.lines().map(str::to_string).collect();
+
+        assert!(status.success(), "{content:?}: bear failed: {stderr}");
+        assert_one_diagnostic(
+            &format!("previous database {content:?}"),
+            &sut,
+            "bear: warning: cannot read previous entries from compile_commands.json: ",
+        );
+        env.load_compilation_database("compile_commands.json")?.assert_count(count)?;
+    }
     Ok(())
 }
 

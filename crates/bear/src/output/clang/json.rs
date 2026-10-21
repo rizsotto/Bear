@@ -138,14 +138,14 @@ where
 {
     match state {
         State::AtStart => {
-            let bracket = reader.consume_skipping_ws()?;
+            let bracket = reader.consume_skipping_ws().inspect_err(|_| *state = State::Failed)?;
             if bracket != b'[' {
                 *state = State::Failed;
                 return Err(serde::de::Error::custom("expected `[`"));
             }
 
             // Check for empty array
-            let next_byte = reader.peek_skipping_ws()?;
+            let next_byte = reader.peek_skipping_ws().inspect_err(|_| *state = State::Failed)?;
             if next_byte == b']' {
                 reader.consume()?; // Consume the closing bracket
                 *state = State::Finished;
@@ -158,9 +158,12 @@ where
         }
         State::AtMiddle => {
             // At this point we've consumed the previous value and need to check for delimiter
-            let delimiter = reader.consume_skipping_ws()?;
+            let delimiter = reader.consume_skipping_ws().inspect_err(|_| *state = State::Failed)?;
             match delimiter {
-                b',' => deserialize_single(reader).map(Some),
+                b',' => {
+                    reader.peek_skipping_ws().inspect_err(|_| *state = State::Failed)?;
+                    deserialize_single(reader).map(Some)
+                }
                 b']' => {
                     *state = State::Finished;
                     Ok(None)
@@ -251,5 +254,31 @@ mod tests {
 
         let second = it.next().unwrap();
         assert!(second.is_err());
+    }
+
+    // Requirements: output-append
+    #[test]
+    fn test_truncated_json_reading_ends() {
+        // (input, expected outcome per item: true for Ok, false for Err)
+        let cases: [(&str, &[bool]); 8] = [
+            ("", &[false]),
+            ("   ", &[false]),
+            ("[", &[false]),
+            ("[ \"a\"", &[true, false]),
+            ("[ \"a\" ,", &[true, false]),
+            ("[ \"a\" ,  ", &[true, false]),
+            ("[ \"a\" , \"b", &[true, false, false]),
+            ("[ \"a", &[false, false]),
+        ];
+
+        for (input, expected) in cases {
+            // A bound, so a reader that never ends fails the test instead of hanging it.
+            let sut: Vec<bool> = deserialize_seq::<String, _>(input.as_bytes())
+                .take(expected.len() + 10)
+                .map(|item| item.is_ok())
+                .collect();
+
+            assert_eq!(sut, expected, "input: {input:?}");
+        }
     }
 }
