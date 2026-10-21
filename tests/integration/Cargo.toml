@@ -27,22 +27,3 @@ which.workspace = true
 name = "integration"
 path = "tests/integration.rs"
 harness = true
-
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(has_preload_library)',
-    'cfg(has_executable_true)',
-    'cfg(has_executable_false)',
-    'cfg(has_executable_echo)',
-    'cfg(has_executable_sleep)',
-    'cfg(has_executable_shell)',
-    'cfg(has_executable_make)',
-    'cfg(has_executable_compiler_c)',
-    'cfg(has_executable_compiler_cxx)',
-    'cfg(has_executable_compiler_fortran)',
-    'cfg(has_executable_compiler_cuda)',
-    'cfg(has_executable_libtool)',
-    'cfg(has_executable_fakeroot)',
-    'cfg(has_executable_valgrind)',
-    'cfg(has_executable_ar)',
-] }
