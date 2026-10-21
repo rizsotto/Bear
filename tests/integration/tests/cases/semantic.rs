@@ -422,6 +422,37 @@ fn semantic_database_entry_set_is_order_independent() -> Result<()> {
     Ok(())
 }
 
+// Requirements: output-env-derived-flags, output-json-compilation-database
+//
+// MSVC reads `CL` as leading and `_CL_` as trailing options. The leading
+// words go after the compiler, so `arguments[0]` stays the compiler. A bare
+// `cl` event is recognized by name, so this runs on any host.
+#[test]
+fn semantic_msvc_environment_words_keep_compiler_first() -> Result<()> {
+    let env = TestEnvironment::new("semantic_msvc_env_words")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "cl",
+        "arguments": ["cl", "/c", "foo.c"],
+        "working_dir": temp_dir,
+        "environment": { "CL": "/O2 /W4", "_CL_": "/DX" }
+    });
+    env.create_source_files(&[("events.json", &format!("{event}\n"))])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+    sut.assert_contains(&compilation_entry!(
+        file: "foo.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: ["cl", "/O2", "/W4", "/c", "foo.c", "/DX"].map(String::from).to_vec()
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: output-json-compilation-database
 //
 // The compiler is written into `arguments[0]` exactly as the event observed

@@ -96,7 +96,10 @@ impl Interpreter for FlagBasedInterpreter {
             (Vec::new(), Vec::new())
         };
 
-        let mut all_args = prepend_args;
+        // The compiler stays first; prepended words go right after it.
+        let mut annotated_args = annotated_args.into_iter();
+        let mut all_args: Vec<Argument> = annotated_args.next().into_iter().collect();
+        all_args.extend(prepend_args);
         all_args.extend(annotated_args);
         all_args.extend(append_args);
 
@@ -742,6 +745,68 @@ mod environment_mapping_tests {
         assert!(prepend.is_empty());
         let args = collect_args(&append);
         assert_eq!(args, vec!["/link", "foo.lib"]);
+    }
+
+    fn msvc() -> FlagBasedInterpreter {
+        FlagBasedInterpreter::new(
+            &MSVC_FLAGS,
+            &[],
+            &[],
+            MSVC_SLASH_PREFIX,
+            &MSVC_ENV_RULES,
+            true,
+            SourceMode::PerSourceStripped,
+        )
+    }
+
+    fn armclang() -> FlagBasedInterpreter {
+        FlagBasedInterpreter::new(
+            &ARMCLANG_FLAGS,
+            &[],
+            &[],
+            ARMCLANG_SLASH_PREFIX,
+            &ARMCLANG_ENV_RULES,
+            true,
+            SourceMode::PerSourceStripped,
+        )
+    }
+
+    // Requirements: output-env-derived-flags, output-json-compilation-database
+    #[test]
+    fn prepended_environment_words_follow_the_compiler() {
+        let cases: Vec<(FlagBasedInterpreter, Execution, Vec<&str>)> = vec![
+            (
+                msvc(),
+                Execution::from_strings(
+                    "cl",
+                    vec!["cl", "/c", "foo.c"],
+                    "/home/user",
+                    HashMap::from([("CL", "/O2 /W4"), ("_CL_", "/DX")]),
+                ),
+                vec!["cl", "/O2", "/W4", "/c", "foo.c", "/DX"],
+            ),
+            (
+                armclang(),
+                Execution::from_strings(
+                    "armclang",
+                    vec!["armclang", "-c", "foo.c"],
+                    "/home/user",
+                    HashMap::from([("ARMCOMPILER6_CLANGOPT", "-O2")]),
+                ),
+                vec!["armclang", "-O2", "-c", "foo.c"],
+            ),
+        ];
+
+        for (interpreter, execution, expected) in cases {
+            let input = execution.to_string();
+
+            let sut = match interpreter.recognize(execution) {
+                RecognizeResult::Recognized(command) => collect_args(&command.arguments),
+                _ => panic!("expected a recognized command for {input}"),
+            };
+
+            assert_eq!(sut, expected, "argument order for {input}");
+        }
     }
 
     #[test]
