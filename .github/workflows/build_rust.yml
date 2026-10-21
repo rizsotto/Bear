@@ -87,14 +87,20 @@ jobs:
           RUST_LOG: debug
 
   compile-android:
-    name: Compile (Android, ${{ matrix.target }})
+    name: Compile (Android, ${{ matrix.target }}, API ${{ matrix.api }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: aarch64-linux-android
+            api: 24
             clang: aarch64-linux-android24-clang
+          # posix_spawn and posix_spawnp exist from API 28.
+          - target: aarch64-linux-android
+            api: 28
+            clang: aarch64-linux-android28-clang
           - target: armv7-linux-androideabi
+            api: 24
             clang: armv7a-linux-androideabi24-clang
     runs-on: ubuntu-latest
     needs: [lint]
