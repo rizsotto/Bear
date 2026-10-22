@@ -30,7 +30,7 @@ Supervision chains nest in wrapper mode, so only the outermost
 supervisor creates a process group (`GroupPolicy::Leader` in
 `supervise.rs`); nested ones `Inherit`. Governed by requirement
 `cli-signal-forwarding`; rationale in
-`docs/rationale/process-tree-teardown.md`.
+`docs/rationale/supervise-a-compiler-call.md`.
 
 ## Wrapper directory
 

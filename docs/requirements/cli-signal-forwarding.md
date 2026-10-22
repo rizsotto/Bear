@@ -81,4 +81,5 @@ owned by
 
 ## Rationale
 
-- [Tear down the whole build tree: process group, then cgroup, with real-signal forwarding](../rationale/process-tree-teardown.md)
+- [Supervise the build](../rationale/process-tree-teardown.md)
+- [Supervise a compiler call](../rationale/supervise-a-compiler-call.md)
