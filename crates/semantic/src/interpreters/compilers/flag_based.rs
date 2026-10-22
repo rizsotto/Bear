@@ -10,7 +10,7 @@
 use super::super::matchers::{
     EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule,
 };
-use super::response_file::Syntax;
+use super::response_file::{Syntax, tokenize_msvc};
 use crate::{
     Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, OutputSpelling, PassEffect,
     RecognizeResult, SourceMode,
@@ -31,6 +31,8 @@ struct FlagBasedInterpreter {
     /// When true, environment variables in `env_rules` are folded into the
     /// recognized arguments (`format.arguments.from_environment`).
     from_environment: bool,
+    /// How `env_rules` values that expand to words are split.
+    env_syntax: Syntax,
     /// How this family's invocations map to compilation database entries.
     /// See [`SourceMode`]. Comes from the family's YAML `source_mode:` (via the
     /// generated [`FamilyDef`]); it is a per-family datum, consumed at the
@@ -39,25 +41,17 @@ struct FlagBasedInterpreter {
 }
 
 impl FlagBasedInterpreter {
-    /// Creates a new flag-based interpreter with the given flag table, ignore filters,
-    /// and environment variable mapping rules.
-    fn new(
-        flags: &'static [FlagRule],
-        ignore_executables: &'static [&'static str],
-        ignore_flags: &'static [&'static str],
-        slash_prefix: bool,
-        env_rules: &'static [EnvRule],
-        from_environment: bool,
-        source_mode: SourceMode,
-    ) -> Self {
+    /// Creates a new flag-based interpreter from one family's generated data.
+    fn new(def: &FamilyDef, from_environment: bool) -> Self {
         Self {
-            analyzer: FlagAnalyzer::new(flags),
-            ignore_executables,
-            ignore_flags,
-            slash_prefix,
-            env_rules,
+            analyzer: FlagAnalyzer::new(def.flags),
+            ignore_executables: def.ignore_executables,
+            ignore_flags: def.ignore_flags,
+            slash_prefix: def.slash_prefix,
+            env_rules: def.env_rules,
             from_environment,
-            source_mode,
+            env_syntax: def.response_file_syntax,
+            source_mode: def.source_mode,
         }
     }
 
@@ -91,7 +85,7 @@ impl Interpreter for FlagBasedInterpreter {
         let Execution { executable, mut arguments, working_dir, environment } = execution;
         let annotated_args = parse_arguments_owned(&self.analyzer, &mut arguments, self.slash_prefix);
         let (prepend_args, append_args) = if self.from_environment {
-            parse_environment(&environment, self.env_rules)
+            parse_environment(&environment, self.env_rules, self.env_syntax)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -222,6 +216,7 @@ fn parse_arguments_owned(
 fn parse_environment(
     environment: &std::collections::HashMap<String, String>,
     rules: &[EnvRule],
+    syntax: Syntax,
 ) -> (Vec<Argument>, Vec<Argument>) {
     let mut prepend = Vec::new();
     let mut append = Vec::new();
@@ -243,7 +238,10 @@ fn parse_environment(
                 }
             }
             EnvMapping::Expand { position } => {
-                let words = shell_words::split(value).unwrap_or_else(|_| vec![value.clone()]);
+                let words = match syntax {
+                    Syntax::Msvc => tokenize_msvc(value),
+                    Syntax::GnuClang => shell_words::split(value).unwrap_or_else(|_| vec![value.clone()]),
+                };
                 let target = match position {
                     EnvPosition::Prepend => &mut prepend,
                     EnvPosition::Append => &mut append,
@@ -276,7 +274,8 @@ include!(concat!(env!("OUT_DIR"), "/families.rs"));
 /// One compiler family's generated data: references to its flag-table statics
 /// plus the two per-family behavior selectors. The generated `FAMILIES` array
 /// is a slice of these; `register_all` (in the parent module) loops over it,
-/// and `response_file::syntax_for` reads `response_file_syntax` back out.
+/// and `response_file::syntax_for` reads `response_file_syntax` back out, as
+/// does `FlagBasedInterpreter::new` to split environment-derived words.
 pub(super) struct FamilyDef {
     pub(super) id: &'static str,
     pub(super) flags: &'static [FlagRule],
@@ -291,15 +290,7 @@ pub(super) struct FamilyDef {
 /// Build the interpreter for one family, returning an opaque `impl Interpreter`
 /// so callers never see the concrete `FlagBasedInterpreter`.
 pub(super) fn interpreter(def: &FamilyDef, from_environment: bool) -> impl Interpreter {
-    FlagBasedInterpreter::new(
-        def.flags,
-        def.ignore_executables,
-        def.ignore_flags,
-        def.slash_prefix,
-        def.env_rules,
-        from_environment,
-        def.source_mode,
-    )
+    FlagBasedInterpreter::new(def, from_environment)
 }
 
 #[cfg(test)]
@@ -674,7 +665,7 @@ mod environment_mapping_tests {
             if cfg!(windows) { (r"C:\a;C:\b", r"C:\a", r"C:\b") } else { ("/a:/b", "/a", "/b") };
         env.insert("CPATH".to_string(), value.to_string());
 
-        let (prepend, append) = parse_environment(&env, rules);
+        let (prepend, append) = parse_environment(&env, rules, Syntax::GnuClang);
         assert!(prepend.is_empty());
         let args = collect_args(&append);
         assert_eq!(args, vec!["-I", expected_a, "-I", expected_b]);
@@ -693,7 +684,7 @@ mod environment_mapping_tests {
             if cfg!(windows) { (r";C:\a;;C:\b;", r"C:\a", r"C:\b") } else { (":/a::/b:", "/a", "/b") };
         env.insert("CPATH".to_string(), value.to_string());
 
-        let (_prepend, append) = parse_environment(&env, rules);
+        let (_prepend, append) = parse_environment(&env, rules, Syntax::GnuClang);
         let args = collect_args(&append);
         assert_eq!(args, vec!["-I", expected_a, "-I", expected_b]);
     }
@@ -708,7 +699,7 @@ mod environment_mapping_tests {
         let mut env = HashMap::new();
         env.insert("INCLUDE".to_string(), r"C:\a;C:\b".to_string());
 
-        let (_prepend, append) = parse_environment(&env, rules);
+        let (_prepend, append) = parse_environment(&env, rules, Syntax::Msvc);
         let args = collect_args(&append);
         assert_eq!(args, vec!["/I", r"C:\a", "/I", r"C:\b"]);
     }
@@ -724,7 +715,7 @@ mod environment_mapping_tests {
         let mut env = HashMap::new();
         env.insert("CL".to_string(), "/O2 /W4".to_string());
 
-        let (prepend, append) = parse_environment(&env, rules);
+        let (prepend, append) = parse_environment(&env, rules, Syntax::Msvc);
         assert!(append.is_empty());
         let args = collect_args(&prepend);
         assert_eq!(args, vec!["/O2", "/W4"]);
@@ -741,34 +732,22 @@ mod environment_mapping_tests {
         let mut env = HashMap::new();
         env.insert("_CL_".to_string(), "/link foo.lib".to_string());
 
-        let (prepend, append) = parse_environment(&env, rules);
+        let (prepend, append) = parse_environment(&env, rules, Syntax::Msvc);
         assert!(prepend.is_empty());
         let args = collect_args(&append);
         assert_eq!(args, vec!["/link", "foo.lib"]);
     }
 
+    fn family(id: &str) -> &'static FamilyDef {
+        FAMILIES.iter().find(|def| def.id == id).unwrap()
+    }
+
     fn msvc() -> FlagBasedInterpreter {
-        FlagBasedInterpreter::new(
-            &MSVC_FLAGS,
-            &[],
-            &[],
-            MSVC_SLASH_PREFIX,
-            &MSVC_ENV_RULES,
-            true,
-            SourceMode::PerSourceStripped,
-        )
+        FlagBasedInterpreter::new(family("msvc"), true)
     }
 
     fn armclang() -> FlagBasedInterpreter {
-        FlagBasedInterpreter::new(
-            &ARMCLANG_FLAGS,
-            &[],
-            &[],
-            ARMCLANG_SLASH_PREFIX,
-            &ARMCLANG_ENV_RULES,
-            true,
-            SourceMode::PerSourceStripped,
-        )
+        FlagBasedInterpreter::new(family("armclang"), true)
     }
 
     // Requirements: output-env-derived-flags, output-json-compilation-database
@@ -809,6 +788,52 @@ mod environment_mapping_tests {
         }
     }
 
+    // Requirements: output-env-derived-flags
+    #[test]
+    fn environment_words_split_with_the_family_syntax() {
+        let cl = |value: &str| {
+            Execution::from_strings(
+                "cl",
+                vec!["cl", "/c", "foo.c"],
+                "/home/user",
+                HashMap::from([("CL", value)]),
+            )
+        };
+        let armclang_opt = |value: &str| {
+            Execution::from_strings(
+                "armclang",
+                vec!["armclang", "-c", "foo.c"],
+                "/home/user",
+                HashMap::from([("ARMCOMPILER6_CLANGOPT", value)]),
+            )
+        };
+        let cases: Vec<(FlagBasedInterpreter, Execution, Vec<&str>)> = vec![
+            (msvc(), cl(r"/IC:\foo /W4"), vec!["cl", r"/IC:\foo", "/W4", "/c", "foo.c"]),
+            (
+                msvc(),
+                cl(r#"/I"C:\Program Files\x" /W4"#),
+                vec!["cl", r"/IC:\Program Files\x", "/W4", "/c", "foo.c"],
+            ),
+            (msvc(), cl(r#"/DNAME=\"v\""#), vec!["cl", r#"/DNAME="v""#, "/c", "foo.c"]),
+            (
+                armclang(),
+                armclang_opt(r#"-I/a\ b -DX=\"v\""#),
+                vec!["armclang", "-I/a b", r#"-DX="v""#, "-c", "foo.c"],
+            ),
+        ];
+
+        for (interpreter, execution, expected) in cases {
+            let input = execution.to_string();
+
+            let sut = match interpreter.recognize(execution) {
+                RecognizeResult::Recognized(command) => collect_args(&command.arguments),
+                _ => panic!("expected a recognized command for {input}"),
+            };
+
+            assert_eq!(sut, expected, "environment words for {input}");
+        }
+    }
+
     #[test]
     fn missing_variable_produces_no_args() {
         let rules = &[EnvRule::new(
@@ -818,7 +843,7 @@ mod environment_mapping_tests {
         )];
         let env = HashMap::new();
 
-        let (prepend, append) = parse_environment(&env, rules);
+        let (prepend, append) = parse_environment(&env, rules, Syntax::GnuClang);
         assert!(prepend.is_empty());
         assert!(append.is_empty());
     }
@@ -887,7 +912,7 @@ mod environment_mapping_tests {
         let mut env = HashMap::new();
         env.insert("CL".to_string(), r#"/DPATH="C:\Program Files" /W4"#.to_string());
 
-        let (prepend, _append) = parse_environment(&env, rules);
+        let (prepend, _append) = parse_environment(&env, rules, Syntax::Msvc);
         let args = collect_args(&prepend);
         assert_eq!(args, vec![r"/DPATH=C:\Program Files", "/W4"]);
     }

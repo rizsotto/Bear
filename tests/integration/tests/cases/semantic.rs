@@ -453,6 +453,36 @@ fn semantic_msvc_environment_words_keep_compiler_first() -> Result<()> {
     Ok(())
 }
 
+// Requirements: output-env-derived-flags
+//
+// MSVC splits `CL` with Windows command-line rules, so a backslash in an
+// unquoted path is kept, the same way the family's response files are read.
+#[test]
+fn semantic_msvc_environment_words_keep_backslashes() -> Result<()> {
+    let env = TestEnvironment::new("semantic_msvc_env_backslashes")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "cl",
+        "arguments": ["cl", "/c", "foo.c"],
+        "working_dir": temp_dir,
+        "environment": { "CL": r"/IC:\foo /W4" }
+    });
+    env.create_source_files(&[("events.json", &format!("{event}\n"))])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+    sut.assert_contains(&compilation_entry!(
+        file: "foo.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: ["cl", r"/IC:\foo", "/W4", "/c", "foo.c"].map(String::from).to_vec()
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: output-json-compilation-database
 //
 // The compiler is written into `arguments[0]` exactly as the event observed

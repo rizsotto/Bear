@@ -183,7 +183,7 @@ fn tokenize_gnu(content: &str) -> Vec<String> {
 /// and backslashes are literal except when they precede a quote (`2n` -> `n`
 /// backslashes and a quote toggle; `2n+1` -> `n` backslashes and a literal
 /// quote).
-fn tokenize_msvc(content: &str) -> Vec<String> {
+pub(super) fn tokenize_msvc(content: &str) -> Vec<String> {
     let chars: Vec<char> = content.chars().collect();
     let mut tokens = Vec::new();
     let mut current = String::new();

@@ -65,8 +65,8 @@ non-http(s) entry. `description` is emitted into the generated
 ## Per-family selectors: source_mode and response_file_syntax
 
 Two selectors are consumed outside the flag classifier (`source_mode` at
-the converter, `response_file_syntax` at response-file tokenization).
-Their semantics are code; the per-family choice is data -- optional
+the converter, `response_file_syntax` at response-file tokenization and
+environment expansion). Their semantics are code; the per-family choice is data -- optional
 top-level YAML keys, not inherited through `extends`. Defaults:
 `source_mode: per-source-stripped` (vala is `combined`, swift is
 `per-source-full`) and `response_file_syntax: gnu` (msvc and clang_cl are

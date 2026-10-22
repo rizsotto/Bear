@@ -237,7 +237,7 @@ Each entry has:
 | Type | Fields | Behavior |
 |------|--------|----------|
 | Flag | `flag` + `separator` | Split value by separator, emit `<flag> <entry>` per element |
-| Expand | `expand` + `separator: space` | Shell-split value, insert as raw arguments |
+| Expand | `expand` + `separator: space` | Split value with the family's `response_file_syntax` rules, insert as raw arguments |
 
 ### Separators
 
@@ -245,7 +245,7 @@ Each entry has:
 |-------|---------|
 | `path` | Platform path separator (`:` on Unix, `;` on Windows) |
 | `";"` | Fixed semicolon separator |
-| `space` | POSIX shell-word splitting (used with `expand`) |
+| `space` | Word splitting by the family's `response_file_syntax` (shell words for `gnu`, Windows command-line rules for `msvc`; used with `expand`) |
 
 ### Expand positions
 
@@ -284,8 +284,8 @@ extend GCC and will have an empty environment table.
 
 Two per-family selectors are consumed outside the flag classifier -- one
 after parsing (at the converter), one before it (at response-file
-tokenization). Their *semantics* are code; the per-family *choice* is
-data, declared in these YAML files. Neither is inherited through
+tokenization and environment expansion). Their *semantics* are code;
+the per-family *choice* is data, declared in these YAML files. Neither is inherited through
 `extends`: each family states its own (so `clang_cl` carries
 `response_file_syntax: msvc` itself, it does not inherit it from `msvc`).
 
@@ -307,7 +307,8 @@ entries. Consumed at the converter (post-parse). Values:
 
 `response_file_syntax` -- how `@file` response files are tokenized before
 flag classification (only relevant with `format.arguments.from_response_files`).
-Values: `gnu` (default) for GCC/Clang whitespace-and-quote rules;
+The same rules split the value of an `expand` environment variable into
+words. Values: `gnu` (default) for GCC/Clang whitespace-and-quote rules;
 `msvc` for the Windows `CommandLineToArgv` rules used by `msvc` and
 `clang-cl`.
 

@@ -38,6 +38,8 @@ seen by the wrapper mechanism, are a separate contract, owned by
   compiler stays first in `arguments`, the words of `CL` go after the
   compiler and before the command-line flags, and the words of `_CL_`
   go after the command-line flags.
+- A variable's value is split into words with the same rules as the
+  family's response files (owned by `output-response-file-inlining`).
 - The compiler YAML of each family owns which variables are recognized,
   the flag each one becomes, and whether its words go before or after
   the command-line flags. This file owns the toggle, its default, and
