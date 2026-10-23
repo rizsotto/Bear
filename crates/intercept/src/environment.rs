@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::collections::HashSet;
 use std::env::JoinPathsError;
 use std::path::{Path, PathBuf};
 
@@ -17,98 +16,59 @@ pub const KEY_OS_PATH: &str = "PATH";
 // Compiler-specific environment variable names, generated from compilers/*.yaml.
 include!(concat!(env!("OUT_DIR"), "/env_keys.rs"));
 
+// These run in every intercepted process, the preload library included, so
+// they must not allocate.
+
 // https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html
-pub(crate) const KEY_MAKE_C_COMPILER: &str = "CC";
-pub(crate) const KEY_MAKE_CXX_COMPILER: &str = "CXX";
-pub(crate) const KEY_MAKE_C_PREPROCESSOR: &str = "CPP";
-pub(crate) const KEY_MAKE_FORTRAN_COMPILER: &str = "FC";
-pub(crate) const KEY_MAKE_ARCHIVE: &str = "AR";
-pub(crate) const KEY_MAKE_ASSEMBLER: &str = "AS";
-pub(crate) const KEY_MAKE_MODULA_COMPILER: &str = "M2C";
-pub(crate) const KEY_MAKE_PASCAL_COMPILER: &str = "PC";
-pub(crate) const KEY_MAKE_LEX: &str = "LEX";
-pub(crate) const KEY_MAKE_YACC: &str = "YACC";
-pub(crate) const KEY_MAKE_LINT: &str = "LINT";
-
-pub(crate) const KEY_MAKE_AR_FLAGS: &str = "ARFLAGS";
-pub(crate) const KEY_MAKE_AS_FLAGS: &str = "ASFLAGS";
-pub(crate) const KEY_MAKE_C_FLAGS: &str = "CFLAGS";
-pub(crate) const KEY_MAKE_CXX_FLAGS: &str = "CXXFLAGS";
-pub(crate) const KEY_MAKE_C_PREPROCESSOR_FLAGS: &str = "CPPFLAGS";
-pub(crate) const KEY_MAKE_FORTRAN_FLAGS: &str = "FFLAGS";
-pub(crate) const KEY_MAKE_LINKER_FLAGS: &str = "LDFLAGS";
-pub(crate) const KEY_MAKE_LINKER_LIBS: &str = "LDLIBS";
-pub(crate) const KEY_MAKE_LEX_FLAGS: &str = "LFLAGS";
-pub(crate) const KEY_MAKE_YACC_FLAGS: &str = "YFLAGS";
-pub(crate) const KEY_MAKE_PASCAL_FLAGS: &str = "PFLAGS";
-pub(crate) const KEY_MAKE_LINT_FLAGS: &str = "LINTFLAGS";
-
-// https://doc.rust-lang.org/cargo/reference/environment-variables.html
-pub(crate) const KEY_CARGO_CARGO: &str = "CARGO";
-pub(crate) const KEY_CARGO_RUSTC: &str = "RUSTC";
-pub(crate) const KEY_CARGO_RUSTC_WRAPPER: &str = "RUSTC_WRAPPER";
-
-pub(crate) const KEY_CARGO_RUSTFLAGS: &str = "RUSTFLAGS";
-
-static MAKE_PROGRAM_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
-    [
-        KEY_MAKE_C_COMPILER,
-        KEY_MAKE_CXX_COMPILER,
-        KEY_MAKE_C_PREPROCESSOR,
-        KEY_MAKE_FORTRAN_COMPILER,
-        KEY_MAKE_ARCHIVE,
-        KEY_MAKE_ASSEMBLER,
-        KEY_MAKE_MODULA_COMPILER,
-        KEY_MAKE_PASCAL_COMPILER,
-        KEY_MAKE_LEX,
-        KEY_MAKE_YACC,
-        KEY_MAKE_LINT,
-    ]
-    .iter()
-    .cloned()
-    .collect()
-});
-
-static MAKE_FLAGS_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
-    [
-        KEY_MAKE_AR_FLAGS,
-        KEY_MAKE_AS_FLAGS,
-        KEY_MAKE_C_FLAGS,
-        KEY_MAKE_CXX_FLAGS,
-        KEY_MAKE_C_PREPROCESSOR_FLAGS,
-        KEY_MAKE_FORTRAN_FLAGS,
-        KEY_MAKE_LINKER_FLAGS,
-        KEY_MAKE_LINKER_LIBS,
-        KEY_MAKE_LEX_FLAGS,
-        KEY_MAKE_YACC_FLAGS,
-        KEY_MAKE_PASCAL_FLAGS,
-        KEY_MAKE_LINT_FLAGS,
-    ]
-    .iter()
-    .cloned()
-    .collect()
-});
-
-static CARGO_PROGRAM_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
-    [KEY_CARGO_CARGO, KEY_CARGO_RUSTC, KEY_CARGO_RUSTC_WRAPPER].iter().cloned().collect()
-});
-
-static CARGO_FLAGS_KEYS: std::sync::LazyLock<HashSet<&'static str>> =
-    std::sync::LazyLock::new(|| [KEY_CARGO_RUSTFLAGS].iter().cloned().collect());
-
-pub fn relevant_env(key: &str) -> bool {
-    matches!(key, KEY_INTERCEPT_STATE | KEY_OS_PRELOAD_PATH | KEY_OS_MACOS_PRELOAD_PATH | KEY_OS_MACOS_FLAT_NAMESPACE)
-        || MAKE_PROGRAM_KEYS.contains(key)
-        || MAKE_FLAGS_KEYS.contains(key)
-        || CARGO_PROGRAM_KEYS.contains(key)
-        || CARGO_FLAGS_KEYS.contains(key)
-        || COMPILER_ENV_KEYS.contains(&key)
-        // Windows PATH variable is case sensitive and not always capitalized
-        || key.to_uppercase() == KEY_OS_PATH
+// Only the program variables. The `*FLAGS` variables are not kept: compilers
+// never read them, make expands them into the command line.
+const fn make_program_key(key: &str) -> bool {
+    matches!(
+        key.as_bytes(),
+        b"CC" | b"CXX" | b"CPP" | b"FC" | b"AR" | b"AS" | b"M2C" | b"PC" | b"LEX" | b"YACC" | b"LINT"
+    )
 }
 
-pub fn program_env(key: &str) -> bool {
-    MAKE_PROGRAM_KEYS.contains(key) || CARGO_PROGRAM_KEYS.contains(key)
+// https://cmake.org/cmake/help/latest/manual/cmake-env-variables.7.html#environment-variables-for-languages
+// https://cmake.org/cmake/help/latest/envvar/ASM_DIALECT.html
+const fn cmake_program_key(key: &str) -> bool {
+    matches!(
+        key.as_bytes(),
+        b"CUDACXX"
+            | b"CUDAHOSTCXX"
+            | b"HIPCXX"
+            | b"HIPHOSTCXX"
+            | b"ISPC"
+            | b"OBJC"
+            | b"OBJCXX"
+            | b"RC"
+            | b"SWIFTC"
+            | b"SYCLCXX"
+            | b"ASM"
+            | b"ASM_NASM"
+            | b"ASM_MASM"
+            | b"ASM_MARMASM"
+            | b"ASM_POASM"
+            | b"ASM-ATT"
+    )
+}
+
+// Windows PATH variable is case sensitive and not always capitalized
+const fn path_key(key: &str) -> bool {
+    key.eq_ignore_ascii_case(KEY_OS_PATH)
+}
+
+pub fn relevant_env(key: &str) -> bool {
+    matches!(
+        key,
+        KEY_INTERCEPT_STATE | KEY_OS_PRELOAD_PATH | KEY_OS_MACOS_PRELOAD_PATH | KEY_OS_MACOS_FLAT_NAMESPACE
+    ) || program_env(key)
+        || COMPILER_ENV_KEYS.contains(&key)
+        || path_key(key)
+}
+
+pub const fn program_env(key: &str) -> bool {
+    make_program_key(key) || cmake_program_key(key)
 }
 
 /// Manipulates a `PATH`-like environment variable by inserting a path at the beginning.
@@ -176,6 +136,68 @@ mod tests {
             path_entries,
             expected
         );
+    }
+
+    // Requirements: interception-wrapper-mechanism
+    #[test]
+    fn program_env_accepts_only_make_and_cmake_program_keys() {
+        let cases = [
+            ("CC", true),
+            ("CXX", true),
+            ("LINT", true),
+            ("CUDACXX", true),
+            ("OBJCXX", true),
+            ("SWIFTC", true),
+            ("ASM", true),
+            ("ASM_NASM", true),
+            ("ASM-ATT", true),
+            ("CFLAGS", false),
+            ("LDFLAGS", false),
+            ("CUDAFLAGS", false),
+            ("CMAKE_C_COMPILER", false),
+            ("CARGO", false),
+            ("RUSTC", false),
+            ("RUSTC_WRAPPER", false),
+            ("RUSTFLAGS", false),
+            ("cc", false),
+            ("PATH", false),
+        ];
+
+        for (key, expected) in cases {
+            let sut = program_env(key);
+
+            assert_eq!(sut, expected, "program_env({key:?})");
+        }
+    }
+
+    // Requirements: interception-wrapper-mechanism
+    #[test]
+    fn relevant_env_keeps_program_path_and_compiler_keys_only() {
+        let cases = [
+            ("CC", true),
+            ("RC", true),
+            ("ASM_MARMASM", true),
+            ("BEAR_INTERCEPT", true),
+            ("LD_PRELOAD", true),
+            ("CPATH", true),
+            ("PATH", true),
+            ("Path", true),
+            ("path", true),
+            ("CFLAGS", false),
+            ("CXXFLAGS", false),
+            ("LDLIBS", false),
+            ("CARGO", false),
+            ("RUSTC", false),
+            ("RUSTC_WRAPPER", false),
+            ("RUSTFLAGS", false),
+            ("HOME", false),
+        ];
+
+        for (key, expected) in cases {
+            let sut = relevant_env(key);
+
+            assert_eq!(sut, expected, "relevant_env({key:?})");
+        }
     }
 
     #[test]

@@ -447,6 +447,43 @@ intercept:
     Ok(())
 }
 
+// Requirements: interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_leaves_cargo_variables_alone() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_cargo_vars_untouched")?;
+    // A compiler name as the value: were RUSTC rewritten, it would turn into
+    // the wrapper path.
+    let value = filename_of(COMPILER_C_PATH);
+    let script = env.create_shell_script("build.sh", "printf '%s' \"$RUSTC\" > rustc_seen.txt\n")?;
+    let config = "schema: \"4.2\"\n\nintercept:\n  mode: wrapper\n";
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir()).env("RUSTC", &value).args([
+        "--config",
+        config_path.to_str().unwrap(),
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ]);
+    let output = cmd.output()?;
+    assert!(
+        output.status.success(),
+        "bear failed: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let sut = env.read_file("rustc_seen.txt")?;
+    assert_eq!(sut, value, "RUSTC must reach the build unchanged");
+    Ok(())
+}
+
 /// An explicitly configured compiler list REPLACES PATH-based discovery in
 /// wrapper mode; it does not extend it. When the user configures at least one
 /// compiler for interception, exactly those are wrapped and the PATH scan is
@@ -473,13 +510,38 @@ intercept:
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn wrapper_mode_configured_compilers_replace_path_discovery() -> Result<()> {
-    // The make-family program variables, the subset of `program_env` that can
-    // name a C compiler. Bear registers a wrapper for these regardless of the
-    // configured list, so one left set by the host would wrap the compiler in
-    // the configured run and mask the contrast. The cargo-family keys in
-    // `program_env` are omitted deliberately: they cannot name this compiler.
-    const COMPILER_ENV_VARS: [&str; 11] =
-        ["CC", "CXX", "CPP", "FC", "AR", "AS", "M2C", "PC", "LEX", "YACC", "LINT"];
+    // Every `program_env` key. Bear registers a wrapper for these regardless
+    // of the configured list, so one left set by the host would wrap the
+    // compiler in the configured run and mask the contrast.
+    const COMPILER_ENV_VARS: [&str; 27] = [
+        "CC",
+        "CXX",
+        "CPP",
+        "FC",
+        "AR",
+        "AS",
+        "M2C",
+        "PC",
+        "LEX",
+        "YACC",
+        "LINT",
+        "CUDACXX",
+        "CUDAHOSTCXX",
+        "HIPCXX",
+        "HIPHOSTCXX",
+        "ISPC",
+        "OBJC",
+        "OBJCXX",
+        "RC",
+        "SWIFTC",
+        "SYCLCXX",
+        "ASM",
+        "ASM_NASM",
+        "ASM_MASM",
+        "ASM_MARMASM",
+        "ASM_POASM",
+        "ASM-ATT",
+    ];
 
     let env = TestEnvironment::new("wrapper_configured_compilers")?;
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;

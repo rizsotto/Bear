@@ -1093,27 +1093,34 @@ fn probe_dispatches_cc_to_clang_when_version_advertises_clang() -> Result<()> {
     // Use command_bear() directly so we can force RUST_LOG=debug without
     // touching the test process env (which would race with parallel tests).
     //
-    // `CFLAGS` carries a flag that names GCC, to reproduce #716: the debug
+    // `CPATH` carries a value that names GCC, to reproduce #716: the debug
     // log dumps the intercepted execution's environment, so a build
     // environment that merely mentions GCC (as a Gentoo package build does)
     // must not read as "the GCC interpreter recognized this command".
     //
-    // It has to be a flags variable rather than `CC`, which is how the
-    // reported build spelled it. `CC` is a program variable: in wrapper mode
-    // the runner resolves its value on PATH, so a Gentoo triplet name would
-    // log a resolution warning on every other distro. `CFLAGS` reaches the
-    // log through the same env filter (`intercept::environment`) without
-    // ever being resolved or folded into the recorded arguments, so the
-    // reproduction costs nothing on hosts that have no such compiler.
+    // It has to be a compiler-read variable rather than `CC`, which is how
+    // the reported build spelled it. `CC` is a program variable: in wrapper
+    // mode the runner resolves its value on PATH, so a Gentoo triplet name
+    // would log a resolution warning on every other distro. `CPATH` reaches
+    // the log through the same env filter (`intercept::environment`) without
+    // ever being resolved, so the reproduction costs nothing on hosts that
+    // have no such compiler.
     let mut cmd = env.command_bear();
     cmd.current_dir(env.test_dir())
         .env("RUST_LOG", "debug")
         .env("RUST_BACKTRACE", "1")
-        .env("CFLAGS", "-frecord-gcc-switches")
+        .env("CPATH", "/nonexistent/x86_64-pc-linux-gnu-gcc")
         .args(["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()]);
     let output = cmd.output()?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "bear failed:\n{}", stderr);
+
+    // The repro only works while the debug log carries the GCC-naming value.
+    assert!(
+        stderr.contains("x86_64-pc-linux-gnu-gcc"),
+        "the debug log no longer shows the GCC-naming environment value.\nstderr:\n{}",
+        stderr
+    );
 
     // (1) Entry for hello.c must exist.
     let db = env.load_compilation_database("compile_commands.json")?;

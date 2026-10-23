@@ -207,7 +207,7 @@ mod tests {
         test_env.insert("PATH".to_string(), "/usr/bin:/bin".to_string());
         test_env.insert("CC".to_string(), "gcc".to_string());
         test_env.insert("IRRELEVANT_VAR".to_string(), "value".to_string());
-        test_env.insert("CFLAGS".to_string(), "-O2".to_string());
+        test_env.insert("CPATH".to_string(), "/opt/include".to_string());
 
         let context = Context {
             current_executable: std::env::current_exe().unwrap(),
@@ -222,7 +222,7 @@ mod tests {
         // Should include relevant variables
         assert!(display_output.contains("PATH=/usr/bin:/bin"));
         assert!(display_output.contains("CC=gcc"));
-        assert!(display_output.contains("CFLAGS=-O2"));
+        assert!(display_output.contains("CPATH=/opt/include"));
 
         // Should not include irrelevant variables
         assert!(!display_output.contains("IRRELEVANT_VAR=value"));
