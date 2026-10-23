@@ -107,9 +107,13 @@ static REAL_PCLOSE: AtomicPtr<libc::c_void> = {
 /// Map from FILE* address to child pid for our popen implementation.
 /// When our `rust_popen` spawns a child, it stores the pid here so
 /// `rust_pclose` can later `waitpid` it.
+///
+/// A `BTreeMap` rather than a `HashMap`: it is const-constructible, so the
+/// static needs no lazy init, and it needs no random seed, which a
+/// `HashMap` would fetch from the OS inside the host process.
 #[cfg(all(has_symbol_popen, not(target_os = "android")))]
-static POPEN_CHILDREN: std::sync::LazyLock<std::sync::Mutex<HashMap<usize, pid_t>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+static POPEN_CHILDREN: std::sync::Mutex<std::collections::BTreeMap<usize, pid_t>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
 
 /// Reporter for sending execution events to the collector.
 /// Initialized once by `rust_session_init` when called from the C shim constructor.
