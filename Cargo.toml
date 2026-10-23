@@ -14,6 +14,7 @@ repository = "https://github.com/rizsotto/Bear"
 homepage = "https://github.com/rizsotto/Bear"
 license = "GPL-3.0-or-later"
 edition = "2024"
+rust-version = "1.89"
 
 [workspace.dependencies]
 thiserror = "2.0"
