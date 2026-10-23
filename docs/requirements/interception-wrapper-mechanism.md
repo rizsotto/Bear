@@ -7,12 +7,19 @@ status: implemented
 
 With the wrapper mechanism, Bear puts wrapper executables, named after
 the compilers, in a wrapper directory first on PATH, and points the
-compiler environment variables (`CC`, `CXX`, and similar) at them. The
-build runs the wrapper instead of the real compiler. The wrapper reports
-the execution to Bear and runs the real compiler. The user gets a
-compilation database without changing the build system. Which mechanism
-runs is owned by `interception-mechanism-selection`, and so is the
-promise that interception leaves the build's output alone.
+compiler program variables at them. The build runs the wrapper instead
+of the real compiler. The wrapper reports the execution to Bear and runs
+the real compiler. The user gets a compilation database without changing
+the build system. Which mechanism runs is owned by
+`interception-mechanism-selection`, and so is the promise that
+interception leaves the build's output alone.
+
+The compiler program variables are the variables that name a program.
+From make's implicit variables: `CC`, `CXX`, `CPP`, `FC`, `AR`, `AS`,
+`M2C`, `PC`, `LEX`, `YACC`, `LINT`. From CMake's language variables:
+`CUDACXX`, `CUDAHOSTCXX`, `HIPCXX`, `HIPHOSTCXX`, `ISPC`, `OBJC`,
+`OBJCXX`, `RC`, `SWIFTC`, `SYCLCXX`, and the assembler variables `ASM`,
+`ASM_NASM`, `ASM_MASM`, `ASM_MARMASM`, `ASM_POASM`, `ASM-ATT`.
 
 ## Acceptance criteria
 
@@ -28,6 +35,11 @@ promise that interception leaves the build's output alone.
   via PATH to `/usr/bin/gcc`, wraps `gcc` in both cases, and the entry
   names `/usr/bin/gcc` as the compiler. Values that carry flags are
   owned by `interception-cc-env-var-flags`.
+- **Given** `CFLAGS` set in the build environment, **when** the build
+  runs, **then** the build sees it unchanged.
+- **Given** `RUSTC`, `RUSTC_WRAPPER`, or `CARGO` set in the build
+  environment, **when** the build runs, **then** the build sees the
+  value unchanged and Bear wraps no program for it.
 - **Given** a configuration that lists no compiler for interception
   (entries excluded from the database do not count), **when** Bear
   starts, **then** it scans PATH and wraps every compiler it recognizes
@@ -37,13 +49,13 @@ promise that interception leaves the build's output alone.
   interception, **when** Bear starts, **then** it wraps exactly the
   listed paths, whatever their names (an unusual cross-compiler
   included), and skips the PATH scan.
-- **Given** a compiler named in a compiler environment variable,
-  **when** Bear starts, **then** it is wrapped, whether or not the
-  configuration lists compilers.
+- **Given** a compiler named in a compiler program variable, **when**
+  Bear starts, **then** it is wrapped, whether or not the configuration
+  lists compilers, and the build sees the wrapper in that variable.
 - **Given** a build that runs `/opt/custom/bin/mycc -c test.c` directly,
-  with `mycc` not named in a compiler variable and not listed in the
-  configuration, **when** Bear finishes, **then** that invocation is not
-  intercepted.
+  with `mycc` not named in a compiler program variable and not listed
+  in the configuration, **when** Bear finishes, **then** that invocation
+  is not intercepted.
 - **Given** a build under Bear, **when** the build runs, **then** the
   wrapper directory `.bear/` exists in the working directory, and
   **when** Bear exits, **then** it is removed and no wrapper artifacts
@@ -70,15 +82,15 @@ promise that interception leaves the build's output alone.
 
 **Only wrapped compilers are intercepted**: the wrapper mechanism sees
 only the compilers it wrapped at startup, and only when the build finds
-them through PATH or a compiler variable. A compiler that is not on
-PATH, not in a compiler variable, and not listed in the configuration
-is not intercepted.
+them through PATH or a compiler program variable. A compiler that is
+not on PATH, not in a compiler program variable, and not listed in the
+configuration is not intercepted.
 
 **Unrecognized compiler names** (issue #561): a compiler whose name
 Bear does not recognize is skipped by the PATH scan. It is wrapped only
-when a compiler variable names it, or when the configuration lists it.
-Listing it turns the PATH scan off, so the other compilers must be
-listed too.
+when a compiler program variable names it, or when the configuration
+lists it. Listing it turns the PATH scan off, so the other compilers
+must be listed too.
 
 **PATH ordering conflicts** (issue #445): the wrapper directory must be
 first in PATH. A masquerade directory such as ccache's can conflict
@@ -94,4 +106,5 @@ the recorded path under Bear avoids this.
 
 ## Rationale
 
+- [Wrapper mechanism rewrites program variables only](../rationale/env-vars-rewritten-by-wrapper.md)
 - [Wrapper mechanism: hard links, deterministic directory, resolve-at-startup](../rationale/wrapper-mode-design-decisions.md)
