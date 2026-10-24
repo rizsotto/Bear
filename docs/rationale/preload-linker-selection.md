@@ -39,6 +39,14 @@ itself). Targets without that default, such as aarch64, fall back to
 the system `cc` default linker, GNU ld -- which is why issue #662
 appeared on ARM64 only.
 
+An installed linker is not necessarily a capable one. The rust-lld
+shipped by rustup is built without zlib support, so on a host whose
+system objects carry zlib-compressed debug sections it refuses the
+link outright ("`/usr/lib/crtn.o:(.debug_info)` is compressed with
+ELFCOMPRESS_ZLIB, but lld is not built with zlib support"), which is
+what FreeBSD base `crt*.o` look like. Selecting a linker by presence
+alone therefore picks a linker that cannot link at all.
+
 ## Decision
 
 `build.rs` selects the linker for the ELF cdylib link with a fallback
@@ -53,10 +61,27 @@ chain instead of hard-coding `-fuse-ld=lld`:
    failure and the remedy, and add no linker flag, in case the
    toolchain's default linker copes on its own.
 
+Each present candidate must also pass a probe link before it is
+chosen, so a candidate that exists but cannot do this job is skipped
+instead of failing the build. The probe is a miniature of the real
+link, built in `OUT_DIR`: one PIC object turned into a shared library
+with the same version script passed twice, standing in for rustc's
+anonymous script plus `exports.map`. Both known failure modes
+reproduce in it -- GNU ld rejects the two anonymous tags, and a
+zlib-less lld rejects the host's compressed `crt*.o`. A host that
+cannot be probed at all (no usable `cc`) keeps the order above
+unverified.
+
 ## Consequences
 
 - rustup-installed toolchains build the library on every architecture
-  with no extra linker package: the bundled rust-lld covers them.
+  with no extra linker package: the bundled rust-lld covers them,
+  except where the probe rejects it (FreeBSD hosts, whose base system
+  provides a zlib-capable `ld.lld` as the next candidate).
+- The probe costs two `cc` invocations plus one per candidate on a
+  clean build, and reruns only when `build.rs` or the shim sources
+  change. A rejected first choice is reported as a build warning, so
+  the downgrade is visible rather than silent.
 - Builds against a Rust toolchain without bundled rust-lld (some
   distro packages) need `lld` or `mold` installed; both are widely
   packaged. The failure without them is an early, explicit warning
