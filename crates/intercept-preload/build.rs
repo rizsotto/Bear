@@ -114,25 +114,110 @@ fn main() {
 
 /// Pick a linker that can combine rustc's own cdylib version script with
 /// the exports.map above; GNU ld refuses that combination outright. The
-/// preference order and its reasoning are recorded in
+/// preference order, the probe that confirms a candidate before it is
+/// used, and the reasoning behind both are recorded in
 /// docs/rationale/preload-linker-selection.md.
 fn emit_elf_linker_selection() {
-    if let Some(gcc_ld_dir) = bundled_rust_lld_dir() {
-        println!("cargo:rustc-cdylib-link-arg=-B{}", gcc_ld_dir.display());
-        println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
-    } else if find_in_path("ld.lld") {
-        println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
-    } else if find_in_path("mold") {
-        println!("cargo:rustc-cdylib-link-arg=-fuse-ld=mold");
-    } else {
+    let candidates = elf_linker_candidates();
+
+    // Being installed is not the same as being able to perform this link.
+    let selected = match LinkProbe::new() {
+        Some(probe) => candidates.iter().position(|candidate| probe.can_link(&candidate.flags)),
+        None => (!candidates.is_empty()).then_some(0),
+    };
+
+    let Some(index) = selected else {
         // On hosts whose default linker already is lld (e.g. FreeBSD) the
         // link succeeds anyway, so phrase this as a hint, not a verdict.
         println!(
-            "cargo:warning=could not confirm an lld or mold linker; relying on \
-             the toolchain default. If linking libexec fails with 'anonymous \
+            "cargo:warning=could not confirm a usable lld or mold linker; relying \
+             on the toolchain default. If linking libexec fails with 'anonymous \
              version tag cannot be combined with other version tags', install \
              lld or mold (GNU ld cannot link this library)"
         );
+        return;
+    };
+
+    if index > 0 {
+        println!(
+            "cargo:warning={} cannot link libexec on this host; using {} instead",
+            candidates[0].name, candidates[index].name
+        );
+    }
+    for flag in &candidates[index].flags {
+        println!("cargo:rustc-cdylib-link-arg={}", flag);
+    }
+}
+
+struct LinkerCandidate {
+    /// How the candidate is named in build warnings.
+    name: &'static str,
+    /// The `cc` flags that select it.
+    flags: Vec<String>,
+}
+
+fn elf_linker_candidates() -> Vec<LinkerCandidate> {
+    let mut candidates = Vec::new();
+    if let Some(gcc_ld_dir) = bundled_rust_lld_dir() {
+        candidates.push(LinkerCandidate {
+            name: "the toolchain's bundled rust-lld",
+            flags: vec![format!("-B{}", gcc_ld_dir.display()), "-fuse-ld=lld".to_string()],
+        });
+    }
+    if find_in_path("ld.lld") {
+        candidates.push(LinkerCandidate { name: "the system lld", flags: vec!["-fuse-ld=lld".to_string()] });
+    }
+    if find_in_path("mold") {
+        candidates
+            .push(LinkerCandidate { name: "the system mold", flags: vec!["-fuse-ld=mold".to_string()] });
+    }
+    candidates
+}
+
+/// A miniature of the cdylib link, kept in `OUT_DIR`, in which both known
+/// failure modes reproduce.
+struct LinkProbe {
+    compiler: cc::Tool,
+    object: std::path::PathBuf,
+    script: std::path::PathBuf,
+    library: std::path::PathBuf,
+}
+
+impl LinkProbe {
+    /// `None` when the host cannot be probed at all (no usable `cc`,
+    /// unwritable `OUT_DIR`).
+    fn new() -> Option<Self> {
+        let compiler = cc::Build::new().try_get_compiler().ok()?;
+        let dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR")?).join("linker-probe");
+        std::fs::create_dir_all(&dir).ok()?;
+
+        let source = dir.join("probe.c");
+        std::fs::write(&source, "int probe_symbol(void) { return 0; }\n").ok()?;
+        let script = dir.join("probe.map");
+        std::fs::write(&script, "{ global: probe_symbol; local: *; };\n").ok()?;
+
+        let object = dir.join("probe.o");
+        let compiled =
+            compiler.to_command().arg("-fPIC").arg("-c").arg(&source).arg("-o").arg(&object).output().ok()?;
+
+        compiled.status.success().then_some(Self { compiler, object, script, library: dir.join("probe.so") })
+    }
+
+    fn can_link(&self, flags: &[String]) -> bool {
+        let version_script = format!("-Wl,--version-script={}", self.script.display());
+        let linked = self
+            .compiler
+            .to_command()
+            .arg("-shared")
+            .arg(&self.object)
+            .arg("-o")
+            .arg(&self.library)
+            // Twice: one stands for rustc's script, one for ours.
+            .arg(&version_script)
+            .arg(&version_script)
+            .args(flags)
+            .output();
+        matches!(linked, Ok(linked) if linked.status.success())
     }
 }
 

@@ -34,8 +34,9 @@ supported platforms:
 4. Emits cdylib link args:
    - Linux: `-Wl,--whole-archive`, `-Wl,--version-script=...`,
      `-Wl,-rpath,$ORIGIN`, plus a linker selection (bundled rust-lld,
-     then system lld, then mold; GNU ld cannot link this library --
-     see `docs/rationale/preload-linker-selection.md`).
+     then system lld, then mold, each confirmed by a probe link
+     before it is used; GNU ld cannot link this library -- see
+     `docs/rationale/preload-linker-selection.md`).
    - macOS: `-Wl,-force_load,...`,
      `-Wl,-exported_symbols_list,...`, `-Wl,-rpath,@loader_path`.
 
