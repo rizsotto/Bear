@@ -220,8 +220,7 @@ fn hardened_nested_make_env_cleared() -> Result<()> {
         ("inner/inner.c", "int inner() { return 2; }"),
     ])?;
 
-    let inner_makefile =
-        format!("all:\n\t{compiler} -c inner.c -o inner.o\n", compiler = filename_of(COMPILER_C_PATH),);
+    let inner_makefile = format!("all:\n\t{compiler} -c inner.c -o inner.o\n", compiler = COMPILER_C_PATH);
     env.create_makefile("inner/Makefile", &inner_makefile)?;
 
     // NOTE: `inner` must be .PHONY because `inner/` is a real directory;
@@ -235,7 +234,7 @@ fn hardened_nested_make_env_cleared() -> Result<()> {
             "inner:\n",
             "\tunset LD_PRELOAD && $(MAKE) -C inner\n",
         ),
-        compiler = filename_of(COMPILER_C_PATH),
+        compiler = COMPILER_C_PATH,
     );
     env.create_makefile("Makefile", &outer_makefile)?;
 
