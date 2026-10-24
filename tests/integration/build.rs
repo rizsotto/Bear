@@ -122,10 +122,10 @@ fn profile_dir_of(out_dir: &std::path::Path) -> &std::path::Path {
 }
 
 fn check_executable_exists(executable: &str) {
+    println!("cargo:rustc-check-cfg=cfg(has_executable_{})", executable);
     match which::which(executable) {
         Ok(path) => {
             println!("cargo:rustc-cfg=has_executable_{}", executable);
-            println!("cargo:rustc-check-cfg=cfg(has_executable_{})", executable);
             println!("cargo:rustc-env={}_PATH={}", executable.to_uppercase(), path.display());
             println!("cargo:warning=Checking for executable: {} ... {}", executable, path.display());
         }
@@ -136,10 +136,10 @@ fn check_executable_exists(executable: &str) {
 }
 
 fn check_one_executable_exists(define: &str, executables: &[&str]) {
+    println!("cargo:rustc-check-cfg=cfg(has_executable_{})", define);
     for executable in executables {
         if let Ok(path) = which::which(executable) {
             println!("cargo:rustc-cfg=has_executable_{}", define);
-            println!("cargo:rustc-check-cfg=cfg(has_executable_{})", define);
             println!("cargo:rustc-env={}_PATH={}", define.to_uppercase(), path.display());
             println!("cargo:warning=Checking for executable: {} ... {}", define, path.display());
             return;
@@ -203,6 +203,8 @@ fn detect_ccache_masquerade_dir(dir: &str) -> Option<String> {
 }
 
 fn check_preload_library_availability(preload_path: &str) {
+    println!("cargo:rustc-check-cfg=cfg(has_preload_library)");
+
     // Check if we're on a platform that supports LD_PRELOAD (Unix-like systems)
     let platform_supports_preload = !cfg!(windows);
 
@@ -214,7 +216,6 @@ fn check_preload_library_availability(preload_path: &str) {
 
     if platform_supports_preload && preload_file_exists && runtime_supports_preload {
         println!("cargo:rustc-cfg=has_preload_library");
-        println!("cargo:rustc-check-cfg=cfg(has_preload_library)");
         println!("cargo:warning=Preload library available at: {}", preload_path);
     } else {
         println!(
