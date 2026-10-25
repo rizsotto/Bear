@@ -11,6 +11,7 @@ homepage.workspace = true
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish = false
 
 [lib]
 name = "semantic"

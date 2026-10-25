@@ -20,8 +20,8 @@ allow = [
     # unicode-ident is "(MIT OR Apache-2.0) AND Unicode-3.0".
     "BSD-3-Clause",
     "Unicode-3.0",
-    # Bear's own crates. Nine of the eleven are publishable, so they are
-    # part of the graph cargo-deny walks.
+    # Bear's own crates. They are part of the graph cargo-deny walks,
+    # published or not.
     "GPL-3.0-or-later",
 ]
 
@@ -44,6 +44,11 @@ multiple-versions-include-dev = true
 skip = [
     { crate = "syn:^2", reason = "mockall_derive (dev-only) has not moved to syn 3" },
 ]
+# A "*" requirement takes whatever version comes next. Path dependencies
+# between Bear's own crates have no version; they pass because no crate in
+# the workspace is published.
+wildcards = "deny"
+allow-wildcard-paths = true
 
 # crates.io only: a git or alternative-registry dependency bypasses the
 # review that a published, versioned crate gets.
