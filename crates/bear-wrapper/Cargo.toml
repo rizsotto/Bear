@@ -21,3 +21,6 @@ intercept = { path = "../intercept" }
 intercept-supervisor = { path = "../intercept-supervisor" }
 anyhow.workspace = true
 log.workspace = true
+
+[lints]
+workspace = true

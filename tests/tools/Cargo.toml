@@ -26,3 +26,6 @@ serde.workspace = true
 serde_json.workspace = true
 shell-words.workspace = true
 thiserror.workspace = true
+
+[lints]
+workspace = true

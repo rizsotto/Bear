@@ -28,3 +28,6 @@ which.workspace = true
 name = "integration"
 path = "tests/integration.rs"
 harness = true
+
+[lints]
+workspace = true

@@ -9,7 +9,6 @@ use serde_json::Value;
 pub use bear_test_tools::CompilationEntryMatcher;
 
 /// Compilation database wrapper with assertion helpers
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct CompilationDatabase {
     pub(super) entries: Vec<Value>,
@@ -17,7 +16,6 @@ pub struct CompilationDatabase {
 
 impl CompilationDatabase {
     /// Assert the number of entries
-    #[allow(dead_code)]
     pub fn assert_count(&self, expected: usize) -> Result<()> {
         let actual = self.entries.len();
         if actual != expected {
@@ -27,7 +25,6 @@ impl CompilationDatabase {
     }
 
     /// Assert that the database contains an entry matching the criteria
-    #[allow(dead_code)]
     pub fn assert_contains(&self, matcher: &CompilationEntryMatcher) -> Result<()> {
         let found = self.entries.iter().any(|entry| matcher.matches(entry));
         if !found {
@@ -41,7 +38,6 @@ impl CompilationDatabase {
     }
 
     /// Get all entries
-    #[allow(dead_code)]
     pub fn entries(&self) -> &[Value] {
         &self.entries
     }

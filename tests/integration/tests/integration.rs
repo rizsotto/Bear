@@ -7,4 +7,9 @@
 //! - `cases`: Actual integration test cases that verify Bear functionality
 
 mod cases;
+#[allow(
+    dead_code,
+    unused_imports,
+    reason = "tests are gated on host tools, so helpers used only by skipped tests go unused"
+)]
 mod fixtures;

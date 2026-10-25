@@ -33,9 +33,9 @@ pub fn generate_recognition_patterns(
 ) -> Result<String> {
     let mut out = String::new();
     out.push_str("// Generated from compilers/*.yaml -- DO NOT EDIT\n");
-    // The 5-tuple row shape trips clippy::type_complexity; it is plain
-    // generated data, not an API to simplify with a type alias.
-    out.push_str("#[allow(clippy::type_complexity)]\n");
+    out.push_str(
+        "#[allow(clippy::type_complexity, reason = \"plain generated data, not an API to simplify with a type alias\")]\n",
+    );
     out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = &[\n");
 
     // Emit compiler rows in discovery order: specializations (higher extends

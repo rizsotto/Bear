@@ -38,6 +38,6 @@ Conventions for Rust code across every workspace crate. The per-crate
   capabilities with the build-probed `#[cfg(has_symbol_X)]` (target) /
   `#[cfg(has_executable_X)]` (host tool) keys, never on `target_os = "linux"`.
 - **Lint suppressions**: only `#[allow(...)]` when there is no better fix,
-  always with a trailing `// reason` comment.
+  always with `reason = "..."` inside the attribute.
 - **Comments** explain *why*, not *what*; default to none unless a subtle
   invariant would otherwise need re-deriving.

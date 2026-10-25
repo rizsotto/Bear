@@ -5,7 +5,6 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 /// Intercept events wrapper with assertion helpers
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct InterceptEvents {
     pub(super) events: Vec<Value>,
@@ -13,7 +12,6 @@ pub struct InterceptEvents {
 
 impl InterceptEvents {
     /// Assert the number of events
-    #[allow(dead_code)]
     pub fn assert_count(&self, expected: usize) -> Result<()> {
         let actual = self.events.len();
         if actual != expected {
@@ -23,7 +21,6 @@ impl InterceptEvents {
     }
 
     /// Assert that the events contain an entry matching the criteria
-    #[allow(dead_code)]
     pub fn assert_contains(&self, matcher: &EventMatcher) -> Result<()> {
         let found = self.events.iter().any(|event| matcher.matches(event));
         if !found {
@@ -37,13 +34,11 @@ impl InterceptEvents {
     }
 
     /// Count events matching specific criteria
-    #[allow(dead_code)]
     pub fn count_matching(&self, matcher: &EventMatcher) -> usize {
         self.events.iter().filter(|event| matcher.matches(event)).count()
     }
 
     /// Assert that events contain a specific number of entries matching the criteria
-    #[allow(dead_code)]
     pub fn assert_count_matching(&self, matcher: &EventMatcher, expected: usize) -> Result<()> {
         let actual = self.count_matching(matcher);
         if actual != expected {
@@ -58,7 +53,6 @@ impl InterceptEvents {
     }
 
     /// Assert that there are at least the minimum number of events
-    #[allow(dead_code)]
     pub fn assert_min_count(&self, min_expected: usize) -> Result<()> {
         let actual = self.events.len();
         if actual < min_expected {
@@ -68,7 +62,6 @@ impl InterceptEvents {
     }
 
     /// Get all events
-    #[allow(dead_code)]
     pub fn events(&self) -> &[Value] {
         &self.events
     }
@@ -110,13 +103,11 @@ impl EventMatcher {
         self
     }
 
-    #[allow(dead_code)]
     pub fn working_directory<S: Into<String>>(mut self, dir: S) -> Self {
         self.working_directory = Some(dir.into());
         self
     }
 
-    #[allow(dead_code)]
     pub fn event_type<S: Into<String>>(mut self, event_type: S) -> Self {
         self.event_type = Some(event_type.into());
         self

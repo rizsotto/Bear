@@ -225,8 +225,7 @@ pub fn desired_preload_value(ctx: &SessionContext, current: Option<&str>) -> Res
 /// null-terminated array of pointers suitable for passing to exec functions.
 pub struct DoctoredEnvironment {
     /// The environment strings in "KEY=VALUE" format
-    /// This field is kept to ensure the CStrings remain valid while ptrs references them.
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "kept so the CStrings stay valid while ptrs points into them")]
     strings: Vec<CString>,
     /// Pointers to the strings, plus a null terminator
     ptrs: Vec<*const c_char>,
@@ -355,7 +354,7 @@ mod tests {
     /// Helper struct to manage C-style environment arrays for testing.
     /// This ensures the CStrings stay alive while we use pointers to them.
     struct TestEnvp {
-        #[allow(dead_code)]
+        #[allow(dead_code, reason = "kept so the CStrings stay valid while ptrs points into them")]
         strings: Vec<CString>,
         ptrs: Vec<*const c_char>,
     }

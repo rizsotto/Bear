@@ -23,7 +23,6 @@ impl InstallEnvironment {
 
     /// Install with `LIBEXECDIR` set to `subdir` inside the install prefix,
     /// instead of the default `libexec`.
-    #[allow(dead_code)] // used only by the Unix-only install tests
     pub fn with_libexecdir(subdir: &str) -> Result<Self> {
         Self::install(Some(subdir))
     }
@@ -74,7 +73,6 @@ impl InstallEnvironment {
     }
 
     /// The install prefix.
-    #[allow(dead_code)] // used only by the Unix-only install tests
     pub fn install_dir(&self) -> &Path {
         self.install_dir.path()
     }

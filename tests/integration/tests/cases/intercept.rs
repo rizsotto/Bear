@@ -8,8 +8,6 @@
 use crate::fixtures::constants::*;
 use crate::fixtures::infrastructure::*;
 use anyhow::Result;
-#[allow(unused_imports)]
-use encoding_rs;
 
 /// Test basic command interception with preload mechanism
 // Requirements: interception-preload-mechanism

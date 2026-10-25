@@ -19,3 +19,6 @@ path = "src/lib.rs"
 [dependencies]
 tempfile.workspace = true
 cc.workspace = true
+
+[lints]
+workspace = true

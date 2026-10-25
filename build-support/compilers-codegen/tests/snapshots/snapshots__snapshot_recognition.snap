@@ -1,10 +1,9 @@
 ---
 source: build-support/compilers-codegen/tests/snapshots.rs
-assertion_line: 32
 expression: "generate_recognition_patterns(&raw_tables, &compiler_files,\n&wrapper_tables).unwrap()"
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, reason = "plain generated data, not an API to simplify with a type alias")]
 pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool, Option<&str>)] = &[
     ("arm_flang", &["armflang"], false, false, Some("Arm Compiler for Linux Fortran")),
     ("armclang", &["armclang", "armclang++"], false, true, Some("Arm Compiler 6")),

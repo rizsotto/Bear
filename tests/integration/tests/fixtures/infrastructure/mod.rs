@@ -83,9 +83,7 @@ macro_rules! event_matcher {
 }
 
 // Re-export the macros at module level for easier importing
-#[allow(unused_imports)]
 pub use compilation_entry;
-#[allow(unused_imports)]
 pub use event_matcher;
 
 /// Helper function to get the appropriate compiler command for build scripts
@@ -95,13 +93,11 @@ pub fn filename_of(compiler_path: &str) -> String {
 }
 
 // Test helper functions for common operations
-#[allow(dead_code)]
 pub fn touch_file(env: &TestEnvironment, path: &str) -> Result<()> {
     env.create_source_files(&[(path, "")])?;
     Ok(())
 }
 
-#[allow(dead_code)]
 pub fn create_c_file(env: &TestEnvironment, path: &str, content: &str) -> Result<()> {
     env.create_source_files(&[(path, content)])?;
     Ok(())
@@ -197,7 +193,6 @@ fn assert_semantic_event_yields_entry(
 /// verbatim as the sole compilation entry. Creates a dummy executable named
 /// `argv[0]` on disk (recognition only inspects the basename, but the path
 /// must exist).
-#[allow(dead_code)]
 pub fn assert_driver_yields_single_entry(env_name: &str, argv: &[&str]) -> Result<()> {
     assert_semantic_event_yields_entry(env_name, &[argv[0]], argv, argv)
 }
@@ -207,7 +202,6 @@ pub fn assert_driver_yields_single_entry(env_name: &str, argv: &[&str]) -> Resul
 /// `hello.asm`): the entry is asserted against `source_file`/
 /// `source_content` instead of the fixed `hello.c` default. Creates a dummy
 /// executable named `argv[0]` on disk.
-#[allow(dead_code)]
 pub fn assert_driver_yields_single_entry_for_source(
     env_name: &str,
     argv: &[&str],
@@ -229,7 +223,6 @@ pub fn assert_driver_yields_single_entry_for_source(
 /// the launcher token -- `expected_args` is what must survive.
 /// `dummy_executables` must list every basename referenced in `argv` that
 /// needs to exist on disk (the launcher and the wrapped compiler).
-#[allow(dead_code)]
 pub fn assert_launcher_execution_yields_entry(
     env_name: &str,
     dummy_executables: &[&str],
@@ -245,7 +238,6 @@ pub fn assert_launcher_execution_yields_entry(
 /// default duplicate filter (directory+file match) must collapse the pair
 /// to one entry, keeping the FIRST event's argv (the driver's, not the
 /// child's, since it comes first in the event stream).
-#[allow(dead_code)]
 pub fn assert_duplicate_events_collapse_to_first(
     env_name: &str,
     first_argv: &[&str],

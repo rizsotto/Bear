@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::process::Output;
 
 /// Bear command output wrapper
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct BearOutput {
     pub(super) output: Output,
@@ -77,19 +76,16 @@ impl BearOutput {
     }
 
     /// Get stdout as string
-    #[allow(dead_code)]
     pub fn stdout(&self) -> String {
         String::from_utf8_lossy(&self.output.stdout).to_string()
     }
 
     /// Get stderr as string
-    #[allow(dead_code)]
     pub fn stderr(&self) -> String {
         String::from_utf8_lossy(&self.output.stderr).to_string()
     }
 
     /// Get exit code
-    #[allow(dead_code)]
     pub fn exit_code(&self) -> Option<i32> {
         self.output.status.code()
     }

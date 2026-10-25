@@ -236,7 +236,6 @@ pub struct EnvEntry {
     pub effect: String,
     pub mapping: EnvMapping,
     #[serde(default)]
-    #[allow(dead_code)]
     pub note: Option<String>,
 }
 

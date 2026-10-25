@@ -31,3 +31,6 @@ compilers-codegen = { path = "../../build-support/compilers-codegen" }
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -10,8 +10,5 @@ pub mod external_dependencies;
 pub mod infrastructure;
 
 // Re-export commonly used items for convenience
-// These are marked as allow unused since some modules may not use all items
-#[allow(unused_imports)]
 pub use constants::*;
-#[allow(unused_imports)]
 pub use infrastructure::*;

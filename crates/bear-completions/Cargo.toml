@@ -19,3 +19,6 @@ path = "src/main.rs"
 [dependencies]
 bear = { path = "../bear" }
 clap_complete.workspace = true
+
+[lints]
+workspace = true

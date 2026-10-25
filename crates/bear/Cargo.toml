@@ -35,3 +35,6 @@ glob.workspace = true
 semantic = { path = "../semantic", features = ["testing"] }
 mockall.workspace = true
 tempfile.workspace = true
+
+[lints]
+workspace = true

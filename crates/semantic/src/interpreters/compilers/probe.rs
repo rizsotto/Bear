@@ -99,10 +99,7 @@ impl<P: CompilerProbe> CompilerProbe for CachingProbe<P> {
 /// - in unit tests of `CompilerRecognizer` that want to exercise the
 ///   regex/hint layer deterministically without depending on whatever
 ///   `cc`/`c++` resolve to on the host.
-///
-/// On a Unix lib build neither use applies, so silence the dead-code
-/// lint that would otherwise fire there.
-#[cfg_attr(all(unix, not(test)), allow(dead_code))]
+#[cfg_attr(all(unix, not(test)), allow(dead_code, reason = "on a Unix lib build neither use applies"))]
 pub(crate) struct NoProbe;
 
 impl CompilerProbe for NoProbe {

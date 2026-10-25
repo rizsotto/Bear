@@ -4,9 +4,7 @@ use super::{BearOutput, CompilationDatabase, InstallEnvironment, InterceptEvents
 use crate::fixtures::constants::*;
 use anyhow::{Context, Result};
 use assert_cmd::Command;
-#[allow(unused_imports)]
 use assert_fs::{TempDir, prelude::*};
-#[allow(unused_imports)]
 use predicates::prelude::*;
 use serde_json::{self, Value};
 
@@ -57,7 +55,6 @@ impl TestEnvironment {
     /// Path of the installed bear binary, for tests that must drive the
     /// process manually (for example a partial stdout read to break the
     /// pipe) instead of through the buffering `run_bear_*` helpers.
-    #[allow(dead_code)]
     pub fn bear_path(&self) -> &Path {
         self.install.path()
     }
@@ -76,7 +73,6 @@ impl TestEnvironment {
     }
 
     /// Create a build script in the test directory
-    #[allow(dead_code)]
     pub fn create_build_script(&self, script_name: &str, content: &str) -> Result<PathBuf> {
         let script_path = self.test_dir().join(script_name);
         fs::write(&script_path, content)?;
@@ -94,7 +90,6 @@ impl TestEnvironment {
     }
 
     /// Create a shell script with proper shebang and shell detection
-    #[allow(dead_code)]
     #[cfg(has_executable_shell)]
     pub fn create_shell_script(&self, script_name: &str, commands: &str) -> Result<PathBuf> {
         let content = format!("#!{}\n{}", SHELL_PATH, commands);
@@ -102,7 +97,6 @@ impl TestEnvironment {
     }
 
     /// Create shell script with specific encoding
-    #[allow(dead_code)]
     #[cfg(has_executable_shell)]
     pub fn create_shell_script_with_encoding(
         &self,
@@ -145,7 +139,6 @@ impl TestEnvironment {
     }
 
     /// Verify that a file is encoded with the specified encoding
-    #[allow(dead_code)]
     pub fn verify_file_encoding(
         &self,
         file_path: &Path,
@@ -161,7 +154,6 @@ impl TestEnvironment {
     }
 
     /// Create a Makefile in the test directory
-    #[allow(dead_code)]
     pub fn create_makefile(&self, makefile_name: &str, content: &str) -> Result<PathBuf> {
         let makefile_path = self.test_dir().join(makefile_name);
         fs::write(&makefile_path, content)?;
@@ -169,14 +161,12 @@ impl TestEnvironment {
     }
 
     /// Create a configuration file (YAML format)
-    #[allow(dead_code)]
     pub fn create_config(&self, config_yaml: &str) -> Result<PathBuf> {
         let config_path = self.test_dir().join("config.yml");
         fs::write(&config_path, config_yaml)?;
         Ok(config_path)
     }
 
-    #[allow(dead_code)]
     pub fn command_bear(&self) -> std::process::Command {
         std::process::Command::new(self.install.path())
     }
@@ -213,7 +203,6 @@ impl TestEnvironment {
     ///
     /// See `run_bear` for the `RUST_LOG`/`RUST_BACKTRACE` defaults; this
     /// mirrors that behaviour and only adds the stdin payload.
-    #[allow(dead_code)]
     pub fn run_bear_with_stdin(&self, args: &[&str], stdin_bytes: &[u8]) -> Result<BearOutput> {
         let mut cmd = Command::new(self.install.path());
         cmd.current_dir(self.test_dir())
@@ -242,7 +231,6 @@ impl TestEnvironment {
     /// of the harness's own `info` default, which would otherwise mask a
     /// regression in that built-in default. `RUST_BACKTRACE=1` is still
     /// forced so panics in bear surface readable backtraces.
-    #[allow(dead_code)]
     pub fn run_bear_with_stdin_default_log(&self, args: &[&str], stdin_bytes: &[u8]) -> Result<BearOutput> {
         let mut cmd = Command::new(self.install.path());
         cmd.current_dir(self.test_dir())
@@ -262,7 +250,6 @@ impl TestEnvironment {
     }
 
     /// Run bear and expect success
-    #[allow(dead_code)]
     pub fn run_bear_success(&self, args: &[&str]) -> Result<BearOutput> {
         let result = self.run_bear(args)?;
         result.assert_success()?;
@@ -270,7 +257,6 @@ impl TestEnvironment {
     }
 
     /// Run bear and expect failure
-    #[allow(dead_code)]
     pub fn run_bear_failure(&self, args: &[&str]) -> Result<BearOutput> {
         let result = self.run_bear(args)?;
         result.assert_failure()?;
@@ -293,7 +279,6 @@ impl TestEnvironment {
     /// let executable_path = env.run_c_compiler("test_program", &["test.c"])?;
     /// env.run_bear(&["intercept", "--output", "events.json", "--", "./test_program"])?;
     /// ```
-    #[allow(dead_code)]
     #[cfg(has_executable_compiler_c)]
     pub fn run_c_compiler(&self, output_name: &str, source_files: &[&str]) -> Result<PathBuf> {
         let mut cmd = std::process::Command::new(COMPILER_C_PATH);
@@ -330,20 +315,17 @@ impl TestEnvironment {
     }
 
     /// Check if a file exists in the test directory
-    #[allow(dead_code)]
     pub fn file_exists(&self, path: &str) -> bool {
         self.test_dir().join(path).exists()
     }
 
     /// Read file content from test directory
-    #[allow(dead_code)]
     pub fn read_file(&self, path: &str) -> Result<String> {
         let file_path = self.test_dir().join(path);
         fs::read_to_string(&file_path).with_context(|| format!("Failed to read file: {}", path))
     }
 
     /// Load compilation database from file
-    #[allow(dead_code)]
     pub fn load_compilation_database(&self, path: &str) -> Result<CompilationDatabase> {
         let db_path = self.test_dir().join(path);
         let content = fs::read_to_string(&db_path)
@@ -356,7 +338,6 @@ impl TestEnvironment {
     }
 
     /// Load intercept events file
-    #[allow(dead_code)]
     pub fn load_events_file(&self, path: &str) -> Result<InterceptEvents> {
         let events_path = self.test_dir().join(path);
         let content = fs::read_to_string(&events_path)

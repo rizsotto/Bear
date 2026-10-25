@@ -15,7 +15,7 @@ impl Loader {
     /// If the configuration file is specified, it will be used. Otherwise, the default locations
     /// will be searched for the configuration file. If the configuration file is not found, the
     /// default configuration will be returned.
-    #[allow(clippy::result_large_err)] // Config loading runs once at startup.
+    #[allow(clippy::result_large_err, reason = "config loading runs once at startup")]
     pub fn load(
         context: &intercept_supervisor::context::Context,
         filename: &Option<String>,
@@ -91,7 +91,7 @@ impl Loader {
     }
 
     /// Loads the configuration from the specified file.
-    #[allow(clippy::result_large_err)] // Config loading runs once at startup.
+    #[allow(clippy::result_large_err, reason = "config loading runs once at startup")]
     pub fn from_file(path: &Path) -> Result<Main, ConfigError> {
         info!("Loading configuration file: {}", path.display());
 
