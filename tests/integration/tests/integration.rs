@@ -6,6 +6,8 @@
 //! - `fixtures`: Test infrastructure, constants, and fixture tests for external dependencies
 //! - `cases`: Actual integration test cases that verify Bear functionality
 
+#![allow(clippy::unwrap_used, reason = "the whole crate is test code")]
+
 mod cases;
 #[allow(
     dead_code,

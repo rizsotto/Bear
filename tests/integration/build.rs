@@ -43,8 +43,12 @@ fn main() {
 
     // Locate install script and repo root for integration tests.
     // CARGO_MANIFEST_DIR is <root>/tests/integration, two levels below root.
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let repo_root = std::path::Path::new(&manifest_dir).ancestors().nth(2).unwrap();
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR for build scripts");
+    let repo_root = std::path::Path::new(&manifest_dir)
+        .ancestors()
+        .nth(2)
+        .expect("tests/integration sits two levels below the repo root");
     let install_script = repo_root.join("scripts").join("install.sh");
     println!("cargo:rerun-if-changed={}", install_script.display());
     println!("cargo:rustc-env=REPO_ROOT={}", repo_root.display());
@@ -92,7 +96,7 @@ fn main() {
 }
 
 fn find_intercept_artifacts() -> (String, String, String) {
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR for build scripts");
     let target_dir = profile_dir_of(std::path::Path::new(&out_dir));
 
     let driver_path = target_dir.join(DRIVER_NAME);

@@ -6,9 +6,12 @@ fn main() {
     // `semantic` crate uses. The agent-side environment filtering in
     // `src/environment.rs` includes the result via
     // `include!(OUT_DIR/env_keys.rs)`.
-    let manifest_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let manifest_dir = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR for build scripts"),
+    );
     let flags_dir = manifest_dir.join("../semantic/compilers");
-    let out_dir: std::path::PathBuf = std::env::var("OUT_DIR").unwrap().into();
+    let out_dir: std::path::PathBuf =
+        std::env::var("OUT_DIR").expect("cargo sets OUT_DIR for build scripts").into();
 
     if let Err(e) = compilers_codegen::generate_env_keys_only(&flags_dir, &out_dir) {
         eprintln!("error: env-key codegen failed");

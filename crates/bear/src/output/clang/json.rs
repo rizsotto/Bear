@@ -74,7 +74,7 @@ impl<R: io::Read> PeekableReader<R> {
             self.reader.read_exact(std::slice::from_mut(&mut byte)).map_err(serde_json::Error::io)?;
             self.peeked = Some(byte);
         }
-        Ok(self.peeked.unwrap())
+        Ok(self.peeked.expect("set by the read above when it was empty"))
     }
 
     fn consume(&mut self) -> Result<u8, serde_json::Error> {

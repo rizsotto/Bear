@@ -34,7 +34,7 @@ pub enum ValidationError {
 fn collapse(mut errors: Vec<ValidationError>) -> Result<(), ValidationError> {
     match errors.len() {
         0 => Ok(()),
-        1 => Err(errors.pop().unwrap()),
+        1 => Err(errors.pop().expect("the match arm guarantees one error")),
         _ => Err(ValidationError::Multiple { errors }),
     }
 }

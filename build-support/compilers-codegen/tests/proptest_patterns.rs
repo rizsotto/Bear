@@ -2,6 +2,8 @@
 
 //! Property-based tests for pattern_to_rust and FlagMatch::name_len.
 
+#![allow(clippy::unwrap_used, reason = "the whole file is test code")]
+
 use compilers_codegen::codegen::pattern_to_rust;
 use compilers_codegen::yaml_types::FlagMatch;
 use proptest::prelude::*;

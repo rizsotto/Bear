@@ -2,7 +2,8 @@
 
 fn main() {
     let flags_dir = std::path::Path::new("compilers");
-    let out_dir: std::path::PathBuf = std::env::var("OUT_DIR").unwrap().into();
+    let out_dir: std::path::PathBuf =
+        std::env::var("OUT_DIR").expect("cargo sets OUT_DIR for build scripts").into();
     if let Err(e) = compilers_codegen::generate(flags_dir, &out_dir) {
         eprintln!("error: flag codegen failed");
         for cause in e.chain() {

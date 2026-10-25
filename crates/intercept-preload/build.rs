@@ -34,7 +34,7 @@ fn main() {
     platform_checks::emit_check_cfg();
 
     if cfg!(target_family = "unix") {
-        let out_dir = std::env::var("OUT_DIR").unwrap();
+        let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR for build scripts");
 
         let mut intercept_symbols: Vec<&str> =
             detected.symbols.iter().copied().filter(|s| INTERCEPT_FAMILY.contains(s)).collect();
@@ -251,22 +251,23 @@ fn find_in_path(name: &str) -> bool {
 fn generate_linux_exports(path: &str, intercept_symbols: &[&str]) {
     let mut file = std::fs::File::create(path).expect("Failed to create exports.map");
 
-    writeln!(file, "/* Generated version script for libexec library */").unwrap();
-    writeln!(file, "{{").unwrap();
-    writeln!(file, "    global:").unwrap();
+    writeln!(file, "/* Generated version script for libexec library */")
+        .expect("Failed to write exports.map");
+    writeln!(file, "{{").expect("Failed to write exports.map");
+    writeln!(file, "    global:").expect("Failed to write exports.map");
 
     // Export symbols that were detected on this platform
     for symbol in intercept_symbols {
-        writeln!(file, "        {};", symbol).unwrap();
+        writeln!(file, "        {};", symbol).expect("Failed to write exports.map");
     }
 
-    writeln!(file).unwrap();
-    writeln!(file, "        /* Library version info */").unwrap();
-    writeln!(file, "        LIBEXEC_VERSION;").unwrap();
-    writeln!(file).unwrap();
-    writeln!(file, "    local:").unwrap();
-    writeln!(file, "        *;").unwrap();
-    writeln!(file, "}};").unwrap();
+    writeln!(file).expect("Failed to write exports.map");
+    writeln!(file, "        /* Library version info */").expect("Failed to write exports.map");
+    writeln!(file, "        LIBEXEC_VERSION;").expect("Failed to write exports.map");
+    writeln!(file).expect("Failed to write exports.map");
+    writeln!(file, "    local:").expect("Failed to write exports.map");
+    writeln!(file, "        *;").expect("Failed to write exports.map");
+    writeln!(file, "}};").expect("Failed to write exports.map");
 }
 
 /// Generate the macOS exported symbols list based on intercept symbols
@@ -275,9 +276,9 @@ fn generate_macos_exports(path: &str, intercept_symbols: &[&str]) {
 
     // macOS exported_symbols_list format: one symbol per line, prefixed with underscore
     for symbol in intercept_symbols {
-        writeln!(file, "_{}", symbol).unwrap();
+        writeln!(file, "_{}", symbol).expect("Failed to write exports.txt");
     }
 
     // Library version info
-    writeln!(file, "_LIBEXEC_VERSION").unwrap();
+    writeln!(file, "_LIBEXEC_VERSION").expect("Failed to write exports.txt");
 }

@@ -67,9 +67,8 @@ pub fn generate_recognition_patterns(
         // Auto-add own ignore_when.executables as recognition entries (no cross-compilation, no version).
         // Only use the table's own list, not inherited - inherited executables are already
         // recognized under the base compiler id.
-        let own_ignore = table.ignore_when.as_ref();
-        if own_ignore.is_some_and(|iw| !iw.executables.is_empty()) {
-            let exes = &own_ignore.unwrap().executables;
+        if let Some(iw) = table.ignore_when.as_ref().filter(|iw| !iw.executables.is_empty()) {
+            let exes = &iw.executables;
             let names_str: Vec<String> = exes.iter().map(|n| format!("\"{}\"", n)).collect();
             out.push_str(&format!(
                 "    (\"{}\", &[{}], false, false, None),\n",
