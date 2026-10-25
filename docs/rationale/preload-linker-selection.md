@@ -32,6 +32,12 @@ build used to hard-code `-fuse-ld=lld`
 ([#664](https://github.com/rizsotto/Bear/pull/664)), which fails where
 no lld is installed.
 
+An installed linker is not always a capable one. rustup's rust-lld is
+built without zlib. On a host whose system objects carry zlib-compressed
+debug sections, such as the FreeBSD base `crt*.o`, it refuses the link:
+"is compressed with ELFCOMPRESS_ZLIB, but lld is not built with zlib
+support" ([#722](https://github.com/rizsotto/Bear/pull/722)).
+
 Options considered:
 
 - Drive the final link with `cc` from a staticlib. One version script
@@ -49,14 +55,25 @@ Options considered:
 ## Decision
 
 The build script picks the ELF linker in this order: the toolchain's
-bundled rust-lld, a system `ld.lld`, a system `mold`. If none is found,
-it adds no linker flag and prints a build warning that names the GNU ld
-error and the fix, in case the default linker copes anyway.
+bundled rust-lld, a system `ld.lld`, a system `mold`. A candidate is
+used only if it passes a probe link in `OUT_DIR`: one PIC object linked
+into a shared library with the same version script given twice, in place
+of rustc's script and `exports.map`. Both known failures show up in the
+probe: GNU ld rejects the two anonymous tags, and a zlib-less lld
+rejects compressed `crt*.o`. If no candidate is found or passes, the
+build adds no linker flag and prints a build warning that names the GNU
+ld error and the fix, in case the default linker copes anyway. If the
+probe cannot run at all (no usable `cc`, for example), the first
+candidate is used unchecked.
 
 ## Consequences
 
 - rustup toolchains build the library on every architecture with no
-  extra linker package.
+  extra linker package. On FreeBSD the probe rejects rust-lld and the
+  base system's `ld.lld` takes over.
+- A skipped first choice shows up as a build warning, so the switch is
+  not silent. On a clean build the probe costs one compile, then one
+  link per candidate until one passes.
 - A Rust toolchain without bundled rust-lld (some distro packages) needs
   `lld` or `mold`. Both are widely packaged. Without them the user gets
   an early warning before the cryptic linker error.
@@ -77,4 +94,5 @@ error and the fix, in case the default linker copes anyway.
 - [interception-preload-mechanism](../requirements/interception-preload-mechanism.md), the requirement this supports
 - [#662](https://github.com/rizsotto/Bear/issues/662), the GNU ld link failure on aarch64
 - [#664](https://github.com/rizsotto/Bear/pull/664), the original hard-coded `-fuse-ld=lld`
+- [#722](https://github.com/rizsotto/Bear/pull/722), the probe link, after rust-lld failed on FreeBSD
 - [How to use linker version scripts in Rust 1.54](https://users.rust-lang.org/t/how-to-use-linker-version-scripts-in-rust-1-54/64033), the rustc version-script behavior

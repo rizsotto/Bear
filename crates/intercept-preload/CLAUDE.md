@@ -22,11 +22,12 @@ async-signal-safe handlers). Annotate it consistently:
 
 ## Build script
 
-On ELF platforms, `build.rs` picks the linker. The order and why GNU ld is out
-are in `docs/rationale/preload-linker-selection.md`; the user-facing
-linker prerequisite is in `INSTALL.md`. If the linker set or order
-changes, update the code and the rationale. If the set changes, update
-`INSTALL.md` too.
+On ELF platforms, `build.rs` picks the linker. The order, the probe link that
+confirms each candidate, and why GNU ld is out are in
+`docs/rationale/preload-linker-selection.md`; the user-facing linker
+prerequisite is in `INSTALL.md`. If the linker set, order, or probe changes,
+update the code and the rationale. If the set changes, update `INSTALL.md`
+too.
 
 `INTERCEPT_FAMILY` in `build.rs` lists the symbols `src/c/shim.c`
 exports. Source of truth is `src/c/shim.c` itself.
