@@ -2,7 +2,8 @@
 
 use super::formats::SerializationError;
 use super::{WriterCreationError, WriterError};
-use std::{fs, path};
+use std::hash::{BuildHasher, Hasher};
+use std::{fs, io, path};
 
 /// An output file that is published all at once, or not at all.
 ///
@@ -18,10 +19,12 @@ use std::{fs, path};
 /// Publishing is a rename, so the previous file survives any failure before it, including
 /// signals that cannot be caught such as `SIGKILL`; the guarantee does not rely on signal
 /// handling (only the cleanup does). `rename(2)` is atomic only when source and destination
-/// share a filesystem, so the temporary file lives next to the output. Its name is random, so
-/// it never collides with the output or with the temporary file of another Bear run. On
-/// Windows the underlying `MoveFileEx`/`MOVEFILE_REPLACE_EXISTING` is not fully atomic under
-/// all conditions, a platform limitation Bear accepts.
+/// share a filesystem, so the temporary file lives next to the output. Its name holds the
+/// process id and a random part, so it never collides with the output, nor with the temporary
+/// file of another Bear run, even one on another host or in a container that shares the
+/// directory. A temporary file left behind by a killed run is not cleaned up. On Windows the
+/// underlying `MoveFileEx`/`MOVEFILE_REPLACE_EXISTING` is not fully atomic under all
+/// conditions, a platform limitation Bear accepts.
 ///
 /// An output that exists and is not a regular file (`/dev/null`, a pipe) is written in place:
 /// a rename would replace it with a regular file. Such an output, like a stream, has nothing
@@ -33,7 +36,7 @@ use std::{fs, path};
 pub struct AtomicFile(Option<Staged>);
 
 struct Staged {
-    temp: tempfile::TempPath,
+    temp_path: path::PathBuf,
     final_path: path::PathBuf,
 }
 
@@ -52,21 +55,28 @@ impl AtomicFile {
             Some(parent) if !parent.as_os_str().is_empty() => parent,
             _ => path::Path::new("."),
         };
-        let mut prefix = std::ffi::OsString::from(".");
-        prefix.push(final_path.file_name().unwrap_or_default());
-        prefix.push(".");
 
-        // Opening the file here, instead of in `tempfile`, keeps two things as `File::create` has
-        // them: the permissions (`tempfile` uses 0600), and the plain OS error (`tempfile` adds
-        // the random temporary path to it).
-        let (file, temp) = tempfile::Builder::new()
-            .prefix(&prefix)
-            .suffix(".tmp")
-            .make_in(directory, |path| fs::OpenOptions::new().write(true).create_new(true).open(path))
-            .map_err(error)?
-            .into_parts();
+        // `create_new` neither reuses nor follows a file that is already at the name, so a taken
+        // name gets a new random part. The permissions and the error are the ones `File::create`
+        // gives.
+        let mut attempts = 0;
+        loop {
+            let mut name = std::ffi::OsString::from(".");
+            name.push(final_path.file_name().unwrap_or_default());
+            name.push(format!(".{}.{:016x}.tmp", std::process::id(), random()));
+            let temp_path = directory.join(name);
 
-        Ok((Self(Some(Staged { temp, final_path: final_path.to_path_buf() })), file))
+            match fs::OpenOptions::new().write(true).create_new(true).open(&temp_path) {
+                Ok(file) => {
+                    let staged = Staged { temp_path, final_path: final_path.to_path_buf() };
+                    return Ok((Self(Some(staged)), file));
+                }
+                Err(err) if err.kind() == io::ErrorKind::AlreadyExists && attempts < CREATE_RETRIES => {
+                    attempts += 1;
+                }
+                Err(err) => return Err(error(err)),
+            }
+        }
     }
 
     /// An output with nothing to commit: a stream, or a file written in place.
@@ -78,17 +88,30 @@ impl AtomicFile {
     ///
     /// When the rename fails, the error references the final path (the likely cause), and the
     /// temporary file is kept for debugging.
-    pub(crate) fn commit(self) -> Result<(), WriterError> {
-        let Some(Staged { temp, final_path }) = self.0 else {
+    pub(crate) fn commit(mut self) -> Result<(), WriterError> {
+        let Some(Staged { temp_path, final_path }) = self.0.take() else {
             return Ok(());
         };
-        temp.persist(&final_path).map_err(|err| {
-            match err.path.keep() {
-                Ok(kept) => log::warn!("Kept the temporary file for debugging: {}", kept.display()),
-                Err(keep_err) => log::warn!("Failed to keep the temporary file: {}", keep_err.error),
-            }
-            WriterError::Io(final_path, SerializationError::Io(err.error))
+        fs::rename(&temp_path, &final_path).map_err(|err| {
+            log::warn!("Kept the temporary file for debugging: {}", temp_path.display());
+            WriterError::Io(final_path, SerializationError::Io(err))
         })
+    }
+}
+
+const CREATE_RETRIES: u32 = 4;
+
+/// 64 random bits from `std`: the keys of a `RandomState` are seeded by the OS, and differ for
+/// each instance.
+fn random() -> u64 {
+    std::hash::RandomState::new().build_hasher().finish()
+}
+
+impl Drop for AtomicFile {
+    fn drop(&mut self) {
+        if let Some(staged) = self.0.take() {
+            let _ = fs::remove_file(staged.temp_path);
+        }
     }
 }
 
@@ -105,6 +128,12 @@ mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    /// A path shaped like the temporary file of `final_path` in this process.
+    fn other_temp_path(final_path: &path::Path) -> path::PathBuf {
+        let name = final_path.file_name().unwrap().to_string_lossy();
+        final_path.with_file_name(format!(".{name}.{}.{:016x}.tmp", std::process::id(), 0))
     }
 
     #[test]
@@ -177,10 +206,55 @@ mod tests {
 
         let names = entries(dir.path());
         assert_eq!(names.len(), 1);
-        assert!(
-            names[0].starts_with(".output.json.") && names[0].ends_with(".tmp"),
-            "unexpected name: {names:?}"
-        );
+        let random = names[0]
+            .strip_prefix(&format!(".output.json.{}.", std::process::id()))
+            .and_then(|rest| rest.strip_suffix(".tmp"))
+            .unwrap_or_else(|| panic!("unexpected name: {names:?}"));
+        assert_eq!(random.len(), 16, "unexpected name: {names:?}");
+        assert!(random.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn test_drop_removes_the_temp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let (sut, file) = AtomicFile::create(&final_path).unwrap();
+        drop(file);
+        assert_eq!(entries(dir.path()).len(), 1);
+
+        drop(sut);
+
+        assert!(entries(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn test_existing_temp_file_is_left_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let other_path = other_temp_path(&final_path);
+        fs::write(&other_path, "another run").unwrap();
+
+        let (sut, mut file) = AtomicFile::create(&final_path).unwrap();
+        file.write_all(b"content").unwrap();
+        drop(file);
+        sut.commit().unwrap();
+
+        assert_eq!(fs::read_to_string(&other_path).unwrap(), "another run");
+        assert_eq!(fs::read_to_string(&final_path).unwrap(), "content");
+        assert_eq!(entries(dir.path()).len(), 2);
+    }
+
+    #[test]
+    fn test_two_staged_files_for_one_output_do_not_collide() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+
+        let (first, _first_file) = AtomicFile::create(&final_path).unwrap();
+        let (second, _second_file) = AtomicFile::create(&final_path).unwrap();
+
+        assert_eq!(entries(dir.path()).len(), 2);
+        drop((first, second));
+        assert!(entries(dir.path()).is_empty());
     }
 
     #[test]
