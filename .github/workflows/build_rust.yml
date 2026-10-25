@@ -8,6 +8,8 @@ env:
   CARGO_TERM_COLOR: always
   # Keep identical to the typos version the devcontainer installs.
   TYPOS_VERSION: 1.51.1
+  # cargo-deny rejects unknown deny.toml keys, and keys change between releases.
+  CARGO_DENY_VERSION: 0.20.2
 
 permissions:
   contents: read
@@ -150,6 +152,6 @@ jobs:
           toolchain: stable
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny
+          tool: cargo-deny@${{ env.CARGO_DENY_VERSION }}
       - name: Run Cargo Deny
-        run: cargo deny check advisories licenses
+        run: cargo deny check advisories licenses bans sources

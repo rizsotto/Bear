@@ -34,3 +34,19 @@ allow = [
 unmaintained = "all"
 unsound = "all"
 yanked = "deny"
+
+# A second version of a crate costs build time and doubles what has to be
+# trusted, so a new one is a decision, not a side effect of a bump. Dev-only
+# crates count too: they are built on every test run.
+[bans]
+multiple-versions = "deny"
+multiple-versions-include-dev = true
+skip = [
+    { crate = "syn:^2", reason = "mockall_derive (dev-only) has not moved to syn 3" },
+]
+
+# crates.io only: a git or alternative-registry dependency bypasses the
+# review that a published, versioned crate gets.
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
