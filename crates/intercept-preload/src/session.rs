@@ -84,6 +84,10 @@ unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a
     let mut ptr = envp;
     std::iter::from_fn(move || {
         loop {
+            // SAFETY: ptr starts at envp, which this fn's # Safety says is a
+            // valid, non-null array. ptr only moves forward one element after
+            // the entry it points to was seen non-null, so it never passes the
+            // terminating null.
             if unsafe { (*ptr).is_null() } {
                 return None;
             }
@@ -91,6 +95,9 @@ unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a
             // We re-borrow it as &'a CStr, which is sound because the caller
             // guarantees the C strings remain valid for 'a.
             let cstr: &'a CStr = unsafe { CStr::from_ptr(*ptr) };
+            // SAFETY: the entry at ptr was just read as non-null, so the
+            // terminating null is at or after ptr + 1, and the add stays inside
+            // the array.
             ptr = unsafe { ptr.add(1) };
 
             let Ok(entry) = cstr.to_str() else {
@@ -123,6 +130,9 @@ unsafe fn from_envp(envp: *const *const c_char) -> Option<PreloadState> {
         return None;
     }
 
+    // SAFETY: envp is non-null (checked above). This fn's # Safety gives the
+    // rest of envp_iter's contract (null-terminated array of NUL-terminated
+    // strings).
     unsafe { envp_iter(envp) }.find(|(key, _, _)| *key == KEY_INTERCEPT_STATE).and_then(|(_, value, _)| {
         match value.try_into() {
             Ok(state) => Some(state),
@@ -144,6 +154,9 @@ unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String
         return None;
     }
 
+    // SAFETY: envp is non-null (checked above). This fn's # Safety gives the
+    // rest of envp_iter's contract (null-terminated array of NUL-terminated
+    // strings).
     unsafe { envp_iter(envp) }.find(|(k, _, _)| *k == key).map(|(_, v, _)| v.to_string())
 }
 
@@ -177,6 +190,9 @@ pub unsafe fn in_session(ctx: &SessionContext, envp: *const *const c_char) -> bo
     let mut intercept_state_matches = false;
     let mut preload_matches = false;
 
+    // SAFETY: envp is non-null (checked above). The caller must pass a valid
+    // null-terminated array of NUL-terminated strings, which is what envp_iter
+    // needs.
     for (key, value, _) in unsafe { envp_iter(envp) } {
         if key == KEY_INTERCEPT_STATE {
             if let Ok(parsed_state) = PreloadState::try_from(value) {
@@ -256,6 +272,11 @@ impl DoctoredEnvironment {
         // Copy existing environment variables, skipping ones we'll set ourselves.
         // Uses envp_iter for consistent parsing and malformed-entry logging.
         if !envp.is_null() {
+            // SAFETY: envp is non-null (checked above). Its only caller,
+            // resolve_environment, passes one under its own # Safety contract.
+            // Every entry is copied into an owned CString inside the loop, so
+            // no borrow outlives the call. This fn is not marked unsafe, so the
+            // contract is not enforced by the type.
             for (key, value, full_entry) in unsafe { envp_iter(envp) } {
                 #[cfg(target_os = "macos")]
                 let dominated_by_bear =
@@ -313,6 +334,8 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
         return None;
     }
 
+    // SAFETY: envp is non-null (checked above) and this fn's # Safety gives
+    // from_envp its contract (null-terminated array of NUL-terminated strings).
     match unsafe { from_envp(envp) } {
         None => {
             log::info!("session init failed: variables not found");
@@ -323,6 +346,8 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
 
             // Capture and normalize the preload variable before anything modifies it.
             // This preserves co-resident libraries (e.g. libsandbox.so).
+            // SAFETY: same contract as above: envp is non-null and valid per
+            // this fn's # Safety. The returned String is owned.
             let startup_preload = unsafe { read_env_value(envp, PRELOAD_KEY) }.map(|v| normalize_preload(&v));
 
             let ctx = SessionContext { state: session, startup_preload };
@@ -391,6 +416,8 @@ mod tests {
 
     #[test]
     fn test_from_envp_returns_none_for_null_pointer() {
+        // SAFETY: a null envp is allowed by from_envp's contract and returns
+        // None.
         let result = unsafe { from_envp(std::ptr::null()) };
         assert!(result.is_none());
     }
@@ -399,6 +426,8 @@ mod tests {
     fn test_from_envp_returns_none_when_intercept_state_not_found() {
         let envp = TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user", "SHELL=/bin/sh"]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_none());
     }
@@ -407,6 +436,8 @@ mod tests {
     fn test_from_envp_returns_none_for_empty_environment() {
         let envp = TestEnvp::new(&[]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_none());
     }
@@ -415,6 +446,8 @@ mod tests {
     fn test_from_envp_returns_none_for_invalid_json() {
         let envp = TestEnvp::new(&["PATH=/usr/bin", "BEAR_INTERCEPT=invalid_json_here", "HOME=/home/user"]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_none());
     }
@@ -428,6 +461,8 @@ mod tests {
             TestEnvp::new(&["PATH=/usr/bin", &intercept_entry, "HOME=/home/user"])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_some());
 
@@ -444,6 +479,8 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, "PATH=/usr/bin"])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_some());
         assert_eq!(result.unwrap(), state);
@@ -458,6 +495,8 @@ mod tests {
             TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user", &intercept_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_some());
         assert_eq!(result.unwrap(), state);
@@ -466,6 +505,8 @@ mod tests {
     #[test]
     fn test_in_session_returns_false_for_null_pointer() {
         let ctx = create_test_ctx();
+        // SAFETY: a null envp is allowed by in_session's contract and returns
+        // false.
         let result = unsafe { in_session(&ctx, std::ptr::null()) };
         assert!(!result);
     }
@@ -477,6 +518,8 @@ mod tests {
 
         let envp = TestEnvp::new(&["PATH=/usr/bin", &preload_entry]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
@@ -489,6 +532,8 @@ mod tests {
 
         let envp = TestEnvp::new(&["PATH=/usr/bin", &intercept_entry]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
@@ -509,6 +554,8 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, &preload_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
@@ -525,6 +572,8 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, &preload_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
@@ -540,6 +589,8 @@ mod tests {
             TestEnvp::new(&["PATH=/usr/bin", &intercept_entry, &preload_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(result);
     }
@@ -557,6 +608,8 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, &preload_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(result);
     }
@@ -566,6 +619,8 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&[]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
@@ -684,6 +739,9 @@ mod tests {
         // Should be able to iterate through the envp
         let mut count = 0;
         let mut current = ptr;
+        // SAFETY: doctored owns its strings and pointer array, and as_ptr ends
+        // with a null, so the walk stays in bounds before it reaches the
+        // terminator.
         unsafe {
             while !(*current).is_null() {
                 count += 1;
@@ -711,6 +769,7 @@ mod tests {
     fn test_init_session_from_envp_returns_none_for_null() {
         // Note: We can't easily test SESSION_CTX initialization multiple times
         // since it's a OnceLock. We test the return value behavior.
+        // SAFETY: a null envp is allowed and handled by returning early.
         let result = unsafe { init_session_from_envp(std::ptr::null()) };
         assert!(result.is_none());
     }
@@ -719,6 +778,8 @@ mod tests {
     fn test_init_session_from_envp_returns_none_when_not_found() {
         let envp = TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user"]);
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { init_session_from_envp(envp.as_ptr()) };
         assert!(result.is_none());
     }
@@ -734,6 +795,8 @@ mod tests {
             TestEnvp::new(&["MALFORMED_ENTRY", &intercept_entry, "PATH=/usr/bin"])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         // Should still find the valid state
         assert!(result.is_some());
@@ -751,6 +814,8 @@ mod tests {
             TestEnvp::new(&["MALFORMED", &intercept_entry, &preload_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(result);
     }
@@ -784,6 +849,8 @@ mod tests {
             TestEnvp::new(&[&intercept_entry])
         };
 
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
         let result = unsafe { from_envp(envp.as_ptr()) };
         assert!(result.is_some());
 

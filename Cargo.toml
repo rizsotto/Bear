@@ -19,6 +19,7 @@ rust-version = "1.89"
 [workspace.lints.clippy]
 allow_attributes_without_reason = "warn"
 unwrap_used = "warn"
+undocumented_unsafe_blocks = "warn"
 
 [workspace.dependencies]
 thiserror = "2.0"

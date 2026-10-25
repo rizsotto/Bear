@@ -46,60 +46,90 @@ use crate::session::{DoctoredEnvironment, SESSION_CTX, in_session, init_session_
 
 #[ctor(unsafe)]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execve".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_EXECVPE: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvpe".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_EXECVP: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvp".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_EXECVP_OPENBSD: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvP".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_EXECT: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"exect".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_POSIX_SPAWN: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"posix_spawn".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_POSIX_SPAWNP: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"posix_spawnp".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_POPEN: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"popen".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"system".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
 #[ctor(unsafe)]
 static REAL_PCLOSE: AtomicPtr<libc::c_void> = {
+    // SAFETY: the name is a NUL-terminated literal. dlsym may return null
+    // (symbol absent); every user of this static checks for null before calling
+    // through it.
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"pclose".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
@@ -137,6 +167,9 @@ pub unsafe extern "C" fn rust_session_init(envp: *const *const c_char) {
     intercept::logging::init("preload");
 
     // Initialize the session and get the destination for reporter setup
+    // SAFETY: envp is the process environment from the C constructor. This fn's
+    // # Safety says it is a null-terminated array of NUL-terminated strings;
+    // null is handled.
     let destination = unsafe { init_session_from_envp(envp) };
 
     // Initialize the reporter from the captured destination
@@ -171,6 +204,12 @@ pub unsafe extern "C" fn rust_execve(
         envp: *const *const c_char,
     ) -> c_int;
 
+    // SAFETY: the pointer args are the caller's execve arguments, valid under
+    // this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. resolved_env owns any doctored strings until
+    // the end of this block, so envp_to_use stays valid. func_ptr is non-null
+    // (checked) and comes from dlsym(RTLD_NEXT, "execve"), so the transmute to
+    // the matching fn type is sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -220,6 +259,12 @@ pub unsafe extern "C" fn rust_execvpe(
         envp: *const *const c_char,
     ) -> c_int;
 
+    // SAFETY: the pointer args are the caller's execvpe arguments, valid under
+    // this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. resolved_env owns any doctored strings until
+    // the end of this block, so envp_to_use stays valid. func_ptr is non-null
+    // (checked) and comes from dlsym(RTLD_NEXT, "execvpe"), so the transmute to
+    // the matching fn type is sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -264,6 +309,11 @@ pub unsafe extern "C" fn rust_execvpe(
 pub unsafe extern "C" fn rust_execvp(file: *const c_char, argv: *const *const c_char) -> c_int {
     type ExecvpFunc = unsafe extern "C" fn(file: *const c_char, argv: *const *const c_char) -> c_int;
 
+    // SAFETY: the pointer args are the caller's execvp arguments, valid under
+    // this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. func_ptr is non-null (checked) and comes from
+    // dlsym(RTLD_NEXT, "execvp"), so the transmute to the matching fn type is
+    // sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -308,6 +358,11 @@ pub unsafe extern "C" fn rust_execvP(
         argv: *const *const c_char,
     ) -> c_int;
 
+    // SAFETY: the pointer args are the caller's execvP arguments, valid under
+    // this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. func_ptr is non-null (checked) and comes from
+    // dlsym(RTLD_NEXT, "execvP"), so the transmute to the matching fn type is
+    // sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -352,6 +407,12 @@ pub unsafe extern "C" fn rust_exect(
         envp: *const *const c_char,
     ) -> c_int;
 
+    // SAFETY: the pointer args are the caller's exect arguments, valid under
+    // this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. resolved_env owns any doctored strings until
+    // the end of this block, so envp_to_use stays valid. func_ptr is non-null
+    // (checked) and comes from dlsym(RTLD_NEXT, "exect"), so the transmute to
+    // the matching fn type is sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -406,6 +467,12 @@ pub unsafe extern "C" fn rust_posix_spawn(
         envp: *const *const c_char,
     ) -> c_int;
 
+    // SAFETY: the pointer args are the caller's posix_spawn arguments, valid
+    // under this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. resolved_env owns any doctored strings until
+    // the end of this block, so envp_to_use stays valid. func_ptr is non-null
+    // (checked) and comes from dlsym(RTLD_NEXT, "posix_spawn"), so the
+    // transmute to the matching fn type is sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -459,6 +526,12 @@ pub unsafe extern "C" fn rust_posix_spawnp(
         envp: *const *const c_char,
     ) -> c_int;
 
+    // SAFETY: the pointer args are the caller's posix_spawnp arguments, valid
+    // under this fn's # Safety; as_path_buf, as_string_vec and as_environment
+    // null-check before reading. resolved_env owns any doctored strings until
+    // the end of this block, so envp_to_use stays valid. func_ptr is non-null
+    // (checked) and comes from dlsym(RTLD_NEXT, "posix_spawnp"), so the
+    // transmute to the matching fn type is sound.
     unsafe {
         report(|| {
             let result = Execution {
@@ -509,6 +582,9 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         return ptr::null_mut();
     }
 
+    // SAFETY: command is non-null (checked above) and NUL-terminated per this
+    // fn's # Safety. The borrowed str is only used inside this call; the caller
+    // keeps the C string alive.
     let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -518,6 +594,8 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         }
     };
 
+    // SAFETY: mode is non-null (checked above) and NUL-terminated per this fn's
+    // # Safety. The borrowed str is only used inside this call.
     let mode_str = match unsafe { CStr::from_ptr(mode) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -544,6 +622,8 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     let pipe_result = if cloexec {
         create_pipe_cloexec(pipe_fds.as_mut_ptr())
     } else {
+        // SAFETY: pipe_fds is a live local [c_int; 2], which is what pipe(2)
+        // writes to.
         unsafe { libc::pipe(pipe_fds.as_mut_ptr()) }
     };
     if pipe_result != 0 {
@@ -562,11 +642,19 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     // children if the caller later fork+execs without going through our override.
     // This matches libc popen behavior. (When 'e' was requested and pipe2 was used,
     // both fds already have CLOEXEC, but setting it again is harmless.)
+    // SAFETY: parent_fd is an open end of the pipe made above. F_SETFD takes an
+    // int, no pointer.
     unsafe { libc::fcntl(parent_fd, libc::F_SETFD, libc::FD_CLOEXEC) };
 
     // Set up file actions: redirect child's stdin/stdout to the pipe
+    // SAFETY: posix_spawn_file_actions_t is a plain C struct; all-zero bytes is
+    // a valid value to pass to _init, which sets it up next.
     let mut file_actions: libc::posix_spawn_file_actions_t = unsafe { std::mem::zeroed() };
+    // SAFETY: file_actions is a live, exclusively borrowed local. _init is the
+    // required first call on it.
     if unsafe { libc::posix_spawn_file_actions_init(&mut file_actions) } != 0 {
+        // SAFETY: both fds are open ends of the pipe made above. This path
+        // returns right after, so neither is used again.
         unsafe {
             libc::close(pipe_fds[0]);
             libc::close(pipe_fds[1]);
@@ -574,10 +662,16 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         return ptr::null_mut();
     }
     // Close the parent's end in the child
+    // SAFETY: file_actions was initialized above and is live. The fds are open
+    // pipe ends; these calls only record actions.
     unsafe { libc::posix_spawn_file_actions_addclose(&mut file_actions, parent_fd) };
     // Redirect child's target fd (stdin or stdout) to the child's end of the pipe
+    // SAFETY: file_actions was initialized above and is live. The fds are open
+    // pipe ends; these calls only record actions.
     unsafe { libc::posix_spawn_file_actions_adddup2(&mut file_actions, child_fd, child_target_fd) };
     // Close the child's original pipe fd (now duplicated to target)
+    // SAFETY: file_actions was initialized above and is live. The fds are open
+    // pipe ends; these calls only record actions.
     unsafe { libc::posix_spawn_file_actions_addclose(&mut file_actions, child_fd) };
 
     // Build argv for /bin/sh -c <command>
@@ -586,6 +680,8 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     let cmd_cstr = match std::ffi::CString::new(command_str) {
         Ok(c) => c,
         Err(_) => {
+            // SAFETY: file_actions was initialized above and is destroyed once
+            // on this path. The pipe fds are open and unused after the return.
             unsafe {
                 libc::posix_spawn_file_actions_destroy(&mut file_actions);
                 libc::close(pipe_fds[0]);
@@ -598,11 +694,19 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
 
     // Doctor the environment via the same path as exec-family calls
     let envp = get_environ();
+    // SAFETY: envp is the process environ (get_environ), a null-terminated
+    // array of NUL-terminated strings, which is resolve_environment's contract.
+    // A concurrent setenv in another thread would race, as it does for libc.
     let resolved_env = unsafe { resolve_environment(envp) };
     let envp_to_use = resolved_env.as_ptr();
 
     // Spawn the child
     let mut child_pid: pid_t = 0;
+    // SAFETY: func_ptr is non-null (checked first) and comes from
+    // dlsym(RTLD_NEXT, "posix_spawnp"), so the transmute is sound. child_pid,
+    // file_actions and argv are live locals. argv is null-terminated and its
+    // strings (sh, dash_c, cmd_cstr) outlive the call. attrp is null, which is
+    // allowed. envp_to_use is kept alive by resolved_env.
     let spawn_result = unsafe {
         let func_ptr = REAL_POSIX_SPAWNP.load(Ordering::SeqCst);
         if func_ptr.is_null() {
@@ -624,9 +728,13 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         real_func(&mut child_pid, sh.as_ptr(), &file_actions, ptr::null(), argv.as_ptr(), envp_to_use)
     };
 
+    // SAFETY: file_actions was initialized above and is destroyed exactly once,
+    // after the spawn call is done with it.
     unsafe { libc::posix_spawn_file_actions_destroy(&mut file_actions) };
 
     if spawn_result != 0 {
+        // SAFETY: both fds are still open (we own them) and are not used after
+        // this return.
         unsafe {
             libc::close(pipe_fds[0]);
             libc::close(pipe_fds[1]);
@@ -636,11 +744,19 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     }
 
     // Close the child's end in the parent
+    // SAFETY: child_fd is an open pipe end owned by us. The child has its own
+    // copy and the parent never uses it again.
     unsafe { libc::close(child_fd) };
 
     // Wrap the parent's fd in a FILE*
+    // SAFETY: parent_fd is open and owned by us. mode is non-null and
+    // NUL-terminated per this fn's # Safety, and fdopen does not keep the
+    // pointer.
     let file_ptr = unsafe { libc::fdopen(parent_fd, mode) };
     if file_ptr.is_null() {
+        // SAFETY: fdopen failed, so parent_fd is still ours to close. child_pid
+        // is the child just spawned; killing and reaping it leaves no zombie. A
+        // null status pointer is allowed for waitpid.
         unsafe {
             libc::close(parent_fd);
             libc::kill(child_pid, libc::SIGKILL);
@@ -681,7 +797,12 @@ pub unsafe extern "C" fn rust_pclose(stream: *mut libc::FILE) -> c_int {
         let func_ptr = REAL_PCLOSE.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             type PcloseFunc = unsafe extern "C" fn(stream: *mut libc::FILE) -> c_int;
+            // SAFETY: func_ptr is non-null (checked above) and comes from
+            // dlsym(RTLD_NEXT, "pclose"), so PcloseFunc is its real signature.
             let real_func: PcloseFunc = unsafe { std::mem::transmute(func_ptr) };
+            // SAFETY: stream is non-null (checked at the top). It was not
+            // opened by our popen, so the real pclose is the right owner for
+            // it.
             return unsafe { real_func(stream) };
         }
         set_errno(libc::EINVAL);
@@ -689,11 +810,15 @@ pub unsafe extern "C" fn rust_pclose(stream: *mut libc::FILE) -> c_int {
     };
 
     // Close the stream (this closes the underlying fd)
+    // SAFETY: stream is non-null and came from rust_popen (its pid was in
+    // POPEN_CHILDREN and is now removed, so it is closed once). The caller must
+    // not use it after pclose.
     unsafe { libc::fclose(stream) };
 
     // Wait for the child
     let mut status: c_int = 0;
     loop {
+        // SAFETY: status is a live local c_int, the only thing waitpid writes.
         let ret = unsafe { libc::waitpid(pid, &mut status, 0) };
         if ret != -1 || get_errno() != libc::EINTR {
             break;
@@ -730,6 +855,9 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
         return 1;
     }
 
+    // SAFETY: command is non-null (checked above) and NUL-terminated per this
+    // fn's # Safety. The borrowed str is only used inside this call; the caller
+    // keeps the C string alive.
     let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -761,19 +889,35 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
     let argv: [*const c_char; 4] = [sh.as_ptr(), dash_c.as_ptr(), cmd_cstr.as_ptr(), ptr::null()];
 
     // Block SIGCHLD, ignore SIGINT and SIGQUIT (POSIX system() semantics)
+    // SAFETY: sigset_t is a plain C type; all-zero bytes is a valid value, and
+    // sigemptyset initializes it right below.
     let mut block_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+    // SAFETY: sigset_t is a plain C type; all-zero bytes is a valid value, and
+    // sigemptyset initializes it right below.
     let mut old_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+    // SAFETY: block_mask and old_mask are live locals. sigemptyset and
+    // sigaddset write block_mask, sigprocmask reads it and writes old_mask.
+    // SIGCHLD is a valid signal.
     unsafe {
         libc::sigemptyset(&mut block_mask);
         libc::sigaddset(&mut block_mask, libc::SIGCHLD);
         libc::sigprocmask(libc::SIG_BLOCK, &block_mask, &mut old_mask);
     }
 
+    // SAFETY: signal() with SIG_IGN installs no handler code. The old
+    // disposition is saved and restored below, as libc system() does.
     let old_sigint = unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
+    // SAFETY: signal() with SIG_IGN installs no handler code. The old
+    // disposition is saved and restored below, as libc system() does.
     let old_sigquit = unsafe { libc::signal(libc::SIGQUIT, libc::SIG_IGN) };
 
     // Set up spawn attributes to restore default signal handling in the child
+    // SAFETY: posix_spawnattr_t is a plain C type; all-zero bytes is a valid
+    // value to pass to _init, called first below.
     let mut attr: libc::posix_spawnattr_t = unsafe { std::mem::zeroed() };
+    // SAFETY: attr is a live local and posix_spawnattr_init is the first call
+    // on it. default_sigs is zeroed and then set up by sigemptyset. old_mask
+    // was filled by sigprocmask above.
     unsafe {
         libc::posix_spawnattr_init(&mut attr);
         libc::posix_spawnattr_setflags(
@@ -792,11 +936,21 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
 
     // Doctor the environment via the same path as exec-family calls
     let envp = get_environ();
+    // SAFETY: envp is the process environ (get_environ), a null-terminated
+    // array of NUL-terminated strings, which is resolve_environment's contract.
+    // A concurrent setenv in another thread would race, as it does for libc.
     let resolved_env = unsafe { resolve_environment(envp) };
     let envp_to_use = resolved_env.as_ptr();
 
     // Spawn the child
     let mut child_pid: pid_t = 0;
+    // SAFETY: func_ptr is non-null (checked first) and comes from
+    // dlsym(RTLD_NEXT, "posix_spawnp"), so the transmute is sound. child_pid
+    // and attr are live locals; attr was initialized above. file_actions is
+    // null, which is allowed. argv is null-terminated and its strings (sh,
+    // dash_c, cmd_cstr) outlive the call. envp_to_use is kept alive by
+    // resolved_env. The early-return path destroys attr once and restores the
+    // signal state saved above.
     let spawn_result = unsafe {
         let func_ptr = REAL_POSIX_SPAWNP.load(Ordering::SeqCst);
         if func_ptr.is_null() {
@@ -826,6 +980,9 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
         )
     };
 
+    // SAFETY: attr was initialized above and is destroyed once (the early
+    // return in the block above skips this line), after the spawn is done with
+    // it.
     unsafe { libc::posix_spawnattr_destroy(&mut attr) };
 
     let status = if spawn_result != 0 {
@@ -836,6 +993,8 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
         // Wait for the child
         let mut wstatus: c_int = 0;
         loop {
+            // SAFETY: wstatus is a live local c_int, the only thing waitpid
+            // writes. child_pid is the child spawned above.
             let ret = unsafe { libc::waitpid(child_pid, &mut wstatus, 0) };
             if ret != -1 || get_errno() != libc::EINTR {
                 break;
@@ -845,6 +1004,8 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
     };
 
     // Restore signal handling
+    // SAFETY: old_sigint and old_sigquit are the dispositions signal() returned
+    // above, and old_mask was filled by sigprocmask. Restoring them is valid.
     unsafe {
         libc::signal(libc::SIGINT, old_sigint);
         libc::signal(libc::SIGQUIT, old_sigquit);
@@ -896,6 +1057,9 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
             ResolvedEnvironment::Original(envp)
         }
         Some(ctx) => {
+            // SAFETY: envp is resolve_environment's argument, so its # Safety
+            // contract (valid null-terminated array of NUL-terminated strings,
+            // or null) is what in_session needs.
             if unsafe { in_session(ctx, envp) } {
                 // Environment is still aligned with session, pass through
                 ResolvedEnvironment::Original(envp)
@@ -921,6 +1085,8 @@ fn get_environ() -> *const *const c_char {
         unsafe extern "C" {
             fn _NSGetEnviron() -> *mut *mut *mut c_char;
         }
+        // SAFETY: _NSGetEnviron returns a valid pointer to the process's
+        // environ for the whole process lifetime; we only read it.
         unsafe { *_NSGetEnviron() as *const *const c_char }
     }
     #[cfg(not(target_os = "macos"))]
@@ -928,6 +1094,8 @@ fn get_environ() -> *const *const c_char {
         unsafe extern "C" {
             static environ: *const *const c_char;
         }
+        // SAFETY: environ is the libc global. Reading the pointer is valid. A
+        // concurrent setenv in another thread would race, as it does for libc.
         unsafe { environ }
     }
 }
@@ -940,14 +1108,20 @@ fn get_environ() -> *const *const c_char {
 fn create_pipe_cloexec(fds: *mut c_int) -> c_int {
     #[cfg(not(target_os = "macos"))]
     {
+        // SAFETY: fds must point to a [c_int; 2] for pipe2. The only caller
+        // passes pipe_fds from rust_popen, which is a live local array of two.
         unsafe { libc::pipe2(fds, libc::O_CLOEXEC) }
     }
     #[cfg(target_os = "macos")]
     {
+        // SAFETY: fds must point to a [c_int; 2] for pipe. The only caller
+        // passes pipe_fds from rust_popen, which is a live local array of two.
         let ret = unsafe { libc::pipe(fds) };
         if ret != 0 {
             return ret;
         }
+        // SAFETY: fds points to two c_ints (see above), so *fds and *fds.add(1)
+        // are in bounds. The fds are open since pipe succeeded.
         unsafe {
             libc::fcntl(*fds, libc::F_SETFD, libc::FD_CLOEXEC);
             libc::fcntl(*fds.add(1), libc::F_SETFD, libc::FD_CLOEXEC);
@@ -983,6 +1157,9 @@ unsafe fn as_string(s: *const c_char) -> Result<String, c_int> {
     if s.is_null() {
         return Err(libc::EINVAL);
     }
+    // SAFETY: s is non-null (checked above) and NUL-terminated, as the callers'
+    // C APIs require. The borrowed &CStr is only used inside this expression;
+    // the result is copied.
     match unsafe { CStr::from_ptr(s) }.to_str() {
         Ok(s) => Ok(s.to_string()),
         Err(_) => Err(libc::EINVAL),
@@ -994,6 +1171,9 @@ unsafe fn as_path_buf(s: *const c_char) -> Result<PathBuf, c_int> {
     if s.is_null() {
         return Err(libc::EINVAL);
     }
+    // SAFETY: s is non-null (checked above) and NUL-terminated, as the callers'
+    // C APIs require. The borrowed &CStr is only used inside this expression;
+    // the result is copied.
     match unsafe { CStr::from_ptr(s) }.to_str() {
         Ok(s) => Ok(PathBuf::from(s)),
         Err(_) => Err(libc::EINVAL),
@@ -1008,7 +1188,12 @@ unsafe fn as_string_vec(s: *const *const c_char) -> Result<Vec<String>, c_int> {
     let mut vec = Vec::new();
 
     let mut i = 0;
+    // SAFETY: s is non-null (checked above). The array is null-terminated, and
+    // the loop stops at the first null, so s.add(i) never goes past the
+    // terminator.
     while !unsafe { (*s.add(i)).is_null() } {
+        // SAFETY: s.add(i) is in bounds because the entry at i was just seen to
+        // be non-null; as_string null-checks and reads a NUL-terminated string.
         let arg = unsafe { as_string(*s.add(i)) }?;
         vec.push(arg);
         i += 1;
@@ -1025,7 +1210,12 @@ unsafe fn as_environment(s: *const *const c_char) -> Result<HashMap<String, Stri
     let mut map = HashMap::new();
 
     let mut i = 0;
+    // SAFETY: s is non-null (checked above). The array is null-terminated, and
+    // the loop stops at the first null, so s.add(i) never goes past the
+    // terminator.
     while !unsafe { (*s.add(i)).is_null() } {
+        // SAFETY: s.add(i) is in bounds because the entry at i was just seen to
+        // be non-null; as_string null-checks and reads a NUL-terminated string.
         let key_and_value = unsafe { as_string(*s.add(i)) }?;
         if let Some(pos) = key_and_value.find('=') {
             let key = key_and_value[..pos].to_string();

@@ -16,9 +16,10 @@ async-signal-safe handlers). Annotate it consistently:
 
 - Every `unsafe fn` carries a `/// # Safety` doc comment stating the
   caller's obligations.
-- Each `unsafe {}` block gets an inline `// SAFETY:` comment when its
-  reasoning is not already covered by the enclosing function's `# Safety`
-  section.
+- Each `unsafe {}` block gets an inline `// SAFETY:` comment
+  (`clippy::undocumented_unsafe_blocks` checks it). When the enclosing
+  function's `# Safety` section covers it, the comment can say so and
+  name the requirement.
 
 ## Build script
 

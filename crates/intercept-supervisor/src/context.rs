@@ -149,12 +149,16 @@ fn is_sip_enabled() -> bool {
 fn get_confstr_cs_path() -> String {
     use std::ffi::CStr;
 
+    // SAFETY: confstr with a null buffer and length 0 is allowed; it only
+    // returns the required size.
     let len = unsafe { libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0) };
     if len == 0 {
         return "/usr/bin:/bin".to_string();
     }
 
     let mut buf = vec![0u8; len];
+    // SAFETY: buf is a live Vec<u8> of exactly len bytes, and confstr writes at
+    // most len bytes (including the NUL) into it.
     let result = unsafe { libc::confstr(libc::_CS_PATH, buf.as_mut_ptr() as *mut libc::c_char, len) };
     if result == 0 {
         return "/usr/bin:/bin".to_string();

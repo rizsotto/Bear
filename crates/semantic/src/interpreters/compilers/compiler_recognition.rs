@@ -1181,6 +1181,9 @@ mod tests {
         let recognizer = CompilerRecognizer::with_probe(hints, probe);
 
         assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::compiler("cray_cc")));
+        // SAFETY: probe_ptr points into the Box<FakeProbe> owned by recognizer,
+        // which is alive and not moved here. calls() takes &self and only reads
+        // an atomic.
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0, "hint must short-circuit the probe");
     }
@@ -1212,6 +1215,9 @@ mod tests {
         let recognizer = CompilerRecognizer::with_probe(hints, probe);
 
         assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::compiler("gcc")));
+        // SAFETY: probe_ptr points into the Box<FakeProbe> owned by recognizer,
+        // which is alive and not moved here. calls() takes &self and only reads
+        // an atomic.
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0, "hint must short-circuit the probe");
     }
@@ -1229,6 +1235,9 @@ mod tests {
             let _ = recognizer.recognize(path(name));
         }
 
+        // SAFETY: probe_ptr points into the Box<FakeProbe> owned by recognizer,
+        // which is alive and not moved here. calls() takes &self and only reads
+        // an atomic.
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0, "only AMBIGUOUS_NAMES should ever reach the probe");
     }
@@ -1253,6 +1262,9 @@ mod tests {
         assert_eq!(recognizer.recognize(path("sccache")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("icecc")), Some(CompilerType::Wrapper));
 
+        // SAFETY: probe_ptr points into the Box<FakeProbe> owned by recognizer,
+        // which is alive and not moved here. calls() takes &self and only reads
+        // an atomic.
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0);
     }
@@ -1344,6 +1356,9 @@ mod tests {
         let sut = recognizer.recognize(&link);
 
         assert_eq!(sut, Some(CompilerType::compiler("gcc")));
+        // SAFETY: probe_ptr points into the Box<FakeProbe> owned by recognizer,
+        // which is alive and not moved here. calls() takes &self and only reads
+        // an atomic.
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 1, "the masquerade link must be probed exactly once, as invoked");
     }

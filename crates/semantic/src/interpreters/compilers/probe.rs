@@ -266,6 +266,10 @@ mod unix {
             // the caller's terminal session, and under the parallel probe
             // tests it gave intermittent misclassification (3 of 8 runs
             // failed, against 0 of 13 with setsid).
+            // SAFETY: the closure runs in the forked child before exec. It
+            // calls only setsid(), which is async-signal-safe, and builds an
+            // io::Error from errno without allocating. It touches no locks or
+            // shared state.
             unsafe {
                 cmd.pre_exec(|| {
                     if libc::setsid() == -1 {
