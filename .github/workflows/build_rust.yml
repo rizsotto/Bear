@@ -2,13 +2,14 @@ name: rust CI
 
 on:
   push:
+    branches: [master, next]
   pull_request:
 
 env:
   CARGO_TERM_COLOR: always
   # Keep identical to the typos version the devcontainer installs.
   TYPOS_VERSION: 1.51.1
-  # cargo-deny rejects unknown deny.toml keys, and keys change between releases.
+  # Keep identical to the cargo-deny version in .deny.toml.
   CARGO_DENY_VERSION: 0.20.2
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
           toolchain: stable
           components: clippy,rustfmt
       - run: cargo fmt -- --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --locked -- -D warnings
 
   compile:
     name: Compile
@@ -36,7 +37,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - run: cargo build --verbose --release
+      - run: cargo build --verbose --release --locked
 
   test:
     name: Test
@@ -67,8 +68,8 @@ jobs:
           sudo apt-get install -y ccache
       - name: Run integration tests
         run: |
-          cargo build --verbose
-          cargo test --verbose
+          cargo build --verbose --locked
+          cargo test --verbose --locked
         env:
           RUST_LOG: debug
 
@@ -83,8 +84,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Run integration tests
         run: |
-          cargo build --verbose
-          cargo test --verbose
+          cargo build --verbose --locked
+          cargo test --verbose --locked
         env:
           RUST_LOG: debug
 
@@ -120,7 +121,7 @@ jobs:
           export "CC_${target_lower}=$ndk_bin/${{ matrix.clang }}"
           export "AR_${target_lower}=$ndk_bin/llvm-ar"
           export "CARGO_TARGET_${target_upper}_LINKER=$ndk_bin/${{ matrix.clang }}"
-          cargo build --verbose --release --target ${{ matrix.target }}
+          cargo build --verbose --release --target ${{ matrix.target }} --locked
 
   doc:
     name: Generate Documentation
@@ -130,9 +131,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - run: cargo doc --no-deps
+      - run: cargo doc --no-deps --locked
 
-  spellcheck:
+  spell-check:
     name: Spell Check Documentation
     runs-on: ubuntu-latest
     steps:
@@ -142,8 +143,8 @@ jobs:
           tool: typos@${{ env.TYPOS_VERSION }}
       - run: typos
 
-  audit:
-    name: Audit
+  dependency-policy-check:
+    name: Dependency policy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -154,4 +155,4 @@ jobs:
         with:
           tool: cargo-deny@${{ env.CARGO_DENY_VERSION }}
       - name: Run Cargo Deny
-        run: cargo deny check advisories licenses bans sources
+        run: cargo deny check licenses bans sources

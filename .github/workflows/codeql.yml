@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: '23 4 * * 1'
 
+env:
+  CARGO_TERM_COLOR: always
+  # Keep identical to the cargo-deny version in .deny.toml.
+  CARGO_DENY_VERSION: 0.20.2
+
 permissions:
   contents: read
 
@@ -39,7 +44,21 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
       - if: matrix.build-mode == 'manual'
-        run: cargo build -p intercept-preload
+        run: cargo build -p intercept-preload --locked
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:${{ matrix.language }}
+
+  advisories:
+    name: Advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@${{ env.CARGO_DENY_VERSION }}
+      - name: Run Cargo Deny
+        run: cargo deny check advisories

@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# Written for cargo-deny 0.20.2. cargo-deny rejects unknown keys, and keys
+# change between releases, so CI pins this version (CARGO_DENY_VERSION in
+# build_rust.yml and codeql.yml). Bump all three together.
+
 # Every dependency is statically linked into GPL-3.0-or-later binaries,
 # so each one has to carry a GPL-3.0-compatible license. CI gates on
 # this because the alternative is finding out from a distribution

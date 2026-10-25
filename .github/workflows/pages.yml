@@ -2,6 +2,7 @@ name: docs site
 
 on:
   push:
+    branches: [master, next]
   pull_request:
 
 env:
