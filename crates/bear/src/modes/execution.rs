@@ -3,10 +3,10 @@
 use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
 use crate::output::AtomicFile;
-use crossbeam_channel::{Receiver, bounded, unbounded};
 use intercept_supervisor::SuperviseError;
 use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use thiserror::Error;
 
 /// A type-erased error carried across the pipeline seam.
@@ -15,6 +15,15 @@ use thiserror::Error;
 /// precise error type internally and boxes it here at the trait boundary, so
 /// the traits do not force every implementation onto one shared error type.
 pub type DynError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Backpressure here would slow the build: a full channel stops the
+/// collector from accepting reports. The room is large enough that only a
+/// consumer far behind the build ever blocks it.
+const INTERCEPT_CHANNEL_CAPACITY: usize = 1024;
+
+/// Replay reads from a file or a pipe, so backpressure costs nothing and keeps memory
+/// use low.
+const REPLAY_CHANNEL_CAPACITY: usize = 10;
 
 /// A trait for consuming events from a channel-based stream.
 ///
@@ -59,7 +68,7 @@ pub trait Producer: Send + Sync {
     /// # Returns
     /// * `Ok(())` - All items were successfully produced
     /// * `Err(DynError)` - An error occurred during production
-    fn produce(&self, sender: crossbeam_channel::Sender<intercept::Execution>) -> Result<(), DynError>;
+    fn produce(&self, sender: SyncSender<intercept::Execution>) -> Result<(), DynError>;
 }
 
 /// A trait for cancelling ongoing operations.
@@ -139,7 +148,7 @@ impl Interceptor {
     /// * `Ok(ExitCode::SUCCESS)` - All operations completed successfully
     /// * `Err(RuntimeError)` - An error occurred in any component
     pub fn run(self, command: BuildCommand) -> Result<ExitCode, RuntimeError> {
-        let (sender, receiver) = unbounded::<intercept::Execution>();
+        let (sender, receiver) = sync_channel::<intercept::Execution>(INTERCEPT_CHANNEL_CAPACITY);
 
         // Inject the initial command as the first execution
         let _ = sender.send(execution_from_build_command(&command));
@@ -209,10 +218,7 @@ impl Replayer {
     /// * `Ok(ExitCode::SUCCESS)` - All events were successfully replayed
     /// * `Err(RuntimeError)` - An error occurred during replay (most likely IO error)
     pub fn run(self) -> Result<ExitCode, RuntimeError> {
-        // Using bounded channel to reduce memory usage and implement backpressure.
-        // This is possible with replay mode, because the source is a file. While this
-        // is not possible with intercept mode, because that would slow the build process.
-        let (sender, receiver) = bounded::<intercept::Execution>(10);
+        let (sender, receiver) = sync_channel::<intercept::Execution>(REPLAY_CHANNEL_CAPACITY);
 
         let producer_thread = {
             let producer = self.producer;
@@ -319,7 +325,7 @@ mod tests {
     }
 
     impl Producer for MockCancellableProducer {
-        fn produce(&self, sender: crossbeam_channel::Sender<intercept::Execution>) -> Result<(), DynError> {
+        fn produce(&self, sender: SyncSender<intercept::Execution>) -> Result<(), DynError> {
             if self.should_fail_produce {
                 return Err(Box::new(std::io::Error::new(
                     std::io::ErrorKind::ConnectionRefused,
@@ -458,6 +464,34 @@ mod tests {
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Consumer(_)));
+    }
+
+    #[test]
+    fn test_replayer_producer_stops_when_consumer_drops_receiver_mid_stream() {
+        // More events than the channel holds, so the producer blocks in send
+        // until the consumer drops its receiver.
+        let mut producer_mock = MockProducer::new();
+        producer_mock.expect_produce().times(1).returning(|sender| {
+            for _ in 0..(REPLAY_CHANNEL_CAPACITY * 5) {
+                if sender.send(create_test_execution("/usr/bin/gcc")).is_err() {
+                    return Ok(());
+                }
+            }
+            panic!("the consumer dropped its receiver, so a send must fail");
+        });
+
+        let mut consumer_mock = MockConsumer::new();
+        consumer_mock.expect_consume().times(1).returning(|receiver| {
+            receiver.recv().expect("first event");
+            Err(Box::new(WriterError::Io(
+                std::path::PathBuf::new(),
+                SerializationError::Io(std::io::Error::other("Test failure")),
+            )))
+        });
+
+        let sut = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock)).run();
+
+        assert!(matches!(sut, Err(RuntimeError::Consumer(_))));
     }
 
     #[test]

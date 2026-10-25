@@ -247,7 +247,6 @@ mod impls {
         AtomicFile, ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError,
     };
     use crate::{args, config, output, parse_sh};
-    use crossbeam_channel::{Receiver, Sender};
     use intercept_supervisor::CollectorOnTcp;
     use intercept_supervisor::SuperviseError;
     use semantic::CompilerHints;
@@ -256,6 +255,7 @@ mod impls {
     use std::path::PathBuf;
     use std::process::ExitStatus;
     use std::sync::Arc;
+    use std::sync::mpsc::{Receiver, SyncSender};
     use std::{fs, io};
     use thiserror::Error;
 
@@ -270,7 +270,7 @@ mod impls {
     }
 
     impl execution::Producer for TcpEventProducer {
-        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
+        fn produce(&self, destination: SyncSender<intercept::Execution>) -> Result<(), DynError> {
             for execution in self.source.executions() {
                 match execution {
                     Ok(execution) => {
@@ -367,7 +367,7 @@ mod impls {
         /// empty stream stays a success (an empty database is a valid
         /// output) but is reported on stderr, since it is almost always a
         /// plumbing mistake.
-        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
+        fn produce(&self, destination: SyncSender<intercept::Execution>) -> Result<(), DynError> {
             let source: Box<dyn io::Read> = if super::is_stdio(&self.path) {
                 Box::new(io::stdin().lock())
             } else {
@@ -458,7 +458,7 @@ mod impls {
         /// longest logical line. Skipped lines are logged as warnings;
         /// when every non-empty line was skipped, the run fails so the
         /// caller does not exit successfully having emitted nothing.
-        fn produce(&self, destination: Sender<intercept::Execution>) -> Result<(), DynError> {
+        fn produce(&self, destination: SyncSender<intercept::Execution>) -> Result<(), DynError> {
             let input: Box<dyn io::BufRead> = if super::is_stdio(&self.path) {
                 Box::new(io::stdin().lock())
             } else {

@@ -86,7 +86,6 @@ name = "bear"
 version = "4.2.3"
 dependencies = [
  "clap",
- "crossbeam-channel",
  "glob",
  "intercept",
  "intercept-supervisor",
@@ -326,15 +325,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "crossbeam-channel"
-version = "0.5.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98b0cc327b5bc766e7fda9c9260cc0fa81b43a8e240440422dff70788e3f9ef1"
-dependencies = [
- "crossbeam-utils",
 ]
 
 [[package]]

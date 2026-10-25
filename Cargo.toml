@@ -22,7 +22,6 @@ anyhow = "1.0"
 serde = { version = "1.0", default-features = false, features = ["derive", "std"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 serde-saphyr = { version = "2.0", default-features = false, features = ["deserialize", "serialize"] }
-crossbeam-channel = { version = "0.5", default-features = false, features = ["std"] }
 clap = { version = "4.6", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
 clap_complete = { version = "4.6", default-features = false }
 log = { version = "0.4", default-features = false, features = ["std"] }
