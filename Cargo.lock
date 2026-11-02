@@ -83,7 +83,7 @@ checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "bear"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "clap",
  "glob",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "bear-completions"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "bear",
  "clap_complete",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "bear-driver"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "anyhow",
  "bear",
@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "bear-test-tools"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -134,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "bear-wrapper"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "anyhow",
  "intercept",
@@ -291,7 +291,7 @@ checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
 name = "compilers-codegen"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "anyhow",
  "insta",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "integration-tests"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -602,7 +602,7 @@ dependencies = [
 
 [[package]]
 name = "intercept"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "compilers-codegen",
  "env_logger",
@@ -616,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "intercept-preload"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "cc",
  "ctor",
@@ -631,7 +631,7 @@ dependencies = [
 
 [[package]]
 name = "intercept-supervisor"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "intercept",
  "libc",
@@ -747,7 +747,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "platform-checks"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "cc",
  "tempfile",
@@ -950,7 +950,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "semantic"
-version = "4.2.3"
+version = "4.2.4"
 dependencies = [
  "compilers-codegen",
  "intercept",
