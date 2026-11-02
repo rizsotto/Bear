@@ -158,8 +158,12 @@ consumer_cdb() {
 
         # Feed the entry to clang-tidy. A single real check forces a full parse;
         # `-p <cdb-dir>` makes it read Bear's recorded command for this file.
+        # `-Wno-error` undoes a recorded `-Werror`: the target is only warning-free
+        # under GCC, so a clang warning promoted to an error says nothing about
+        # the database (seen on the kernel, built with CONFIG_WERROR=y).
         _cc_diag="$(clang-tidy --checks='-*,bugprone-assert-side-effect' \
-            --allow-no-checks -p "$_cc_cdbdir" "$_cc_file" 2>&1)"
+            --allow-no-checks --extra-arg=-Wno-error \
+            -p "$_cc_cdbdir" "$_cc_file" 2>&1)"
 
         # The verdict is the presence of front-end `error:` diagnostics. None =>
         # the AST built (warnings are expected on a gcc TU and are ignored). Any

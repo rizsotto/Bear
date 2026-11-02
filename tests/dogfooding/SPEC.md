@@ -404,7 +404,9 @@ reports their failures as "N errors" with a non-zero exit even when the AST buil
 perfectly (every curl TU "built the AST" yet reported up to 60 such bogus
 errors), making its exit code useless as a database-validity signal. clang-tidy
 with no lint check does a pure parse, so the only `error:` diagnostics are
-genuine front-end errors.
+genuine front-end errors. The consumer also passes `--extra-arg=-Wno-error`: a
+recorded `-Werror` (the kernel's `CONFIG_WERROR=y`) would promote clang-only
+warnings on a gcc-clean TU to errors, which says nothing about the database.
 
 Categorization (keyed on clang-tidy's `error:` diagnostics):
 
