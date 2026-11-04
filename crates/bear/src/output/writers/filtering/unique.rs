@@ -29,11 +29,6 @@ pub(crate) struct DuplicateEntryFilter {
     hash_values: HashSet<u64>,
 }
 
-// SAFETY: the struct owns only a Vec of plain config enum values and a
-// HashSet<u64>. It holds no Rc, raw pointer or thread-affine state, so moving
-// it to another thread is sound.
-unsafe impl Send for DuplicateEntryFilter {}
-
 impl DuplicateEntryFilter {
     fn unique(&mut self, entry: &Entry) -> bool {
         let hash = self.hash_function(entry);
