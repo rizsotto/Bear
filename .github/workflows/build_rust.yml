@@ -18,26 +18,23 @@ permissions:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: clippy,rustfmt
-      - run: cargo fmt -- --check
+      - if: runner.os == 'Linux'
+        run: cargo fmt -- --check
       - run: cargo clippy --all-targets --locked -- -D warnings
-
-  compile:
-    name: Compile
-    runs-on: ubuntu-latest
-    needs: [lint]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - run: cargo build --verbose --release --locked
 
   test:
     name: Test
@@ -55,7 +52,6 @@ jobs:
           - os: ubuntu-26.04-arm
             toolchain: stable
     runs-on: ${{ matrix.os }}
-    needs: [lint]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -66,28 +62,37 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ccache
-      - name: Run integration tests
-        run: |
-          cargo build --verbose --locked
-          cargo test --verbose --locked
+      - run: cargo build --locked
+      - run: cargo test --locked
         env:
           RUST_LOG: debug
 
   test-musl:
-    name: Test (Alpine, musl)
+    name: Test (alpine-latest, apk rust)
     runs-on: ubuntu-latest
-    needs: [lint]
     container: alpine:latest
     steps:
       - name: Install build dependencies
         run: apk add --no-cache git build-base lld rust cargo ccache
       - uses: actions/checkout@v7
-      - name: Run integration tests
+      - name: Expose rust toolchain versions
         run: |
-          cargo build --verbose --locked
-          cargo test --verbose --locked
+          cargo --version
+          rustc --version
+      - run: cargo build --verbose --locked
+      - run: cargo test --verbose --locked
         env:
           RUST_LOG: debug
+
+  compile:
+    name: Compile (ubuntu-latest, stable, release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: cargo build --release --locked
 
   compile-android:
     name: Compile (Android, ${{ matrix.target }}, API ${{ matrix.api }})
@@ -106,7 +111,6 @@ jobs:
             api: 24
             clang: armv7a-linux-androideabi24-clang
     runs-on: ubuntu-latest
-    needs: [lint]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
