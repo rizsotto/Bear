@@ -39,6 +39,10 @@ include!(concat!(env!("OUT_DIR"), "/wrappers.rs"));
 /// compiler, or wrapper-of-wrapper (e.g. `ccache distcc gcc`). The Err
 /// arm lets the caller surface `RecognizeResult::NotRecognized` without
 /// re-cloning the execution.
+#[allow(
+    clippy::result_large_err,
+    reason = "Err hands the input back by move; Execution only exceeds the limit on Windows"
+)]
 pub(super) fn unwrap(
     execution: Execution,
     recognizer: &CompilerRecognizer,

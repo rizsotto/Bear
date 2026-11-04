@@ -504,7 +504,7 @@ fn is_executable_file(path: &Path) -> bool {
     #[cfg(not(unix))]
     {
         // On Windows, assume .exe files are executable, others might be scripts
-        path.extension().map_or(false, |ext| ext == EXE_EXTENSION)
+        path.extension().is_some_and(|ext| ext == EXE_EXTENSION)
     }
 }
 
