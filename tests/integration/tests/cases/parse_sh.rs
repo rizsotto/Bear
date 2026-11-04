@@ -16,6 +16,10 @@ use crate::fixtures::*;
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
 
+/// The captured build trees in these tests do not exist on the test host, so
+/// the missing-source filter is turned off.
+const KEEP_MISSING_SOURCES_CONFIG: &str = "schema: '4.2'\n\nsources:\n  only_existing_files: false\n";
+
 /// A real `make -n` capture of zlib 1.3.1's build (77 lines; 34 compile
 /// commands among the gcc/ar/mv/mkdir/ln/subshell/redirect noise). See
 /// `tests/integration/tests/fixtures/data/zlib.make-n.sh`.
@@ -34,6 +38,7 @@ const ZLIB_SH_W: &str = include_str!("../fixtures/data/zlib.make-n-w.sh");
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_stdin_default_writes_default_database() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_stdin_default")?;
+    env.create_source_files(&[("foo.c", "")])?;
     let temp_dir = env.test_dir().to_str().unwrap();
 
     let result = env.run_bear_with_stdin(&["parse-sh"], b"gcc -c foo.c\n")?;
@@ -61,7 +66,7 @@ fn parse_sh_stdin_default_writes_default_database() -> Result<()> {
 fn parse_sh_file_input_and_output() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_file_io")?;
 
-    env.create_source_files(&[("build.sh", "gcc -c foo.c\n")])?;
+    env.create_source_files(&[("build.sh", "gcc -c foo.c\n"), ("foo.c", "")])?;
 
     let result = env.run_bear(&["parse-sh", "-i", "build.sh", "-o", "db.json"])?;
     result.assert_success()?;
@@ -83,6 +88,7 @@ fn parse_sh_file_input_and_output() -> Result<()> {
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_stdout_streaming_emits_database() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_stdout_streaming")?;
+    env.create_source_files(&[("foo.c", "")])?;
 
     let result = env.run_bear_with_stdin(&["parse-sh", "--output", "-"], b"gcc -c foo.c\n")?;
     result.assert_success()?;
@@ -124,6 +130,7 @@ fn parse_sh_stdout_streaming_rejects_append() -> Result<()> {
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_append_merges_databases() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_append")?;
+    env.create_source_files(&[("a.c", ""), ("b.c", "")])?;
 
     let first = env.run_bear_with_stdin(&["parse-sh"], b"gcc -c a.c\n")?;
     first.assert_success()?;
@@ -156,6 +163,9 @@ duplicates:
     - directory
     - file
     - arguments
+
+sources:
+  only_existing_files: false
 "#;
 
     let env = TestEnvironment::new("parse_sh_config_dedup")?;
@@ -345,6 +355,7 @@ fn parse_sh_skip_summary_counts_lines_not_segments() -> Result<()> {
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_leading_assignment_reaches_semantic_as_environment() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_environment")?;
+    env.create_source_files(&[("foo.c", "")])?;
 
     let script = b"CPATH=/opt/include gcc -c foo.c -o foo.o >/dev/null 2>&1\n";
     let result = env.run_bear_with_stdin(&["parse-sh"], script)?;
@@ -466,16 +477,71 @@ fn parse_sh_empty_input_exits_zero_with_warning() -> Result<()> {
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_directory_flag_sets_entry_directory() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_directory_flag")?;
+    let config_path = env.create_config(KEEP_MISSING_SOURCES_CONFIG)?;
+    let config_path = config_path.to_str().context("config path is not valid UTF-8")?;
 
     // The default path format records paths as-is without touching the
-    // filesystem, so a directory that only existed where the log was
-    // captured is fine.
-    let result = env.run_bear_with_stdin(&["parse-sh", "--directory", "/custom/build"], b"gcc -c foo.c\n")?;
+    // filesystem, but the missing-source filter does look at it, so a log
+    // captured elsewhere needs that filter off.
+    let result = env.run_bear_with_stdin(
+        &["-c", config_path, "parse-sh", "--directory", "/custom/build"],
+        b"gcc -c foo.c\n",
+    )?;
     result.assert_success()?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
     assert_eq!(db.entries()[0]["directory"], "/custom/build");
+
+    Ok(())
+}
+
+// Requirements: interception-shell-text-parsing, output-missing-source-filter
+//
+// With the filter on (the default), a log whose sources are absent gives an
+// empty database, and the run says why instead of staying silent.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_log_with_absent_sources_reports_empty_database() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_absent_sources")?;
+    env.create_source_files(&[("build.log", "gcc -c a.c\n")])?;
+
+    let sut = env.run_bear(&["parse-sh", "-i", "build.log", "-C", "/home/you/project"])?;
+
+    sut.assert_success()?;
+    env.load_compilation_database("compile_commands.json")?.assert_count(0)?;
+    let stderr = sut.stderr();
+    assert!(
+        stderr.contains("dropped because their source file is missing")
+            && stderr.contains("sources.only_existing_files"),
+        "expected the ERROR line naming the key; got:\n{stderr}"
+    );
+
+    Ok(())
+}
+
+// Requirements: interception-shell-text-parsing, output-missing-source-filter
+//
+// The documented way to read a log from another machine: the filter off
+// through `--config`, with and without `-C`.
+#[test]
+#[cfg(has_executable_compiler_c)]
+fn parse_sh_log_from_another_machine_with_filter_off() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_another_machine")?;
+    env.create_source_files(&[("build.log", "gcc -c a.c\n")])?;
+    let config = env.create_config("schema: \"4.2\"\nsources:\n  only_existing_files: false\n")?;
+    let config = config.to_str().context("config path is not valid UTF-8")?;
+
+    let sut = env.run_bear(&["--config", config, "parse-sh", "-i", "build.log"])?;
+    sut.assert_success()?;
+    env.load_compilation_database("compile_commands.json")?.assert_count(1)?;
+
+    let sut =
+        env.run_bear(&["--config", config, "parse-sh", "-i", "build.log", "-C", "/home/you/project"])?;
+    sut.assert_success()?;
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    assert_eq!(db.entries()[0]["directory"], "/home/you/project");
 
     Ok(())
 }
@@ -528,8 +594,10 @@ fn assert_all_entries_use_gcc(db: &CompilationDatabase) -> Result<()> {
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_zlib_capture_writes_default_deduped_database() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_zlib_default")?;
+    let config_path = env.create_config(KEEP_MISSING_SOURCES_CONFIG)?;
+    let config_path = config_path.to_str().context("config path is not valid UTF-8")?;
 
-    let result = env.run_bear_with_stdin(&["parse-sh"], ZLIB_SH.as_bytes())?;
+    let result = env.run_bear_with_stdin(&["-c", config_path, "parse-sh"], ZLIB_SH.as_bytes())?;
     result.assert_success()?;
     let stderr = result.stderr();
     assert!(stderr.contains("skipped"), "stderr must report the skip: {stderr}");
@@ -559,8 +627,10 @@ fn parse_sh_zlib_capture_writes_default_deduped_database() -> Result<()> {
 #[cfg(has_executable_compiler_c)]
 fn parse_sh_zlib_make_n_w_capture_records_marker_directory() -> Result<()> {
     let env = TestEnvironment::new("parse_sh_zlib_make_n_w")?;
+    let config_path = env.create_config(KEEP_MISSING_SOURCES_CONFIG)?;
+    let config_path = config_path.to_str().context("config path is not valid UTF-8")?;
 
-    let result = env.run_bear_with_stdin(&["parse-sh"], ZLIB_SH_W.as_bytes())?;
+    let result = env.run_bear_with_stdin(&["-c", config_path, "parse-sh"], ZLIB_SH_W.as_bytes())?;
     result.assert_success()?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
@@ -595,8 +665,10 @@ gcc -c b.c
 ";
 
     let env = TestEnvironment::new("parse_sh_recursive_make_directory")?;
+    let config_path = env.create_config(KEEP_MISSING_SOURCES_CONFIG)?;
+    let config_path = config_path.to_str().context("config path is not valid UTF-8")?;
 
-    let result = env.run_bear_with_stdin(&["parse-sh"], SCRIPT.as_bytes())?;
+    let result = env.run_bear_with_stdin(&["-c", config_path, "parse-sh"], SCRIPT.as_bytes())?;
     result.assert_success()?;
 
     let db = env.load_compilation_database("compile_commands.json")?;

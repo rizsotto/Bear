@@ -135,12 +135,22 @@ pub struct FileRule {
 ///
 /// **Important**: For matching to work correctly, rule paths/patterns should use the same
 /// format as configured in `format.paths.file`. This consistency is the user's responsibility.
-#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct SourceFilter {
+    /// Drop entries whose source file is known to be missing from the file system.
+    /// Enabled by default.
+    #[serde(default = "default_enabled")]
+    pub only_existing_files: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub directories: Vec<DirectoryRule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<FileRule>,
+}
+
+impl Default for SourceFilter {
+    fn default() -> Self {
+        Self { only_existing_files: true, directories: vec![], files: vec![] }
+    }
 }
 
 /// Duplicate filter configuration matching the YAML format.

@@ -1226,6 +1226,9 @@ fn append_to_large_database_stays_within_budget() -> Result<()> {
     std::fs::write(env.test_dir().join("compile_commands.json"), existing)?;
 
     env.create_source_files(&[("new.c", "int main() { return 0; }")])?;
+    for i in 0..n {
+        std::fs::write(env.test_dir().join(format!("file_{i}.c")), "")?;
+    }
     let cmd = format!("{} -c new.c -o new.o", filename_of(COMPILER_C_PATH));
     let script_path = env.create_shell_script("build.sh", &cmd)?;
 

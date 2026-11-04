@@ -125,7 +125,7 @@ fn build_filtered_stack<Base: IteratorWriter<crate::output::clang::Entry>>(
     let synthesizer = HeaderEntrySynthesizer::new(unique_writer, config.headers.clone(), Arc::clone(&stats));
     let source_filter_writer = FilteredOutputWriter::new(
         synthesizer,
-        SourceEntryFilter::from(config.sources.clone()),
+        SourceEntryFilter::from(config.sources.clone()).with_statistics(Arc::clone(&stats)),
         Arc::clone(&stats),
         |s| &s.entries_filtered_by_source,
     );
@@ -242,7 +242,10 @@ mod tests {
     fn test_create_pipeline_writes_entries() {
         let dir = tempfile::tempdir().unwrap();
         let output_path = dir.path().join("compile_commands.json");
-        let config = config::Main::default();
+        let config = config::Main {
+            sources: config::SourceFilter { only_existing_files: false, ..Default::default() },
+            ..Default::default()
+        };
         let args = args::BuildSemantic { path: output_path.clone(), append: false };
         let stats = OutputStatistics::new();
 
@@ -267,7 +270,10 @@ mod tests {
     fn test_create_pipeline_deduplicates_entries() {
         let dir = tempfile::tempdir().unwrap();
         let output_path = dir.path().join("compile_commands.json");
-        let config = config::Main::default();
+        let config = config::Main {
+            sources: config::SourceFilter { only_existing_files: false, ..Default::default() },
+            ..Default::default()
+        };
         let args = args::BuildSemantic { path: output_path.clone(), append: false };
         let stats = OutputStatistics::new();
 
@@ -292,6 +298,7 @@ mod tests {
         let output_path = dir.path().join("compile_commands.json");
         let config = config::Main {
             sources: config::SourceFilter {
+                only_existing_files: false,
                 directories: vec![config::DirectoryRule {
                     path: std::path::PathBuf::from("/usr/include"),
                     action: config::DirectoryAction::Exclude,

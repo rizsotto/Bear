@@ -119,6 +119,7 @@ fn error_when_the_output_cannot_be_written() -> Result<()> {
         return Ok(());
     }
     let env = TestEnvironment::new("diagnostics_write_error")?;
+    env.create_source_files(&[("a.c", "")])?;
 
     let sut = run(&env, &["parse-sh", "--output", "/dev/full"], b"gcc -c a.c\n", false)?;
 
@@ -131,6 +132,7 @@ fn error_when_the_output_cannot_be_written() -> Result<()> {
 fn warning_when_previous_entries_cannot_be_read() -> Result<()> {
     let env = TestEnvironment::new("diagnostics_append_warning")?;
     invalid_existing_database(&env)?;
+    env.create_source_files(&[("a.c", "")])?;
 
     let sut =
         run(&env, &["parse-sh", "--append", "--output", "compile_commands.json"], b"gcc -c a.c\n", true)?;
@@ -151,10 +153,13 @@ fn warning_when_previous_entries_are_empty_or_truncated() -> Result<()> {
     use std::process::{Command, Stdio};
     use std::time::{Duration, Instant};
 
-    let one_entry = r#"[ {"directory": "/", "file": "/b.c", "arguments": ["gcc", "-c", "/b.c"]} ,"#;
-    for (content, count) in [("", 1), ("[", 1), (one_entry, 2)] {
+    for (content, count) in [("", 1), ("[", 1), ("ONE_ENTRY", 2)] {
         let env = TestEnvironment::new("diagnostics_append_truncated")?;
-        env.create_source_files(&[("compile_commands.json", content)])?;
+        let dir = env.test_dir().to_str().context("test dir is UTF-8")?.replace('\\', "/");
+        let one_entry =
+            format!(r#"[ {{"directory": "{dir}", "file": "b.c", "arguments": ["gcc", "-c", "b.c"]}} ,"#);
+        let content = if content == "ONE_ENTRY" { one_entry.as_str() } else { content };
+        env.create_source_files(&[("compile_commands.json", content), ("a.c", ""), ("b.c", "")])?;
 
         // Spawned with a deadline: the reader used to loop on EOF forever.
         let mut child = Command::new(env.bear_path())

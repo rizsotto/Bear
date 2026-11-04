@@ -220,6 +220,7 @@ mod test {
                 Compiler { path: PathBuf::from("/usr/bin/clang++"), as_: None, ignore: false },
             ],
             sources: SourceFilter {
+                only_existing_files: true,
                 directories: vec![
                     DirectoryRule {
                         path: PathBuf::from("/opt/project/sources"),
@@ -268,7 +269,7 @@ mod test {
             schema: String::from("4.2"),
             intercept: Intercept::Wrapper,
             compilers: vec![],
-            sources: SourceFilter { directories: vec![], files: vec![] },
+            sources: SourceFilter { only_existing_files: true, directories: vec![], files: vec![] },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::Directory, OutputFields::File] },
             format: Format {
                 paths: PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
@@ -301,7 +302,7 @@ mod test {
             schema: String::from("4.2"),
             intercept: Intercept::Preload,
             compilers: vec![],
-            sources: SourceFilter { directories: vec![], files: vec![] },
+            sources: SourceFilter { only_existing_files: true, directories: vec![], files: vec![] },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::Directory, OutputFields::File] },
             format: Format {
                 paths: PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
@@ -341,6 +342,23 @@ mod test {
         };
 
         assert_eq!(expected, result);
+    }
+
+    // Requirements: output-missing-source-filter
+    #[test]
+    fn test_only_existing_files_key() {
+        let cases: Vec<(&str, bool)> = vec![
+            ("schema: 4.2\n", true),
+            ("schema: 4.2\nsources:\n  directories: []\n", true),
+            ("schema: 4.2\nsources:\n  only_existing_files: true\n", true),
+            ("schema: 4.2\nsources:\n  only_existing_files: false\n", false),
+        ];
+
+        for (content, expected) in cases {
+            let sut: Main = Loader::from_reader(content.as_bytes()).unwrap();
+
+            assert_eq!(sut.sources.only_existing_files, expected, "content: {content:?}");
+        }
     }
 
     #[test]

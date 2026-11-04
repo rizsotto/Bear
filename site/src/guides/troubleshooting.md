@@ -128,7 +128,17 @@ Bear](../reference/configuration.md#duplicates) enumerates the fields
 There are two different causes, and they need different fixes.
 
 `--append` across runs carries forward entries from earlier
-invocations, including ones for files that no longer exist. Drop
+invocations, including ones for files that no longer exist. Trim them
+with a run that builds nothing:
+
+```sh
+bear --append -- true
+```
+
+Bear checks every entry it writes, old ones included, and drops those
+whose source file is gone. This relies on `sources.only_existing_files`,
+which is on by default (see the [configuration
+reference](../reference/configuration.md)). If a trim is not enough, drop
 `--append` and rebuild from clean to get a database with only the
 current build's entries:
 
@@ -145,8 +155,9 @@ A configure step inside a *single* Bear run is the other cause, and
 `--append` has nothing to do with it. `bear -- sh -c './configure &&
 make'`, or a Makefile that re-runs `configure` itself, puts the
 configure phase's throwaway compiles (`conftest.c` and friends) in the
-same output as the real build. Split the two, so the build run's output
-is the one that survives:
+same output as the real build. The trim run above removes those probe
+entries once the probe files are deleted. Or split the two, so the build
+run's output is the one that survives:
 
 ```sh
 bear -- ./configure

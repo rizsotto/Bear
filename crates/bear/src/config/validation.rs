@@ -196,6 +196,7 @@ mod tests {
     #[test]
     fn test_validate_source_filter_empty_paths() {
         let config = SourceFilter {
+            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Exclude },
@@ -217,6 +218,7 @@ mod tests {
     #[test]
     fn test_validate_source_filter_multiple_empty_paths() {
         let config = SourceFilter {
+            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Exclude },
@@ -239,6 +241,7 @@ mod tests {
     #[test]
     fn test_validate_source_filter_valid_config() {
         let config = SourceFilter {
+            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
@@ -254,6 +257,7 @@ mod tests {
     #[test]
     fn test_validate_source_filter_valid_file_rules() {
         let config = SourceFilter {
+            only_existing_files: true,
             directories: vec![],
             files: vec![
                 FileRule { pattern: "moc_*.cpp".to_string(), action: DirectoryAction::Exclude },
@@ -269,6 +273,7 @@ mod tests {
     #[test]
     fn test_validate_source_filter_empty_pattern() {
         let config = SourceFilter {
+            only_existing_files: true,
             directories: vec![],
             files: vec![FileRule { pattern: String::new(), action: DirectoryAction::Exclude }],
         };
@@ -288,6 +293,7 @@ mod tests {
     #[test]
     fn test_validate_source_filter_invalid_pattern() {
         let config = SourceFilter {
+            only_existing_files: true,
             directories: vec![],
             files: vec![FileRule { pattern: "moc_[.cpp".to_string(), action: DirectoryAction::Exclude }],
         };
@@ -305,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_validate_source_filter_empty_directories() {
-        let config = SourceFilter { directories: vec![], files: vec![] };
+        let config = SourceFilter { only_existing_files: true, directories: vec![], files: vec![] };
 
         let result = SourceFilter::validate(&config);
         assert!(result.is_ok());

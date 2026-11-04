@@ -48,10 +48,21 @@
 //! 6. **Compilation**: Each `glob::Pattern` is compiled once, when the filter is built from
 //!    configuration, not per entry. Configuration validation rejects patterns that fail to
 //!    compile before a filter is ever built from them.
+//!
+//! ## Missing-source check
+//!
+//! The rules above never touch the file system. When `only_existing_files` is on, an entry
+//! that the rules accept is also checked against the file system, and dropped when its
+//! source file is known to be missing. A relative `file` is resolved against the entry's
+//! `directory`. A file that cannot be checked (for example, access denied on a parent
+//! directory) is kept. The check runs last, so rejected entries cost no lookup.
 
 use crate::config::{DirectoryAction, SourceFilter};
 use crate::output::clang::Entry;
+use crate::output::statistics::OutputStatistics;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 // --- Source entry filter ---
 
@@ -76,12 +87,39 @@ pub(crate) struct SourceEntryFilter {
     config: SourceFilter,
     /// Filename-glob rules, compiled once from `config.files`.
     file_rules: Vec<CompiledFileRule>,
+    /// Where drops by the missing-source check are counted, when wired to a pipeline.
+    stats: Option<Arc<OutputStatistics>>,
 }
 
 impl SourceEntryFilter {
+    /// Counts the entries dropped by the missing-source check in `stats`.
+    pub(crate) fn with_statistics(mut self, stats: Arc<OutputStatistics>) -> Self {
+        self.stats = Some(stats);
+        self
+    }
+
     /// Determines whether a compilation database entry should be included.
     fn should_include(&self, entry: &Entry) -> bool {
-        self.should_include_path(&entry.file)
+        self.should_include_path(&entry.file) && self.source_not_missing(entry)
+    }
+
+    /// Checks that the source file is not known to be missing.
+    ///
+    /// Only `Ok(false)` from the file system counts as missing; an error means the
+    /// file could not be checked, and the entry is kept.
+    fn source_not_missing(&self, entry: &Entry) -> bool {
+        if !self.config.only_existing_files {
+            return true;
+        }
+        let path = entry.directory.join(&entry.file);
+        let present = path.try_exists().unwrap_or(true);
+        if !present {
+            log::debug!("Dropping entry whose source file is missing: {}", path.display());
+            if let Some(stats) = &self.stats {
+                stats.entries_dropped_missing_source.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        present
     }
 
     /// Determines whether a file path should be included based on the configured rules.
@@ -172,7 +210,7 @@ impl From<SourceFilter> for SourceEntryFilter {
             })
             .collect();
 
-        SourceEntryFilter { config, file_rules }
+        SourceEntryFilter { config, file_rules, stats: None }
     }
 }
 
@@ -190,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_empty_directories_accepts_all() {
-        let config = SourceFilter { directories: vec![], files: vec![] };
+        let config = SourceFilter { only_existing_files: false, directories: vec![], files: vec![] };
         let mut filter = SourceEntryFilter::from(config);
 
         assert!(filter.accept(&create_test_entry("any/path.c", "/project")));
@@ -201,6 +239,7 @@ mod tests {
     #[test]
     fn test_order_based_evaluation() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("src/test"), action: DirectoryAction::Exclude },
@@ -224,6 +263,7 @@ mod tests {
     #[test]
     fn test_no_match_accepts() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
@@ -240,6 +280,7 @@ mod tests {
     #[test]
     fn test_exact_path_matching() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("src/main.c"),
                 action: DirectoryAction::Exclude,
@@ -257,6 +298,7 @@ mod tests {
     #[test]
     fn test_prefix_matching() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
             files: vec![],
         };
@@ -273,6 +315,7 @@ mod tests {
     #[test]
     fn test_case_sensitivity_unix() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Exclude }],
             files: vec![],
         };
@@ -287,6 +330,7 @@ mod tests {
     #[test]
     fn test_case_sensitivity_windows() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Exclude }],
             files: vec![],
         };
@@ -301,6 +345,7 @@ mod tests {
     fn test_platform_separators() {
         #[cfg(unix)]
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("src/lib"),
                 action: DirectoryAction::Exclude,
@@ -310,6 +355,7 @@ mod tests {
 
         #[cfg(windows)]
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("src\\lib"),
                 action: DirectoryAction::Exclude,
@@ -336,6 +382,7 @@ mod tests {
     #[test]
     fn test_complex_scenario() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("."), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
@@ -415,7 +462,7 @@ mod tests {
         ];
 
         for case in cases {
-            let config = SourceFilter { directories: vec![], files: case.files };
+            let config = SourceFilter { only_existing_files: false, directories: vec![], files: case.files };
             let mut sut = SourceEntryFilter::from(config);
 
             let actual = sut.accept(&create_test_entry(case.path, "/project"));
@@ -429,6 +476,7 @@ mod tests {
     fn test_directory_and_file_rules_compose() {
         // Accepted by the directory rules, excluded by a file-pattern rule: dropped.
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
             files: vec![FileRule { pattern: "moc_*.cpp".to_string(), action: DirectoryAction::Exclude }],
         };
@@ -437,6 +485,7 @@ mod tests {
 
         // Excluded by the directory rules, accepted by the file-pattern rules: still dropped.
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("build"),
                 action: DirectoryAction::Exclude,
@@ -448,6 +497,7 @@ mod tests {
 
         // Accepted by both rule sets: included.
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
             files: vec![FileRule { pattern: "moc_*.cpp".to_string(), action: DirectoryAction::Exclude }],
         };
@@ -460,6 +510,7 @@ mod tests {
     #[test]
     fn test_file_pattern_windows_separator_matches_full_path() {
         let config = SourceFilter {
+            only_existing_files: false,
             directories: vec![],
             files: vec![FileRule {
                 pattern: "generated\\moc_window.cpp".to_string(),
@@ -470,5 +521,159 @@ mod tests {
 
         assert!(!sut.accept(&create_test_entry("generated\\moc_window.cpp", "/project")));
         assert!(sut.accept(&create_test_entry("other\\moc_window.cpp", "/project")));
+    }
+}
+
+#[cfg(test)]
+mod missing_source_tests {
+    use super::*;
+    use crate::output::writers::filtering::EntryFilter;
+    use tempfile::TempDir;
+
+    fn filter_with(
+        only_existing_files: bool,
+        directories: Vec<crate::config::DirectoryRule>,
+    ) -> SourceEntryFilter {
+        SourceEntryFilter::from(SourceFilter { only_existing_files, directories, files: vec![] })
+    }
+
+    fn entry(file: &str, directory: &Path) -> Entry {
+        Entry::from_arguments_str(file, vec!["gcc", "-c"], directory.to_str().unwrap(), None)
+    }
+
+    fn project() -> TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/existing.c"), "").unwrap();
+        dir
+    }
+
+    // Requirements: output-missing-source-filter
+    #[test]
+    fn test_missing_source_check() {
+        struct Case {
+            name: &'static str,
+            only_existing_files: bool,
+            file: &'static str,
+            absolute: bool,
+            expected: bool,
+        }
+
+        let cases = vec![
+            Case {
+                name: "existing absolute file is kept",
+                only_existing_files: true,
+                file: "src/existing.c",
+                absolute: true,
+                expected: true,
+            },
+            Case {
+                name: "missing absolute file is dropped",
+                only_existing_files: true,
+                file: "src/missing.c",
+                absolute: true,
+                expected: false,
+            },
+            Case {
+                name: "existing relative file is resolved against the directory",
+                only_existing_files: true,
+                file: "src/existing.c",
+                absolute: false,
+                expected: true,
+            },
+            Case {
+                name: "missing relative file is dropped",
+                only_existing_files: true,
+                file: "src/missing.c",
+                absolute: false,
+                expected: false,
+            },
+            Case {
+                name: "option off keeps a missing file",
+                only_existing_files: false,
+                file: "src/missing.c",
+                absolute: true,
+                expected: true,
+            },
+        ];
+
+        for case in cases {
+            let dir = project();
+            let mut sut = filter_with(case.only_existing_files, vec![]);
+            let file = if case.absolute {
+                dir.path().join(case.file).to_str().unwrap().to_string()
+            } else {
+                case.file.to_string()
+            };
+
+            let actual = sut.accept(&entry(&file, dir.path()));
+
+            assert_eq!(actual, case.expected, "case: {}", case.name);
+        }
+    }
+
+    // Requirements: output-missing-source-filter
+    #[test]
+    fn test_rules_run_before_the_file_system_check() {
+        use crate::config::{DirectoryAction, DirectoryRule};
+        let dir = project();
+        let rule = DirectoryRule { path: dir.path().join("src"), action: DirectoryAction::Exclude };
+        let mut sut = filter_with(true, vec![rule]);
+        let file = dir.path().join("src/existing.c");
+
+        let actual = sut.accept(&entry(file.to_str().unwrap(), dir.path()));
+
+        assert!(!actual);
+    }
+
+    // Requirements: output-missing-source-filter, output-generated-file-filter
+    #[test]
+    fn test_pattern_rules_compose_with_the_check() {
+        use crate::config::{DirectoryAction, FileRule};
+        let cases = vec![
+            ("pattern-excluded existing file", "src/existing.c", false),
+            ("pattern-accepted missing file", "src/missing.h", false),
+            ("pattern-accepted existing file", "src/other.c", true),
+        ];
+
+        for (name, file, expected) in cases {
+            let dir = project();
+            std::fs::write(dir.path().join("src/other.c"), "").unwrap();
+            let rules =
+                vec![FileRule { pattern: "existing.c".to_string(), action: DirectoryAction::Exclude }];
+            let stats = OutputStatistics::new();
+            let mut sut = SourceEntryFilter::from(SourceFilter {
+                only_existing_files: true,
+                directories: vec![],
+                files: rules,
+            })
+            .with_statistics(Arc::clone(&stats));
+
+            let actual = sut.accept(&entry(file, dir.path()));
+
+            assert_eq!(actual, expected, "case: {name}");
+            let counted = stats.entries_dropped_missing_source.load(Ordering::Relaxed);
+            assert_eq!(counted, usize::from(file == "src/missing.h"), "case: {name}");
+        }
+    }
+
+    // Requirements: output-missing-source-filter
+    #[cfg(unix)]
+    #[test]
+    fn test_unreadable_parent_keeps_the_entry() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = project();
+        let locked = dir.path().join("src");
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let denied = locked.join("existing.c").try_exists().is_err();
+        let mut sut = filter_with(true, vec![]);
+
+        let actual = sut.accept(&entry("src/existing.c", dir.path()));
+
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Root bypasses permissions: the file is found, so the check proves nothing.
+        if denied {
+            assert!(actual);
+        }
     }
 }

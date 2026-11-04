@@ -407,7 +407,13 @@ fn semantic_database_entry_set_is_order_independent() -> Result<()> {
         .collect();
     let forward = events.join("\n") + "\n";
     let reverse = events.iter().rev().cloned().collect::<Vec<_>>().join("\n") + "\n";
-    env.create_source_files(&[("forward.json", &forward), ("reverse.json", &reverse)])?;
+    env.create_source_files(&[
+        ("forward.json", &forward),
+        ("reverse.json", &reverse),
+        ("a.c", ""),
+        ("b.c", ""),
+        ("c.c", ""),
+    ])?;
 
     env.run_bear_success(&["semantic", "--input", "forward.json", "--output", "forward_db.json"])?;
     env.run_bear_success(&["semantic", "--input", "reverse.json", "--output", "reverse_db.json"])?;
@@ -438,7 +444,7 @@ fn semantic_msvc_environment_words_keep_compiler_first() -> Result<()> {
         "working_dir": temp_dir,
         "environment": { "CL": "/O2 /W4", "_CL_": "/DX" }
     });
-    env.create_source_files(&[("events.json", &format!("{event}\n"))])?;
+    env.create_source_files(&[("events.json", &format!("{event}\n")), ("foo.c", "")])?;
 
     env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
@@ -468,7 +474,7 @@ fn semantic_msvc_environment_words_keep_backslashes() -> Result<()> {
         "working_dir": temp_dir,
         "environment": { "CL": r"/IC:\foo /W4" }
     });
-    env.create_source_files(&[("events.json", &format!("{event}\n"))])?;
+    env.create_source_files(&[("events.json", &format!("{event}\n")), ("foo.c", "")])?;
 
     env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
@@ -989,7 +995,9 @@ fn msvc_glued_output_flags_survive_and_set_output_field() -> Result<()> {
 
     env.create_source_files(&[("events.json", &event.to_string())])?;
     let config_path = env.test_dir().join("config.yaml");
-    std::fs::write(&config_path, output_field_config())?;
+    // The source is a Windows path that cannot exist on this host.
+    let config = format!("{}\nsources:\n  only_existing_files: false\n", output_field_config());
+    std::fs::write(&config_path, config)?;
 
     // act
     env.run_bear_success(&[
@@ -1388,6 +1396,9 @@ fn output_flag_keeps_the_spelling_the_build_used() -> Result<()> {
         .join("\n");
 
     env.create_source_files(&[("events.json", &events)])?;
+    for (_, _, source, _) in &cases {
+        env.create_source_files(&[(source, "")])?;
+    }
     let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, output_field_config())?;
 
@@ -1854,6 +1865,41 @@ fn vala_multiple_sources_produce_single_entry() -> Result<()> {
             "c.vala".to_string(),
         ]
     ))?;
+
+    Ok(())
+}
+
+// Requirements: output-compilation-entries, output-missing-source-filter
+//
+// An entry that stands for a whole valac invocation is kept or dropped as a
+// unit, by the one source in its `file` field: the first one.
+#[test]
+fn vala_single_unit_entry_is_checked_by_its_first_source() -> Result<()> {
+    // (case, files on disk, expected files in the database)
+    let cases: Vec<(&str, Vec<&str>, Vec<&str>)> = vec![
+        ("first source missing", vec!["b.vala", "c.vala"], vec![]),
+        ("first source present, others missing", vec!["a.vala"], vec!["a.vala"]),
+    ];
+
+    for (name, on_disk, expected) in cases {
+        let env = TestEnvironment::new("vala_unit_missing_source")?;
+        let event = json!({
+            "executable": "valac",
+            "arguments": ["valac", "--pkg", "gio-2.0", "a.vala", "b.vala", "c.vala"],
+            "working_dir": env.test_dir().to_str().unwrap(),
+            "environment": {}
+        });
+        env.create_source_files(&[("events.json", &event.to_string())])?;
+        for file in on_disk {
+            env.create_source_files(&[(file, "void main() { }")])?;
+        }
+
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+        let sut = env.load_compilation_database("compile_commands.json")?;
+        let files: Vec<&str> = sut.entries().iter().filter_map(|e| e["file"].as_str()).collect();
+        assert_eq!(files, expected, "case: {name}");
+    }
 
     Ok(())
 }

@@ -182,7 +182,9 @@ accepted together with `--append`.
 **-C, \-\-directory** *DIR*
 : Initial working directory for the parsed commands. Use it for input
 captured elsewhere (a CI log, a dry run from another checkout). Give an
-absolute path; the directory need not exist on this machine.
+absolute path. With the default `sources.only_existing_files: true`,
+entries whose sources are missing on this machine are dropped; set it to
+`false` for a log from another machine (see CONFIGURATION).
 
 The commands recognized in the text go through the same semantic
 analysis and output stage as an intercepted build, so the configuration
@@ -212,11 +214,14 @@ and `PATH` used to resolve bare executable names are the parse-time
 ones, not the real build's; and only POSIX `sh` text is supported.
 Prefer `bear -- <build command>` whenever the build can actually be run.
 
-The source files named in the parsed commands need not exist: entries
-are reconstructed from the text alone. The one exception is the
-`canonical` path format, which resolves symlinks on disk; when the
-sources are absent, configure `absolute` instead (see `format.paths`
-under CONFIGURATION).
+Entries are reconstructed from the text alone, but the output filters
+still see this machine's file system. With the default
+`sources.only_existing_files: true`, a log whose sources are absent gives
+an empty database, and Bear logs an error saying so. Set
+`sources.only_existing_files` to `false` to read a log from another
+machine. The `canonical` path format also needs the sources present,
+because it resolves symlinks on disk; when the sources are absent,
+configure `absolute` instead (see `format.paths` under CONFIGURATION).
 
 
 # OUTPUT
@@ -283,6 +288,7 @@ compilers:
   - path: /usr/local/bin/gcc
     ignore: true
 sources:
+  only_existing_files: true  # default
   directories:
     - path: /project/tests
       action: exclude
@@ -379,6 +385,16 @@ compilers:
 
 Filters entries by source file location and filename.
 
+- **only_existing_files**: Drop an entry whose source file is known to be
+missing from the file system. The default is `true`. A relative `file` is
+checked against the entry's `directory`. A file that cannot be checked
+(for example, access to a parent directory is denied) is kept. The check
+runs when each entry is written, so in combined mode a file the build
+deletes after compiling it is usually kept, while in semantic and parse-sh
+mode it is dropped. With the `relative` directory format, `directory` is
+written as `.`, so the check looks under the directory Bear runs in.
+Entries read with `--append` are checked the same way, so
+`bear --append -- true` trims entries for files that are gone.
 - **directories**: List of directory-based rules, each with a **path**
 and an **action** (`include` or `exclude`).
 - **files**: List of filename-glob rules, each with a **pattern** and an

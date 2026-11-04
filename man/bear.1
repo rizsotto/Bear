@@ -187,7 +187,10 @@ Not accepted together with \f[CR]\-\-append\f[R].
 Initial working directory for the parsed commands.
 Use it for input captured elsewhere (a CI log, a dry run from another
 checkout).
-Give an absolute path; the directory need not exist on this machine.
+Give an absolute path.
+With the default \f[CR]sources.only_existing_files: true\f[R], entries
+whose sources are missing on this machine are dropped; set it to
+\f[CR]false\f[R] for a log from another machine (see CONFIGURATION).
 .PP
 The commands recognized in the text go through the same semantic
 analysis and output stage as an intercepted build, so the configuration
@@ -224,11 +227,16 @@ only POSIX \f[CR]sh\f[R] text is supported.
 Prefer \f[CR]bear \-\- <build command>\f[R] whenever the build can
 actually be run.
 .PP
-The source files named in the parsed commands need not exist: entries
-are reconstructed from the text alone.
-The one exception is the \f[CR]canonical\f[R] path format, which
-resolves symlinks on disk; when the sources are absent, configure
-\f[CR]absolute\f[R] instead (see \f[CR]format.paths\f[R] under
+Entries are reconstructed from the text alone, but the output filters
+still see this machine\(cqs file system.
+With the default \f[CR]sources.only_existing_files: true\f[R], a log
+whose sources are absent gives an empty database, and Bear logs an error
+saying so.
+Set \f[CR]sources.only_existing_files\f[R] to \f[CR]false\f[R] to read a
+log from another machine.
+The \f[CR]canonical\f[R] path format also needs the sources present,
+because it resolves symlinks on disk; when the sources are absent,
+configure \f[CR]absolute\f[R] instead (see \f[CR]format.paths\f[R] under
 CONFIGURATION).
 .SH OUTPUT
 Bear writes a JSON compilation database conforming to the Clang JSON
@@ -297,6 +305,7 @@ compilers\f[B]:\f[R]
   \f[B]\-\f[R] path\f[B]:\f[R] /usr/local/bin/gcc
     ignore\f[B]:\f[R] true
 sources\f[B]:\f[R]
+  only_existing_files\f[B]:\f[R] true\f[I]  # default\f[R]
   directories\f[B]:\f[R]
     \f[B]\-\f[R] path\f[B]:\f[R] /project/tests
       action\f[B]:\f[R] exclude
@@ -399,6 +408,23 @@ compilers\f[B]:\f[R]
 .EE
 .SS sources
 Filters entries by source file location and filename.
+.IP \(bu 2
+\f[B]only_existing_files\f[R]: Drop an entry whose source file is known
+to be missing from the file system.
+The default is \f[CR]true\f[R].
+A relative \f[CR]file\f[R] is checked against the entry\(cqs
+\f[CR]directory\f[R].
+A file that cannot be checked (for example, access to a parent directory
+is denied) is kept.
+The check runs when each entry is written, so in combined mode a file
+the build deletes after compiling it is usually kept, while in semantic
+and parse\-sh mode it is dropped.
+With the \f[CR]relative\f[R] directory format, \f[CR]directory\f[R] is
+written as \f[CR].\f[R], so the check looks under the directory Bear
+runs in.
+Entries read with \f[CR]\-\-append\f[R] are checked the same way, so
+\f[CR]bear \-\-append \-\- true\f[R] trims entries for files that are
+gone.
 .IP \(bu 2
 \f[B]directories\f[R]: List of directory\-based rules, each with a
 \f[B]path\f[R] and an \f[B]action\f[R] (\f[CR]include\f[R] or

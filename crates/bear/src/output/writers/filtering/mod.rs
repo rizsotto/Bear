@@ -105,6 +105,7 @@ mod tests {
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();
         let filter = SourceEntryFilter::from(config::SourceFilter {
+            only_existing_files: false,
             directories: vec![
                 config::DirectoryRule {
                     path: std::path::PathBuf::from("src"),

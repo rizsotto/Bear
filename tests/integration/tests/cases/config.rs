@@ -144,6 +144,7 @@ sources:
 
 /// Test source file filtering
 /// Verifies only_existing_files configuration option
+// Requirements: output-missing-source-filter
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -190,7 +191,6 @@ sources:
     // Only existing.c should be in the output
     let db = env.load_compilation_database("compile_commands.json")?;
 
-    // Verify that we have entries and at least one is for existing.c
     let expected_args = vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "existing.c".to_string()];
 
     let matcher = CompilationEntryMatcher::new()
@@ -199,6 +199,191 @@ sources:
         .arguments(expected_args);
 
     db.assert_contains(&matcher)?;
+    db.assert_count(1)?;
+    assert!(
+        !db.entries().iter().any(|entry| entry["file"] == "nonexistent.c"),
+        "nonexistent.c must be dropped: {:?}",
+        db.entries()
+    );
+
+    Ok(())
+}
+
+/// Writes `events.json` with one compile event per source, run from the test directory.
+fn write_compile_events(env: &TestEnvironment, sources: &[&str]) -> Result<()> {
+    use serde_json::json;
+
+    let directory = env.test_dir().to_str().unwrap().to_string();
+    let events: Vec<String> = sources
+        .iter()
+        .map(|source| {
+            json!({
+                "executable": "gcc",
+                "arguments": ["gcc", "-c", source],
+                "working_dir": directory,
+                "environment": {}
+            })
+            .to_string()
+        })
+        .collect();
+    env.create_source_files(&[("events.json", &(events.join("\n") + "\n"))])
+}
+
+fn files_in(db: &CompilationDatabase) -> Vec<String> {
+    let mut files: Vec<String> =
+        db.entries().iter().filter_map(|entry| entry["file"].as_str().map(String::from)).collect();
+    files.sort();
+    files
+}
+
+/// With no setting, the option is on: the entry for the missing file is dropped.
+/// With the option off, both entries stay.
+// Requirements: output-missing-source-filter
+#[test]
+#[cfg(target_family = "unix")]
+fn missing_source_filter_default_on_and_switchable() -> Result<()> {
+    let cases: Vec<(&str, Option<&str>, Vec<&str>)> = vec![
+        ("no setting", None, vec!["existing.c"]),
+        ("option on", Some("true"), vec!["existing.c"]),
+        ("option off", Some("false"), vec!["existing.c", "missing.c"]),
+    ];
+
+    for (name, setting, expected) in cases {
+        let env = TestEnvironment::new("missing_source_switch")?;
+        env.create_source_files(&[("existing.c", "int main(void) { return 0; }")])?;
+        write_compile_events(&env, &["existing.c", "missing.c"])?;
+        let mut args = vec!["semantic", "--input", "events.json", "--output", "compile_commands.json"];
+        let config_path;
+        if let Some(value) = setting {
+            let config = format!("schema: \"4.2\"\n\nsources:\n  only_existing_files: {value}\n");
+            config_path = env.create_config(&config)?;
+            args.splice(0..0, ["--config", config_path.to_str().unwrap()]);
+        }
+
+        env.run_bear_success(&args)?;
+
+        let sut = env.load_compilation_database("compile_commands.json")?;
+        assert_eq!(files_in(&sut), expected, "case: {name}");
+    }
+
+    Ok(())
+}
+
+/// A relative `file` is checked against the entry's directory, not Bear's own directory.
+// Requirements: output-missing-source-filter
+#[test]
+#[cfg(target_family = "unix")]
+fn missing_source_filter_resolves_relative_file_against_directory() -> Result<()> {
+    let env = TestEnvironment::new("missing_source_relative")?;
+    // The file exists only under `project/`, and Bear runs in the parent.
+    env.create_source_files(&[("project/inside.c", "int main(void) { return 0; }")])?;
+    let directory = env.test_dir().join("project");
+    let event = serde_json::json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "inside.c"],
+        "working_dir": directory.to_str().unwrap(),
+        "environment": {}
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    assert_eq!(files_in(&sut), ["inside.c"]);
+
+    Ok(())
+}
+
+/// When invalid and missing-source drops empty the database, one ERROR names both causes.
+// Requirements: output-missing-source-filter, output-json-compilation-database
+#[test]
+#[cfg(target_family = "unix")]
+fn empty_database_from_invalid_and_missing_entries_reports_one_error() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("empty_invalid_and_missing")?;
+    let invalid = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "bogus.c"],
+        "working_dir": "",
+        "environment": {}
+    });
+    let missing = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "missing.c"],
+        "working_dir": env.test_dir().to_str().unwrap(),
+        "environment": {}
+    });
+    // The invalid entry's source exists, so the source filter keeps it for validation to drop.
+    env.create_source_files(&[("events.json", &format!("{invalid}\n{missing}\n")), ("bogus.c", "")])?;
+
+    let output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    env.load_compilation_database("compile_commands.json")?.assert_count(0)?;
+    let errors: Vec<String> =
+        output.stderr().lines().filter(|l| l.contains("ERROR")).map(String::from).collect();
+    assert_eq!(errors.len(), 1, "expected exactly one ERROR line; got: {errors:?}");
+    assert!(
+        errors[0].contains("invalid: 1")
+            && errors[0].contains("source file missing: 1")
+            && errors[0].contains("sources.only_existing_files"),
+        "the ERROR must name both causes and the key: {}",
+        errors[0]
+    );
+
+    Ok(())
+}
+
+/// Entries read from an existing database are checked like new ones.
+// Requirements: output-missing-source-filter, output-append
+#[test]
+#[cfg(target_family = "unix")]
+fn missing_source_filter_applies_to_appended_entries() -> Result<()> {
+    let env = TestEnvironment::new("missing_source_append")?;
+    env.create_source_files(&[("kept.c", ""), ("new.c", "")])?;
+    write_compile_events(&env, &["new.c"])?;
+    let directory = env.test_dir().to_str().unwrap().to_string();
+    let existing = serde_json::json!([
+        {"directory": directory, "file": "kept.c", "arguments": ["gcc", "-c", "kept.c"]},
+        {"directory": directory, "file": "removed.c", "arguments": ["gcc", "-c", "removed.c"]},
+    ]);
+    env.create_source_files(&[("compile_commands.json", &existing.to_string())])?;
+
+    env.run_bear_success(&[
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+        "--append",
+    ])?;
+
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    assert_eq!(files_in(&sut), ["kept.c", "new.c"]);
+
+    Ok(())
+}
+
+/// The trim run: a build that runs no compiler, with `--append`, drops stale entries
+/// and keeps the valid ones.
+// Requirements: output-missing-source-filter, output-append
+#[test]
+#[cfg(has_executable_true)]
+fn trim_run_drops_stale_entries_and_keeps_valid_ones() -> Result<()> {
+    let env = TestEnvironment::new("missing_source_trim")?;
+    env.create_source_files(&[("valid.c", "")])?;
+    let directory = env.test_dir().to_str().unwrap().to_string();
+    let existing = serde_json::json!([
+        {"directory": directory, "file": "valid.c", "arguments": ["gcc", "-c", "valid.c"]},
+        {"directory": directory, "file": "stale.c", "arguments": ["gcc", "-c", "stale.c"]},
+    ]);
+    env.create_source_files(&[("compile_commands.json", &existing.to_string())])?;
+
+    env.run_bear_success(&["--append", "--output", "compile_commands.json", "--", TRUE_PATH])?;
+
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    assert_eq!(files_in(&sut), ["valid.c"]);
 
     Ok(())
 }
@@ -990,6 +1175,9 @@ format:
   paths:
     directory: canonical
     file: canonical
+
+sources:
+  only_existing_files: false
 "#;
     let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
@@ -1148,7 +1336,11 @@ fn invalid_entry_is_dropped_with_warning_not_fatal() -> Result<()> {
         "environment": {}
     });
     let events_content = format!("{}\n{}", event_invalid, event_valid);
-    env.create_source_files(&[("events.json", &events_content), ("main.c", "int main() { return 0; }")])?;
+    env.create_source_files(&[
+        ("events.json", &events_content),
+        ("main.c", "int main() { return 0; }"),
+        ("bogus.c", ""),
+    ])?;
 
     let output =
         env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
@@ -1190,7 +1382,7 @@ fn all_entries_dropped_emits_error_summary() -> Result<()> {
         "working_dir": "",
         "environment": {}
     });
-    env.create_source_files(&[("events.json", &event.to_string())])?;
+    env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "")])?;
 
     let output =
         env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
@@ -1485,7 +1677,7 @@ fn duplicate_filter_preserves_input_order() -> Result<()> {
     // disturbing the order of the survivors.
     events.insert(2, events[0].clone());
     let events_content = events.join("\n") + "\n";
-    env.create_source_files(&[("events.json", &events_content)])?;
+    env.create_source_files(&[("events.json", &events_content), ("a.c", ""), ("b.c", ""), ("c.c", "")])?;
 
     env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 

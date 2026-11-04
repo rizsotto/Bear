@@ -65,16 +65,28 @@ impl OutputWriter {
         // Log pipeline statistics
         log::info!("{}", self.stats);
 
-        // If every candidate entry was dropped as invalid, surface that
-        // at ERROR level so the empty compilation database is never silent.
-        // The per-entry WARN logs explain individual drops; this one
-        // explains the shape of the whole output.
-        let written = self.stats.entries_written.load(std::sync::atomic::Ordering::Relaxed);
-        let dropped = self.stats.entries_dropped_invalid.load(std::sync::atomic::Ordering::Relaxed);
-        if written == 0 && dropped > 0 {
-            log::error!(
-                "Compilation database is empty: all {dropped} candidate entries were dropped as invalid; see WARN log lines above for per-entry reasons",
-            );
+        // If nothing was written and entries were dropped as invalid or for a
+        // missing source file, surface that as one ERROR so the empty
+        // compilation database is never silent. The per-entry logs explain
+        // individual drops; this one explains the shape of the whole output.
+        let load =
+            |counter: &std::sync::atomic::AtomicUsize| counter.load(std::sync::atomic::Ordering::Relaxed);
+        let written = load(&self.stats.entries_written);
+        let invalid = load(&self.stats.entries_dropped_invalid);
+        let missing = load(&self.stats.entries_dropped_missing_source);
+        let filtered = load(&self.stats.entries_filtered_by_source);
+        if written == 0 && (invalid > 0 || (missing > 0 && missing == filtered)) {
+            match (invalid > 0, missing > 0) {
+                (true, false) => log::error!(
+                    "Compilation database is empty: all {invalid} candidate entries were dropped as invalid; see WARN log lines above for per-entry reasons",
+                ),
+                (false, _) => log::error!(
+                    "Compilation database is empty: all {missing} candidate entries were dropped because their source file is missing; set sources.only_existing_files to false to keep them",
+                ),
+                (true, true) => log::error!(
+                    "Compilation database is empty: all candidate entries were dropped (invalid: {invalid}, source file missing: {missing}); see WARN log lines above for per-entry reasons, and set sources.only_existing_files to false to keep entries whose source file is missing",
+                ),
+            }
         }
 
         result
@@ -127,7 +139,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let output_path = dir.path().join("compile_commands.json");
         let args = args::BuildSemantic { path: output_path.clone(), append: false };
-        let config = config::Main::default();
+        let config = config::Main {
+            sources: config::SourceFilter { only_existing_files: false, ..Default::default() },
+            ..Default::default()
+        };
 
         let writer = OutputWriter::try_from((&args, &config)).unwrap();
 

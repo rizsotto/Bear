@@ -82,6 +82,7 @@ regardless of this section.
 
 ```yaml
 sources:
+  only_existing_files: true
   directories:
     - path: /project/tests
       action: exclude
@@ -90,8 +91,17 @@ sources:
       action: exclude
 ```
 
-Default: `{}` (both lists empty; nothing is filtered out).
+Default: `only_existing_files: true` and both lists empty.
 
+- **`sources.only_existing_files`**: drop an entry whose source file is
+  known to be missing from the file system. A relative `file` is checked
+  against the entry's `directory`. A file that cannot be checked (for
+  example, access to a parent directory is denied) is kept. The check
+  runs when each entry is written, so in combined mode a file the build
+  deletes after compiling it is usually kept, while in semantic and
+  parse-sh mode it is dropped. With the `relative` directory format,
+  `directory` is written as `.`, so the check looks under the directory
+  Bear runs in. Entries read with `--append` are checked the same way.
 - **`sources.directories.path`**, **`sources.directories.action`**: list
   of directory rules; `action` is `include` or `exclude`.
 - **`sources.files.pattern`**, **`sources.files.action`**: list of

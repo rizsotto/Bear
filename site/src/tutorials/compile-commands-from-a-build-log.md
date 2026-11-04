@@ -119,6 +119,9 @@ directly instead of only delegating, which the
 [Makefile recipe](../guides/recipes/compile-commands-for-makefile.md) covers in
 more detail.
 
+For a log from a machine whose sources are not here, see [a log that
+came from another machine](../guides/recipes/dry-run-capture.md#a-log-that-was-captured-without-these-flags).
+
 ## Limits of reconstructing from text
 
 `parse-sh` reconstructs commands from what a build system chose to

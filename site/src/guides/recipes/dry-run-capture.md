@@ -210,6 +210,22 @@ machine or another checkout:
 bear parse-sh -i build.log -C /home/you/project
 ```
 
+A log from another machine names sources that are not on this one, and
+Bear drops entries whose source file is missing. Turn that off with
+`sources.only_existing_files` (see the [configuration
+reference](../../reference/configuration.md#sources)), in a config file
+that starts with `schema: "4.2"`:
+
+```yaml
+schema: "4.2"
+sources:
+  only_existing_files: false
+```
+
+```sh
+bear --config keep-missing.yml parse-sh -i build.log -C /home/you/project
+```
+
 [Recover compile_commands.json from a build
 log](../../tutorials/compile-commands-from-a-build-log.md) walks a
 handed-over log end to end.

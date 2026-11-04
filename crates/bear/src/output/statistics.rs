@@ -29,7 +29,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 ///   `entries_dropped_invalid` (unresolvable directory)
 /// - **AppendClangOutputWriter**: `entries_read_from_existing`
 /// - **UniqueOutputWriter**: `duplicates_detected`
-/// - **SourceFilterOutputWriter**: `entries_filtered_by_source`
+/// - **SourceFilterOutputWriter**: `entries_filtered_by_source`, and
+///   `entries_dropped_missing_source` for the existence check
 /// - **HeaderEntrySynthesizer**: entries_synthesized
 /// - **ValidatingOutputWriter**: `entries_dropped_invalid`
 /// - **ClangOutputWriter**: `entries_written`
@@ -49,6 +50,10 @@ pub struct OutputStatistics {
 
     /// Number of entries filtered out based on source file location rules.
     pub entries_filtered_by_source: AtomicUsize,
+
+    /// Number of entries dropped because their source file is known to be missing.
+    /// These are also counted in `entries_filtered_by_source`.
+    pub entries_dropped_missing_source: AtomicUsize,
 
     /// Number of header entries synthesized from a donor translation unit.
     pub entries_synthesized: AtomicUsize,
@@ -75,6 +80,7 @@ impl fmt::Display for OutputStatistics {
         let from_existing = self.entries_read_from_existing.load(Ordering::Relaxed);
         let duplicates = self.duplicates_detected.load(Ordering::Relaxed);
         let filtered = self.entries_filtered_by_source.load(Ordering::Relaxed);
+        let missing = self.entries_dropped_missing_source.load(Ordering::Relaxed);
         let synthesized = self.entries_synthesized.load(Ordering::Relaxed);
         let dropped_invalid = self.entries_dropped_invalid.load(Ordering::Relaxed);
         let written = self.entries_written.load(Ordering::Relaxed);
@@ -84,7 +90,7 @@ impl fmt::Display for OutputStatistics {
         writeln!(f, "  current entries: {}", produced)?;
         writeln!(f, "  previous entries: {}", from_existing)?;
         writeln!(f, "  filtered entries by duplicate: {}", duplicates)?;
-        writeln!(f, "  filtered entries by source: {}", filtered)?;
+        writeln!(f, "  filtered entries by source: {} (source file missing: {})", filtered, missing)?;
         writeln!(f, "  synthesized header entries: {}", synthesized)?;
         writeln!(f, "  dropped entries (invalid): {}", dropped_invalid)?;
         write!(f, "  total entries written: {}", written)
@@ -110,6 +116,7 @@ mod tests {
         stats.entries_read_from_existing.store(5, Ordering::Relaxed);
         stats.duplicates_detected.store(3, Ordering::Relaxed);
         stats.entries_filtered_by_source.store(2, Ordering::Relaxed);
+        stats.entries_dropped_missing_source.store(1, Ordering::Relaxed);
         stats.entries_synthesized.store(4, Ordering::Relaxed);
         stats.entries_dropped_invalid.store(1, Ordering::Relaxed);
         stats.entries_written.store(10, Ordering::Relaxed);
@@ -120,7 +127,7 @@ mod tests {
         assert!(output.contains("current entries: 15"));
         assert!(output.contains("previous entries: 5"));
         assert!(output.contains("filtered entries by duplicate: 3"));
-        assert!(output.contains("filtered entries by source: 2"));
+        assert!(output.contains("filtered entries by source: 2 (source file missing: 1)"));
         assert!(output.contains("synthesized header entries: 4"));
         assert!(output.contains("dropped entries (invalid): 1"));
         assert!(output.contains("total entries written: 10"));
