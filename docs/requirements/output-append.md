@@ -30,7 +30,8 @@ Bear run. When appending, Bear merges the new entries with the existing
   no build.
 - **Given** an existing database and a build that runs no compiler,
   **when** a run that is appending finishes, **then** the existing
-  entries are kept unchanged.
+  entries are kept unchanged, except those the output filters drop
+  (`output-missing-source-filter`).
 - **Given** an existing database that is not valid JSON, **when** a run
   that is appending finishes, **then** Bear logs a warning for the break,
   and one more for the entry the break is inside of, if any. The database
