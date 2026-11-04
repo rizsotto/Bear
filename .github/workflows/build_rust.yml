@@ -147,6 +147,15 @@ jobs:
           tool: typos@${{ env.TYPOS_VERSION }}
       - run: typos
 
+  coverage-check:
+    name: Requirements and crate-table coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: ./scripts/check-requirements-coverage.sh
+      - run: ./scripts/check-requirements-references.sh
+      - run: ./scripts/check-crate-table-coverage.sh
+
   dependency-policy-check:
     name: Dependency policy
     runs-on: ubuntu-latest
