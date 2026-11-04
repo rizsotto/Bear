@@ -265,18 +265,20 @@ impl DoctoredEnvironment {
     /// The method is called when `in_session` returned false, therefore the
     /// environment is not aligned with the preload mode settings. The result environment
     /// will be aligned with the preload mode settings based on the context.
-    pub fn from_envp(ctx: &SessionContext, envp: *const *const c_char) -> Result<Self, c_int> {
+    ///
+    /// # Safety
+    /// The `envp` pointer must be a valid null-terminated array of null-terminated
+    /// C strings in "KEY=VALUE" format, or null.
+    pub unsafe fn from_envp(ctx: &SessionContext, envp: *const *const c_char) -> Result<Self, c_int> {
         let mut strings = Vec::new();
         let mut original_preload_value: Option<String> = None;
 
         // Copy existing environment variables, skipping ones we'll set ourselves.
         // Uses envp_iter for consistent parsing and malformed-entry logging.
         if !envp.is_null() {
-            // SAFETY: envp is non-null (checked above). Its only caller,
-            // resolve_environment, passes one under its own # Safety contract.
-            // Every entry is copied into an owned CString inside the loop, so
-            // no borrow outlives the call. This fn is not marked unsafe, so the
-            // contract is not enforced by the type.
+            // SAFETY: envp is non-null (checked above) and this fn's # Safety
+            // gives the rest of envp_iter's contract. Every entry is copied into
+            // an owned CString inside the loop, so no borrow outlives the call.
             for (key, value, full_entry) in unsafe { envp_iter(envp) } {
                 #[cfg(target_os = "macos")]
                 let dominated_by_bear =
@@ -629,7 +631,8 @@ mod tests {
     fn test_doctored_environment_from_null_envp() {
         let ctx = create_test_ctx();
 
-        let result = DoctoredEnvironment::from_envp(&ctx, std::ptr::null());
+        // SAFETY: a null envp is allowed by from_envp's contract.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, std::ptr::null()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -644,7 +647,9 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user", "SHELL=/bin/sh"]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -662,7 +667,9 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -679,7 +686,9 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -699,7 +708,9 @@ mod tests {
             TestEnvp::new(&["PATH=/usr/bin", &existing_preload])
         };
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -727,7 +738,9 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -756,7 +769,9 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user"]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -826,7 +841,9 @@ mod tests {
         // Entry with value containing equals signs
         let envp = TestEnvp::new(&["MY_VAR=value=with=equals", "PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -865,7 +882,9 @@ mod tests {
         let ctx = create_test_ctx();
         let envp = TestEnvp::new(&[]);
 
-        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let result = unsafe { DoctoredEnvironment::from_envp(&ctx, envp.as_ptr()) };
         assert!(result.is_ok());
 
         let doctored = result.unwrap();

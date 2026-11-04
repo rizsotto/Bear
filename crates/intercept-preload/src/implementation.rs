@@ -620,7 +620,8 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     // Create the pipe, with O_CLOEXEC if requested via 'e' in mode.
     let mut pipe_fds: [c_int; 2] = [0; 2];
     let pipe_result = if cloexec {
-        create_pipe_cloexec(pipe_fds.as_mut_ptr())
+        // SAFETY: pipe_fds is a live local [c_int; 2].
+        unsafe { create_pipe_cloexec(pipe_fds.as_mut_ptr()) }
     } else {
         // SAFETY: pipe_fds is a live local [c_int; 2], which is what pipe(2)
         // writes to.
@@ -1065,7 +1066,9 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
                 ResolvedEnvironment::Original(envp)
             } else {
                 // Environment was modified, doctor it
-                match DoctoredEnvironment::from_envp(ctx, envp) {
+                // SAFETY: envp comes under this fn's # Safety contract, which
+                // is the same one from_envp needs.
+                match unsafe { DoctoredEnvironment::from_envp(ctx, envp) } {
                     Ok(doctored) => ResolvedEnvironment::Doctored(doctored),
                     Err(_) => ResolvedEnvironment::Original(envp),
                 }
@@ -1104,18 +1107,21 @@ fn get_environ() -> *const *const c_char {
 ///
 /// Uses `pipe2(O_CLOEXEC)` on platforms that support it (Linux, FreeBSD),
 /// falls back to `pipe()` + `fcntl(FD_CLOEXEC)` on macOS.
+///
+/// # Safety
+/// `fds` must point to a writable `[c_int; 2]`.
 #[cfg(all(has_symbol_popen, not(target_os = "android")))]
-fn create_pipe_cloexec(fds: *mut c_int) -> c_int {
+unsafe fn create_pipe_cloexec(fds: *mut c_int) -> c_int {
     #[cfg(not(target_os = "macos"))]
     {
-        // SAFETY: fds must point to a [c_int; 2] for pipe2. The only caller
-        // passes pipe_fds from rust_popen, which is a live local array of two.
+        // SAFETY: this fn's # Safety says fds points to a writable
+        // [c_int; 2], which is what pipe2 writes to.
         unsafe { libc::pipe2(fds, libc::O_CLOEXEC) }
     }
     #[cfg(target_os = "macos")]
     {
-        // SAFETY: fds must point to a [c_int; 2] for pipe. The only caller
-        // passes pipe_fds from rust_popen, which is a live local array of two.
+        // SAFETY: this fn's # Safety says fds points to a writable
+        // [c_int; 2], which is what pipe writes to.
         let ret = unsafe { libc::pipe(fds) };
         if ret != 0 {
             return ret;
