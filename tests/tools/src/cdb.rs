@@ -93,7 +93,7 @@ impl Entry {
 }
 
 /// A parsed compilation database.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct CompilationDatabase {
     pub entries: Vec<Entry>,
 }
@@ -184,7 +184,7 @@ impl Entry {
 /// The set of normalization operations to apply before comparison or
 /// serialization. Every field is off/empty by default; construct with
 /// [`Normalization::default`] and set only what a given comparison needs.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Normalization {
     /// Emit the database in a canonical entry order.
     pub sort: bool,

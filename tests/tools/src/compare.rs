@@ -27,7 +27,7 @@ pub struct DifferingEntry {
 }
 
 /// The outcome of comparing two databases.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct DiffReport {
     /// Entries present in A but absent from B (as a multiset).
     pub only_in_a: Vec<Entry>,

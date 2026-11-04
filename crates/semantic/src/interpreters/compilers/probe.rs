@@ -240,12 +240,6 @@ mod unix {
         }
     }
 
-    impl Default for VersionProbe {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
     impl CompilerProbe for VersionProbe {
         fn probe(&self, executable_path: &Path) -> Option<CompilerType> {
             let mut cmd = Command::new(executable_path);

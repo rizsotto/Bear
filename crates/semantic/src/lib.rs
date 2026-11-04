@@ -76,7 +76,7 @@ pub struct Command {
 }
 
 /// A compiler command-line argument with semantic classification.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Argument {
     /// Flags and other non-file arguments (e.g. `-c`, `-Wall`, `-I /usr/include`).
     Other { arguments: Vec<String>, kind: ArgumentKind },
@@ -202,7 +202,7 @@ pub enum CompilerPass {
 /// `source_mode:` key (default `per-source-stripped`). It is not used at
 /// parse time; the converter consumes it (post-parse).
 /// See the `output-compilation-entries` requirement for the full contract.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub enum SourceMode {
     /// Each source is a separable translation unit: the converter emits one
     /// entry per source, and each entry's arguments keep only that source

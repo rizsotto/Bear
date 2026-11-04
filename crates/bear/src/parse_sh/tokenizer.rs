@@ -24,7 +24,7 @@ use std::io;
 
 /// One token of the supported shell subset. Redirections and here-document
 /// bodies never appear: both are consumed inside the tokenizer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Word(Word),
     /// `;`, `&&`, `||`, `|`, or `&`: ends the current command.

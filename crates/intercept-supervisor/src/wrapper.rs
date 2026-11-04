@@ -121,20 +121,6 @@ fn normalize_executable_key(name: &str) -> String {
     }
 }
 
-impl Display for WrapperConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Collector address: {}", self.collector_address)?;
-        if self.executables.is_empty() {
-            write!(f, "No executables configured")
-        } else {
-            for (name, path) in self.executables.iter() {
-                writeln!(f, "    {} -> {}", name, path.display())?;
-            }
-            Ok(())
-        }
-    }
-}
-
 /// Reader for wrapper configurations.
 ///
 /// Handles deserialization of wrapper configurations from various input sources.

@@ -32,11 +32,3 @@ impl TryFrom<&str> for PreloadState {
         serde_json::from_str(value)
     }
 }
-
-impl TryFrom<String> for PreloadState {
-    type Error = serde_json::Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        serde_json::from_str(&value)
-    }
-}

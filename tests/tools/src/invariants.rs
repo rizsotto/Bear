@@ -64,7 +64,7 @@ pub struct Check {
 }
 
 /// The full invariants report for one database.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct InvariantsReport {
     pub pass: bool,
     pub checks: Vec<Check>,

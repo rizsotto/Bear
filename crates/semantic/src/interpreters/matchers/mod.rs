@@ -17,7 +17,7 @@ pub use source::{is_c_family_source, is_header_file, looks_like_a_source_file};
 
 /// Flag pattern definitions that describe HOW to consume arguments from the command line.
 /// These patterns define the syntactic structure of compiler flags and their arguments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub(super) enum FlagPattern {
     /// Match the flag exactly with specified number of required separate arguments: "-c", "-o file"
     /// The u32 represents how many additional arguments are required (0 for no additional args)
@@ -72,7 +72,7 @@ pub(super) struct FlagRule {
 /// Result of matching a flag against command line arguments.
 /// Contains only metadata (which rule matched and how many args it consumed),
 /// avoiding string clones in the matching phase.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct FlagMatch {
     /// The flag definition that matched
     pub rule: FlagRule,
@@ -240,7 +240,7 @@ pub(super) enum EnvPosition {
 }
 
 /// How an environment variable value maps to compiler arguments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub(super) enum EnvMapping {
     /// Split value by separator, emit `flag <entry>` per element.
     Flag { flag: &'static str, separator: EnvSeparator },
@@ -249,7 +249,7 @@ pub(super) enum EnvMapping {
 }
 
 /// A rule mapping an environment variable to compiler arguments.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct EnvRule {
     pub variable: &'static str,
     pub mapping: EnvMapping,

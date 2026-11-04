@@ -23,7 +23,7 @@ pub enum Kind {
 /// A new vendor variant of clang/gcc therefore gets correct ordering for
 /// free from the `extends` it needs for flag inheritance anyway -- there is
 /// no separate priority to set.
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct CompilerIdentity {
     pub id: String,
     #[serde(default)]
@@ -150,13 +150,13 @@ impl WrapperTable {
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct WrapperOption {
     #[serde(rename = "match")]
     pub match_: FlagMatch,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct RecognizeEntry {
     pub description: String,
     pub references: Vec<String>,
