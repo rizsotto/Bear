@@ -15,6 +15,14 @@ never set the key. The default of this filter does not depend on the
 append default: it is useful with overwrite too, and with appending as
 it works today.
 
+Parse-sh mode is the one place where on hurts: a log copied from
+another machine names sources that are not here, so its database comes
+out empty. A default that depends on the mode was considered and not
+chosen, since the same key would mean different things per run. The
+cost is that such users must turn the option off, and the run reports
+an error when every entry is dropped, so the empty output is never
+silent.
+
 In combined mode Bear writes entries while the build runs, so each
 entry is checked shortly after its compiler call starts. A file that
 the build deletes later, such as a `configure` probe, usually passes
@@ -40,7 +48,9 @@ The filter stays one step in the existing output pipeline. Results for
 files a build deletes differ between combined mode and semantic mode,
 and the documentation has to say so.
 
-Revisit if users report leftover entries that the trim run does not
+Revisit when Bear gains a run-wide way to say the input came from
+another machine: that switch should turn this check off. Also revisit
+if users report leftover entries that the trim run does not
 fix, or if the check turns out to be costly on slow file systems.
 
 ## References

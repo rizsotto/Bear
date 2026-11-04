@@ -42,6 +42,13 @@ writes the database. This is on by default.
   translation unit (`output-compilation-entries`), **when** the option
   is on, **then** the entry is kept or dropped as a unit, by the one
   source in its `file` field.
+- **Given** a parse-sh run on a log whose sources are not on this
+  machine, and the option on, **when** Bear writes the database,
+  **then** the database is an empty JSON array `[]`. The check applies
+  in every mode; turning the option off gives a full database.
+- **Given** a run where the check drops every candidate entry, **when**
+  Bear writes the database, **then** a single `ERROR` line reports that
+  every entry was dropped because its source file is missing.
 
 ## Non-functional constraints
 
@@ -58,6 +65,11 @@ writes the database. This is on by default.
   dropped. Existing entries read when appending are checked after the
   build in every mode, so an appending run with a build that runs no
   compiler trims them.
+- With the relative format for `directory` (`output-path-format`), the
+  directory is written as `.`, so the check looks for the file relative
+  to the directory Bear runs in. Entries compiled in another directory
+  are dropped even though their file exists. Run Bear from the build
+  directory, or turn the option off.
 
 ## Rationale
 

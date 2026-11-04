@@ -212,11 +212,13 @@ dry-run text itself. The man page must state them too.
   of scope. A saved full-build log works only as far as its lines are
   `sh` commands. Interleaved compiler output is skipped like any other
   unsupported line.
-- Whether a source file exists on the parsing machine does not change
-  the output: entries come from the text alone, so a log whose sources
-  are absent still gives a full database. The exception is the path
-  format that resolves paths against the real filesystem. It needs the
-  sources present. The man page names the alternative for that case.
+- Entries come from the text, but the output filters still see the
+  parsing machine's file system. With the missing-source filter on, the
+  default, a log whose sources are absent gives an empty database
+  (`output-missing-source-filter`); turning the filter off gives a full
+  one. The path format that resolves paths against the real filesystem
+  also needs the sources present. The man page names the alternative for
+  that case.
 
 ## Rationale
 
