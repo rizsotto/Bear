@@ -75,7 +75,9 @@ page and the known limitations below must say so.
 - A candidate's executable is the first word that is not a leading
   assignment, taken as written. Bare names stay bare.
 - A candidate's environment is the mode's own environment at parse time,
-  with that command's leading `VAR=value` words laid over it. It reaches
+  with that command's leading `VAR=value` words laid over it. When the
+  input is declared to come from another machine, the base is empty
+  and only those words count (`cli-input-from-another-machine`). It reaches
   semantic analysis as an intercepted execution's environment does,
   seen through [`output-env-derived-flags`](output-env-derived-flags.md).
 - **Given** the line `CPATH=/opt/include gcc -c foo.c -o foo.o >/dev/null 2>&1`
@@ -207,7 +209,10 @@ dry-run text itself. The man page must state them too.
   `PATH` used to resolve bare names are the mode's own at parse time and
   may differ from the real build's. A log from another machine implies a
   foreign environment and `PATH` that the mode cannot rebuild, even when
-  the caller sets the working directory.
+  the caller sets the working directory. Declaring the input as coming
+  from another machine keeps the mode's own environment out of the
+  entries, but does not rebuild the real one
+  (`cli-input-from-another-machine`).
 - Input is POSIX `sh` text only. Other shells and Windows `cmd` are out
   of scope. A saved full-build log works only as far as its lines are
   `sh` commands. Interleaved compiler output is skipped like any other
@@ -215,8 +220,9 @@ dry-run text itself. The man page must state them too.
 - Entries come from the text, but the output filters still see the
   parsing machine's file system. With the missing-source filter on, the
   default, a log whose sources are absent gives an empty database
-  (`output-missing-source-filter`); turning the filter off gives a full
-  one. The path format that resolves paths against the real filesystem
+  (`output-missing-source-filter`); turning the filter off, or declaring
+  the input as coming from another machine
+  (`cli-input-from-another-machine`), gives a full one. The path format that resolves paths against the real filesystem
   also needs the sources present. The man page names the alternative for
   that case.
 

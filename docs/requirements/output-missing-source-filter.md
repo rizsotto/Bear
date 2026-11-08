@@ -45,7 +45,9 @@ writes the database. This is on by default.
 - **Given** a parse-sh run on a log whose sources are not on this
   machine, and the option on, **when** Bear writes the database,
   **then** the database is an empty JSON array `[]`. The check applies
-  in every mode; turning the option off gives a full database.
+  in every mode; turning the option off gives a full database. When the
+  input is declared to come from another machine, the check is not
+  applied (`cli-input-from-another-machine`).
 - **Given** a run where the check drops every candidate entry, **when**
   Bear writes the database, **then** a single `ERROR` line reports that
   every entry was dropped because its source file is missing.

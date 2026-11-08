@@ -63,6 +63,8 @@ Bear records argv exactly as the build wrote it.
   Bear runs with inlining on, **then** the entry keeps `@flags.resp`
   literally, a warning names the missing file, and the other entries
   are written as usual. An unreadable file is handled the same way.
+- Inlining is rejected for input declared to come from another machine
+  (`cli-input-from-another-machine`).
 
 ## Non-functional constraints
 

@@ -18,10 +18,12 @@ it works today.
 Parse-sh mode is the one place where on hurts: a log copied from
 another machine names sources that are not here, so its database comes
 out empty. A default that depends on the mode was considered and not
-chosen, since the same key would mean different things per run. The
-cost is that such users must turn the option off, and the run reports
-an error when every entry is dropped, so the empty output is never
-silent.
+chosen, since the same key would mean different things per run.
+Such users declare the input as coming from another machine, which
+turns the check off
+([input-from-another-machine-switch](input-from-another-machine-switch.md)),
+or turn the option off. The run reports an error when every entry is
+dropped, so the empty output is never silent.
 
 In combined mode Bear writes entries while the build runs, so each
 entry is checked shortly after its compiler call starts. A file that
@@ -48,12 +50,11 @@ The filter stays one step in the existing output pipeline. Results for
 files a build deletes differ between combined mode and semantic mode,
 and the documentation has to say so.
 
-Revisit when Bear gains a run-wide way to say the input came from
-another machine: that switch should turn this check off. Also revisit
-if users report leftover entries that the trim run does not
+Revisit if users report leftover entries that the trim run does not
 fix, or if the check turns out to be costly on slow file systems.
 
 ## References
 
 - [output-missing-source-filter](../requirements/output-missing-source-filter.md), the requirement this supports
 - [output-append](../requirements/output-append.md), the behavior the trim run relies on
+- [input-from-another-machine-switch](input-from-another-machine-switch.md), the option that turns this check off

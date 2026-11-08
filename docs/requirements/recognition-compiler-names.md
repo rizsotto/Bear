@@ -65,7 +65,9 @@ name the build invoked, exactly as executed.
   file), **when** Bear runs in semantic mode,
   **then** the database holds one entry for `hello.f90`, parsed with
   Flang flag semantics, not GCC's. A configured family wins over the
-  family the name would otherwise get.
+  family the name would otherwise get. For input declared to come from
+  another machine, no path is resolved to find a match
+  (`cli-input-from-another-machine`).
 - **Given** an event file with a
   `swiftc -module-name App -emit-object a.swift b.swift` execution,
   **when** Bear runs in semantic mode, **then** the database holds two

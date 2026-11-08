@@ -54,7 +54,14 @@ because its answer depends on the name it was called by.
 - The user override is per-path and explicit: declaring a path under
   `compilers:` takes priority over the probe and is the only way to
   recover recognition for a quirky `cc` whose `--version` output the
-  probe cannot read. There is no process-wide off switch, by request.
+  probe cannot read. The probe has no off switch of its own. Input
+  declared to come from another machine skips it, because there the
+  local `cc` says nothing about the other machine's
+  ([input-from-another-machine-switch](input-from-another-machine-switch.md)).
+  Unconfigured ambiguous names are then parsed with the Clang table, a
+  deliberate exception to loud-not-wrong: Clang's table extends GCC's,
+  so the guess is wrong only for a GCC argument that spells a
+  Clang-only flag.
 - Caching per canonical path keeps the cost at one or two `fork+exec`
   pairs per clean build rather than per invocation. Masquerade links are the
   one exception: the canonical key would collapse different masquerade
@@ -76,4 +83,5 @@ because its answer depends on the name it was called by.
 ## References
 
 - [recognition-ambiguous-name-probe](../requirements/recognition-ambiguous-name-probe.md), the requirement this supports
+- [input-from-another-machine-switch](input-from-another-machine-switch.md), where the probe is skipped
 - [PR #695](https://github.com/rizsotto/Bear/pull/695), the per-invocation probe variant, not taken

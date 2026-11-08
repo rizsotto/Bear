@@ -49,7 +49,9 @@ override Bear's guess.
 - **Given** a `cc` whose `--version` output has no known signature (a
   custom wrapper with a vendor banner), **when** Bear recognizes it,
   **then** the probe declines, the execution is not classified, and it
-  yields no entry. Bear never falls back to a guess by name. The same
+  yields no entry. Bear never falls back to a guess by name. The one
+  exception is input declared to come from another machine, where no
+  probe runs (`cli-input-from-another-machine`). The same
   holds when the probe exits non-zero, cannot be started, or is not
   available on the platform.
 - **Given** Bear running with its preload library in the environment,

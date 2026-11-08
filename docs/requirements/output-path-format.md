@@ -70,6 +70,8 @@ Four formats are supported for each of the two fields:
   `/home/user/project/obj/main.o`, and `-I../include` is unchanged. The
   source and output paths in `arguments` always use the format of
   `file`.
+- The symlink-resolving format is rejected for input declared to come
+  from another machine (`cli-input-from-another-machine`).
 
 ## Non-functional constraints
 

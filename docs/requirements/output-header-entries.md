@@ -45,6 +45,8 @@ is off by default.
   entry (owned by `output-json-compilation-database`).
 - The set of file extensions that count as headers is built in. No
   configuration changes it.
+- Header entries are rejected for input declared to come from another
+  machine (`cli-input-from-another-machine`).
 
 ## Rationale
 
