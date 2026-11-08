@@ -85,7 +85,7 @@ target build type); all are pinned so the golden stays stable. An unpinned base
 would let a package update change the compiler under a fixed golden; an unpinned
 build type would change the recorded flags. Release is the default build type.
 
-Implementation: `targets/zlib/config.env` pins the fedora:44 base by digest, the
+Implementation: `targets/zlib/config.env` pins the fedora:45 base by digest, the
 zlib 1.3.1 tarball by URL + sha256, and `BUILD_TYPE=Release`
 (`CFLAGS="-O3 -DNDEBUG"`).
 
@@ -159,7 +159,7 @@ target updates; no hand-maintained baseline. The oracle target is curl (CMake-
 native, small); zlib stays the golden target (autotools).
 
 Implementation: `targets/curl/config.env` sets `VALIDATION=oracle` and pins the
-fedora:44 base by digest, curl 8.11.1 by URL + sha256, and `BUILD_TYPE=Release`.
+fedora:45 base by digest, curl 8.11.1 by URL + sha256, and `BUILD_TYPE=Release`.
 The in-container command (dogfood-fixed-paths) configures out-of-tree (source
 `/src`, build `/build`) with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` and the
 optional dependencies turned off (no TLS/nghttp2/zlib/zstd/brotli/psl/idn/ssh/
