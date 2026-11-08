@@ -171,15 +171,15 @@ impl Validator<PathFormat> for PathFormat {
     type Error = ValidationError;
 
     /// Validates the path format configuration according to the rules:
-    /// - When directory is relative, file must be relative too
+    /// - The relative format is not supported for directory
     /// - When directory is canonical, file can't be absolute
     /// - When directory is absolute, file can't be canonical
     fn validate(config: &PathFormat) -> Result<(), Self::Error> {
         use PathResolver::*;
 
         match (&config.directory, &config.file) {
-            (Relative, Absolute | Canonical) => Err(ValidationError::PathFormatError {
-                message: "When directory is relative, file must be relative too",
+            (Relative, _) => Err(ValidationError::PathFormatError {
+                message: "The relative format is not supported for format.paths.directory; use absolute",
             }),
             (Canonical, Absolute) => Err(ValidationError::PathFormatError {
                 message: "When directory is canonical, file can't be absolute",
@@ -487,7 +487,6 @@ mod tests {
     fn test_validate_path_format_success() {
         let valid_configs = vec![
             PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
-            PathFormat { directory: PathResolver::Relative, file: PathResolver::Relative },
             PathFormat { directory: PathResolver::Canonical, file: PathResolver::Relative },
             PathFormat { directory: PathResolver::Absolute, file: PathResolver::Relative },
             PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
@@ -498,16 +497,25 @@ mod tests {
         }
     }
 
+    // Requirements: output-path-format
     #[test]
     fn test_validate_path_format_failures() {
         let invalid_configs = vec![
             (
+                PathFormat { directory: PathResolver::Relative, file: PathResolver::AsIs },
+                "The relative format is not supported for format.paths.directory; use absolute",
+            ),
+            (
+                PathFormat { directory: PathResolver::Relative, file: PathResolver::Relative },
+                "The relative format is not supported for format.paths.directory; use absolute",
+            ),
+            (
                 PathFormat { directory: PathResolver::Relative, file: PathResolver::Absolute },
-                "When directory is relative, file must be relative too",
+                "The relative format is not supported for format.paths.directory; use absolute",
             ),
             (
                 PathFormat { directory: PathResolver::Relative, file: PathResolver::Canonical },
-                "When directory is relative, file must be relative too",
+                "The relative format is not supported for format.paths.directory; use absolute",
             ),
             (
                 PathFormat { directory: PathResolver::Canonical, file: PathResolver::Absolute },

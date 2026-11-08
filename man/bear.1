@@ -455,9 +455,6 @@ is denied) is kept.
 The check runs when each entry is written, so in combined mode a file
 the build deletes after compiling it is usually kept, while in semantic
 and parse\-sh mode it is dropped.
-With the \f[CR]relative\f[R] directory format, \f[CR]directory\f[R] is
-written as \f[CR].\f[R], so the check looks under the directory Bear
-runs in.
 Entries read with \f[CR]\-\-append\f[R] are checked the same way, so
 \f[CR]bear \-\-append \-\- true\f[R] trims entries for files that are
 gone.
@@ -506,7 +503,8 @@ Controls output formatting.
 \f[B]paths.directory\f[R], \f[B]paths.file\f[R]: How to format these
 fields\(cq paths: \f[CR]as\-is\f[R] (default, no transformation),
 \f[CR]canonical\f[R] (resolve symlinks; requires the path to exist),
-\f[CR]relative\f[R] (to the \f[CR]directory\f[R] field), or
+\f[CR]relative\f[R] (\f[CR]paths.file\f[R] only, relative to the
+\f[CR]directory\f[R] field; \f[CR]paths.directory\f[R] rejects it), or
 \f[CR]absolute\f[R].
 The \f[CR]canonical\f[R] format is rejected with
 \f[CR]\-\-no\-local\-lookups\f[R].

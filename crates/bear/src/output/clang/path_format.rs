@@ -277,10 +277,9 @@ mod tests {
 
     #[test]
     fn test_relative_to_same_path_returns_curdir() {
-        // Regression test for GitHub issue #692: `directory: relative` calls
-        // relative_to(working_dir, working_dir); the component walk produces
-        // no remaining components and must yield "." rather than an empty
-        // path (an empty directory field fails Entry::validate).
+        // Regression test for GitHub issue #692: the component walk over two
+        // equal paths produces no remaining components and must yield "."
+        // rather than an empty path (an empty field fails Entry::validate).
         let temp_dir = tempdir().unwrap();
         let temp_path = temp_dir.path().canonicalize().unwrap();
 
@@ -338,7 +337,6 @@ mod tests {
                 PathResolver::Canonical,
                 strip_windows_extended_length_prefix(directory.canonicalize().unwrap()),
             ),
-            (PathResolver::Relative, PathBuf::from(".")),
         ];
 
         for (resolver, expected) in cases {

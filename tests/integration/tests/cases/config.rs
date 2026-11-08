@@ -1252,108 +1252,50 @@ format:
     Ok(())
 }
 
-/// Reproduces GitHub issue #692: with `directory: relative`, the working
-/// directory resolves relative to itself and produces an empty path, which
-/// fails entry validation and aborts the output pipeline. The symptom the
-/// reporter saw was repeated "sending on a disconnected channel" errors and
-/// no compilation database being written.
+/// The relative format is not offered for `directory`: released clang
+/// tools ignore an entry whose `directory` and `file` are both relative.
 // Requirements: output-path-format
 #[test]
 #[cfg(target_family = "unix")]
-fn relative_directory_format_does_not_break_pipeline() -> Result<()> {
+fn relative_directory_format_is_rejected() -> Result<()> {
     use serde_json::json;
 
-    let env = TestEnvironment::new("relative_directory_format")?;
-    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+    let cases = [("relative file", "relative"), ("as-is file", "as-is")];
 
-    let event = json!({
-        "executable": COMPILER_C_PATH,
-        "arguments": [COMPILER_C_PATH, "-c", "main.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-    env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "int main() { return 0; }")])?;
+    for (case, file_format) in cases {
+        let env = TestEnvironment::new("relative_directory_rejected")?;
+        let temp_dir = env.test_dir().to_str().unwrap().to_string();
+        let event = json!({
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "main.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        });
+        env.create_source_files(&[
+            ("events.json", &event.to_string()),
+            ("main.c", "int main() { return 0; }"),
+        ])?;
+        let config = format!(
+            "schema: \"4.2\"\n\nformat:\n  paths:\n    directory: relative\n    file: {file_format}\n"
+        );
+        let config_path = env.test_dir().join("config.yaml");
+        std::fs::write(&config_path, config)?;
 
-    let config = r#"
-schema: "4.2"
+        let sut = env.run_bear_failure(&[
+            "--config",
+            config_path.to_str().unwrap(),
+            "semantic",
+            "--input",
+            "events.json",
+            "--output",
+            "compile_commands.json",
+        ])?;
 
-format:
-  paths:
-    directory: relative
-    file: relative
-"#;
-    let config_path = env.test_dir().join("config.yaml");
-    std::fs::write(&config_path, config)?;
-
-    env.run_bear_success(&[
-        "--config",
-        config_path.to_str().unwrap(),
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-
-    let entry = db.entries().first().expect("expected at least one entry");
-    let directory = entry.get("directory").and_then(|v| v.as_str()).unwrap_or("");
-    assert!(!directory.is_empty(), "directory field must not be empty; got {directory:?}");
-
-    Ok(())
-}
-
-/// Companion to `relative_directory_format_does_not_break_pipeline`: with
-/// only `directory: relative` (and `file: as-is`) the output pipeline
-/// succeeds too. Isolates the regression guard to the `directory` axis --
-/// when issue #692 was open, this config reproduced the bug independently
-/// of the `file` setting.
-// Requirements: output-path-format
-#[test]
-#[cfg(target_family = "unix")]
-fn relative_directory_alone_does_not_break_pipeline() -> Result<()> {
-    use serde_json::json;
-
-    let env = TestEnvironment::new("relative_directory_alone")?;
-    let temp_dir = env.test_dir().to_str().unwrap().to_string();
-
-    let event = json!({
-        "executable": COMPILER_C_PATH,
-        "arguments": [COMPILER_C_PATH, "-c", "main.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-    env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "int main() { return 0; }")])?;
-
-    let config = r#"
-schema: "4.2"
-
-format:
-  paths:
-    directory: relative
-    file: as-is
-"#;
-    let config_path = env.test_dir().join("config.yaml");
-    std::fs::write(&config_path, config)?;
-
-    env.run_bear_success(&[
-        "--config",
-        config_path.to_str().unwrap(),
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-
-    let entry = db.entries().first().expect("expected at least one entry");
-    let directory = entry.get("directory").and_then(|v| v.as_str()).unwrap_or("");
-    assert!(!directory.is_empty(), "directory field must not be empty; got {directory:?}");
+        let stderr = sut.stderr();
+        assert!(stderr.contains("format.paths.directory"), "{case}: stderr was: {stderr}");
+        assert!(stderr.contains("absolute"), "{case}: stderr was: {stderr}");
+        assert!(!env.file_exists("compile_commands.json"), "{case}: a database was written");
+    }
 
     Ok(())
 }

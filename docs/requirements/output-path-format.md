@@ -1,6 +1,6 @@
 ---
 title: Path format for file and directory fields
-status: accepted
+status: implemented
 ---
 
 ## Intent

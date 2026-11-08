@@ -1,6 +1,6 @@
 ---
 title: Dropping entries whose source file is missing
-status: accepted
+status: implemented
 ---
 
 ## Intent

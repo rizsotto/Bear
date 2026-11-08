@@ -99,11 +99,9 @@ Default: `only_existing_files: true` and both lists empty.
   example, access to a parent directory is denied) is kept. The check
   runs when each entry is written, so in combined mode a file the build
   deletes after compiling it is usually kept, while in semantic and
-  parse-sh mode it is dropped. With the `relative` directory format,
-  `directory` is written as `.`, so the check looks under the directory
-  Bear runs in. Entries read with `--append` are checked the same way. The
-  `--no-local-lookups` option of `semantic` and `parse-sh` turns the
-  check off.
+  parse-sh mode it is dropped. Entries read with `--append` are checked
+  the same way. The `--no-local-lookups` option of `semantic` and
+  `parse-sh` turns the check off.
 - **`sources.directories.path`**, **`sources.directories.action`**: list
   of directory rules; `action` is `include` or `exclude`.
 - **`sources.files.pattern`**, **`sources.files.action`**: list of
@@ -142,6 +140,8 @@ format:
 
 - **`format.paths.directory`**, **`format.paths.file`**: `as-is`,
   `canonical`, `relative`, or `absolute`. Default: `as-is` for both.
+  `relative` is for `paths.file` only, relative to the `directory`
+  field; `paths.directory` rejects it, so use `absolute` there.
   `canonical` is rejected with `--no-local-lookups`.
 
 ### format.entries

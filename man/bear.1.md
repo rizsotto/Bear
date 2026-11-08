@@ -420,8 +420,7 @@ checked against the entry's `directory`. A file that cannot be checked
 (for example, access to a parent directory is denied) is kept. The check
 runs when each entry is written, so in combined mode a file the build
 deletes after compiling it is usually kept, while in semantic and parse-sh
-mode it is dropped. With the `relative` directory format, `directory` is
-written as `.`, so the check looks under the directory Bear runs in.
+mode it is dropped.
 Entries read with `--append` are checked the same way, so
 `bear --append -- true` trims entries for files that are gone. The
 `--no-local-lookups` option of `bear semantic` and `bear parse-sh`
@@ -462,9 +461,9 @@ Controls output formatting.
 
 - **paths.directory**, **paths.file**: How to format these fields'
 paths: `as-is` (default, no transformation), `canonical` (resolve
-symlinks; requires the path to exist), `relative` (to the `directory`
-field), or `absolute`. The `canonical` format is rejected with
-`--no-local-lookups`.
+symlinks; requires the path to exist), `relative` (`paths.file` only,
+relative to the `directory` field; `paths.directory` rejects it), or
+`absolute`. The `canonical` format is rejected with `--no-local-lookups`.
 - **entries.use_array_format**: Use the `arguments` array (default)
 instead of the `command` string. Set to `false` for consumers that read
 only the `command` field.

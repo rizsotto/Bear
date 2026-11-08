@@ -1176,45 +1176,6 @@ mod tests {
     }
 
     #[test]
-    fn test_relative_path_format_makes_paths_relative() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().canonicalize().unwrap();
-        let working_dir = temp_path.to_str().unwrap();
-
-        let source_file = temp_path.join("main.c");
-        std::fs::write(&source_file, "").unwrap();
-
-        let sut = {
-            let format = Format {
-                paths: PathFormat { directory: PathResolver::Relative, file: PathResolver::Relative },
-                entries: EntryFormat::default(),
-                arguments: ArgumentsFormat::default(),
-            };
-            CommandConverter::new(format)
-        };
-
-        // Use a relative source file (relative to working dir)
-        let command = Command::from_strings(
-            working_dir,
-            "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-            ],
-        );
-
-        let entries = sut.convert(&command);
-        assert_eq!(entries.len(), 1);
-
-        let entry = &entries[0];
-        // Directory should be relative (the working dir resolved relative to itself is ".")
-        assert!(!entry.directory.is_absolute(), "directory should be relative: {:?}", entry.directory);
-        // File should be relative
-        assert!(!entry.file.is_absolute(), "file should be relative: {:?}", entry.file);
-    }
-
-    #[test]
     fn test_canonical_path_format_resolves_dotdot() {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = temp_dir.path().canonicalize().unwrap();
