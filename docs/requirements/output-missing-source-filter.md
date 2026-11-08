@@ -1,6 +1,6 @@
 ---
 title: Dropping entries whose source file is missing
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -67,11 +67,6 @@ writes the database. This is on by default.
   dropped. Existing entries read when appending are checked after the
   build in every mode, so an appending run with a build that runs no
   compiler trims them.
-- With the relative format for `directory` (`output-path-format`), the
-  directory is written as `.`, so the check looks for the file relative
-  to the directory Bear runs in. Entries compiled in another directory
-  are dropped even though their file exists. Run Bear from the build
-  directory, or turn the option off.
 
 ## Rationale
 

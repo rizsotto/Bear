@@ -1,6 +1,6 @@
 ---
 title: Header file entries in the output
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -24,6 +24,11 @@ is off by default.
   removed, and it has no `output` field. For example
   `["cc", "-c", "src/main.c", "-o", "src/main.o"]` gives
   `["cc", "-c", "src/util.h"]`.
+- **Given** a build that compiles `src/main.c`, next to `src/link.h`, a
+  symlink to a header file, **when** Bear finishes with header entries
+  on and the default strategy, **then** the database holds an entry for
+  `src/link.h`, under the symlink's path. A symlink whose target is
+  missing, or is a directory, gives no entry.
 - **Given** a build whose compilation emitted a dependency file that
   lists headers inside the compilation's working directory and system
   headers outside it, **when** Bear finishes with the dependency-file

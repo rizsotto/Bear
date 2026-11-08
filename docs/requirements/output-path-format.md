@@ -1,6 +1,6 @@
 ---
 title: Path format for file and directory fields
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -14,13 +14,14 @@ field and of the `file` field.
 
 ## Acceptance criteria
 
-Four formats are supported for each of the two fields:
+Four formats are supported for `file`, and all but the relative one for
+`directory`:
 
 | Format | Result |
 |---|---|
 | as is (the default) | the path exactly as interception observed it |
 | absolute | the path made absolute; it need not exist on disk |
-| relative | the path relative to the entry's directory |
+| relative (`file` only) | the path relative to the entry's directory |
 | symlink-resolving | symlinks followed and `.` and `..` removed; the path must exist when the output is written |
 
 - **Given** a build run from `/home/user/project` that compiles
@@ -39,8 +40,11 @@ Four formats are supported for each of the two fields:
 - **Given** `/a/b/one.c` compiled from `/a/b` and `/a/c/two.c` compiled
   from `/a/c`, **when** `directory` is absolute and `file` is relative,
   **then** the entries are `/a/b` with `one.c` and `/a/c` with `two.c`.
-- **Given** `directory` uses the relative format, **when** Bear writes
-  the entry, **then** `directory` is `.`.
+- **Given** a configuration that selects the relative format for
+  `directory`, **when** Bear starts, **then** it exits non-zero before
+  any work starts, and the diagnostic names the setting and the
+  absolute format as the alternative. Released clang tools do not use
+  an entry whose `directory` and `file` are both relative.
 - **Given** a source reached through a symlink, **when** `file` uses the
   symlink-resolving format, **then** `file` is the real path.
 - **Given** a build on Windows, **when** a field uses the
@@ -82,3 +86,7 @@ Four formats are supported for each of the two fields:
 
 - Paths inside other flags, such as include search paths, are not
   transformed. They are written as the build spelled them.
+
+## Rationale
+
+- [No relative format for `directory`](../rationale/no-relative-directory-format.md)
