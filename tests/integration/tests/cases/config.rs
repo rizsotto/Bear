@@ -2193,6 +2193,21 @@ fn entries_kept(env: &TestEnvironment) -> Result<usize> {
     Ok(env.load_compilation_database("compile_commands.json")?.entries().len())
 }
 
+/// The harness points Bear's user configuration directory inside the test
+/// directory, so a developer's own `bear.yml` cannot change test results.
+#[test]
+#[cfg(unix)]
+fn harness_isolates_the_user_configuration_directory() -> Result<()> {
+    let env = TestEnvironment::new("harness_user_config_isolated")?;
+    write_at(&env.user_config_dir().join("bear.yml"), KEEP_MISSING)?;
+
+    let sut = env.run_bear_with_stdin(&["parse-sh"], b"gcc -c missing.c\n")?;
+
+    sut.assert_success()?;
+    assert_eq!(entries_kept(&env)?, 1);
+    Ok(())
+}
+
 // Requirements: cli-configuration-file
 #[test]
 fn named_config_file_is_read_and_search_is_skipped() -> Result<()> {

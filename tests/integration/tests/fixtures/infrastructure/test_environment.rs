@@ -167,8 +167,17 @@ impl TestEnvironment {
         Ok(config_path)
     }
 
+    /// The user configuration directory Bear sees. It is inside the test
+    /// directory and does not exist unless a test creates it, so a
+    /// developer's own `bear.yml` never changes a test's result.
+    pub fn user_config_dir(&self) -> PathBuf {
+        self.test_dir().join(".user-config")
+    }
+
     pub fn command_bear(&self) -> std::process::Command {
-        std::process::Command::new(self.install.path())
+        let mut cmd = std::process::Command::new(self.install.path());
+        cmd.env("XDG_CONFIG_HOME", self.user_config_dir());
+        cmd
     }
 
     /// Run bear with the given arguments.
@@ -182,7 +191,10 @@ impl TestEnvironment {
     /// readable backtraces.
     pub fn run_bear(&self, args: &[&str]) -> Result<BearOutput> {
         let mut cmd = Command::new(self.install.path());
-        cmd.current_dir(self.test_dir()).env("RUST_BACKTRACE", "1").args(args);
+        cmd.current_dir(self.test_dir())
+            .env("RUST_BACKTRACE", "1")
+            .env("XDG_CONFIG_HOME", self.user_config_dir())
+            .args(args);
         if std::env::var_os("RUST_LOG").is_none() {
             cmd.env("RUST_LOG", "info");
         }
@@ -207,6 +219,7 @@ impl TestEnvironment {
         let mut cmd = Command::new(self.install.path());
         cmd.current_dir(self.test_dir())
             .env("RUST_BACKTRACE", "1")
+            .env("XDG_CONFIG_HOME", self.user_config_dir())
             .args(args)
             .write_stdin(stdin_bytes.to_vec());
         if std::env::var_os("RUST_LOG").is_none() {
@@ -235,6 +248,7 @@ impl TestEnvironment {
         let mut cmd = Command::new(self.install.path());
         cmd.current_dir(self.test_dir())
             .env("RUST_BACKTRACE", "1")
+            .env("XDG_CONFIG_HOME", self.user_config_dir())
             .env_remove("RUST_LOG")
             .args(args)
             .write_stdin(stdin_bytes.to_vec());
