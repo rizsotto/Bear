@@ -3086,3 +3086,47 @@ fn semantic_no_local_lookups_conflicts_with_print_compilers() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: cli-input-from-another-machine, recognition-ambiguous-name-probe
+#[test]
+#[cfg(all(unix, has_executable_shell))]
+fn semantic_no_local_lookups_does_not_probe_cc() -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let env = TestEnvironment::new("semantic_no_local_lookups_probe")?;
+    let marker = env.test_dir().join("probe-ran");
+    let fake_cc = env.test_dir().join("cc");
+    std::fs::write(
+        &fake_cc,
+        format!(
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  : > '{}'\n  \
+             echo 'cc (GCC) 14.2.0'\n  echo 'Copyright (C) 2024 Free Software Foundation, Inc.'\nfi\nexit 0\n",
+            marker.display()
+        ),
+    )?;
+    std::fs::set_permissions(&fake_cc, std::fs::Permissions::from_mode(0o755))?;
+    env.create_source_files(&[("a.c", "int a;"), ("b.c", "int b;")])?;
+    // GCC reads `-Xclang` as a flag of its own and keeps `b.c` as a source;
+    // Clang reads `b.c` as the argument of `-Xclang`.
+    let event = json!({
+        "executable": fake_cc.to_str().unwrap(),
+        "arguments": ["cc", "-c", "a.c", "-Xclang", "b.c"],
+        "working_dir": env.test_dir().to_str().unwrap(),
+        "environment": {}
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+
+    let sut = env.run_bear(&["semantic", "--no-local-lookups", "-i", "events.json", "-o", "without.json"])?;
+
+    sut.assert_success()?;
+    assert!(!marker.exists(), "no program may run to identify cc");
+    let db = env.load_compilation_database("without.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("a.c".to_string()))?;
+
+    env.run_bear_success(&["semantic", "-i", "events.json", "-o", "with.json"])?;
+    assert!(marker.exists(), "without the option the probe runs");
+    env.load_compilation_database("with.json")?.assert_count(2)?;
+
+    Ok(())
+}

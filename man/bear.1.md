@@ -160,6 +160,13 @@ already in an `--append` output file are kept. Compiler paths in the
 configuration need not exist here. Not accepted together with
 `--print-compilers`.
 
+: Bear does not run a compiler to identify it. A `cc`, `c++`, or `CC`
+with no configured family is parsed as Clang. Clang's flag table
+includes GCC's, so a GCC call is read the same, except for a rare GCC
+argument such as `-load` or a `-lazy...` library flag. Configure the
+compiler's family in `compilers` to avoid this. A configured compiler path matches only by the path as written or
+by its file name; Bear resolves no path on this machine.
+
 : The settings that read this machine's files are rejected at startup,
 and the error names the setting and the configuration file:
 `format.paths.directory: canonical`, `format.paths.file: canonical`,

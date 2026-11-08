@@ -70,7 +70,7 @@ impl Mode {
         // at startup in every mode that reads configuration -- before a build
         // starts. This is also the only place that sees both the config types
         // and the semantic types, so it owns the conversion between them.
-        let hints = compiler_hints(&config.compilers)?;
+        let hints = compiler_hints(&config.compilers, local_lookups)?;
 
         match mode {
             args::Mode::Intercept { input, output } => {
@@ -205,8 +205,11 @@ impl Mode {
 /// `ignore: true`: they contribute no hint, but a typo in one still fails the
 /// run, the way it did when the configuration schema validated the spelling
 /// itself. An entry without `as:` is classified by the builder.
-fn compiler_hints(compilers: &[config::Compiler]) -> Result<CompilerHints, ConfigurationError> {
-    let mut hints = CompilerHints::new();
+fn compiler_hints(
+    compilers: &[config::Compiler],
+    local_lookups: bool,
+) -> Result<CompilerHints, ConfigurationError> {
+    let mut hints = if local_lookups { CompilerHints::new() } else { CompilerHints::without_local_lookups() };
     for compiler in compilers {
         let spelling = compiler.as_.as_deref();
         let resolved = if compiler.ignore {
@@ -795,7 +798,7 @@ mod tests {
             },
         ];
 
-        let sut = CompilerRecognizer::new_with_hints(compiler_hints(&compilers).unwrap());
+        let sut = CompilerRecognizer::new_with_hints(compiler_hints(&compilers, true).unwrap());
 
         assert_eq!(sut.recognize(Path::new("/opt/toolchain/quiet-tool")), None);
         assert!(sut.recognize(Path::new("/opt/toolchain/loud-tool")).is_some());

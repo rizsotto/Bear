@@ -123,7 +123,8 @@ mod tests {
         // of these, this fails instead of silently misclassifying at runtime.
         //
         // These are the only such literals: the ambiguous-name probe's two
-        // verdicts and the recognition fallback (all `gcc`/`clang`). Family
+        // verdicts, the recognition fallback and the Clang default for an
+        // ambiguous name without local lookups (all `gcc`/`clang`). Family
         // registration and response-file syntax are driven entirely by
         // generated data (the FAMILIES registry), so they carry no id
         // literals to guard here; the dispatch test

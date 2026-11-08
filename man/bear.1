@@ -161,6 +161,16 @@ diagnostic names it.
 Entries already in an \f[CR]\-\-append\f[R] output file are kept.
 Compiler paths in the configuration need not exist here.
 Not accepted together with \f[CR]\-\-print\-compilers\f[R].
+Bear does not run a compiler to identify it.
+A \f[CR]cc\f[R], \f[CR]c++\f[R], or \f[CR]CC\f[R] with no configured
+family is parsed as Clang.
+Clang\(cqs flag table includes GCC\(cqs, so a GCC call is read the same,
+except for a rare GCC argument such as \f[CR]\-load\f[R] or a
+\f[CR]\-lazy...\f[R] library flag.
+Configure the compiler\(cqs family in \f[CR]compilers\f[R] to avoid
+this.
+A configured compiler path matches only by the path as written or by its
+file name; Bear resolves no path on this machine.
 The settings that read this machine\(cqs files are rejected at startup,
 and the error names the setting and the configuration file:
 \f[CR]format.paths.directory: canonical\f[R],

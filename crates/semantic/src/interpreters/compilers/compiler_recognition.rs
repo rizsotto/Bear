@@ -49,6 +49,7 @@ const AMBIGUOUS_NAMES: &[&str] = &["cc", "c++", "CC"];
 pub struct CompilerRecognizer {
     patterns: Vec<(CompilerType, Regex)>,
     hints: HashMap<PathBuf, CompilerType>,
+    local_lookups: bool,
     probe: Box<dyn CompilerProbe>,
 }
 
@@ -76,7 +77,12 @@ impl CompilerRecognizer {
     /// Creates a recognizer with an injectable probe. Used by tests to swap
     /// in a fake probe that does not fork+exec.
     pub(crate) fn with_probe(hints: CompilerHints, probe: Box<dyn CompilerProbe>) -> Self {
-        Self { patterns: DEFAULT_PATTERNS.clone(), hints: hints.entries, probe }
+        Self {
+            patterns: DEFAULT_PATTERNS.clone(),
+            hints: hints.entries,
+            local_lookups: hints.local_lookups,
+            probe,
+        }
     }
 
     /// Recognizes the compiler type from an executable path.
@@ -103,11 +109,16 @@ impl CompilerRecognizer {
         //    `cc` (GCC). Caching of probe results lives inside the probe
         //    itself (`CachingProbe`) so the cost is at most
         //    one fork+exec per unique compiler path per process.
+        //    Without local lookups nothing may be run here, so an unhinted
+        //    ambiguous name is Clang (see `CompilerHints::without_local_lookups`).
         let filename = executable_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if AMBIGUOUS_NAMES.contains(&filename)
-            && let Some(t) = self.probe_canonical(executable_path)
-        {
-            return Some(t);
+        if AMBIGUOUS_NAMES.contains(&filename) {
+            if !self.local_lookups {
+                return Some(CompilerType::compiler("clang"));
+            }
+            if let Some(t) = self.probe_canonical(executable_path) {
+                return Some(t);
+            }
         }
 
         // 3. Fall back to regex-based recognition.
@@ -124,6 +135,10 @@ impl CompilerRecognizer {
         // Try original path first
         if let Some(&compiler_type) = self.hints.get(executable_path) {
             return Some(compiler_type);
+        }
+
+        if !self.local_lookups {
+            return None;
         }
 
         // Try canonicalized path
@@ -192,15 +207,30 @@ impl Default for CompilerRecognizer {
 /// never crosses into this module. Insertion order is the configuration
 /// order, which is what the first-wins rule for colliding filenames is
 /// defined against.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct CompilerHints {
     entries: HashMap<PathBuf, CompilerType>,
+    local_lookups: bool,
+}
+
+impl Default for CompilerHints {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CompilerHints {
     /// An empty hint table: recognition falls back to probe and regex only.
     pub fn new() -> Self {
-        Self::default()
+        Self { entries: HashMap::new(), local_lookups: true }
+    }
+
+    /// An empty hint table for input from another machine. Nothing is
+    /// resolved or run on this machine: paths are matched as written, no
+    /// `--version` probe runs, and a `cc`, `c++` or `CC` without a hint is
+    /// recognized as the Clang family.
+    pub fn without_local_lookups() -> Self {
+        Self { local_lookups: false, ..Self::new() }
     }
 
     /// Resolves `spelling` and records the resulting hint for `path`.
@@ -224,7 +254,9 @@ impl CompilerHints {
     ///
     /// `path` is canonicalized for the path key; when canonicalization fails
     /// (e.g. the path does not exist) the original is used. This matches
-    /// paths that are spelled differently but name the same executable.
+    /// paths that are spelled differently but name the same executable. A
+    /// table from [`CompilerHints::without_local_lookups`] keeps the
+    /// spelling as written.
     pub fn add(&mut self, path: &Path, spelling: Option<&str>) -> Result<(), SpellingError> {
         let compiler_type = match spelling {
             Some(spelling) => spelling.parse::<CompilerType>()?,
@@ -252,8 +284,12 @@ impl CompilerHints {
         // Never collides with a filename key for validated config:
         // config paths must exist, so canonicalization yields an
         // absolute, multi-component path.
-        let canonical_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        self.entries.insert(canonical_path, compiler_type);
+        let key = if self.local_lookups {
+            path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+        } else {
+            path.to_path_buf()
+        };
+        self.entries.insert(key, compiler_type);
 
         Ok(())
     }
@@ -663,6 +699,89 @@ mod tests {
 
         let sut = CompilerHints::check(Some("not-a-compiler"));
         assert!(sut.is_err(), "an unknown spelling must fail even without a hint");
+    }
+
+    /// Probe that fails the test if the recognizer ever asks it anything.
+    struct PanicProbe;
+
+    impl CompilerProbe for PanicProbe {
+        fn probe(&self, executable_path: &Path) -> Option<CompilerType> {
+            panic!("probe must not run, asked about {}", executable_path.display());
+        }
+    }
+
+    fn offline_recognizer(hints: CompilerHints) -> CompilerRecognizer {
+        CompilerRecognizer::with_probe(hints, Box::new(PanicProbe))
+    }
+
+    // Requirements: cli-input-from-another-machine, recognition-ambiguous-name-probe
+    #[test]
+    fn test_without_local_lookups_reads_ambiguous_names_as_clang() {
+        let sut = offline_recognizer(CompilerHints::without_local_lookups());
+
+        let clang = Some(CompilerType::compiler("clang"));
+        assert_cases(
+            &sut,
+            &[
+                ("cc", clang),
+                ("c++", clang),
+                ("CC", clang),
+                ("/usr/bin/cc", clang),
+                ("/usr/bin/c++", clang),
+                ("/opt/cray/bin/CC", clang),
+                ("gcc", Some(CompilerType::compiler("gcc"))),
+            ],
+        );
+    }
+
+    // Requirements: cli-input-from-another-machine, recognition-ambiguous-name-probe
+    #[test]
+    fn test_without_local_lookups_hint_beats_the_clang_default() {
+        let mut hints = CompilerHints::without_local_lookups();
+        hints.add(path("/opt/toolchain/cc"), Some("gcc")).unwrap();
+
+        let sut = offline_recognizer(hints);
+
+        let gcc = Some(CompilerType::compiler("gcc"));
+        assert_cases(
+            &sut,
+            &[("cc", gcc), ("/opt/toolchain/cc", gcc), ("c++", Some(CompilerType::compiler("clang")))],
+        );
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[cfg(unix)]
+    #[test]
+    fn test_without_local_lookups_keeps_the_spelling_of_a_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("real-tool");
+        let link = dir.path().join("linked-tool");
+        std::fs::write(&target, "").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let mut hints = CompilerHints::without_local_lookups();
+        hints.add(&link, Some("gcc")).unwrap();
+
+        let sut = offline_recognizer(hints);
+
+        assert_eq!(sut.recognize(&link), Some(CompilerType::compiler("gcc")));
+        assert_eq!(sut.recognize(&target), None, "the link must not be resolved to its target");
+    }
+
+    // Requirements: recognition-compiler-names
+    #[cfg(unix)]
+    #[test]
+    fn test_with_local_lookups_resolves_the_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("real-tool");
+        let link = dir.path().join("linked-tool");
+        std::fs::write(&target, "").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let mut hints = CompilerHints::new();
+        hints.add(&link, Some("gcc")).unwrap();
+
+        let sut = CompilerRecognizer::with_probe(hints, Box::new(NoProbe));
+
+        assert_eq!(sut.recognize(&target), Some(CompilerType::compiler("gcc")));
     }
 
     #[test]

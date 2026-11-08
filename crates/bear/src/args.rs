@@ -314,7 +314,7 @@ pub fn cli() -> Command {
                         .conflicts_with("append"),
                     arg!(--"print-compilers" "Print the compilers Bear recognizes and exit")
                         .action(ArgAction::SetTrue),
-                    arg!(--"no-local-lookups" "Input comes from another machine: do not check that sources exist on this machine")
+                    arg!(--"no-local-lookups" "Input comes from another machine: do not look up files, programs, or environment on this machine")
                         .action(ArgAction::SetTrue)
                         .conflicts_with("print-compilers"),
                 ])
@@ -340,7 +340,7 @@ pub fn cli() -> Command {
                         .action(ArgAction::SetTrue)
                         .conflicts_with("append"),
                     arg!(-C --directory <DIR> "Initial working directory for the parsed commands"),
-                    arg!(--"no-local-lookups" "Input comes from another machine: do not check that sources exist, and do not use Bear's own environment")
+                    arg!(--"no-local-lookups" "Input comes from another machine: do not look up files, programs, or environment on this machine")
                         .action(ArgAction::SetTrue),
                 ])
                 .arg_required_else_help(false)
