@@ -1203,6 +1203,55 @@ sources:
     Ok(())
 }
 
+// Requirements: output-path-format
+#[test]
+fn absolute_directory_format_resolves_a_relative_working_directory_once() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("absolute_directory_relative_working_dir")?;
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "main.c"],
+        "working_dir": "build",
+        "environment": {}
+    });
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("build/main.c", "int main() { return 0; }"),
+    ])?;
+    let config = r#"
+schema: "4.2"
+
+format:
+  paths:
+    directory: absolute
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // Bear runs in the test directory; its working directory as the OS
+    // reports it has symlinks resolved.
+    let expected = env.test_dir().canonicalize()?.join("build");
+    let expected = expected.to_string_lossy();
+    let expected = expected.strip_prefix(r"\\?\").unwrap_or(&expected);
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(1)?;
+    let directory = sut.entries()[0].get("directory").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    assert_eq!(directory, expected);
+
+    Ok(())
+}
+
 /// Reproduces GitHub issue #692: with `directory: relative`, the working
 /// directory resolves relative to itself and produces an empty path, which
 /// fails entry validation and aborts the output pipeline. The symptom the

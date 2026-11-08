@@ -19,7 +19,8 @@
 //! - `relative`: compute the path relative to the base directory. Returns
 //!   `PathsCannotBeRelative` when the two paths share no common root (e.g.
 //!   files on different Windows drive letters).
-//! - `canonical`: resolve symlinks and `.`/`..` via `Path::canonicalize()`,
+//! - `canonical`: join with the base directory when relative, then resolve
+//!   symlinks and `.`/`..` via `Path::canonicalize()`,
 //!   which requires every path component to exist on disk, then strip the
 //!   Windows extended-length prefix (`\\?\`) that clangd rejects (issue #683).
 //!
@@ -65,8 +66,8 @@ fn resolve_as_is(_base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
     Ok(path.to_path_buf())
 }
 
-fn resolve_canonical(_base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
-    Ok(strip_windows_extended_length_prefix(path.canonicalize()?))
+fn resolve_canonical(base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
+    Ok(strip_windows_extended_length_prefix(join_to_base(base, path).canonicalize()?))
 }
 
 fn resolve_relative(base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
@@ -85,7 +86,14 @@ fn strip_windows_extended_length_prefix(path: PathBuf) -> PathBuf {
 
 /// Compute the absolute path from the root directory if the path is relative.
 fn absolute_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
-    if path.is_absolute() { Ok(absolute(path)?) } else { Ok(absolute(root.join(path))?) }
+    Ok(absolute(join_to_base(root, path))?)
+}
+
+/// Join a relative path to its base. The `directory` field is resolved with
+/// itself as the base; a relative working directory is relative to the
+/// directory Bear runs in, so joining it to itself would double it.
+fn join_to_base(base: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() || path == base { path.to_path_buf() } else { base.join(path) }
 }
 
 /// Compute the relative path from the root directory.
@@ -302,6 +310,42 @@ mod tests {
         let expected = strip_windows_extended_length_prefix(file_path);
         assert_eq!(result, expected);
         assert!(result.is_absolute());
+    }
+
+    // Requirements: output-path-format
+    #[test]
+    fn test_canonical_resolves_a_relative_path_against_the_base() {
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+        let file_path = temp_path.join("test.txt");
+        fs::write(&file_path, "test content").unwrap();
+
+        let sut = resolver_for(PathResolver::Canonical)(&temp_path, Path::new("test.txt")).unwrap();
+
+        assert_eq!(sut, strip_windows_extended_length_prefix(file_path));
+    }
+
+    // Requirements: output-path-format
+    #[test]
+    fn test_a_relative_directory_resolved_against_itself_is_not_doubled() {
+        // The `directory` field is resolved with itself as the base. A
+        // relative working directory is relative to the directory Bear runs
+        // in, which for unit tests is the crate root, where `src` exists.
+        let directory = Path::new("src");
+        let cases = [
+            (PathResolver::Absolute, absolute(directory).unwrap()),
+            (
+                PathResolver::Canonical,
+                strip_windows_extended_length_prefix(directory.canonicalize().unwrap()),
+            ),
+            (PathResolver::Relative, PathBuf::from(".")),
+        ];
+
+        for (resolver, expected) in cases {
+            let sut = resolver_for(resolver)(directory, directory).unwrap();
+
+            assert_eq!(sut, expected, "resolver: {resolver:?}");
+        }
     }
 
     #[test]
