@@ -1,6 +1,6 @@
 ---
 title: Finding and reading the configuration file
-status: accepted
+status: implemented
 ---
 
 ## Intent

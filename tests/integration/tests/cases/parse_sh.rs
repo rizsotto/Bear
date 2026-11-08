@@ -181,7 +181,7 @@ sources:
     Ok(())
 }
 
-// Requirements: interception-shell-text-parsing
+// Requirements: interception-shell-text-parsing, cli-configuration-file, cli-exit-codes
 //
 // parse-sh now consumes configuration, so a malformed config in a default
 // search location (`bear.yml` in the working directory) aborts the run

@@ -584,7 +584,7 @@ mod test {
         assert_eq!(arguments, Arguments { config: None, local_lookups: true, mode: Mode::PrintCompilers });
     }
 
-    // Requirements: recognition-compiler-names
+    // Requirements: recognition-compiler-names, cli-configuration-file
     #[test]
     fn test_semantic_print_compilers_rejects_config() {
         // arrange

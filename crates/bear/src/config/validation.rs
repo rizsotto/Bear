@@ -205,6 +205,7 @@ mod tests {
         Main { compilers: vec![compiler], ..Main::default() }
     }
 
+    // Requirements: recognition-compiler-names
     #[test]
     fn test_check_compiler_paths_rejects_missing_path() {
         let config = main_with_compiler("/nonexistent/compiler", false);
@@ -214,6 +215,20 @@ mod tests {
         match sut {
             Err(ValidationError::PathNotFound { path }) => assert_eq!(path, "/nonexistent/compiler"),
             other => panic!("Expected PathNotFound validation error, got: {other:?}"),
+        }
+    }
+
+    // Requirements: recognition-compiler-names
+    #[test]
+    fn test_validate_rejects_a_duplicate_compiler_path() {
+        let mut config = main_with_compiler("/opt/toolchain/cc", false);
+        config.compilers.extend(main_with_compiler("/opt/toolchain/cc", true).compilers);
+
+        let sut = Main::validate(&config);
+
+        match sut {
+            Err(ValidationError::DuplicateEntry { field: "compiler", idx: 1 }) => {}
+            other => panic!("Expected a duplicate compiler entry at 1, got: {other:?}"),
         }
     }
 

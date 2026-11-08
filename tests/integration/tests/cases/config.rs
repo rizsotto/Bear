@@ -1565,6 +1565,7 @@ fn canonical_directory_failure_for_all_entries_emits_error_summary() -> Result<(
 
 /// Test invalid configuration handling
 /// Verifies Bear handles invalid config gracefully
+// Requirements: cli-configuration-file, cli-exit-codes
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn invalid_config_handling() -> Result<()> {
@@ -1597,6 +1598,7 @@ fn invalid_config_handling() -> Result<()> {
 
 /// Test unsupported schema version
 /// Verifies Bear rejects unsupported schema versions
+// Requirements: cli-configuration-file, cli-exit-codes
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -1640,6 +1642,7 @@ sources:
 
     // Error message should mention schema version issue
     assert!(output.stderr().contains("schema"));
+    assert!(output.stderr().contains("Expected: 4.2"), "{}", output.stderr());
 
     Ok(())
 }
@@ -2138,7 +2141,7 @@ compilers:
     Ok(())
 }
 
-// Requirements: cli-input-from-another-machine
+// Requirements: cli-input-from-another-machine, recognition-compiler-names
 //
 // Without the option a configured compiler path must exist; with it the
 // configuration is accepted, for an active entry and for an ignored one.
@@ -2172,6 +2175,7 @@ fn compiler_path_missing_here_is_accepted_with_no_local_lookups() -> Result<()> 
     Ok(())
 }
 
+// Requirements: cli-input-from-another-machine, recognition-compiler-names
 #[test]
 fn compiler_path_missing_here_still_rejects_duplicates_with_no_local_lookups() -> Result<()> {
     let env = TestEnvironment::new("config_no_local_lookups_duplicate")?;
@@ -2192,5 +2196,206 @@ fn compiler_path_missing_here_still_rejects_duplicates_with_no_local_lookups() -
     sut.assert_failure()?;
     assert!(sut.stderr().contains("Duplicate compiler entry"), "{}", sut.stderr());
 
+    Ok(())
+}
+
+const KEEP_MISSING: &str = "schema: \"4.2\"\nsources:\n  only_existing_files: false\n";
+const DROP_MISSING: &str = "schema: \"4.2\"\nsources:\n  only_existing_files: true\n";
+
+/// Runs `bear parse-sh` on a build log naming a missing source, with the user
+/// configuration directories pointed inside the test directory.
+///
+/// The entry for `missing.c` survives only when the configuration read sets
+/// `sources.only_existing_files: false`, so the database shows which file won.
+fn run_parse_sh_isolated(
+    env: &TestEnvironment,
+    extra_args: &[&str],
+    xdg: Option<&str>,
+) -> Result<std::process::Output> {
+    run_parse_sh_on(env, "gcc -c missing.c\n", extra_args, xdg)
+}
+
+fn run_parse_sh_on(
+    env: &TestEnvironment,
+    log: &str,
+    extra_args: &[&str],
+    xdg: Option<&str>,
+) -> Result<std::process::Output> {
+    let home = env.test_dir().join("home");
+    std::fs::create_dir_all(&home)?;
+    env.create_source_files(&[("build.log", log)])?;
+
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir())
+        .env("RUST_LOG", "info")
+        .env("HOME", &home)
+        .env("LOCALAPPDATA", home.join("local"))
+        .env("APPDATA", home.join("roaming"));
+    match xdg {
+        Some(value) => cmd.env("XDG_CONFIG_HOME", value),
+        None => cmd.env_remove("XDG_CONFIG_HOME"),
+    };
+    cmd.args(extra_args).args(["parse-sh", "-i", "build.log"]);
+    Ok(cmd.output()?)
+}
+
+fn write_at(path: &std::path::Path, content: &str) -> Result<()> {
+    std::fs::create_dir_all(path.parent().unwrap())?;
+    std::fs::write(path, content)?;
+    Ok(())
+}
+
+fn entries_kept(env: &TestEnvironment) -> Result<usize> {
+    Ok(env.load_compilation_database("compile_commands.json")?.entries().len())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+fn named_config_file_is_read_and_search_is_skipped() -> Result<()> {
+    let env = TestEnvironment::new("config_named_file_wins")?;
+    write_at(&env.test_dir().join("bear.yml"), DROP_MISSING)?;
+    write_at(&env.test_dir().join("named.yml"), KEEP_MISSING)?;
+
+    let sut = run_parse_sh_isolated(&env, &["--config", "named.yml"], None)?;
+
+    assert!(sut.status.success(), "{}", String::from_utf8_lossy(&sut.stderr));
+    assert_eq!(entries_kept(&env)?, 1);
+    Ok(())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+#[cfg(unix)]
+fn working_directory_config_wins_over_xdg_and_is_not_merged() -> Result<()> {
+    let env = TestEnvironment::new("config_cwd_over_xdg")?;
+    let xdg = env.test_dir().join("xdg");
+    write_at(&env.test_dir().join("bear.yml"), KEEP_MISSING)?;
+    // Only the XDG file asks for the array-less `command` form.
+    write_at(&xdg.join("bear.yml"), "schema: \"4.2\"\nformat:\n  entries:\n    use_array_format: false\n")?;
+
+    let sut = run_parse_sh_isolated(&env, &[], Some(xdg.to_str().unwrap()))?;
+
+    assert!(sut.status.success(), "{}", String::from_utf8_lossy(&sut.stderr));
+    let db = env.load_compilation_database("compile_commands.json")?;
+    assert_eq!(db.entries().len(), 1);
+    assert!(db.entries()[0].get("arguments").is_some(), "the XDG file must not be merged in");
+    assert!(db.entries()[0].get("command").is_none());
+    Ok(())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+#[cfg(unix)]
+fn xdg_config_locations_are_searched_in_order() -> Result<()> {
+    let cases = [("direct file", "xdg/bear.yml", 1), ("Bear subdirectory", "xdg/Bear/bear.yml", 1)];
+
+    for (case, relative, expected) in cases {
+        let env = TestEnvironment::new("config_xdg_search")?;
+        let xdg = env.test_dir().join("xdg");
+        write_at(&env.test_dir().join(relative), KEEP_MISSING)?;
+
+        let sut = run_parse_sh_isolated(&env, &[], Some(xdg.to_str().unwrap()))?;
+
+        assert!(sut.status.success(), "{case}: {}", String::from_utf8_lossy(&sut.stderr));
+        assert_eq!(entries_kept(&env)?, expected, "{case}");
+    }
+    Ok(())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+#[cfg(unix)]
+fn direct_xdg_file_wins_over_bear_subdirectory() -> Result<()> {
+    let env = TestEnvironment::new("config_xdg_direct_over_subdir")?;
+    let xdg = env.test_dir().join("xdg");
+    write_at(&xdg.join("bear.yml"), DROP_MISSING)?;
+    write_at(&xdg.join("Bear").join("bear.yml"), KEEP_MISSING)?;
+
+    let sut = run_parse_sh_isolated(&env, &[], Some(xdg.to_str().unwrap()))?;
+
+    assert!(sut.status.success(), "{}", String::from_utf8_lossy(&sut.stderr));
+    assert_eq!(entries_kept(&env)?, 0);
+    Ok(())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+#[cfg(unix)]
+fn empty_xdg_config_home_counts_as_unset() -> Result<()> {
+    let env = TestEnvironment::new("config_empty_xdg")?;
+    write_at(&env.test_dir().join("home/.config/bear.yml"), KEEP_MISSING)?;
+
+    let sut = run_parse_sh_isolated(&env, &[], Some(""))?;
+
+    assert!(sut.status.success(), "{}", String::from_utf8_lossy(&sut.stderr));
+    assert_eq!(entries_kept(&env)?, 1);
+    Ok(())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+#[cfg(unix)]
+fn no_config_file_uses_defaults_without_a_diagnostic() -> Result<()> {
+    let env = TestEnvironment::new("config_none_found")?;
+    env.create_source_files(&[("existing.c", "int main(void) { return 0; }")])?;
+    let xdg = env.test_dir().join("xdg");
+    std::fs::create_dir_all(&xdg)?;
+
+    let sut =
+        run_parse_sh_on(&env, "gcc -c existing.c\ngcc -c missing.c\n", &[], Some(xdg.to_str().unwrap()))?;
+
+    assert!(sut.status.success());
+    let stderr = String::from_utf8_lossy(&sut.stderr);
+    let loud: Vec<&str> = stderr.lines().filter(|l| l.contains("WARN") || l.contains("ERROR")).collect();
+    assert!(loud.is_empty(), "no warning or error expected: {loud:?}");
+    let db = env.load_compilation_database("compile_commands.json")?;
+    assert_eq!(files_in(&db).len(), 1, "defaults drop the entry for the missing source");
+    Ok(())
+}
+
+// Requirements: cli-configuration-file, cli-exit-codes
+#[test]
+fn named_config_file_that_does_not_exist_stops_the_run() -> Result<()> {
+    let env = TestEnvironment::new("config_named_missing")?;
+
+    let sut = run_parse_sh_isolated(&env, &["--config", "nowhere.yml"], None)?;
+
+    assert!(!sut.status.success());
+    assert!(
+        String::from_utf8_lossy(&sut.stderr).contains("nowhere.yml"),
+        "{}",
+        String::from_utf8_lossy(&sut.stderr)
+    );
+    assert!(!env.file_exists("compile_commands.json"));
+    Ok(())
+}
+
+// Requirements: cli-configuration-file, cli-exit-codes
+#[test]
+#[cfg(unix)]
+fn broken_searched_config_is_not_skipped_for_the_next_location() -> Result<()> {
+    let env = TestEnvironment::new("config_broken_not_skipped")?;
+    let xdg = env.test_dir().join("xdg");
+    write_at(&env.test_dir().join("bear.yml"), "format:\n  paths: [unclosed\n")?;
+    write_at(&xdg.join("bear.yml"), KEEP_MISSING)?;
+
+    let sut = run_parse_sh_isolated(&env, &[], Some(xdg.to_str().unwrap()))?;
+
+    assert!(!sut.status.success());
+    let stderr = String::from_utf8_lossy(&sut.stderr);
+    assert!(stderr.contains("bear.yml") && !stderr.contains("xdg"), "{stderr}");
+    assert!(!env.file_exists("compile_commands.json"));
+    Ok(())
+}
+
+// Requirements: cli-configuration-file
+#[test]
+fn listing_compilers_reads_no_configuration_file() -> Result<()> {
+    let env = TestEnvironment::new("config_not_read_by_print_compilers")?;
+    write_at(&env.test_dir().join("bear.yml"), "format:\n  paths: [unclosed\n")?;
+
+    let sut = env.run_bear(&["semantic", "--print-compilers"])?;
+
+    sut.assert_success()?;
     Ok(())
 }
