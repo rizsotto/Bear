@@ -168,9 +168,9 @@ impl DirectoryCollector {
 
             let mut header_names: Vec<std::ffi::OsString> = read_dir
                 .filter_map(|entry| entry.ok())
-                .filter(|entry| entry.file_type().is_ok_and(|ft| ft.is_file()))
+                .filter(|entry| is_header_file(Path::new(&entry.file_name())))
+                .filter(|entry| std::fs::metadata(entry.path()).is_ok_and(|meta| meta.is_file()))
                 .map(|entry| entry.file_name())
-                .filter(|name| is_header_file(Path::new(name)))
                 .collect();
             header_names.sort();
 
@@ -703,6 +703,31 @@ mod tests {
 
         assert!(!out.iter().any(|e| e.file == Path::new("src/readme.txt")));
         assert_eq!(stats.entries_synthesized.load(Ordering::Relaxed), 2);
+    }
+
+    // Requirements: output-header-entries
+    #[test]
+    #[cfg(unix)]
+    fn test_siblings_follow_symlinks_to_header_files() {
+        use std::os::unix::fs::symlink;
+
+        let fixture = fixture::Fixture::new();
+        let src = fixture.path().join("src");
+        std::fs::create_dir_all(fixture.path().join("real/dir")).unwrap();
+        std::fs::write(fixture.path().join("real/target.h"), "").unwrap();
+        std::fs::remove_file(src.join("util.h")).unwrap();
+        std::fs::remove_file(src.join("helper.hpp")).unwrap();
+        symlink(fixture.path().join("real/target.h"), src.join("link.h")).unwrap();
+        symlink(fixture.path().join("real/missing.h"), src.join("broken.h")).unwrap();
+        symlink(fixture.path().join("real/dir"), src.join("dir.h")).unwrap();
+        let (writer, collected) = CollectingWriter::new();
+        let sut = HeaderEntrySynthesizer::new(writer, enabled_config(), OutputStatistics::new());
+
+        sut.write(vec![donor_entry(fixture.path())].into_iter()).unwrap();
+
+        let out = collected.lock().unwrap();
+        let files: Vec<&Path> = out.iter().map(|e| e.file.as_path()).collect();
+        assert_eq!(files, vec![Path::new("src/main.c"), Path::new("src/link.h")]);
     }
 
     #[test]

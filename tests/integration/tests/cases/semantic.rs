@@ -1587,6 +1587,68 @@ format:
 
 // Requirements: output-header-entries
 //
+// `src/link.h` is a symlink to `real/util.h`, a header outside the scanned
+// directory. The entry is reported under the link's path.
+#[test]
+#[cfg(unix)]
+fn synthesized_header_entry_follows_a_symlink_to_a_header() -> Result<()> {
+    // arrange
+    let env = TestEnvironment::new("header_entry_symlink")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "src/main.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    let config = r#"
+schema: "4.2"
+
+headers:
+  enabled: true
+  strategy: siblings
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#;
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("src/main.c", "int main() { return 0; }"),
+        ("real/util.h", "int util(void);"),
+    ])?;
+    std::os::unix::fs::symlink(env.test_dir().join("real/util.h"), env.test_dir().join("src/link.h"))?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // act
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // assert
+    let sut = env.load_compilation_database("compile_commands.json")?;
+    sut.assert_count(2)?;
+    sut.assert_contains(&compilation_entry!(
+        file: "src/link.h".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["gcc".to_string(), "-c".to_string(), "src/link.h".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: output-header-entries
+//
 // A synthesized header entry clones the donor's arguments with the output
 // flag removed. That removal must recognize the glued spelling too: a
 // leftover `-omain.o` in a header entry names an object the header does not
