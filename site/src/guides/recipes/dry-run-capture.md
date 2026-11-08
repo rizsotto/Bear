@@ -210,21 +210,21 @@ machine or another checkout:
 bear parse-sh -i build.log -C /home/you/project
 ```
 
-A log from another machine names sources that are not on this one, and
-Bear drops entries whose source file is missing. Turn that off with
-`sources.only_existing_files` (see the [configuration
-reference](../../reference/configuration.md#sources)), in a config file
-that starts with `schema: "4.2"`:
-
-```yaml
-schema: "4.2"
-sources:
-  only_existing_files: false
-```
+A log from another machine names sources and compilers that are not on
+this one. Pass `--no-local-lookups` and Bear stops looking for them: it
+keeps entries whose source file is missing, and it runs no compiler to
+identify `cc` or `c++`. Give `-C` the directory as it was on the other
+machine:
 
 ```sh
-bear --config keep-missing.yml parse-sh -i build.log -C /home/you/project
+bear parse-sh --no-local-lookups -i build.log -C /home/you/project
 ```
+
+A few settings need this machine's files and are rejected with this
+option; the [configuration reference](../../reference/configuration.md)
+marks them. To keep entries for sources deleted on this machine, set
+`sources.only_existing_files` to `false` (see
+[sources](../../reference/configuration.md#sources)).
 
 [Recover compile_commands.json from a build
 log](../../tutorials/compile-commands-from-a-build-log.md) walks a

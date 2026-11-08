@@ -107,6 +107,11 @@ answers, the cases no flag fixes (a sub-make that never descends, a
 ninja dry run that prints progress instead of commands), and how to read
 the skip report Bear writes on standard error.
 
+For a log from another machine, an empty database can also mean Bear
+dropped entries whose sources are not on this one. Pass
+`--no-local-lookups` (see [a log that was captured without these
+flags](recipes/dry-run-capture.md#a-log-that-was-captured-without-these-flags)).
+
 ## The output has duplicate entries
 
 Two entries are duplicates only when every field listed in

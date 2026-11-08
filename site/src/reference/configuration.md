@@ -101,7 +101,9 @@ Default: `only_existing_files: true` and both lists empty.
   deletes after compiling it is usually kept, while in semantic and
   parse-sh mode it is dropped. With the `relative` directory format,
   `directory` is written as `.`, so the check looks under the directory
-  Bear runs in. Entries read with `--append` are checked the same way.
+  Bear runs in. Entries read with `--append` are checked the same way. The
+  `--no-local-lookups` option of `semantic` and `parse-sh` turns the
+  check off.
 - **`sources.directories.path`**, **`sources.directories.action`**: list
   of directory rules; `action` is `include` or `exclude`.
 - **`sources.files.pattern`**, **`sources.files.action`**: list of
@@ -140,6 +142,7 @@ format:
 
 - **`format.paths.directory`**, **`format.paths.file`**: `as-is`,
   `canonical`, `relative`, or `absolute`. Default: `as-is` for both.
+  `canonical` is rejected with `--no-local-lookups`.
 
 ### format.entries
 
@@ -152,7 +155,7 @@ format:
 
 - **`format.arguments.from_response_files`**: expand `@file`
   response-file references into their tokenized contents. Default:
-  `false`.
+  `false`. Rejected with `--no-local-lookups`.
 - **`format.arguments.from_environment`**: fold compiler environment
   variables (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
   `OBJC_INCLUDE_PATH`, MSVC's `CL` / `_CL_`) into the recorded arguments.
@@ -167,7 +170,7 @@ headers:
 ```
 
 - **`headers.enabled`**: turn header-entry synthesis on. Default:
-  `false`.
+  `false`. Rejected with `--no-local-lookups`.
 - **`headers.strategy`**: `siblings` or `dependency-files`. Default:
   `siblings`.
 
