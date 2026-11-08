@@ -11,7 +11,7 @@
 
 ## Before modifying
 
-- **CLI arguments** (`src/args.rs`): uses `clap` derive macros. Update the man page; `man/CLAUDE.md` says how. Regenerate `site/src/reference/command-line.md` with `scripts/generate-command-line-reference.py`.
+- **CLI arguments** (`src/args.rs`): uses the `clap` builder API with the `arg!` macro. Update the man page; `man/CLAUDE.md` says how. Regenerate `site/src/reference/command-line.md` with `scripts/generate-command-line-reference.py`.
 - **Configuration types** (`src/config/types.rs`): changes here affect YAML config parsing. Update validation in `src/config/validation.rs`.
 
 ## The config-to-semantic boundary (load-bearing)
