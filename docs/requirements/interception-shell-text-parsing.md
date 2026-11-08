@@ -222,9 +222,10 @@ dry-run text itself. The man page must state them too.
   default, a log whose sources are absent gives an empty database
   (`output-missing-source-filter`); turning the filter off, or declaring
   the input as coming from another machine
-  (`cli-input-from-another-machine`), gives a full one. The path format that resolves paths against the real filesystem
-  also needs the sources present. The man page names the alternative for
-  that case.
+  (`cli-input-from-another-machine`), gives a full one. The
+  symlink-resolving path format also needs the sources present, and is
+  rejected for input declared to come from another machine
+  (`cli-input-from-another-machine`).
 
 ## Rationale
 

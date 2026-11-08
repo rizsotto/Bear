@@ -750,6 +750,24 @@ mod tests {
     }
 
     // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_without_local_lookups_matches_by_path_or_bare_file_name_only() {
+        let mut hints = CompilerHints::without_local_lookups();
+        hints.add(path("/opt/other/bin/cc"), Some("gcc")).unwrap();
+
+        let sut = offline_recognizer(hints);
+
+        assert_cases(
+            &sut,
+            &[
+                ("cc", Some(CompilerType::compiler("gcc"))),
+                ("/opt/other/bin/cc", Some(CompilerType::compiler("gcc"))),
+                ("/usr/bin/cc", Some(CompilerType::compiler("clang"))),
+            ],
+        );
+    }
+
+    // Requirements: cli-input-from-another-machine
     #[cfg(unix)]
     #[test]
     fn test_without_local_lookups_keeps_the_spelling_of_a_symlink() {

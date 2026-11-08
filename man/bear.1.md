@@ -164,8 +164,10 @@ configuration need not exist here. Not accepted together with
 with no configured family is parsed as Clang. Clang's flag table
 includes GCC's, so a GCC call is read the same, except for a rare GCC
 argument such as `-load` or a `-lazy...` library flag. Configure the
-compiler's family in `compilers` to avoid this. A configured compiler path matches only by the path as written or
-by its file name; Bear resolves no path on this machine.
+compiler's family in `compilers` to avoid this. A configured compiler
+path matches only by the path as written, or by its file name when the
+build invoked the compiler by that bare name. Bear resolves no path on
+this machine.
 
 : The settings that read this machine's files are rejected at startup,
 and the error names the setting and the configuration file:

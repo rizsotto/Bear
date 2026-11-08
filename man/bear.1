@@ -169,8 +169,9 @@ except for a rare GCC argument such as \f[CR]\-load\f[R] or a
 \f[CR]\-lazy...\f[R] library flag.
 Configure the compiler\(cqs family in \f[CR]compilers\f[R] to avoid
 this.
-A configured compiler path matches only by the path as written or by its
-file name; Bear resolves no path on this machine.
+A configured compiler path matches only by the path as written, or by
+its file name when the build invoked the compiler by that bare name.
+Bear resolves no path on this machine.
 The settings that read this machine\(cqs files are rejected at startup,
 and the error names the setting and the configuration file:
 \f[CR]format.paths.directory: canonical\f[R],

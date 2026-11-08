@@ -221,6 +221,7 @@ mod tests {
     use crate::config::{DirectoryAction, DirectoryRule, FileRule, SourceFilter};
     use crate::output::writers::filtering::EntryFilter;
     use std::path::PathBuf;
+    use tempfile::TempDir;
 
     fn create_test_entry(file_path: &str, directory: &str) -> Entry {
         Entry::from_arguments_str(file_path, vec!["gcc", "-c"], directory, None)
@@ -522,13 +523,6 @@ mod tests {
         assert!(!sut.accept(&create_test_entry("generated\\moc_window.cpp", "/project")));
         assert!(sut.accept(&create_test_entry("other\\moc_window.cpp", "/project")));
     }
-}
-
-#[cfg(test)]
-mod missing_source_tests {
-    use super::*;
-    use crate::output::writers::filtering::EntryFilter;
-    use tempfile::TempDir;
 
     fn filter_with(
         only_existing_files: bool,

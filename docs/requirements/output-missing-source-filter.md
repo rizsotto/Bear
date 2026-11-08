@@ -67,6 +67,10 @@ writes the database. This is on by default.
   dropped. Existing entries read when appending are checked after the
   build in every mode, so an appending run with a build that runs no
   compiler trims them.
+- An existing database written with the old relative directory format
+  has `.` as `directory`. When appending, such entries are checked
+  relative to the directory Bear runs in, so they can be dropped though
+  their file exists.
 
 ## Rationale
 

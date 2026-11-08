@@ -57,9 +57,9 @@ Compilers:
   does not exist on this machine, **when** Bear runs with the option,
   **then** the configuration is accepted.
 - **Given** a configured compiler path, **when** Bear runs with the
-  option, **then** an execution matches it only by the path as written
-  or by its file name. No path is resolved on this machine to find a
-  match ([`recognition-compiler-names`](recognition-compiler-names.md)).
+  option, **then** an execution matches it only by the path as written,
+  or by its file name when the build invoked it by that bare name. No
+  path is resolved on this machine to find a match ([`recognition-compiler-names`](recognition-compiler-names.md)).
 - **Given** an execution of `cc -Xclang -ast-dump -c a.c` with no
   configured family for `cc`, **when** Bear runs with the option,
   **then** no program is run to identify `cc`, and the call is parsed

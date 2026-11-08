@@ -33,6 +33,7 @@ pub use statistics::OutputStatistics;
 pub struct OutputWriter {
     writer: writers::SemanticCommandWriter,
     stats: Arc<OutputStatistics>,
+    suggest_no_local_lookups: bool,
 }
 
 impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
@@ -43,11 +44,18 @@ impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
         let stats = OutputStatistics::new();
         let writer = writers::create_pipeline(args, config, Arc::clone(&stats))?;
 
-        Ok(Self { writer, stats })
+        Ok(Self { writer, stats, suggest_no_local_lookups: false })
     }
 }
 
 impl OutputWriter {
+    /// Names `--no-local-lookups` in the empty-output error. Set it only for
+    /// the modes that accept the option.
+    pub fn suggesting_no_local_lookups(mut self, suggest: bool) -> Self {
+        self.suggest_no_local_lookups = suggest;
+        self
+    }
+
     /// Writes semantic commands using the configured output writer.
     ///
     /// # Arguments
@@ -76,17 +84,7 @@ impl OutputWriter {
         let missing = load(&self.stats.entries_dropped_missing_source);
         let filtered = load(&self.stats.entries_filtered_by_source);
         if written == 0 && (invalid > 0 || (missing > 0 && missing == filtered)) {
-            match (invalid > 0, missing > 0) {
-                (true, false) => log::error!(
-                    "Compilation database is empty: all {invalid} candidate entries were dropped as invalid; see WARN log lines above for per-entry reasons",
-                ),
-                (false, _) => log::error!(
-                    "Compilation database is empty: all {missing} candidate entries were dropped because their source file is missing; set sources.only_existing_files to false to keep them, or, when the input comes from another machine, pass --no-local-lookups to bear semantic or bear parse-sh",
-                ),
-                (true, true) => log::error!(
-                    "Compilation database is empty: all candidate entries were dropped (invalid: {invalid}, source file missing: {missing}); see WARN log lines above for per-entry reasons, and set sources.only_existing_files to false to keep entries whose source file is missing, or, when the input comes from another machine, pass --no-local-lookups to bear semantic or bear parse-sh",
-                ),
-            }
+            log::error!("{}", empty_output_message(invalid, missing, self.suggest_no_local_lookups));
         }
 
         result
@@ -95,6 +93,25 @@ impl OutputWriter {
     /// Returns the statistics collected during the output pipeline execution.
     pub fn statistics(&self) -> &Arc<OutputStatistics> {
         &self.stats
+    }
+}
+
+fn empty_output_message(invalid: usize, missing: usize, suggest_no_local_lookups: bool) -> String {
+    let other_machine = if suggest_no_local_lookups {
+        ", or, when the input comes from another machine, pass --no-local-lookups"
+    } else {
+        ""
+    };
+    match (invalid > 0, missing > 0) {
+        (true, false) => format!(
+            "Compilation database is empty: all {invalid} candidate entries were dropped as invalid; see WARN log lines above for per-entry reasons"
+        ),
+        (false, _) => format!(
+            "Compilation database is empty: all {missing} candidate entries were dropped because their source file is missing; set sources.only_existing_files to false to keep them{other_machine}"
+        ),
+        (true, true) => format!(
+            "Compilation database is empty: all candidate entries were dropped (invalid: {invalid}, source file missing: {missing}); see WARN log lines above for per-entry reasons, and set sources.only_existing_files to false to keep entries whose source file is missing{other_machine}"
+        ),
     }
 }
 
@@ -170,5 +187,17 @@ mod tests {
 
         let result = OutputWriter::try_from((&args, &config));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn empty_output_message_names_the_option_only_when_it_exists() {
+        for (invalid, missing) in [(0, 2), (1, 2)] {
+            let with = empty_output_message(invalid, missing, true);
+            let without = empty_output_message(invalid, missing, false);
+
+            assert!(with.contains("--no-local-lookups"), "{invalid}/{missing}: {with}");
+            assert!(!without.contains("--no-local-lookups"), "{invalid}/{missing}: {without}");
+            assert!(without.contains("sources.only_existing_files"), "{invalid}/{missing}: {without}");
+        }
     }
 }

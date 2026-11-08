@@ -104,7 +104,7 @@ impl Mode {
                 log::debug!("Mode: replay events and semantic analysis");
 
                 let source = impls::RawEventReader::create(&input.path)?;
-                let consumer = impls::SemanticEventWriter::create(output, &config, hints)
+                let consumer = impls::SemanticEventWriter::create(output, &config, hints, true)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(source), Box::new(consumer));
@@ -125,7 +125,7 @@ impl Mode {
                     std::collections::HashMap::new()
                 };
                 let producer = impls::ShellScriptReader::create(&input.path, directory, environment)?;
-                let consumer = impls::SemanticEventWriter::create(output, &config, hints)
+                let consumer = impls::SemanticEventWriter::create(output, &config, hints, true)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
@@ -157,7 +157,7 @@ impl Mode {
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
-                let consumer = impls::SemanticEventWriter::create(output, &config, hints)
+                let consumer = impls::SemanticEventWriter::create(output, &config, hints, false)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
@@ -601,6 +601,7 @@ mod impls {
             output: args::BuildSemantic,
             config: &config::Main,
             hints: CompilerHints,
+            suggest_no_local_lookups: bool,
         ) -> Result<Self, WriterCreationError> {
             let ignored: Vec<PathBuf> = config
                 .compilers
@@ -615,7 +616,8 @@ mod impls {
                 config.format.arguments.from_response_files,
                 config.format.arguments.from_environment,
             );
-            let writer = output::OutputWriter::try_from((&output, config))?;
+            let writer = output::OutputWriter::try_from((&output, config))?
+                .suggesting_no_local_lookups(suggest_no_local_lookups);
 
             Ok(Self { interpreter: Box::new(interpreter), writer })
         }

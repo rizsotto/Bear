@@ -1205,6 +1205,7 @@ sources:
 
 // Requirements: output-path-format
 #[test]
+#[cfg(unix)]
 fn absolute_directory_format_resolves_a_relative_working_directory_once() -> Result<()> {
     use serde_json::json;
 
@@ -2228,7 +2229,7 @@ fn working_directory_config_wins_over_xdg_and_is_not_merged() -> Result<()> {
 // Requirements: cli-configuration-file
 #[test]
 #[cfg(unix)]
-fn xdg_config_locations_are_searched_in_order() -> Result<()> {
+fn xdg_config_locations_are_searched() -> Result<()> {
     let cases = [("direct file", "xdg/bear.yml", 1), ("Bear subdirectory", "xdg/Bear/bear.yml", 1)];
 
     for (case, relative, expected) in cases {
@@ -2250,13 +2251,19 @@ fn xdg_config_locations_are_searched_in_order() -> Result<()> {
 fn direct_xdg_file_wins_over_bear_subdirectory() -> Result<()> {
     let env = TestEnvironment::new("config_xdg_direct_over_subdir")?;
     let xdg = env.test_dir().join("xdg");
-    write_at(&xdg.join("bear.yml"), DROP_MISSING)?;
+    write_at(
+        &xdg.join("bear.yml"),
+        "schema: \"4.2\"\nsources:\n  only_existing_files: false\nformat:\n  entries:\n    use_array_format: false\n",
+    )?;
     write_at(&xdg.join("Bear").join("bear.yml"), KEEP_MISSING)?;
 
     let sut = run_parse_sh_isolated(&env, &[], Some(xdg.to_str().unwrap()))?;
 
     assert!(sut.status.success(), "{}", String::from_utf8_lossy(&sut.stderr));
-    assert_eq!(entries_kept(&env)?, 0);
+    let db = env.load_compilation_database("compile_commands.json")?;
+    assert_eq!(db.entries().len(), 1);
+    assert!(db.entries()[0].get("command").is_some(), "the direct file must be the one read");
+    assert!(db.entries()[0].get("arguments").is_none());
     Ok(())
 }
 
