@@ -210,6 +210,7 @@ sources:
 }
 
 /// Writes `events.json` with one compile event per source, run from the test directory.
+#[cfg(target_family = "unix")]
 fn write_compile_events(env: &TestEnvironment, sources: &[&str]) -> Result<()> {
     use serde_json::json;
 
