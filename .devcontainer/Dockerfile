@@ -7,6 +7,10 @@ ENV RUSTUP_HOME=/root/.rustup \
 # time/bc/file/which: small diagnostics used by agent-driven measurement
 # and inspection sessions (GNU time and bc are not in the base image).
 #
+# clang/clang-tools-extra: a second compiler family for the integration
+# tests, and clangd/clang-tidy to check a generated compile_commands.json by
+# hand. The c-development group does not include them.
+#
 # mdbook is pinned (--locked) to build the docs site under site/. Keep this
 # version identical to the one the Pages CI workflow installs.
 #
@@ -19,7 +23,7 @@ ENV RUSTUP_HOME=/root/.rustup \
 ENV BD_DISABLE_METRICS=1
 ARG BEADS_VERSION=1.3.1
 ARG BEADS_SHA256=3219443a9734b89b93fb16ee8d65844759fa1b3cd3cf139c606b7353cfb0715c
-RUN dnf -y install curl ca-certificates git gh pandoc time bc file which \
+RUN dnf -y install curl ca-certificates git gh pandoc time bc file which clang clang-tools-extra \
     && dnf -y group install c-development \
     && dnf -y clean all \
     && rm -rf /var/cache/dnf \
