@@ -68,6 +68,15 @@ name the build invoked, exactly as executed.
   family the name would otherwise get. For input declared to come from
   another machine, no path is resolved to find a match
   (`cli-input-from-another-machine`).
+- **Given** a configuration that names a compiler at a path that does
+  not exist on this machine, **when** Bear runs, **then** it exits
+  non-zero before any work starts, and the diagnostic names the path.
+  The same holds for an entry that excludes a compiler. Input declared
+  to come from another machine is the exception
+  (`cli-input-from-another-machine`).
+- **Given** a configuration that names the same compiler path twice,
+  **when** Bear runs, **then** it exits non-zero before any work
+  starts, and the diagnostic names the duplicate entry.
 - **Given** an event file with a
   `swiftc -module-name App -emit-object a.swift b.swift` execution,
   **when** Bear runs in semantic mode, **then** the database holds two
