@@ -822,3 +822,23 @@ fn semantic_exit_code_for_missing_input() -> Result<()> {
     result.assert_failure()?;
     Ok(())
 }
+
+// Requirements: cli-input-from-another-machine, cli-exit-codes
+#[test]
+fn no_local_lookups_is_an_unknown_argument_where_the_build_runs() -> Result<()> {
+    let cases: [&[&str]; 2] = [
+        &["--no-local-lookups", "--", "true"],
+        &["intercept", "--no-local-lookups", "-o", "events.json", "--", "true"],
+    ];
+
+    for args in cases {
+        let env = TestEnvironment::new("no_local_lookups_unknown")?;
+
+        let sut = env.run_bear(args)?;
+
+        sut.assert_failure()?;
+        assert!(sut.stderr().contains("unexpected argument"), "case {args:?}: {}", sut.stderr());
+    }
+
+    Ok(())
+}

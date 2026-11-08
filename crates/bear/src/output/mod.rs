@@ -81,10 +81,10 @@ impl OutputWriter {
                     "Compilation database is empty: all {invalid} candidate entries were dropped as invalid; see WARN log lines above for per-entry reasons",
                 ),
                 (false, _) => log::error!(
-                    "Compilation database is empty: all {missing} candidate entries were dropped because their source file is missing; set sources.only_existing_files to false to keep them",
+                    "Compilation database is empty: all {missing} candidate entries were dropped because their source file is missing; set sources.only_existing_files to false to keep them, or, when the input comes from another machine, pass --no-local-lookups to bear semantic or bear parse-sh",
                 ),
                 (true, true) => log::error!(
-                    "Compilation database is empty: all candidate entries were dropped (invalid: {invalid}, source file missing: {missing}); see WARN log lines above for per-entry reasons, and set sources.only_existing_files to false to keep entries whose source file is missing",
+                    "Compilation database is empty: all candidate entries were dropped (invalid: {invalid}, source file missing: {missing}); see WARN log lines above for per-entry reasons, and set sources.only_existing_files to false to keep entries whose source file is missing, or, when the input comes from another machine, pass --no-local-lookups to bear semantic or bear parse-sh",
                 ),
             }
         }

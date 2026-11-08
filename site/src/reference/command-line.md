@@ -98,6 +98,7 @@ bear semantic [OPTIONS]
 | `-a, --append` | Append result to an existing output file | - |
 | `--overwrite` | Overwrite an existing output file (the default) | - |
 | `--print-compilers` | Print the compilers Bear recognizes and exit | - |
+| `--no-local-lookups` | Input comes from another machine: do not check that sources exist on this machine | - |
 | `-h, --help` | Print help | - |
 
 Reads the event stream that `bear intercept` (or a third-party producer) writes and produces the compilation database, e.g.:
@@ -123,6 +124,7 @@ bear parse-sh [OPTIONS]
 | `-a, --append` | Append result to an existing output file | - |
 | `--overwrite` | Overwrite an existing output file (the default) | - |
 | `-C, --directory <DIR>` | Initial working directory for the parsed commands | - |
+| `--no-local-lookups` | Input comes from another machine: do not check that sources exist, and do not use Bear's own environment | - |
 | `-h, --help` | Print help | - |
 
 Parses the text a build system prints in dry-run mode and writes the compilation database, without running a build, e.g.:

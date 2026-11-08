@@ -3049,3 +3049,40 @@ fn semantic_print_compilers_does_not_block_on_stdin() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: cli-input-from-another-machine, output-missing-source-filter
+#[test]
+fn semantic_no_local_lookups_keeps_entries_for_missing_sources() -> Result<()> {
+    let env = TestEnvironment::new("semantic_no_local_lookups")?;
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "/nowhere/a.c"],
+        "working_dir": "/nowhere",
+        "environment": {}
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+
+    env.run_bear_success(&["semantic", "-i", "events.json", "-o", "without.json"])?;
+    let sut = env.run_bear(&["semantic", "--no-local-lookups", "-i", "events.json"])?;
+
+    sut.assert_success()?;
+    env.load_compilation_database("without.json")?.assert_count(0)?;
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("/nowhere/a.c".to_string()))?;
+
+    Ok(())
+}
+
+// Requirements: cli-input-from-another-machine
+#[test]
+fn semantic_no_local_lookups_conflicts_with_print_compilers() -> Result<()> {
+    let env = TestEnvironment::new("semantic_no_local_lookups_print")?;
+
+    let sut = env.run_bear(&["semantic", "--no-local-lookups", "--print-compilers"])?;
+
+    sut.assert_failure()?;
+    assert!(sut.stderr().contains("cannot be used with"), "{}", sut.stderr());
+
+    Ok(())
+}

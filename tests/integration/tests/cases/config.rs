@@ -2088,3 +2088,60 @@ compilers:
 
     Ok(())
 }
+
+// Requirements: cli-input-from-another-machine
+//
+// Without the option a configured compiler path must exist; with it the
+// configuration is accepted, for an active entry and for an ignored one.
+// The active entry is recognized by its file name.
+#[test]
+fn compiler_path_missing_here_is_accepted_with_no_local_lookups() -> Result<()> {
+    let cases = [
+        ("an active entry", "  - path: /opt/other/bin/my-quirky-cc\n    as: gcc\n", 1),
+        ("an ignored entry", "  - path: /opt/other/bin/my-quirky-cc\n    ignore: true\n", 0),
+    ];
+
+    for (case, compiler, entries) in cases {
+        let env = TestEnvironment::new("config_no_local_lookups_compiler_path")?;
+        let config = env.create_config(&format!("schema: \"4.2\"\ncompilers:\n{compiler}"))?;
+        let config = config.to_str().unwrap();
+        env.create_source_files(&[("build.log", "my-quirky-cc -c /nowhere/a.c\n")])?;
+
+        let without = env.run_bear(&["--config", config, "parse-sh", "-i", "build.log"])?;
+        let sut = env.run_bear(&["--config", config, "parse-sh", "--no-local-lookups", "-i", "build.log"])?;
+
+        without.assert_failure()?;
+        assert!(without.stderr().contains("/opt/other/bin/my-quirky-cc"), "{case}: {}", without.stderr());
+        sut.assert_success()?;
+        let db = env.load_compilation_database("compile_commands.json")?;
+        db.assert_count(entries)?;
+        if entries > 0 {
+            db.assert_contains(&CompilationEntryMatcher::new().file("/nowhere/a.c".to_string()))?;
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn compiler_path_missing_here_still_rejects_duplicates_with_no_local_lookups() -> Result<()> {
+    let env = TestEnvironment::new("config_no_local_lookups_duplicate")?;
+    let config = env.create_config(
+        "schema: \"4.2\"\ncompilers:\n  - path: /opt/other/cc\n    as: gcc\n  - path: /opt/other/cc\n    as: gcc\n",
+    )?;
+    env.create_source_files(&[("build.log", "gcc -c /nowhere/a.c\n")])?;
+
+    let sut = env.run_bear(&[
+        "--config",
+        config.to_str().unwrap(),
+        "parse-sh",
+        "--no-local-lookups",
+        "-i",
+        "build.log",
+    ])?;
+
+    sut.assert_failure()?;
+    assert!(sut.stderr().contains("Duplicate compiler entry"), "{}", sut.stderr());
+
+    Ok(())
+}

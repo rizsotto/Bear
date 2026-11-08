@@ -48,7 +48,7 @@ impl Mode {
     /// the argument/configuration combination is valid, and builds the matching
     /// mode instance -- returning a useful error otherwise.
     pub fn configure(context: context::Context, args: args::Arguments) -> Result<Self, ConfigurationError> {
-        let args::Arguments { config: config_path, mode } = args;
+        let args::Arguments { config: config_path, local_lookups, mode } = args;
 
         // print-compilers runs without configuration: it only lists the
         // built-in recognition tables, so it loads none.
@@ -57,8 +57,13 @@ impl Mode {
             return Ok(Self::PrintCompilers);
         }
 
-        let config = config::Loader::load(&context, &config_path)
+        let mut config = config::Loader::load(&context, &config_path, local_lookups)
             .map_err(|error| ConfigurationError::ConfigLoad(Box::new(error)))?;
+        // Input from another machine: its sources are not here, so the
+        // missing-source filter cannot apply, whatever the config says.
+        if !local_lookups {
+            config.sources.only_existing_files = false;
+        }
         log::info!("{config}");
 
         // Resolve every configured `as:` spelling once, here, so a typo fails
@@ -113,8 +118,13 @@ impl Mode {
                 // back to Bear's invocation directory so the producer always
                 // has a concrete path to interpret from.
                 let directory = input.directory.unwrap_or_else(|| context.current_directory.clone());
-                let producer =
-                    impls::ShellScriptReader::create(&input.path, directory, context.environment.clone())?;
+                // Bear's own environment is not part of a log from another machine.
+                let environment = if local_lookups {
+                    context.environment.clone()
+                } else {
+                    std::collections::HashMap::new()
+                };
+                let producer = impls::ShellScriptReader::create(&input.path, directory, environment)?;
                 let consumer = impls::SemanticEventWriter::create(output, &config, hints)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
@@ -719,6 +729,7 @@ mod tests {
             pub(super) fn arguments(&self) -> args::Arguments {
                 args::Arguments {
                     config: Some(self.config_file.display().to_string()),
+                    local_lookups: true,
                     mode: args::Mode::Semantic {
                         input: args::BuildEvents { path: PathBuf::from("-") },
                         output: args::BuildSemantic { path: PathBuf::from("-"), append: false },

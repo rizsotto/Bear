@@ -34,6 +34,9 @@ pub(crate) fn is_stdio(path: &std::path::Path) -> bool {
 pub struct Arguments {
     /// The path of the configuration file.
     pub config: Option<String>,
+    /// Whether Bear may look at this machine to shape the output. False when
+    /// the input comes from another machine (`--no-local-lookups`).
+    pub local_lookups: bool,
     /// The mode of the application.
     pub mode: Mode,
 }
@@ -152,6 +155,7 @@ impl TryFrom<ArgMatches> for Arguments {
 
     fn try_from(matches: ArgMatches) -> Result<Self, Self::Error> {
         let config = matches.get_one::<String>("config").map(String::to_string);
+        let local_lookups = !local_lookups_disabled(&matches);
         let mode = Mode::try_from(matches)?;
 
         // `--print-compilers` only lists the compilers Bear recognizes from
@@ -161,8 +165,15 @@ impl TryFrom<ArgMatches> for Arguments {
             return Err(ParseError::ConfigNotApplicableToPrintCompilers);
         }
 
-        Ok(Arguments { config, mode })
+        Ok(Arguments { config, local_lookups, mode })
     }
+}
+
+/// The flag exists on the `semantic` and `parse-sh` subcommands only.
+fn local_lookups_disabled(matches: &ArgMatches) -> bool {
+    matches
+        .subcommand()
+        .is_some_and(|(_, sub)| matches!(sub.try_get_one::<bool>("no-local-lookups"), Ok(Some(true))))
 }
 
 impl TryFrom<ArgMatches> for Mode {
@@ -303,6 +314,9 @@ pub fn cli() -> Command {
                         .conflicts_with("append"),
                     arg!(--"print-compilers" "Print the compilers Bear recognizes and exit")
                         .action(ArgAction::SetTrue),
+                    arg!(--"no-local-lookups" "Input comes from another machine: do not check that sources exist on this machine")
+                        .action(ArgAction::SetTrue)
+                        .conflicts_with("print-compilers"),
                 ])
                 .arg_required_else_help(false)
                 .after_help(
@@ -326,6 +340,8 @@ pub fn cli() -> Command {
                         .action(ArgAction::SetTrue)
                         .conflicts_with("append"),
                     arg!(-C --directory <DIR> "Initial working directory for the parsed commands"),
+                    arg!(--"no-local-lookups" "Input comes from another machine: do not check that sources exist, and do not use Bear's own environment")
+                        .action(ArgAction::SetTrue),
                 ])
                 .arg_required_else_help(false)
                 .after_help(
@@ -367,6 +383,7 @@ mod test {
             arguments,
             Arguments {
                 config: Some("~/bear.yaml".into()),
+                local_lookups: true,
                 mode: Mode::Intercept {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
@@ -404,6 +421,7 @@ mod test {
             arguments,
             Arguments {
                 config: Some("~/bear.yaml".into()),
+                local_lookups: true,
                 mode: Mode::Semantic {
                     input: BuildEvents { path: "custom.json".into() },
                     output: BuildSemantic { path: "result.json".into(), append: true },
@@ -427,6 +445,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
+                local_lookups: true,
                 mode: Mode::Semantic {
                     input: BuildEvents { path: "-".into() },
                     output: BuildSemantic { path: "compile_commands.json".into(), append: false },
@@ -447,6 +466,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
+                local_lookups: true,
                 mode: Mode::Semantic {
                     input: BuildEvents { path: "-".into() },
                     output: BuildSemantic { path: "compile_commands.json".into(), append: false },
@@ -472,6 +492,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
+                local_lookups: true,
                 mode: Mode::Intercept {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
@@ -498,6 +519,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
+                local_lookups: true,
                 mode: Mode::ParseSh {
                     input: ShScript { path: "-".into(), directory: None },
                     output: BuildSemantic { path: "compile_commands.json".into(), append: false },
@@ -518,6 +540,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
+                local_lookups: true,
                 mode: Mode::ParseSh {
                     input: ShScript { path: "in.sh".into(), directory: Some("/build".into()) },
                     output: BuildSemantic { path: "db.json".into(), append: true },
@@ -541,6 +564,7 @@ mod test {
             arguments,
             Arguments {
                 config: Some("~/bear.yaml".into()),
+                local_lookups: true,
                 mode: Mode::ParseSh {
                     input: ShScript { path: "-".into(), directory: None },
                     output: BuildSemantic { path: "compile_commands.json".into(), append: false },
@@ -557,7 +581,7 @@ mod test {
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
 
-        assert_eq!(arguments, Arguments { config: None, mode: Mode::PrintCompilers });
+        assert_eq!(arguments, Arguments { config: None, local_lookups: true, mode: Mode::PrintCompilers });
     }
 
     // Requirements: recognition-compiler-names
@@ -585,6 +609,7 @@ mod test {
             arguments,
             Arguments {
                 config: Some("~/bear.yaml".to_string()),
+                local_lookups: true,
                 mode: Mode::Combined {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
@@ -657,6 +682,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
+                local_lookups: true,
                 mode: Mode::Combined {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect(),
@@ -665,5 +691,66 @@ mod test {
                 },
             }
         );
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_no_local_lookups_is_accepted_by_semantic_and_parse_sh() {
+        let executions = vec![
+            vec!["bear", "semantic", "--no-local-lookups"],
+            vec!["bear", "parse-sh", "--no-local-lookups"],
+        ];
+
+        for execution in executions {
+            let matches = cli().try_get_matches_from(&execution).expect("the flag is accepted");
+            let sut = Arguments::try_from(matches).unwrap();
+
+            assert!(!sut.local_lookups, "case {execution:?}");
+        }
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_local_lookups_default_to_on() {
+        let executions = vec![
+            vec!["bear", "semantic"],
+            vec!["bear", "parse-sh"],
+            vec!["bear", "--", "make"],
+            vec!["bear", "intercept", "-o", "e.json", "--", "make"],
+        ];
+
+        for execution in executions {
+            let matches = cli().try_get_matches_from(&execution).unwrap();
+            let sut = Arguments::try_from(matches).unwrap();
+
+            assert!(sut.local_lookups, "case {execution:?}");
+        }
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_no_local_lookups_is_rejected_where_the_build_runs() {
+        let executions = vec![
+            vec!["bear", "--no-local-lookups", "--", "make"],
+            vec!["bear", "intercept", "--no-local-lookups", "-o", "e.json", "--", "make"],
+        ];
+
+        for execution in executions {
+            let sut = cli().try_get_matches_from(&execution);
+
+            let error = sut.expect_err(&format!("case {execution:?} must be rejected"));
+            assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument, "case {execution:?}");
+        }
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_no_local_lookups_conflicts_with_print_compilers() {
+        let execution = vec!["bear", "semantic", "--no-local-lookups", "--print-compilers"];
+
+        let sut = cli().try_get_matches_from(execution);
+
+        let error = sut.expect_err("the two options must conflict");
+        assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
     }
 }

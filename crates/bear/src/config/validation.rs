@@ -19,6 +19,8 @@ pub enum ValidationError {
     PathNotFound { path: String },
     #[error("Duplicate {field} entry at: {idx}")]
     DuplicateEntry { field: &'static str, idx: usize },
+    #[error("Setting {key} needs files on this machine; it cannot be used with --no-local-lookups")]
+    NeedsLocalFiles { key: &'static str },
     #[error("Path format error: {message}")]
     PathFormatError { message: &'static str },
     #[error("Invalid glob pattern for field '{field}': {message}")]
@@ -55,13 +57,6 @@ impl Validator<Main> for Main {
     fn validate(config: &Main) -> Result<(), Self::Error> {
         let mut errors = Vec::new();
 
-        // Validate each compiler configuration
-        for compiler in config.compilers.iter() {
-            if let Err(e) = Compiler::validate(compiler) {
-                errors.push(e);
-            }
-        }
-
         // Check for duplicate compiler paths
         let mut seen_paths = std::collections::HashSet::new();
         for (idx, compiler) in config.compilers.iter().enumerate() {
@@ -78,16 +73,48 @@ impl Validator<Main> for Main {
     }
 }
 
-impl Validator<Compiler> for Compiler {
-    type Error = ValidationError;
+/// Every configured compiler path must exist on this machine. Skipped when
+/// the input comes from another machine.
+pub(super) fn check_compiler_paths(config: &Main) -> Result<(), ValidationError> {
+    let errors = config
+        .compilers
+        .iter()
+        .filter(|compiler| !compiler.path.exists())
+        .map(|compiler| ValidationError::PathNotFound { path: compiler.path.display().to_string() })
+        .collect();
+    collapse(errors)
+}
 
-    fn validate(config: &Compiler) -> Result<(), Self::Error> {
-        if config.path.exists() {
-            Ok(())
-        } else {
-            Err(ValidationError::PathNotFound { path: config.path.display().to_string() })
-        }
+/// Rejects the settings that read this machine's files to shape an entry.
+/// Used when the input comes from another machine.
+pub(super) fn reject_local_file_settings(config: &Main) -> Result<(), ValidationError> {
+    let settings = [
+        ("format.paths.directory: canonical", config.format.paths.directory == PathResolver::Canonical),
+        ("format.paths.file: canonical", config.format.paths.file == PathResolver::Canonical),
+        ("headers.enabled: true", config.headers.enabled),
+        ("format.arguments.from_response_files: true", config.format.arguments.from_response_files),
+    ];
+    let errors = settings
+        .iter()
+        .filter(|(_, on)| *on)
+        .map(|(key, _)| ValidationError::NeedsLocalFiles { key })
+        .collect();
+    collapse(errors)
+}
+
+/// Validates a loaded configuration. With `local_lookups` off (the input
+/// comes from another machine) the compiler paths need not exist, and the
+/// settings that read this machine's files are rejected instead. All
+/// problems are reported together.
+pub(super) fn validate_loaded(config: &Main, local_lookups: bool) -> Result<(), ValidationError> {
+    let mut errors = Vec::new();
+    if local_lookups {
+        extend_with(&mut errors, check_compiler_paths(config));
+    } else {
+        extend_with(&mut errors, reject_local_file_settings(config));
     }
+    extend_with(&mut errors, Main::validate(config));
+    collapse(errors)
 }
 
 impl Validator<SourceFilter> for SourceFilter {
@@ -173,22 +200,86 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    fn main_with_compiler(path: &str, ignore: bool) -> Main {
+        let compiler = Compiler { path: PathBuf::from(path), as_: Some("gcc".to_string()), ignore };
+        Main { compilers: vec![compiler], ..Main::default() }
+    }
+
     #[test]
-    fn test_validate_compiler_invalid_path() {
-        let config = Compiler {
-            path: PathBuf::from("/nonexistent/compiler"),
-            as_: Some("gcc".to_string()),
-            ignore: false,
-        };
+    fn test_check_compiler_paths_rejects_missing_path() {
+        let config = main_with_compiler("/nonexistent/compiler", false);
 
-        let result = Compiler::validate(&config);
-        assert!(result.is_err());
+        let sut = check_compiler_paths(&config);
 
-        match result.unwrap_err() {
-            ValidationError::PathNotFound { .. } => {
-                // Expected - path doesn't exist
+        match sut {
+            Err(ValidationError::PathNotFound { path }) => assert_eq!(path, "/nonexistent/compiler"),
+            other => panic!("Expected PathNotFound validation error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_validate_does_not_check_compiler_paths() {
+        let cases = [("an active entry", false), ("an ignored entry", true)];
+
+        for (case, ignore) in cases {
+            let config = main_with_compiler("/nonexistent/compiler", ignore);
+
+            let sut = Main::validate(&config);
+
+            assert!(sut.is_ok(), "{case}: {sut:?}");
+        }
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_reject_local_file_settings() {
+        fn with(edit: impl FnOnce(&mut Main)) -> Main {
+            let mut config = Main::default();
+            edit(&mut config);
+            config
+        }
+
+        let cases: Vec<(&str, Main, Vec<&str>)> = vec![
+            ("defaults", Main::default(), vec![]),
+            (
+                "canonical directory",
+                with(|c| c.format.paths.directory = PathResolver::Canonical),
+                vec!["format.paths.directory"],
+            ),
+            (
+                "canonical file",
+                with(|c| c.format.paths.file = PathResolver::Canonical),
+                vec!["format.paths.file"],
+            ),
+            ("headers", with(|c| c.headers.enabled = true), vec!["headers.enabled"]),
+            (
+                "response files",
+                with(|c| c.format.arguments.from_response_files = true),
+                vec!["format.arguments.from_response_files"],
+            ),
+            (
+                "several",
+                with(|c| {
+                    c.headers.enabled = true;
+                    c.format.arguments.from_response_files = true;
+                }),
+                vec!["headers.enabled", "format.arguments.from_response_files"],
+            ),
+        ];
+
+        for (case, config, keys) in cases {
+            let sut = reject_local_file_settings(&config);
+
+            match (sut, keys.is_empty()) {
+                (Ok(()), true) => {}
+                (Err(error), false) => {
+                    let message = error.to_string();
+                    for key in keys {
+                        assert!(message.contains(key), "{case}: {message}");
+                    }
+                }
+                (other, _) => panic!("{case}: unexpected {other:?}"),
             }
-            _ => panic!("Expected PathNotFound validation error"),
         }
     }
 

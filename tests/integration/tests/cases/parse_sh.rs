@@ -687,3 +687,157 @@ gcc -c b.c
 
     Ok(())
 }
+
+/// A log from another machine: the sources and the build directory exist
+/// only there.
+const OTHER_MACHINE_LOG: &str = "gcc -c /nowhere/a.c\ngcc -c /nowhere/b.c\n";
+
+fn arguments_of(entry: &Value) -> Result<Vec<&str>> {
+    Ok(entry["arguments"]
+        .as_array()
+        .context("arguments must be an array")?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect())
+}
+
+// Requirements: cli-input-from-another-machine, output-missing-source-filter
+#[test]
+fn parse_sh_no_local_lookups_keeps_entries_for_missing_sources() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_no_local_lookups")?;
+    env.create_source_files(&[("build.log", OTHER_MACHINE_LOG)])?;
+
+    let without = env.run_bear(&["parse-sh", "-i", "build.log", "-o", "without.json"])?;
+    without.assert_success()?;
+    let sut = env.run_bear(&["parse-sh", "--no-local-lookups", "-i", "build.log"])?;
+
+    sut.assert_success()?;
+    env.load_compilation_database("without.json")?.assert_count(0)?;
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("/nowhere/a.c".to_string()))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("/nowhere/b.c".to_string()))?;
+
+    Ok(())
+}
+
+// Requirements: cli-input-from-another-machine
+//
+// An explicit `only_existing_files: true` does not bring the filter back,
+// and nothing in the output names it.
+#[test]
+fn parse_sh_no_local_lookups_overrides_explicit_filter_setting() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_no_local_lookups_explicit")?;
+    env.create_source_files(&[("build.log", OTHER_MACHINE_LOG)])?;
+    let config = env.create_config("schema: '4.2'\nsources:\n  only_existing_files: true\n")?;
+    let config = config.to_str().context("config path is not valid UTF-8")?;
+
+    let sut = env.run_bear(&["--config", config, "parse-sh", "--no-local-lookups", "-i", "build.log"])?;
+
+    sut.assert_success()?;
+    env.load_compilation_database("compile_commands.json")?.assert_count(2)?;
+    let stderr = sut.stderr();
+    assert!(!stderr.contains("ERROR") && !stderr.contains("WARN"), "no diagnostic expected:\n{stderr}");
+
+    Ok(())
+}
+
+// Requirements: cli-input-from-another-machine
+#[test]
+fn parse_sh_no_local_lookups_rejects_settings_that_need_local_files() -> Result<()> {
+    let cases = [
+        ("format.paths.directory", "format:\n  paths:\n    directory: canonical\n"),
+        ("format.paths.file", "format:\n  paths:\n    file: canonical\n"),
+        ("headers.enabled", "headers:\n  enabled: true\n"),
+        ("format.arguments.from_response_files", "format:\n  arguments:\n    from_response_files: true\n"),
+    ];
+
+    for (key, yaml) in cases {
+        let env = TestEnvironment::new("parse_sh_no_local_lookups_rejects")?;
+        env.create_source_files(&[("build.log", OTHER_MACHINE_LOG)])?;
+        let config = env.create_config(&format!("schema: '4.2'\n{yaml}"))?;
+        let config = config.to_str().context("config path is not valid UTF-8")?;
+
+        let sut = env.run_bear(&["--config", config, "parse-sh", "--no-local-lookups", "-i", "build.log"])?;
+
+        sut.assert_failure()?;
+        let stderr = sut.stderr();
+        assert!(stderr.contains(key), "case {key}: stderr must name the key:\n{stderr}");
+        assert!(stderr.contains(config), "case {key}: stderr must name the config file:\n{stderr}");
+        assert!(!env.file_exists("compile_commands.json"), "case {key}: no database may be written");
+    }
+
+    Ok(())
+}
+
+// Requirements: cli-input-from-another-machine, output-env-derived-flags
+//
+// Bear's own `CPATH` is not part of a log from another machine. Without the
+// option it folds into the entry as `-I`.
+#[test]
+fn parse_sh_no_local_lookups_ignores_bears_own_environment() -> Result<()> {
+    let cases = [(false, true), (true, false)];
+
+    for (no_local_lookups, expect_include) in cases {
+        let env = TestEnvironment::new("parse_sh_no_local_lookups_env")?;
+        env.create_source_files(&[("build.log", "gcc -c a.c\n"), ("a.c", "")])?;
+        let mut args = vec!["parse-sh", "-i", "build.log"];
+        if no_local_lookups {
+            args.push("--no-local-lookups");
+        }
+        // `run_bear` cannot set the environment of the child.
+        let mut cmd = env.command_bear();
+        cmd.current_dir(env.test_dir()).env("RUST_LOG", "info").env("CPATH", "/opt/envinc").args(&args);
+
+        let sut = cmd.output()?;
+
+        assert!(sut.status.success(), "{}", String::from_utf8_lossy(&sut.stderr));
+        let db = env.load_compilation_database("compile_commands.json")?;
+        db.assert_count(1)?;
+        let arguments = arguments_of(&db.entries()[0])?;
+        let has_include = arguments.windows(2).any(|pair| pair == ["-I", "/opt/envinc"]);
+        assert_eq!(has_include, expect_include, "no_local_lookups={no_local_lookups}: {arguments:?}");
+    }
+
+    Ok(())
+}
+
+// Requirements: cli-input-from-another-machine
+//
+// A leading `VAR=value` word still applies to its own command.
+#[test]
+fn parse_sh_no_local_lookups_keeps_leading_assignment() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_no_local_lookups_assignment")?;
+
+    let sut = env.run_bear_with_stdin(
+        &["parse-sh", "--no-local-lookups"],
+        b"CPATH=/opt/include gcc -c /nowhere/a.c\n",
+    )?;
+
+    sut.assert_success()?;
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    let arguments = arguments_of(&db.entries()[0])?;
+    assert!(arguments.windows(2).any(|pair| pair == ["-I", "/opt/include"]), "{arguments:?}");
+
+    Ok(())
+}
+
+// Requirements: cli-input-from-another-machine, output-append
+#[test]
+fn parse_sh_no_local_lookups_append_keeps_entry_with_missing_source() -> Result<()> {
+    let env = TestEnvironment::new("parse_sh_no_local_lookups_append")?;
+
+    let first = env.run_bear_with_stdin(&["parse-sh", "--no-local-lookups"], b"gcc -c /nowhere/a.c\n")?;
+    first.assert_success()?;
+    let sut =
+        env.run_bear_with_stdin(&["parse-sh", "--no-local-lookups", "--append"], b"gcc -c /nowhere/b.c\n")?;
+
+    sut.assert_success()?;
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("/nowhere/a.c".to_string()))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("/nowhere/b.c".to_string()))?;
+
+    Ok(())
+}

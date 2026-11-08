@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::Main;
-use super::validation::Validator;
+use super::validation::validate_loaded;
 use log::{debug, info};
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -15,21 +15,26 @@ impl Loader {
     /// If the configuration file is specified, it will be used. Otherwise, the default locations
     /// will be searched for the configuration file. If the configuration file is not found, the
     /// default configuration will be returned.
+    ///
+    /// With `local_lookups` off (the input comes from another machine) the
+    /// configured compiler paths need not exist, and the settings that read
+    /// this machine's files are rejected.
     #[allow(clippy::result_large_err, reason = "config loading runs once at startup")]
     pub fn load(
         context: &intercept_supervisor::context::Context,
         filename: &Option<String>,
+        local_lookups: bool,
     ) -> Result<Main, ConfigError> {
         if let Some(path) = filename {
             // If the configuration file is specified, use it.
-            Self::from_file(Path::new(path))
+            Self::from_file(Path::new(path), local_lookups)
         } else {
             // Otherwise, try to find the configuration file in the default locations.
             let locations = Self::file_locations(context);
             for location in locations {
                 debug!("Checking configuration file: {}", location.display());
                 if location.exists() {
-                    return Self::from_file(location.as_path());
+                    return Self::from_file(location.as_path(), local_lookups);
                 }
             }
             // If the configuration file is not found, return the default configuration.
@@ -92,7 +97,7 @@ impl Loader {
 
     /// Loads the configuration from the specified file.
     #[allow(clippy::result_large_err, reason = "config loading runs once at startup")]
-    pub fn from_file(path: &Path) -> Result<Main, ConfigError> {
+    pub fn from_file(path: &Path, local_lookups: bool) -> Result<Main, ConfigError> {
         info!("Loading configuration file: {}", path.display());
 
         let reader = OpenOptions::new()
@@ -104,7 +109,7 @@ impl Loader {
             .map_err(|source| ConfigError::ParseError { path: path.to_path_buf(), source })?;
 
         // Validate the loaded configuration
-        Main::validate(&content)
+        validate_loaded(&content, local_lookups)
             .map_err(|source| ConfigError::ValidationError { path: path.to_path_buf(), source })?;
 
         Ok(content)
@@ -451,7 +456,7 @@ mod test {
         // fails because the compiler path does not exist. The unknown
         // spelling is caught later, in `Mode::configure` (see
         // `configure_rejects_an_unknown_compiler_as_spelling`).
-        let result = Loader::from_file(&config_file);
+        let result = Loader::from_file(&config_file, true);
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -519,7 +524,7 @@ mod test {
 
         fs::write(&config_file, config_with_hints).unwrap();
 
-        let result = Loader::from_file(&config_file);
+        let result = Loader::from_file(&config_file, true);
 
         assert!(result.is_ok());
 
@@ -532,5 +537,52 @@ mod test {
         assert_eq!(config.compilers[2].as_.as_deref(), Some("flang"));
         assert_eq!(config.compilers[3].as_.as_deref(), Some("intel_fortran"));
         assert_eq!(config.compilers[4].as_.as_deref(), Some("cray_fortran"));
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_local_lookups_off_skips_compiler_path_check() {
+        let cases = [
+            ("an active entry", "- path: /nonexistent/cc\n    as: gcc\n"),
+            ("an ignored entry", "- path: /nonexistent/cc\n    ignore: true\n"),
+        ];
+
+        for (case, compiler) in cases {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let config_file = temp_dir.path().join("bear.yml");
+            fs::write(&config_file, format!("schema: \"4.2\"\ncompilers:\n  {compiler}")).unwrap();
+
+            let with_lookups = Loader::from_file(&config_file, true);
+            let sut = Loader::from_file(&config_file, false);
+
+            assert!(with_lookups.is_err(), "{case}");
+            assert!(sut.is_ok(), "{case}: {sut:?}");
+        }
+    }
+
+    // Requirements: cli-input-from-another-machine
+    #[test]
+    fn test_local_lookups_off_rejects_settings_naming_key_and_file() {
+        let cases = [
+            ("format.paths.directory", "format:\n  paths:\n    directory: canonical\n"),
+            ("format.paths.file", "format:\n  paths:\n    file: canonical\n"),
+            ("headers.enabled", "headers:\n  enabled: true\n"),
+            (
+                "format.arguments.from_response_files",
+                "format:\n  arguments:\n    from_response_files: true\n",
+            ),
+        ];
+
+        for (key, yaml) in cases {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let config_file = temp_dir.path().join("bear.yml");
+            fs::write(&config_file, format!("schema: \"4.2\"\n{yaml}")).unwrap();
+
+            let sut = Loader::from_file(&config_file, false);
+
+            let message = sut.expect_err(key).to_string();
+            assert!(message.contains(key), "{key}: {message}");
+            assert!(message.contains(&config_file.display().to_string()), "{key}: {message}");
+        }
     }
 }

@@ -152,6 +152,23 @@ the output file.
 \f[B]\-\-overwrite\f[R]
 Same as in combined mode: name the current default explicitly.
 Not accepted together with \f[CR]\-\-append\f[R].
+.TP
+\f[B]\-\-no\-local\-lookups\f[R]
+The input comes from another machine.
+Bear does not check that sources exist: the missing\-source filter is
+off, whatever \f[CR]sources.only_existing_files\f[R] says, and no
+diagnostic names it.
+Entries already in an \f[CR]\-\-append\f[R] output file are kept.
+Compiler paths in the configuration need not exist here.
+Not accepted together with \f[CR]\-\-print\-compilers\f[R].
+The settings that read this machine\(cqs files are rejected at startup,
+and the error names the setting and the configuration file:
+\f[CR]format.paths.directory: canonical\f[R],
+\f[CR]format.paths.file: canonical\f[R],
+\f[CR]headers.enabled: true\f[R], and
+\f[CR]format.arguments.from_response_files: true\f[R].
+A configuration file found automatically applies as usual, so if it has
+one of these settings, pass \f[CR]\-\-config\f[R] with another file.
 .SS bear parse\-sh
 Produces the compilation database from shell command text, without
 running anything.
@@ -188,9 +205,13 @@ Initial working directory for the parsed commands.
 Use it for input captured elsewhere (a CI log, a dry run from another
 checkout).
 Give an absolute path.
-With the default \f[CR]sources.only_existing_files: true\f[R], entries
-whose sources are missing on this machine are dropped; set it to
-\f[CR]false\f[R] for a log from another machine (see CONFIGURATION).
+For a log from another machine, pass the directory as it was on the
+other machine (see \f[CR]\-\-no\-local\-lookups\f[R]).
+.TP
+\f[B]\-\-no\-local\-lookups\f[R]
+Same as in semantic mode.
+In addition, Bear\(cqs own environment is not used: only a
+\f[CR]VAR=value\f[R] word in front of a command applies to that command.
 .PP
 The commands recognized in the text go through the same semantic
 analysis and output stage as an intercepted build, so the configuration
@@ -232,12 +253,17 @@ still see this machine\(cqs file system.
 With the default \f[CR]sources.only_existing_files: true\f[R], a log
 whose sources are absent gives an empty database, and Bear logs an error
 saying so.
-Set \f[CR]sources.only_existing_files\f[R] to \f[CR]false\f[R] to read a
-log from another machine.
-The \f[CR]canonical\f[R] path format also needs the sources present,
-because it resolves symlinks on disk; when the sources are absent,
-configure \f[CR]absolute\f[R] instead (see \f[CR]format.paths\f[R] under
-CONFIGURATION).
+.PP
+For a log from a CI runner, a container, or a colleague\(cqs machine,
+pass \f[CR]\-\-no\-local\-lookups\f[R].
+Commands before the first directory change in the log, and every command
+of a log without directory changes, run in the initial working
+directory.
+Pass \f[CR]\-C\f[R] with the directory as it was on the other machine,
+or those entries carry the directory Bear runs in.
+\f[CR]\-C\f[R] is taken as written and is not checked.
+Write source filter rules and compiler paths in the configuration as the
+paths appear in the log.
 .SH OUTPUT
 Bear writes a JSON compilation database conforming to the Clang JSON
 Compilation Database specification (see SEE ALSO): a JSON array of entry
@@ -425,6 +451,9 @@ runs in.
 Entries read with \f[CR]\-\-append\f[R] are checked the same way, so
 \f[CR]bear \-\-append \-\- true\f[R] trims entries for files that are
 gone.
+The \f[CR]\-\-no\-local\-lookups\f[R] option of \f[CR]bear semantic\f[R]
+and \f[CR]bear parse\-sh\f[R] turns the check off, whatever this key
+says.
 .IP \(bu 2
 \f[B]directories\f[R]: List of directory\-based rules, each with a
 \f[B]path\f[R] and an \f[B]action\f[R] (\f[CR]include\f[R] or
@@ -469,6 +498,8 @@ fields\(cq paths: \f[CR]as\-is\f[R] (default, no transformation),
 \f[CR]canonical\f[R] (resolve symlinks; requires the path to exist),
 \f[CR]relative\f[R] (to the \f[CR]directory\f[R] field), or
 \f[CR]absolute\f[R].
+The \f[CR]canonical\f[R] format is rejected with
+\f[CR]\-\-no\-local\-lookups\f[R].
 .IP \(bu 2
 \f[B]entries.use_array_format\f[R]: Use the \f[CR]arguments\f[R] array
 (default) instead of the \f[CR]command\f[R] string.
@@ -485,6 +516,7 @@ recursively, using the compiler\(cqs quoting convention).
 Disabled by default, in which case an \f[CR]\(atfile\f[R] argument is
 recorded verbatim; a missing or unreadable file is left literal with a
 warning.
+Rejected with \f[CR]\-\-no\-local\-lookups\f[R].
 .IP \(bu 2
 \f[B]arguments.from_environment\f[R]: Fold compiler environment
 variables that act as implicit flags into the arguments.
@@ -503,6 +535,7 @@ When enabled, Bear synthesizes an entry for a header by cloning the
 arguments of a compiled C/C++/Objective\-C translation unit, with the
 source path replaced by the header path and the output flag removed.
 Off by default.
+Rejected with \f[CR]\-\-no\-local\-lookups\f[R].
 .IP \(bu 2
 \f[B]enabled\f[R]: Turn header\-entry synthesis on or off.
 Default \f[CR]false\f[R].

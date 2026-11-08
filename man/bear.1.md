@@ -152,6 +152,21 @@ in the output file.
 : Same as in combined mode: name the current default explicitly. Not
 accepted together with `--append`.
 
+**\-\-no\-local\-lookups**
+: The input comes from another machine. Bear does not
+check that sources exist: the missing-source filter is off, whatever
+`sources.only_existing_files` says, and no diagnostic names it. Entries
+already in an `--append` output file are kept. Compiler paths in the
+configuration need not exist here. Not accepted together with
+`--print-compilers`.
+
+: The settings that read this machine's files are rejected at startup,
+and the error names the setting and the configuration file:
+`format.paths.directory: canonical`, `format.paths.file: canonical`,
+`headers.enabled: true`, and `format.arguments.from_response_files:
+true`. A configuration file found automatically applies as usual, so if
+it has one of these settings, pass `--config` with another file.
+
 ## bear parse-sh
 
 Produces the compilation database from shell command text, without
@@ -182,9 +197,13 @@ accepted together with `--append`.
 **-C, \-\-directory** *DIR*
 : Initial working directory for the parsed commands. Use it for input
 captured elsewhere (a CI log, a dry run from another checkout). Give an
-absolute path. With the default `sources.only_existing_files: true`,
-entries whose sources are missing on this machine are dropped; set it to
-`false` for a log from another machine (see CONFIGURATION).
+absolute path. For a log from another machine, pass the directory as it
+was on the other machine (see `--no-local-lookups`).
+
+**\-\-no\-local\-lookups**
+: Same as in semantic mode. In addition, Bear's own environment is not
+used: only a `VAR=value` word in front of a command applies to that
+command.
 
 The commands recognized in the text go through the same semantic
 analysis and output stage as an intercepted build, so the configuration
@@ -217,12 +236,15 @@ Prefer `bear -- <build command>` whenever the build can actually be run.
 Entries are reconstructed from the text alone, but the output filters
 still see this machine's file system. With the default
 `sources.only_existing_files: true`, a log whose sources are absent gives
-an empty database, and Bear logs an error saying so. Set
-`sources.only_existing_files` to `false` to read a log from another
-machine. The `canonical` path format also needs the sources present,
-because it resolves symlinks on disk; when the sources are absent,
-configure `absolute` instead (see `format.paths` under CONFIGURATION).
+an empty database, and Bear logs an error saying so.
 
+For a log from a CI runner, a container, or a colleague's machine, pass
+`--no-local-lookups`. Commands before the first directory change in the
+log, and every command of a log without directory changes, run in the
+initial working directory. Pass `-C` with the directory as it was on the
+other machine, or those entries carry the directory Bear runs in. `-C`
+is taken as written and is not checked. Write source filter rules and
+compiler paths in the configuration as the paths appear in the log.
 
 # OUTPUT
 
@@ -394,7 +416,9 @@ deletes after compiling it is usually kept, while in semantic and parse-sh
 mode it is dropped. With the `relative` directory format, `directory` is
 written as `.`, so the check looks under the directory Bear runs in.
 Entries read with `--append` are checked the same way, so
-`bear --append -- true` trims entries for files that are gone.
+`bear --append -- true` trims entries for files that are gone. The
+`--no-local-lookups` option of `bear semantic` and `bear parse-sh`
+turns the check off, whatever this key says.
 - **directories**: List of directory-based rules, each with a **path**
 and an **action** (`include` or `exclude`).
 - **files**: List of filename-glob rules, each with a **pattern** and an
@@ -432,7 +456,8 @@ Controls output formatting.
 - **paths.directory**, **paths.file**: How to format these fields'
 paths: `as-is` (default, no transformation), `canonical` (resolve
 symlinks; requires the path to exist), `relative` (to the `directory`
-field), or `absolute`.
+field), or `absolute`. The `canonical` format is rejected with
+`--no-local-lookups`.
 - **entries.use_array_format**: Use the `arguments` array (default)
 instead of the `command` string. Set to `false` for consumers that read
 only the `command` field.
@@ -443,7 +468,7 @@ references with the file's tokenized contents (resolved relative to the
 compilation's working directory, expanded recursively, using the
 compiler's quoting convention). Disabled by default, in which case an
 `@file` argument is recorded verbatim; a missing or unreadable file is
-left literal with a warning.
+left literal with a warning. Rejected with `--no-local-lookups`.
 - **arguments.from_environment**: Fold compiler environment variables
 that act as implicit flags into the arguments. GCC/Clang header-search
 paths (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
@@ -458,7 +483,8 @@ Editors and linters often need compile flags for header files, not only
 for the translation units that were compiled. When enabled, Bear
 synthesizes an entry for a header by cloning the arguments of a compiled
 C/C++/Objective-C translation unit, with the source path replaced by the
-header path and the output flag removed. Off by default.
+header path and the output flag removed. Off by default. Rejected with
+`--no-local-lookups`.
 
 - **enabled**: Turn header-entry synthesis on or off. Default `false`.
 - **strategy**: How headers are discovered and which translation unit
