@@ -84,9 +84,23 @@ pub fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
 /// outermost supervisor may create a process group. If every level created
 /// its own group, a top-level group kill would miss the deeper processes.
 ///
-/// Implemented by [`Leader`] and [`Inherit`] only; the policy is chosen at
-/// the call site as a type parameter of [`supervise`].
-pub trait GroupPolicy: policy::Policy {}
+/// Implemented by [`Leader`] and [`Inherit`]; the policy is chosen at the
+/// call site as a type parameter of [`supervise`].
+pub trait GroupPolicy: Sized {
+    /// Runs before the spawn; the returned value lives until the
+    /// supervision ends.
+    fn prepare(command: &mut Command) -> Self;
+
+    /// Runs once, after the first termination signal; returns when the
+    /// direct child is reaped.
+    fn teardown(
+        self,
+        child: &mut Child,
+        signal: c_int,
+        executable: &Path,
+        signals: &mut dyn Iterator<Item = c_int>,
+    ) -> Result<ExitStatus, SuperviseError>;
+}
 
 /// The outermost supervisor (the driver). Creates a new process group with
 /// the child as leader and owns the authoritative escalation: forward the
@@ -101,34 +115,6 @@ pub struct Leader {
 /// relays the received signal to its direct child; the driver's group kill
 /// is the authoritative teardown, so it runs no grace/`SIGKILL` timer.
 pub struct Inherit;
-
-impl GroupPolicy for Leader {}
-impl GroupPolicy for Inherit {}
-
-/// The policy-specific steps of a supervision. Sealed: [`GroupPolicy`]
-/// requires it, and code outside this module cannot name it.
-mod policy {
-    use super::SuperviseError;
-    use std::ffi::c_int;
-    use std::path::Path;
-    use std::process::{Child, Command, ExitStatus};
-
-    pub trait Policy: Sized {
-        /// Runs before the spawn; the returned value lives until the
-        /// supervision ends.
-        fn prepare(command: &mut Command) -> Self;
-
-        /// Runs once, after the first termination signal; returns when the
-        /// direct child is reaped.
-        fn teardown(
-            self,
-            child: &mut Child,
-            signal: c_int,
-            executable: &Path,
-            signals: &mut dyn Iterator<Item = c_int>,
-        ) -> Result<ExitStatus, SuperviseError>;
-    }
-}
 
 /// Errors that can occur during process supervision.
 #[derive(Error, Debug)]
@@ -176,8 +162,7 @@ fn wait(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseErr
 #[cfg(unix)]
 mod platform {
     use super::cgroup;
-    use super::policy::Policy;
-    use super::{Inherit, Leader, SuperviseError, try_wait, wait};
+    use super::{GroupPolicy, Inherit, Leader, SuperviseError, try_wait, wait};
     use signal_hook::consts::signal::SIGCHLD;
     use signal_hook::iterator::Signals;
     use std::ffi::c_int;
@@ -206,7 +191,7 @@ mod platform {
         Ok(std::iter::from_fn(move || signals.forever().next()))
     }
 
-    impl Policy for Leader {
+    impl GroupPolicy for Leader {
         fn prepare(command: &mut Command) -> Self {
             use std::os::unix::process::CommandExt;
 
@@ -291,7 +276,7 @@ mod platform {
         }
     }
 
-    impl Policy for Inherit {
+    impl GroupPolicy for Inherit {
         fn prepare(_command: &mut Command) -> Self {
             Inherit
         }
@@ -360,8 +345,7 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    use super::policy::Policy;
-    use super::{Inherit, Leader, SuperviseError, wait};
+    use super::{GroupPolicy, Inherit, Leader, SuperviseError, wait};
     use std::ffi::c_int;
     use std::path::Path;
     use std::process::{Child, Command, ExitStatus};
@@ -388,7 +372,7 @@ mod platform {
         }))
     }
 
-    impl Policy for Leader {
+    impl GroupPolicy for Leader {
         fn prepare(_command: &mut Command) -> Self {
             Leader {}
         }
@@ -404,7 +388,7 @@ mod platform {
         }
     }
 
-    impl Policy for Inherit {
+    impl GroupPolicy for Inherit {
         fn prepare(_command: &mut Command) -> Self {
             Inherit
         }
