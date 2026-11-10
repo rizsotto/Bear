@@ -15,10 +15,10 @@
 //! to find the real executable path. It reports the execution of the real
 //! executable and then calls the real executable with the same arguments.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use intercept::Execution;
 use intercept::reporter::{Reporter, ReporterFactory};
-use intercept_supervisor::supervise::{Inherit, signals, supervise_execution};
+use intercept_supervisor::supervise::{Inherit, signals, supervise};
 use intercept_supervisor::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 
 /// Implementation of the wrapper process.
@@ -47,9 +47,31 @@ fn main() -> Result<()> {
     }
 
     // Execute the real executable with the same arguments
-    let exit_status = supervise_execution::<Inherit>(real_execution, signals)?;
+    let mut command = command_from_execution(real_execution)?;
+    let exit_status = supervise::<Inherit>(&mut command, signals)?;
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
+}
+
+/// Builds a [`std::process::Command`] from an [`Execution`].
+///
+/// This is a free function rather than a `TryFrom` impl because the orphan
+/// rule forbids implementing the foreign `TryFrom`/`Command` for the foreign
+/// `Execution` from this crate.
+fn command_from_execution(execution: Execution) -> Result<std::process::Command> {
+    let mut command = match execution.arguments.as_slice() {
+        [] => bail!("Execution arguments cannot be empty"),
+        [_] => std::process::Command::new(execution.executable),
+        [_, arguments @ ..] => {
+            let mut command = std::process::Command::new(execution.executable);
+            command.args(arguments);
+            command
+        }
+    };
+
+    command.envs(execution.environment);
+    command.current_dir(execution.working_dir);
+    Ok(command)
 }
 
 /// Report the execution to the remote collector.

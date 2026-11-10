@@ -13,7 +13,6 @@
 //! the termination signals; on Windows it polls, and both policies stop
 //! only the direct child.
 
-use intercept::Execution;
 use std::ffi::c_int;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus};
@@ -131,15 +130,6 @@ pub fn supervise<P: GroupPolicy>(
     policy.teardown(&mut child, signal, &executable, &mut signals)
 }
 
-/// This function supervises the execution of a command represented by the `Execution` struct.
-pub fn supervise_execution<P: GroupPolicy>(
-    execution: Execution,
-    signals: impl IntoIterator<Item = c_int>,
-) -> Result<ExitStatus, SuperviseError> {
-    let mut child = command_from_execution(execution)?;
-    supervise::<P>(&mut child, signals)
-}
-
 fn try_wait(child: &mut Child, executable: &Path) -> Result<Option<ExitStatus>, SuperviseError> {
     match child.try_wait() {
         Ok(Some(status)) => {
@@ -158,27 +148,6 @@ fn wait(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseErr
     child
         .wait()
         .map_err(|err| SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
-}
-
-/// Builds a [`std::process::Command`] from an [`Execution`].
-///
-/// This is a free function rather than a `TryFrom` impl because the orphan
-/// rule forbids implementing the foreign `TryFrom`/`Command` for the foreign
-/// `Execution` from this crate.
-fn command_from_execution(val: Execution) -> Result<Command, SuperviseError> {
-    let mut command = match val.arguments.as_slice() {
-        [] => return Err(SuperviseError::EmptyArguments),
-        [_] => Command::new(val.executable),
-        [_, arguments @ ..] => {
-            let mut cmd = Command::new(val.executable);
-            cmd.args(arguments);
-            cmd
-        }
-    };
-
-    command.envs(val.environment);
-    command.current_dir(val.working_dir);
-    Ok(command)
 }
 
 #[cfg(unix)]
@@ -634,8 +603,6 @@ pub enum SuperviseError {
         #[source]
         source: std::io::Error,
     },
-    #[error("Execution arguments cannot be empty")]
-    EmptyArguments,
 }
 
 #[cfg(all(test, unix))]
