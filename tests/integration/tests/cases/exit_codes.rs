@@ -612,7 +612,7 @@ fn wait_for_file(path: &std::path::Path) {
 /// The supervisor's trace line proving the direct child did not exit within
 /// the teardown grace window: the runner starved the build, and its trap was
 /// SIGKILLed through no fault of the signal-forwarding contract. Emitted by
-/// `leader_teardown` in `intercept-supervisor`; the trap tests retry only on
+/// the `Leader` teardown in `intercept-supervisor`; the trap tests retry only on
 /// this evidence (issue #713).
 #[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
 const GRACE_STARVED_LINE: &str = "did not exit within the grace window";

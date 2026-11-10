@@ -353,7 +353,7 @@ impl BuildEnvironment {
             command.env(key, value);
         }
 
-        supervise::supervise(&mut command, supervise::GroupPolicy::Leader)
+        supervise::supervise::<supervise::Leader>(&mut command)
     }
 }
 

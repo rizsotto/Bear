@@ -1,54 +1,64 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Requirements: cli-signal-forwarding
+//!
+//! Runs a build (or a single compiler call) as a child process, waits for
+//! it, and tears it down when Bear gets a termination signal. The steps
+//! that differ between the outermost supervisor and a nested one live in
+//! [`Leader`] and [`Inherit`], the two implementations of [`GroupPolicy`],
+//! picked at the call site as a type parameter.
+//! On Unix the wait blocks on `SIGCHLD` and the termination signals; on
+//! Windows it polls, and the policy carries no steps.
 
 use intercept::Execution;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use thiserror::Error;
 
-/// Whether this supervisor owns the build's process group or merely inherits it.
+/// How a supervisor relates to the build's process group: it sets up the
+/// group before the spawn, and decides how the build is torn down after a
+/// termination signal.
 ///
 /// In wrapper mode the supervision chain nests
 /// (`bear-driver` -> `make` -> `bear-wrapper` -> real `cc`); only the
 /// outermost supervisor may create a process group. If every level created
 /// its own group, a top-level group kill would miss the deeper processes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GroupPolicy {
-    /// The outermost supervisor (the driver). Creates a new process group with
-    /// the child as leader and owns the authoritative escalation: forward the
-    /// received signal to the whole group, grant a grace window, then escalate
-    /// to `SIGKILL`.
-    Leader,
-    /// A nested supervisor (the wrapper). Stays in the inherited group and only
-    /// relays the received signal to its direct child; the driver's group kill
-    /// is the authoritative teardown, so it runs no grace/`SIGKILL` timer.
-    Inherit,
+///
+/// Implemented by [`Leader`] and [`Inherit`] only; the policy is chosen at
+/// the call site as a type parameter of [`supervise`].
+pub trait GroupPolicy: platform::Policy {}
+
+/// The outermost supervisor (the driver). Creates a new process group with
+/// the child as leader and owns the authoritative escalation: forward the
+/// received signal to the whole group, grant a grace window, then escalate
+/// to `SIGKILL`.
+pub struct Leader {
+    #[cfg(unix)]
+    cgroup: Option<cgroup::Cgroup>,
 }
+
+/// A nested supervisor (the wrapper). Stays in the inherited group and only
+/// relays the received signal to its direct child; the driver's group kill
+/// is the authoritative teardown, so it runs no grace/`SIGKILL` timer.
+pub struct Inherit;
+
+impl GroupPolicy for Leader {}
+impl GroupPolicy for Inherit {}
 
 /// This method supervises the execution of a command.
 ///
 /// It starts the command and waits for its completion. While waiting it
 /// forwards termination signals it receives to the build so the build stops
-/// too, and propagates the build's exit status back to the caller.
-///
-/// On Unix a `Leader` supervisor places the child in a new process group and,
-/// on a termination signal, forwards the real signal to the whole group, grants
-/// a short grace window, then escalates to `SIGKILL` - so the entire process
-/// tree is torn down, not just the immediate child. An `Inherit` supervisor
-/// relays the signal to its direct child only and lets the leader's group kill
-/// reap the rest.
-pub fn supervise(
-    command: &mut std::process::Command,
-    policy: GroupPolicy,
-) -> Result<ExitStatus, SuperviseError> {
-    platform::supervise(command, policy)
+/// too, and propagates the build's exit status back to the caller. How the
+/// build is torn down is up to the policy `P`: [`Leader`] or [`Inherit`].
+pub fn supervise<P: GroupPolicy>(command: &mut std::process::Command) -> Result<ExitStatus, SuperviseError> {
+    platform::supervise::<P>(command)
 }
 
 /// This function supervises the execution of a command represented by the `Execution` struct.
-pub fn supervise_execution(execution: Execution, policy: GroupPolicy) -> Result<ExitStatus, SuperviseError> {
+pub fn supervise_execution<P: GroupPolicy>(execution: Execution) -> Result<ExitStatus, SuperviseError> {
     let mut child = command_from_execution(execution)?;
-    supervise(&mut child, policy)
+    supervise::<P>(&mut child)
 }
 
 /// Builds a [`std::process::Command`] from an [`Execution`].
@@ -75,11 +85,11 @@ fn command_from_execution(val: Execution) -> Result<std::process::Command, Super
 #[cfg(unix)]
 mod platform {
     use super::cgroup;
-    use super::{GroupPolicy, SuperviseError};
+    use super::{Inherit, Leader, SuperviseError};
     use signal_hook::consts::signal::SIGCHLD;
     use signal_hook::iterator::Signals;
     use std::path::{Path, PathBuf};
-    use std::process::{Child, ExitStatus};
+    use std::process::{Child, Command, ExitStatus};
     use std::time::{Duration, Instant};
 
     /// How long the build's process tree is allowed to wind down on its own
@@ -92,28 +102,156 @@ mod platform {
     /// (issue #713).
     const GRACE: Duration = Duration::from_millis(800);
 
-    pub(super) fn supervise(
-        command: &mut std::process::Command,
-        policy: GroupPolicy,
-    ) -> Result<ExitStatus, SuperviseError> {
-        use std::os::unix::process::CommandExt;
+    /// The policy-specific steps of a supervision: what to set up on the
+    /// command before it is spawned, and how to tear the build down once a
+    /// termination signal arrives. Sealed: only [`Leader`] and [`Inherit`].
+    pub trait Policy: Sized {
+        /// Runs before the spawn; the returned value lives until the
+        /// supervision ends.
+        fn prepare(command: &mut Command) -> Self;
 
-        let executable = PathBuf::from(command.get_program());
+        /// Runs once, after the first termination signal; returns when the
+        /// direct child is reaped.
+        fn teardown(
+            self,
+            child: &mut Child,
+            signal: libc::c_int,
+            executable: &Path,
+            signals: &mut Signals,
+        ) -> Result<ExitStatus, SuperviseError>;
+    }
 
-        // The leader owns the build's process group so a single killpg reaps
-        // the whole tree. process_group(0) is safe std: the child becomes a
-        // new group leader (pgid == child pid) before exec.
-        if policy == GroupPolicy::Leader {
+    impl Policy for Leader {
+        fn prepare(command: &mut Command) -> Self {
+            use std::os::unix::process::CommandExt;
+
+            // The leader owns the build's process group so a single killpg
+            // reaps the whole tree. process_group(0) is safe std: the child
+            // becomes a new group leader (pgid == child pid) before exec.
             command.process_group(0);
+
+            // On Linux, additionally place the build in a fresh cgroup so a
+            // descendant that re-`setsid`s out of the process group is still
+            // reaped on escalation. `create_and_attach` returns `None` (and
+            // teardown falls back to the process-group `SIGKILL`) where
+            // cgroup v2 is unavailable or its directory is not
+            // writable/delegated. Nested wrappers inherit it through the child.
+            Leader { cgroup: cgroup::create_and_attach(command) }
         }
 
-        // On Linux, additionally place the build in a fresh cgroup so a
-        // descendant that re-`setsid`s out of the process group is still
-        // reaped on escalation. `create_and_attach` returns `None` (and
-        // teardown falls back to the process-group `SIGKILL`) where cgroup v2
-        // is unavailable or its directory is not writable/delegated. Only the
-        // leader owns a cgroup; nested wrappers inherit it through the child.
-        let cgroup = if policy == GroupPolicy::Leader { cgroup::create_and_attach(command) } else { None };
+        /// Deliver the real signal to the whole group, grant a grace window,
+        /// then force whatever is still alive. The leader runs the single
+        /// authoritative escalation timer for the supervision chain.
+        fn teardown(
+            self,
+            child: &mut Child,
+            signal: libc::c_int,
+            executable: &Path,
+            _signals: &mut Signals,
+        ) -> Result<ExitStatus, SuperviseError> {
+            let pgid = child.id() as libc::pid_t;
+            log::debug!("Received signal {signal}, forwarding to process group {pgid}");
+            send(SendTarget::Group(pgid), signal);
+
+            // Let the tree wind down on its own (run traps, drain in-flight work)
+            // before forcing it. The direct child exiting ends the grace early,
+            // but a cgroup is still swept below: a detached descendant can outlive
+            // the child that exited cleanly.
+            let deadline = Instant::now() + GRACE;
+            let mut exited = None;
+            loop {
+                if let Some(status) = try_wait(child, executable)? {
+                    exited = Some(status);
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+
+            if exited.is_none() {
+                // One stable line across both escalation paths (cgroup and
+                // process-group): tests and triage key on it to distinguish a
+                // starved grace window from a build that exited in time.
+                log::debug!("Build did not exit within the grace window ({GRACE:?})");
+            }
+
+            // Force anything still alive. A cgroup kill reaps the whole cgroup,
+            // including a descendant that left the process group (a daemon that
+            // called `setsid`), so it runs even when the direct child already
+            // exited. Without a cgroup, fall back to forcing the process group -
+            // but only when something is still there to force.
+            match self.cgroup.as_ref() {
+                Some(cgroup) => {
+                    log::debug!("Killing build cgroup to reap the whole tree");
+                    cgroup.kill();
+                }
+                None if exited.is_none() => {
+                    log::debug!("Grace window elapsed, sending SIGKILL to process group {pgid}");
+                    send(SendTarget::Group(pgid), libc::SIGKILL);
+                }
+                None => {}
+            }
+
+            if let Some(status) = exited {
+                return Ok(status);
+            }
+
+            // Nothing left to forward; block until the direct child is reaped. A
+            // blocking wait (not a poll loop) avoids burning CPU and does not hang
+            // any worse than the kernel itself: if SIGKILL cannot collect the child
+            // (e.g. uninterruptible sleep), no caller could have done better.
+            child.wait().map_err(|err| SuperviseError::ProcessWait {
+                executable: executable.to_path_buf(),
+                source: err,
+            })
+        }
+    }
+
+    impl Policy for Inherit {
+        fn prepare(_command: &mut Command) -> Self {
+            Inherit
+        }
+
+        /// Relay the real signal to the direct child only and wait for it to
+        /// be reaped. The leader's group kill is authoritative, so no grace
+        /// or `SIGKILL` timer runs here.
+        fn teardown(
+            self,
+            child: &mut Child,
+            signal: libc::c_int,
+            executable: &Path,
+            signals: &mut Signals,
+        ) -> Result<ExitStatus, SuperviseError> {
+            let child_pid = child.id() as libc::pid_t;
+            log::debug!("Received signal {signal}, forwarding to child {child_pid}");
+            send(SendTarget::Process(child_pid), signal);
+
+            if let Some(status) = try_wait(child, executable)? {
+                return Ok(status);
+            }
+            for info in signals {
+                if info == SIGCHLD
+                    && let Some(status) = try_wait(child, executable)?
+                {
+                    return Ok(status);
+                }
+            }
+            // We never close the signal handle, so the loop above only ends if
+            // signal-hook closes it itself; in that case block until the child is
+            // reaped (the leader's group kill remains the authoritative teardown).
+            child.wait().map_err(|err| SuperviseError::ProcessWait {
+                executable: executable.to_path_buf(),
+                source: err,
+            })
+        }
+    }
+
+    pub(super) fn supervise<P: Policy>(command: &mut Command) -> Result<ExitStatus, SuperviseError> {
+        let executable = PathBuf::from(command.get_program());
+
+        let policy = P::prepare(command);
 
         // Watch the termination signals plus SIGCHLD so the wait below blocks
         // until either the build wants to be torn down or the child exits.
@@ -127,7 +265,6 @@ mod platform {
         let mut child = command
             .spawn()
             .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
-        let child_pid = child.id() as libc::pid_t;
 
         // Close the child-exited-early race: the child may already be gone
         // before we block on the signal iterator.
@@ -158,110 +295,7 @@ mod platform {
             return child.wait().map_err(|err| SuperviseError::ProcessWait { executable, source: err });
         };
 
-        match policy {
-            GroupPolicy::Leader => {
-                leader_teardown(&mut child, child_pid, signal, &executable, cgroup.as_ref())
-            }
-            GroupPolicy::Inherit => inherit_forward(&mut child, child_pid, signal, &executable, &mut signals),
-        }
-    }
-
-    /// Leader: deliver the real signal to the whole group, grant a grace
-    /// window, then force whatever is still alive. The leader runs the single
-    /// authoritative escalation timer for the supervision chain.
-    fn leader_teardown(
-        child: &mut Child,
-        pgid: libc::pid_t,
-        signal: libc::c_int,
-        executable: &Path,
-        cgroup: Option<&cgroup::Cgroup>,
-    ) -> Result<ExitStatus, SuperviseError> {
-        log::debug!("Received signal {signal}, forwarding to process group {pgid}");
-        send(SendTarget::Group(pgid), signal);
-
-        // Let the tree wind down on its own (run traps, drain in-flight work)
-        // before forcing it. The direct child exiting ends the grace early,
-        // but a cgroup is still swept below: a detached descendant can outlive
-        // the child that exited cleanly.
-        let deadline = Instant::now() + GRACE;
-        let mut exited = None;
-        loop {
-            if let Some(status) = try_wait(child, executable)? {
-                exited = Some(status);
-                break;
-            }
-            if Instant::now() >= deadline {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-
-        if exited.is_none() {
-            // One stable line across both escalation paths (cgroup and
-            // process-group): tests and triage key on it to distinguish a
-            // starved grace window from a build that exited in time.
-            log::debug!("Build did not exit within the grace window ({GRACE:?})");
-        }
-
-        // Force anything still alive. A cgroup kill reaps the whole cgroup,
-        // including a descendant that left the process group (a daemon that
-        // called `setsid`), so it runs even when the direct child already
-        // exited. Without a cgroup, fall back to forcing the process group -
-        // but only when something is still there to force.
-        match cgroup {
-            Some(cgroup) => {
-                log::debug!("Killing build cgroup to reap the whole tree");
-                cgroup.kill();
-            }
-            None if exited.is_none() => {
-                log::debug!("Grace window elapsed, sending SIGKILL to process group {pgid}");
-                send(SendTarget::Group(pgid), libc::SIGKILL);
-            }
-            None => {}
-        }
-
-        if let Some(status) = exited {
-            return Ok(status);
-        }
-
-        // Nothing left to forward; block until the direct child is reaped. A
-        // blocking wait (not a poll loop) avoids burning CPU and does not hang
-        // any worse than the kernel itself: if SIGKILL cannot collect the child
-        // (e.g. uninterruptible sleep), no caller could have done better.
-        child
-            .wait()
-            .map_err(|err| SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
-    }
-
-    /// Inherit: relay the real signal to the direct child only and wait for it
-    /// to be reaped. The leader's group kill is authoritative, so no grace or
-    /// `SIGKILL` timer runs here.
-    fn inherit_forward(
-        child: &mut Child,
-        child_pid: libc::pid_t,
-        signal: libc::c_int,
-        executable: &Path,
-        signals: &mut Signals,
-    ) -> Result<ExitStatus, SuperviseError> {
-        log::debug!("Received signal {signal}, forwarding to child {child_pid}");
-        send(SendTarget::Process(child_pid), signal);
-
-        if let Some(status) = try_wait(child, executable)? {
-            return Ok(status);
-        }
-        for info in signals {
-            if info == SIGCHLD
-                && let Some(status) = try_wait(child, executable)?
-            {
-                return Ok(status);
-            }
-        }
-        // We never close the signal handle, so the loop above only ends if
-        // signal-hook closes it itself; in that case block until the child is
-        // reaped (the leader's group kill remains the authoritative teardown).
-        child
-            .wait()
-            .map_err(|err| SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
+        policy.teardown(&mut child, signal, &executable, &mut signals)
     }
 
     fn try_wait(child: &mut Child, executable: &Path) -> Result<Option<ExitStatus>, SuperviseError> {
@@ -476,7 +510,7 @@ mod cgroup {
 
 #[cfg(not(unix))]
 mod platform {
-    use super::{GroupPolicy, SuperviseError};
+    use super::{Inherit, Leader, SuperviseError};
     use std::path::PathBuf;
     use std::process::ExitStatus;
     use std::sync::Arc;
@@ -484,13 +518,18 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
+    /// Process groups are out of scope here, so the policies carry no steps.
+    pub trait Policy {}
+
+    impl Policy for Leader {}
+    impl Policy for Inherit {}
+
     /// A blocking `wait()` cannot be interrupted by a signal on this platform
     /// (no `SIGCHLD`), so the term-signal flag is observed by polling. Process
-    /// groups are out of scope here, so `GroupPolicy` is ignored and only the
-    /// direct child is signalled.
-    pub(super) fn supervise(
+    /// groups are out of scope here, so the `GroupPolicy` is ignored and only
+    /// the direct child is signalled.
+    pub(super) fn supervise<P: Policy>(
         command: &mut std::process::Command,
-        _policy: GroupPolicy,
     ) -> Result<ExitStatus, SuperviseError> {
         let executable = PathBuf::from(command.get_program());
         let signaled = Arc::new(AtomicUsize::new(0));
@@ -582,7 +621,7 @@ mod tests {
             let mut command = Command::new("sh");
             command.arg("-c").arg(format!("exit {code}"));
 
-            let sut = supervise(&mut command, GroupPolicy::Leader).expect("supervise failed");
+            let sut = supervise::<Leader>(&mut command).expect("supervise failed");
 
             assert_eq!(sut.success(), expect_success, "exit {code} success mismatch");
             assert_eq!(sut.code(), Some(code), "exit {code} code mismatch");

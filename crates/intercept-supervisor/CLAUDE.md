@@ -27,7 +27,7 @@ in step. The user-facing side is in `INSTALL.md`.
 ## Process-group nesting
 
 Supervision chains nest in wrapper mode, so only the outermost
-supervisor creates a process group (`GroupPolicy::Leader` in
+supervisor creates a process group (`Leader` policy in
 `supervise.rs`); nested ones `Inherit`. Governed by requirement
 `cli-signal-forwarding`; rationale in
 `docs/rationale/supervise-a-compiler-call.md`.
