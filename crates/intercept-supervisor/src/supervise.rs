@@ -61,7 +61,7 @@ pub fn supervise<P: GroupPolicy>(
         }
     };
 
-    policy.teardown(&mut child, signal, &executable, &mut signals)
+    policy.teardown(&mut child, signal, &executable)
 }
 
 /// Registers the signals a supervision reacts to and returns them as a
@@ -98,7 +98,6 @@ pub trait GroupPolicy: Sized {
         child: &mut Child,
         signal: c_int,
         executable: &Path,
-        signals: &mut dyn Iterator<Item = c_int>,
     ) -> Result<ExitStatus, SuperviseError>;
 }
 
@@ -217,7 +216,6 @@ mod platform {
             child: &mut Child,
             signal: c_int,
             executable: &Path,
-            _signals: &mut dyn Iterator<Item = c_int>,
         ) -> Result<ExitStatus, SuperviseError> {
             let pgid = child.id() as libc::pid_t;
             log::debug!("Received signal {signal}, forwarding to process group {pgid}");
@@ -289,24 +287,14 @@ mod platform {
             child: &mut Child,
             signal: c_int,
             executable: &Path,
-            signals: &mut dyn Iterator<Item = c_int>,
         ) -> Result<ExitStatus, SuperviseError> {
             let child_pid = child.id() as libc::pid_t;
             log::debug!("Received signal {signal}, forwarding to child {child_pid}");
             send(SendTarget::Process(child_pid), signal);
 
-            // Any further item may mean the child exited; a repeated
-            // termination signal needs no second relay.
-            if let Some(status) = try_wait(child, executable)? {
-                return Ok(status);
-            }
-            for _ in signals {
-                if let Some(status) = try_wait(child, executable)? {
-                    return Ok(status);
-                }
-            }
-            // The source ended; block until the child is reaped (the
-            // leader's group kill remains the authoritative teardown).
+            // A repeated termination signal needs no second relay, and a
+            // child that does not stop is reaped by the leader's group kill,
+            // so a blocking wait is enough.
             wait(child, executable)
         }
     }
@@ -382,7 +370,6 @@ mod platform {
             child: &mut Child,
             _signal: c_int,
             executable: &Path,
-            _signals: &mut dyn Iterator<Item = c_int>,
         ) -> Result<ExitStatus, SuperviseError> {
             kill(child, executable)
         }
@@ -398,7 +385,6 @@ mod platform {
             child: &mut Child,
             _signal: c_int,
             executable: &Path,
-            _signals: &mut dyn Iterator<Item = c_int>,
         ) -> Result<ExitStatus, SuperviseError> {
             kill(child, executable)
         }
