@@ -12,6 +12,7 @@
 use crate::{args, config};
 use intercept_supervisor::context;
 use intercept_supervisor::runner;
+use std::ffi::c_int;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
@@ -67,8 +68,9 @@ impl BuildEnvironment {
     pub fn run_build(
         &self,
         build_command: args::BuildCommand,
+        signals: &mut dyn Iterator<Item = c_int>,
     ) -> Result<ExitStatus, intercept_supervisor::SuperviseError> {
-        self.inner.run_build(&build_command.arguments)
+        self.inner.run_build(&build_command.arguments, signals)
     }
 }
 

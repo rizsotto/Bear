@@ -7,12 +7,16 @@
 //! that differ between the outermost supervisor and a nested one live in
 //! [`Leader`] and [`Inherit`], the two implementations of [`GroupPolicy`],
 //! picked at the call site as a type parameter.
-//! On Unix the wait blocks on `SIGCHLD` and the termination signals; on
-//! Windows it polls, and the policy carries no steps.
+//!
+//! The process registers the signals once, with [`signals`], and passes the
+//! source to every supervision. On Unix the source blocks on `SIGCHLD` and
+//! the termination signals; on Windows it polls, and both policies stop
+//! only the direct child.
 
 use intercept::Execution;
-use std::path::PathBuf;
-use std::process::ExitStatus;
+use std::ffi::c_int;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, ExitStatus};
 use thiserror::Error;
 
 /// How a supervisor relates to the build's process group: it sets up the
@@ -26,7 +30,7 @@ use thiserror::Error;
 ///
 /// Implemented by [`Leader`] and [`Inherit`] only; the policy is chosen at
 /// the call site as a type parameter of [`supervise`].
-pub trait GroupPolicy: platform::Policy {}
+pub trait GroupPolicy: policy::Policy {}
 
 /// The outermost supervisor (the driver). Creates a new process group with
 /// the child as leader and owns the authoritative escalation: forward the
@@ -45,20 +49,115 @@ pub struct Inherit;
 impl GroupPolicy for Leader {}
 impl GroupPolicy for Inherit {}
 
+/// The policy-specific steps of a supervision. Sealed: [`GroupPolicy`]
+/// requires it, and code outside this module cannot name it.
+mod policy {
+    use super::SuperviseError;
+    use std::ffi::c_int;
+    use std::path::Path;
+    use std::process::{Child, Command, ExitStatus};
+
+    pub trait Policy: Sized {
+        /// Runs before the spawn; the returned value lives until the
+        /// supervision ends.
+        fn prepare(command: &mut Command) -> Self;
+
+        /// Runs once, after the first termination signal; returns when the
+        /// direct child is reaped.
+        fn teardown(
+            self,
+            child: &mut Child,
+            signal: c_int,
+            executable: &Path,
+            signals: &mut dyn Iterator<Item = c_int>,
+        ) -> Result<ExitStatus, SuperviseError>;
+    }
+}
+
+/// Registers the signals a supervision reacts to and returns them as a
+/// source for [`supervise`].
+///
+/// Call it once per process, before the first spawn: a signal that arrives
+/// after the registration waits in the source, so none is lost. The
+/// handlers stay installed for the life of the process. Every item that is
+/// not a termination signal means the child may have exited.
+pub fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+    platform::signals()
+}
+
 /// This method supervises the execution of a command.
 ///
 /// It starts the command and waits for its completion. While waiting it
-/// forwards termination signals it receives to the build so the build stops
-/// too, and propagates the build's exit status back to the caller. How the
-/// build is torn down is up to the policy `P`: [`Leader`] or [`Inherit`].
-pub fn supervise<P: GroupPolicy>(command: &mut std::process::Command) -> Result<ExitStatus, SuperviseError> {
-    platform::supervise::<P>(command)
+/// forwards termination signals from `signals` to the build so the build
+/// stops too, and propagates the build's exit status back to the caller.
+/// How the build is torn down is up to the policy `P`: [`Leader`] or
+/// [`Inherit`].
+pub fn supervise<P: GroupPolicy>(
+    command: &mut Command,
+    signals: impl IntoIterator<Item = c_int>,
+) -> Result<ExitStatus, SuperviseError> {
+    let executable = PathBuf::from(command.get_program());
+    let mut signals = signals.into_iter();
+
+    let policy = P::prepare(command);
+
+    let mut child = command
+        .spawn()
+        .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
+
+    // Close the child-exited-early race: the child may already be gone
+    // before we block on the signal source.
+    if let Some(status) = try_wait(&mut child, &executable)? {
+        return Ok(status);
+    }
+
+    // Wait for a termination signal, the teardown trigger. Any other item
+    // (`SIGCHLD` on Unix, a poll tick on Windows) means the child may have
+    // exited.
+    let signal = loop {
+        match signals.next() {
+            Some(signal) if signal_hook::consts::TERM_SIGNALS.contains(&signal) => break signal,
+            Some(_) => {
+                if let Some(status) = try_wait(&mut child, &executable)? {
+                    return Ok(status);
+                }
+            }
+            // The source ended: nothing is left to forward, so block until
+            // the child is reaped.
+            None => return wait(&mut child, &executable),
+        }
+    };
+
+    policy.teardown(&mut child, signal, &executable, &mut signals)
 }
 
 /// This function supervises the execution of a command represented by the `Execution` struct.
-pub fn supervise_execution<P: GroupPolicy>(execution: Execution) -> Result<ExitStatus, SuperviseError> {
+pub fn supervise_execution<P: GroupPolicy>(
+    execution: Execution,
+    signals: impl IntoIterator<Item = c_int>,
+) -> Result<ExitStatus, SuperviseError> {
     let mut child = command_from_execution(execution)?;
-    supervise::<P>(&mut child)
+    supervise::<P>(&mut child, signals)
+}
+
+fn try_wait(child: &mut Child, executable: &Path) -> Result<Option<ExitStatus>, SuperviseError> {
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            log::debug!("Child process exited: {status:?}");
+            Ok(Some(status))
+        }
+        Ok(None) => Ok(None),
+        Err(err) => {
+            log::error!("Error waiting for child process: {err}");
+            Err(SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
+        }
+    }
+}
+
+fn wait(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseError> {
+    child
+        .wait()
+        .map_err(|err| SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
 }
 
 /// Builds a [`std::process::Command`] from an [`Execution`].
@@ -66,12 +165,12 @@ pub fn supervise_execution<P: GroupPolicy>(execution: Execution) -> Result<ExitS
 /// This is a free function rather than a `TryFrom` impl because the orphan
 /// rule forbids implementing the foreign `TryFrom`/`Command` for the foreign
 /// `Execution` from this crate.
-fn command_from_execution(val: Execution) -> Result<std::process::Command, SuperviseError> {
+fn command_from_execution(val: Execution) -> Result<Command, SuperviseError> {
     let mut command = match val.arguments.as_slice() {
         [] => return Err(SuperviseError::EmptyArguments),
-        [_] => std::process::Command::new(val.executable),
+        [_] => Command::new(val.executable),
         [_, arguments @ ..] => {
-            let mut cmd = std::process::Command::new(val.executable);
+            let mut cmd = Command::new(val.executable);
             cmd.args(arguments);
             cmd
         }
@@ -85,10 +184,12 @@ fn command_from_execution(val: Execution) -> Result<std::process::Command, Super
 #[cfg(unix)]
 mod platform {
     use super::cgroup;
-    use super::{Inherit, Leader, SuperviseError};
+    use super::policy::Policy;
+    use super::{Inherit, Leader, SuperviseError, try_wait, wait};
     use signal_hook::consts::signal::SIGCHLD;
     use signal_hook::iterator::Signals;
-    use std::path::{Path, PathBuf};
+    use std::ffi::c_int;
+    use std::path::Path;
     use std::process::{Child, Command, ExitStatus};
     use std::time::{Duration, Instant};
 
@@ -102,23 +203,15 @@ mod platform {
     /// (issue #713).
     const GRACE: Duration = Duration::from_millis(800);
 
-    /// The policy-specific steps of a supervision: what to set up on the
-    /// command before it is spawned, and how to tear the build down once a
-    /// termination signal arrives. Sealed: only [`Leader`] and [`Inherit`].
-    pub trait Policy: Sized {
-        /// Runs before the spawn; the returned value lives until the
-        /// supervision ends.
-        fn prepare(command: &mut Command) -> Self;
-
-        /// Runs once, after the first termination signal; returns when the
-        /// direct child is reaped.
-        fn teardown(
-            self,
-            child: &mut Child,
-            signal: libc::c_int,
-            executable: &Path,
-            signals: &mut Signals,
-        ) -> Result<ExitStatus, SuperviseError>;
+    /// The termination signals plus `SIGCHLD`, so a wait on the source
+    /// wakes when the build wants to be torn down or the child exits.
+    /// signal-hook's self-pipe keeps a signal delivered after the
+    /// registration until it is read.
+    pub(super) fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+        let mut watched = signal_hook::consts::TERM_SIGNALS.to_vec();
+        watched.push(SIGCHLD);
+        let mut signals = Signals::new(&watched)?;
+        Ok(std::iter::from_fn(move || signals.forever().next()))
     }
 
     impl Policy for Leader {
@@ -145,9 +238,9 @@ mod platform {
         fn teardown(
             self,
             child: &mut Child,
-            signal: libc::c_int,
+            signal: c_int,
             executable: &Path,
-            _signals: &mut Signals,
+            _signals: &mut dyn Iterator<Item = c_int>,
         ) -> Result<ExitStatus, SuperviseError> {
             let pgid = child.id() as libc::pid_t;
             log::debug!("Received signal {signal}, forwarding to process group {pgid}");
@@ -202,10 +295,7 @@ mod platform {
             // blocking wait (not a poll loop) avoids burning CPU and does not hang
             // any worse than the kernel itself: if SIGKILL cannot collect the child
             // (e.g. uninterruptible sleep), no caller could have done better.
-            child.wait().map_err(|err| SuperviseError::ProcessWait {
-                executable: executable.to_path_buf(),
-                source: err,
-            })
+            wait(child, executable)
         }
     }
 
@@ -220,95 +310,27 @@ mod platform {
         fn teardown(
             self,
             child: &mut Child,
-            signal: libc::c_int,
+            signal: c_int,
             executable: &Path,
-            signals: &mut Signals,
+            signals: &mut dyn Iterator<Item = c_int>,
         ) -> Result<ExitStatus, SuperviseError> {
             let child_pid = child.id() as libc::pid_t;
             log::debug!("Received signal {signal}, forwarding to child {child_pid}");
             send(SendTarget::Process(child_pid), signal);
 
+            // Any further item may mean the child exited; a repeated
+            // termination signal needs no second relay.
             if let Some(status) = try_wait(child, executable)? {
                 return Ok(status);
             }
-            for info in signals {
-                if info == SIGCHLD
-                    && let Some(status) = try_wait(child, executable)?
-                {
+            for _ in signals {
+                if let Some(status) = try_wait(child, executable)? {
                     return Ok(status);
                 }
             }
-            // We never close the signal handle, so the loop above only ends if
-            // signal-hook closes it itself; in that case block until the child is
-            // reaped (the leader's group kill remains the authoritative teardown).
-            child.wait().map_err(|err| SuperviseError::ProcessWait {
-                executable: executable.to_path_buf(),
-                source: err,
-            })
-        }
-    }
-
-    pub(super) fn supervise<P: Policy>(command: &mut Command) -> Result<ExitStatus, SuperviseError> {
-        let executable = PathBuf::from(command.get_program());
-
-        let policy = P::prepare(command);
-
-        // Watch the termination signals plus SIGCHLD so the wait below blocks
-        // until either the build wants to be torn down or the child exits.
-        let mut watched: Vec<libc::c_int> = signal_hook::consts::TERM_SIGNALS.to_vec();
-        watched.push(SIGCHLD);
-        let mut signals = Signals::new(&watched).map_err(|err| SuperviseError::SignalRegistration {
-            executable: executable.clone(),
-            source: err,
-        })?;
-
-        let mut child = command
-            .spawn()
-            .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
-
-        // Close the child-exited-early race: the child may already be gone
-        // before we block on the signal iterator.
-        if let Some(status) = try_wait(&mut child, &executable)? {
-            return Ok(status);
-        }
-
-        // Phase 1: wait for either SIGCHLD (child reaped) or a term signal
-        // (the teardown trigger). signal-hook's self-pipe persists a signal
-        // delivered after registration, so a signal racing this loop is not
-        // lost.
-        let mut received: Option<libc::c_int> = None;
-        for info in &mut signals {
-            if info == SIGCHLD {
-                if let Some(status) = try_wait(&mut child, &executable)? {
-                    return Ok(status);
-                }
-            } else {
-                received = Some(info);
-                break;
-            }
-        }
-        // The loop exits only via the `break` above: we never close the signal
-        // handle, and `Signals::forever()` ends only on a closed handle. If
-        // signal-hook ever closes it out from under us, there is nothing left to
-        // forward, so fall back to blocking until the child is reaped.
-        let Some(signal) = received else {
-            return child.wait().map_err(|err| SuperviseError::ProcessWait { executable, source: err });
-        };
-
-        policy.teardown(&mut child, signal, &executable, &mut signals)
-    }
-
-    fn try_wait(child: &mut Child, executable: &Path) -> Result<Option<ExitStatus>, SuperviseError> {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                log::debug!("Child process exited: {status:?}");
-                Ok(Some(status))
-            }
-            Ok(None) => Ok(None),
-            Err(err) => {
-                log::error!("Error waiting for child process: {err}");
-                Err(SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
-            }
+            // The source ended; block until the child is reaped (the
+            // leader's group kill remains the authoritative teardown).
+            wait(child, executable)
         }
     }
 
@@ -383,7 +405,7 @@ mod cgroup {
             let relative = own_v2_path()?;
             let path = Path::new("/sys/fs/cgroup")
                 .join(relative.trim_start_matches('/'))
-                .join(format!("bear-{}", std::process::id()));
+                .join(format!("bear-{:016x}", random_u64()));
             if let Err(err) = fs::create_dir(&path) {
                 log::debug!("cgroup unavailable ({}: {err}); using process-group teardown", path.display());
                 return None;
@@ -449,6 +471,15 @@ mod cgroup {
         }
     }
 
+    /// A random name part, so two supervisions in one process (parallel
+    /// unit tests) never share a cgroup. std's `RandomState` is seeded
+    /// randomly per thread and changes keys with every instance, so no
+    /// dependency is needed.
+    fn random_u64() -> u64 {
+        use std::hash::{BuildHasher, Hasher};
+        std::collections::hash_map::RandomState::new().build_hasher().finish()
+    }
+
     /// Our own cgroup v2 path, read from the `0::<path>` line of
     /// `/proc/self/cgroup`. `None` on a host without a unified hierarchy.
     fn own_v2_path() -> Option<String> {
@@ -510,74 +541,81 @@ mod cgroup {
 
 #[cfg(not(unix))]
 mod platform {
-    use super::{Inherit, Leader, SuperviseError};
-    use std::path::PathBuf;
-    use std::process::ExitStatus;
+    use super::policy::Policy;
+    use super::{Inherit, Leader, SuperviseError, wait};
+    use std::ffi::c_int;
+    use std::path::Path;
+    use std::process::{Child, Command, ExitStatus};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
     use std::time::Duration;
 
-    /// Process groups are out of scope here, so the policies carry no steps.
-    pub trait Policy {}
+    /// There is no `SIGCHLD` to wake the wait when the child exits, so the
+    /// source wakes it on this interval instead.
+    const POLL: Duration = Duration::from_millis(100);
 
-    impl Policy for Leader {}
-    impl Policy for Inherit {}
-
-    /// A blocking `wait()` cannot be interrupted by a signal on this platform
-    /// (no `SIGCHLD`), so the term-signal flag is observed by polling. Process
-    /// groups are out of scope here, so the `GroupPolicy` is ignored and only
-    /// the direct child is signalled.
-    pub(super) fn supervise<P: Policy>(
-        command: &mut std::process::Command,
-    ) -> Result<ExitStatus, SuperviseError> {
-        let executable = PathBuf::from(command.get_program());
+    /// A termination signal is recorded in a flag. The source sleeps one
+    /// `POLL`, then yields the recorded signal, or `0` when none arrived,
+    /// which the wait reads as "check the child".
+    pub(super) fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
         let signaled = Arc::new(AtomicUsize::new(0));
         for signal in signal_hook::consts::TERM_SIGNALS {
-            signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize).map_err(
-                |err| SuperviseError::SignalRegistration { executable: executable.clone(), source: err },
-            )?;
+            signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)?;
+        }
+        Ok(std::iter::from_fn(move || {
+            thread::sleep(POLL);
+            Some(signaled.swap(0, Ordering::SeqCst) as c_int)
+        }))
+    }
+
+    impl Policy for Leader {
+        fn prepare(_command: &mut Command) -> Self {
+            Leader {}
         }
 
-        let mut child = command
-            .spawn()
-            .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
-
-        loop {
-            if signaled.swap(0usize, Ordering::SeqCst) != 0 {
-                log::debug!("Received signal, forwarding to child process");
-                child.kill().map_err(|err| SuperviseError::ProcessKill {
-                    executable: executable.clone(),
-                    source: err,
-                })?;
-            }
-
-            match child.try_wait() {
-                Ok(Some(exit_status)) => {
-                    log::debug!("Child process exited: {exit_status:?}");
-                    return Ok(exit_status);
-                }
-                Ok(None) => {
-                    thread::sleep(Duration::from_millis(100));
-                }
-                Err(err) => {
-                    log::error!("Error waiting for child process: {err}");
-                    return Err(SuperviseError::ProcessWait { executable: executable.clone(), source: err });
-                }
-            }
+        fn teardown(
+            self,
+            child: &mut Child,
+            _signal: c_int,
+            executable: &Path,
+            _signals: &mut dyn Iterator<Item = c_int>,
+        ) -> Result<ExitStatus, SuperviseError> {
+            kill(child, executable)
         }
+    }
+
+    impl Policy for Inherit {
+        fn prepare(_command: &mut Command) -> Self {
+            Inherit
+        }
+
+        fn teardown(
+            self,
+            child: &mut Child,
+            _signal: c_int,
+            executable: &Path,
+            _signals: &mut dyn Iterator<Item = c_int>,
+        ) -> Result<ExitStatus, SuperviseError> {
+            kill(child, executable)
+        }
+    }
+
+    /// Process groups are out of scope here, so both policies stop only the
+    /// direct child.
+    fn kill(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseError> {
+        log::debug!("Received signal, forwarding to child process");
+        child.kill().map_err(|err| SuperviseError::ProcessKill {
+            executable: executable.to_path_buf(),
+            source: err,
+        })?;
+        wait(child, executable)
     }
 }
 
 /// Errors that can occur during process supervision.
 #[derive(Error, Debug)]
 pub enum SuperviseError {
-    #[error("cannot register signal handler for '{executable}': {source}", executable = executable.display())]
-    SignalRegistration {
-        executable: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
     #[error("cannot run '{executable}': {source}", executable = executable.display())]
     ProcessSpawn {
         executable: PathBuf,
@@ -604,27 +642,188 @@ pub enum SuperviseError {
 mod tests {
     // Requirements: cli-signal-forwarding
     //
-    // Only the normal-exit path is unit-tested here. The signal-forwarding
-    // paths (real-signal forward, grace window, SIGKILL escalation, whole-tree
-    // teardown) are verified end to end against the real driver in the
-    // integration suite (tests/integration, exit_codes.rs): driving supervise()
-    // in-process is unsafe, because signal-hook handlers are process-global and
-    // would bleed across parallel unit tests.
+    // The signal source is a plain iterator, so these tests feed fake
+    // signals and leave the process-global handlers alone. The child is
+    // real; supervise sends the real signal to it, never to the test
+    // process. No test waits on a timer: the child reports its pid once its
+    // traps are set, and the stand-in for `SIGCHLD` blocks until the child
+    // has exited. Whole-tree teardown is verified end to end against the
+    // real driver in the integration suite (tests/integration, exit_codes.rs).
     use super::*;
-    use std::process::Command;
+    use fixture::shell;
+    use std::os::unix::process::ExitStatusExt;
+
+    mod fixture {
+        use super::*;
+        use std::io::{BufRead, BufReader, PipeReader, PipeWriter, Write};
+        use std::iter;
+        use std::os::unix::process::CommandExt;
+
+        /// The test's side of a child's pipes: the child's stdin, held open
+        /// so a blocking `cat` or `read` waits for the test, and the child's
+        /// stdout, where the script prints `$$` once it is ready.
+        pub(super) struct Probe {
+            stdin: PipeWriter,
+            stdout: BufReader<PipeReader>,
+        }
+
+        /// A `sh -c script` command wired to a [`Probe`]. The termination
+        /// signals are reset to their default action in the child, so a
+        /// signal ignored by the test runner (`cargo test &`) does not leak
+        /// into the build and change what the test sees.
+        pub(super) fn shell(script: &str) -> (Command, Probe) {
+            let (stdin_reader, stdin_writer) = std::io::pipe().expect("stdin pipe");
+            let (stdout_reader, stdout_writer) = std::io::pipe().expect("stdout pipe");
+            let mut command = Command::new("sh");
+            command.arg("-c").arg(script).stdin(stdin_reader).stdout(stdout_writer);
+            // SAFETY: runs in the child between fork and exec, and calls
+            // only `signal`, which is async-signal-safe.
+            unsafe {
+                command.pre_exec(|| {
+                    for signal in signal_hook::consts::TERM_SIGNALS {
+                        libc::signal(*signal, libc::SIG_DFL);
+                    }
+                    Ok(())
+                });
+            }
+            (command, Probe { stdin: stdin_writer, stdout: BufReader::new(stdout_reader) })
+        }
+
+        impl Probe {
+            /// Stands in for `SIGCHLD` only: every item comes once the
+            /// child has exited.
+            pub(super) fn exits(self) -> impl Iterator<Item = c_int> {
+                self.signal_then_exits(None)
+            }
+
+            /// `signal` once the child is ready, then the `SIGCHLD`
+            /// stand-in.
+            pub(super) fn signal(self, signal: c_int) -> impl Iterator<Item = c_int> {
+                self.signal_then_exits(Some(signal))
+            }
+
+            /// Lets the child past its `read`, then ends, so supervise
+            /// is left with nothing to wait on but the child itself.
+            pub(super) fn release(mut self) -> impl Iterator<Item = c_int> {
+                iter::from_fn(move || {
+                    self.stdin.write_all(b"go\n").expect("write to the child");
+                    None
+                })
+            }
+
+            fn signal_then_exits(mut self, signal: Option<c_int>) -> impl Iterator<Item = c_int> {
+                let mut pid = None;
+                iter::from_fn(move || match pid {
+                    None => {
+                        let ready = self.ready();
+                        pid = Some(ready);
+                        match signal {
+                            Some(signal) => Some(signal),
+                            None => wait_for_exit(ready),
+                        }
+                    }
+                    Some(pid) => wait_for_exit(pid),
+                })
+            }
+
+            /// Blocks until the script prints its pid.
+            fn ready(&mut self) -> libc::pid_t {
+                let mut line = String::new();
+                self.stdout.read_line(&mut line).expect("read the child's pid");
+                line.trim().parse().expect("the child prints its pid")
+            }
+        }
+
+        /// Blocks until `pid` has exited, and leaves it unreaped
+        /// (`WNOWAIT`), so supervise still collects its status.
+        fn wait_for_exit(pid: libc::pid_t) -> Option<c_int> {
+            // SAFETY: an all-zero `siginfo_t` is a valid value; waitid only
+            // writes into it.
+            let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+            loop {
+                // SAFETY: plain syscall on a pid this test spawned; `info`
+                // outlives the call.
+                let rc = unsafe {
+                    libc::waitid(libc::P_PID, pid as libc::id_t, &mut info, libc::WEXITED | libc::WNOWAIT)
+                };
+                if rc == 0 {
+                    return Some(libc::SIGCHLD);
+                }
+                let err = std::io::Error::last_os_error();
+                assert_eq!(err.raw_os_error(), Some(libc::EINTR), "waitid failed: {err}");
+            }
+        }
+    }
 
     #[test]
     fn normal_exit_propagates_status() {
         // arrange / act / assert per case: (exit code, expected success)
         let cases = [(0, true), (7, false)];
         for (code, expect_success) in cases {
-            let mut command = Command::new("sh");
-            command.arg("-c").arg(format!("exit {code}"));
+            let (mut command, probe) = shell(&format!("echo $$; exit {code}"));
 
-            let sut = supervise::<Leader>(&mut command).expect("supervise failed");
+            let sut = supervise::<Leader>(&mut command, probe.exits()).expect("supervise failed");
 
             assert_eq!(sut.success(), expect_success, "exit {code} success mismatch");
             assert_eq!(sut.code(), Some(code), "exit {code} code mismatch");
         }
+    }
+
+    #[test]
+    fn ended_source_waits_for_the_child() {
+        let (mut command, probe) = shell("read _; exit 3");
+
+        let sut = supervise::<Leader>(&mut command, probe.release()).expect("supervise failed");
+
+        assert_eq!(sut.code(), Some(3));
+    }
+
+    #[test]
+    fn leader_forwards_the_received_signal() {
+        // arrange / act / assert per case: the signal Bear got reaches the child
+        let cases = [libc::SIGTERM, libc::SIGINT];
+        for signal in cases {
+            let (mut command, probe) = shell("echo $$; exec cat");
+
+            let sut = supervise::<Leader>(&mut command, probe.signal(signal)).expect("supervise failed");
+
+            assert_eq!(sut.signal(), Some(signal), "signal {signal}");
+        }
+    }
+
+    #[test]
+    fn inherit_relays_the_received_signal() {
+        // arrange / act / assert per case: the signal Bear got reaches the child
+        let cases = [libc::SIGTERM, libc::SIGINT];
+        for signal in cases {
+            let (mut command, probe) = shell("echo $$; exec cat");
+
+            let sut = supervise::<Inherit>(&mut command, probe.signal(signal)).expect("supervise failed");
+
+            assert_eq!(sut.signal(), Some(signal), "signal {signal}");
+        }
+    }
+
+    #[test]
+    fn leader_lets_a_trap_finish_within_the_grace_window() {
+        // A shell runs a trap only once its foreground command ends, so a
+        // foreground `cat` forked after the signal would never end. The
+        // background `cat` exists before the pid is printed, so the group
+        // signal reaches it. It reads fd 3 because a background job's stdin
+        // is /dev/null.
+        let (mut command, probe) = shell("exec 3<&0; trap 'exit 5' TERM; cat <&3 & echo $$; wait; exit 0");
+
+        let sut = supervise::<Leader>(&mut command, probe.signal(libc::SIGTERM)).expect("supervise failed");
+
+        assert_eq!(sut.code(), Some(5));
+    }
+
+    #[test]
+    fn leader_kills_a_build_that_ignores_the_signal() {
+        let (mut command, probe) = shell("trap '' TERM; echo $$; exec cat");
+
+        let sut = supervise::<Leader>(&mut command, probe.signal(libc::SIGTERM)).expect("supervise failed");
+
+        assert_eq!(sut.signal(), Some(libc::SIGKILL));
     }
 }

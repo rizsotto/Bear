@@ -181,7 +181,12 @@ impl Mode {
     /// have been provided.
     pub fn run(self) -> ExitCode {
         let status = match self {
-            Self::Intercept(interceptor, command) => interceptor.run(command),
+            // Only the modes that run a build register the signals: in the
+            // others nobody would read them, so a signal would be ignored.
+            Self::Intercept(interceptor, command) => match intercept_supervisor::signals() {
+                Ok(mut signals) => interceptor.run(command, &mut signals),
+                Err(error) => Err(execution::RuntimeError::SignalRegistration(error)),
+            },
             Self::Replay(replayer) => replayer.run(),
             Self::PrintCompilers => {
                 print!(
@@ -664,8 +669,12 @@ mod impls {
         /// Execute the build command in the given environment.
         ///
         /// This will run the build command and return the exit code.
-        fn run(&self, command: BuildCommand) -> Result<ExitStatus, SuperviseError> {
-            self.environment.run_build(command)
+        fn run(
+            &self,
+            command: BuildCommand,
+            signals: &mut dyn Iterator<Item = std::ffi::c_int>,
+        ) -> Result<ExitStatus, SuperviseError> {
+            self.environment.run_build(command, signals)
         }
     }
 }

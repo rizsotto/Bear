@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::env::JoinPathsError;
 #[cfg(windows)]
 use std::env::consts::EXE_EXTENSION;
+use std::ffi::c_int;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
@@ -331,12 +332,17 @@ impl BuildEnvironment {
     ///
     /// * `arguments` - The build command (executable followed by its arguments) to
     ///   execute with interception enabled
+    /// * `signals` - The process's signal source, see [`supervise::signals`]
     ///
     /// # Returns
     ///
     /// Returns `Ok(ExitStatus)` containing the exit status of the build command,
     /// or `Err(SuperviseError)` if the command execution fails or cannot be supervised.
-    pub fn run_build(&self, arguments: &[String]) -> Result<ExitStatus, supervise::SuperviseError> {
+    pub fn run_build(
+        &self,
+        arguments: &[String],
+        signals: impl IntoIterator<Item = c_int>,
+    ) -> Result<ExitStatus, supervise::SuperviseError> {
         log::info!("Build command to run: {arguments:?}");
 
         let [executable, args @ ..] = arguments else {
@@ -353,7 +359,7 @@ impl BuildEnvironment {
             command.env(key, value);
         }
 
-        supervise::supervise::<supervise::Leader>(&mut command)
+        supervise::supervise::<supervise::Leader>(&mut command, signals)
     }
 }
 

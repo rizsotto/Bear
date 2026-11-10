@@ -4,6 +4,7 @@ use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
 use crate::output::AtomicFile;
 use intercept_supervisor::SuperviseError;
+use std::ffi::c_int;
 use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
@@ -108,11 +109,16 @@ pub trait Executor {
     ///
     /// # Arguments
     /// * `command` - The build command to execute
+    /// * `signals` - The process's signal source, forwarded to the build
     ///
     /// # Returns
     /// * `Ok(ExitStatus)` - The build completed with the given exit status
     /// * `Err(SuperviseError)` - An error occurred during execution
-    fn run(&self, command: BuildCommand) -> Result<ExitStatus, SuperviseError>;
+    fn run(
+        &self,
+        command: BuildCommand,
+        signals: &mut dyn Iterator<Item = c_int>,
+    ) -> Result<ExitStatus, SuperviseError>;
 }
 
 /// Coordinates live command interception during build execution.
@@ -143,11 +149,16 @@ impl Interceptor {
     ///
     /// # Arguments
     /// * `command` - The build command to execute with interception
+    /// * `signals` - The process's signal source, forwarded to the build
     ///
     /// # Returns
     /// * `Ok(ExitCode::SUCCESS)` - All operations completed successfully
     /// * `Err(RuntimeError)` - An error occurred in any component
-    pub fn run(self, command: BuildCommand) -> Result<ExitCode, RuntimeError> {
+    pub fn run(
+        self,
+        command: BuildCommand,
+        signals: &mut dyn Iterator<Item = c_int>,
+    ) -> Result<ExitCode, RuntimeError> {
         let (sender, receiver) = sync_channel::<intercept::Execution>(INTERCEPT_CHANNEL_CAPACITY);
 
         // Inject the initial command as the first execution
@@ -163,7 +174,7 @@ impl Interceptor {
             std::thread::spawn(move || consumer.consume(receiver))
         };
 
-        let build_result = self.build.run(command);
+        let build_result = self.build.run(command, signals);
 
         // Stop the interception whatever the build did, so both threads
         // finish and the output can be committed or rolled back. A failed
@@ -261,6 +272,8 @@ pub enum RuntimeError {
     Executor(#[from] SuperviseError),
     #[error("Internal error: {0}")]
     Thread(&'static str),
+    #[error("cannot register signal handlers: {0}")]
+    SignalRegistration(std::io::Error),
 }
 
 #[cfg(test)]
@@ -536,11 +549,11 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in interceptor happy path test"));
@@ -568,7 +581,7 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| {
+        executor_mock.expect_run().times(1).returning(|_, _| {
             Err(SuperviseError::ProcessSpawn {
                 executable: "test_executable".into(),
                 source: std::io::Error::new(std::io::ErrorKind::NotFound, "Test executor failure"),
@@ -576,7 +589,7 @@ mod tests {
         });
 
         let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Executor(_)));
@@ -598,11 +611,11 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
@@ -623,11 +636,11 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Consumer(_)));
@@ -650,11 +663,11 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
@@ -677,10 +690,10 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| Ok(create_failure_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_failure_exit_status()));
 
         let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_ok());
         assert_is_failure(result.expect("Failed to get result in non-zero exit code test"));
@@ -709,14 +722,14 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| {
+        executor_mock.expect_run().times(1).returning(|_, _| {
             std::thread::sleep(Duration::from_millis(50));
             Ok(create_success_exit_status())
         });
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command());
+        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in coordination timing test"));
@@ -803,7 +816,7 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
         let consumer_mock = consumer_with_pending_output(&final_path);
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| {
+        executor_mock.expect_run().times(1).returning(|_, _| {
             Err(SuperviseError::ProcessSpawn {
                 executable: "test_executable".into(),
                 source: std::io::Error::new(std::io::ErrorKind::NotFound, "Test executor failure"),
@@ -811,7 +824,7 @@ mod tests {
         });
 
         let sut = Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock))
-            .run(create_test_command());
+            .run(create_test_command(), &mut std::iter::empty());
 
         assert!(matches!(sut, Err(RuntimeError::Executor(_))));
         assert_eq!(producer_mock.cancel_call_count(), 1);
@@ -826,10 +839,10 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
         let consumer_mock = consumer_with_pending_output(&final_path);
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_| Ok(create_failure_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_failure_exit_status()));
 
         let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock))
-            .run(create_test_command());
+            .run(create_test_command(), &mut std::iter::empty());
 
         assert_is_failure(sut.expect("a failing build is not an error of Bear"));
         assert!(final_path.exists());

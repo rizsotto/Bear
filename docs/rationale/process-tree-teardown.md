@@ -51,7 +51,17 @@ Options:
   `signal-hook` crate Bear already has. Chosen: portable and no polling.
 
 On unix the termination signals are `SIGTERM`, `SIGINT` and `SIGQUIT`.
-Windows has no `SIGCHLD`, so there Bear polls every 100ms.
+Windows has no `SIGCHLD`, so there the wait wakes every 100ms to check
+the child.
+
+The signals are registered once per process, by the code that runs the
+build, and `supervise()` reads them from a source the caller passes in.
+It does not register them itself, for two reasons. Signal handlers are
+global to the process, so a unit test could not drive `supervise()`
+without hitting the tests that run beside it. And a dropped signal-hook
+handler does not restore the default action, so registering per call
+leaves the process ignoring the signal once the call returns. The modes
+that run no build register nothing, so they keep the default action.
 
 **Forward.** The leader sends the real signal it got to the whole
 process group, not a substitute. Build tools such as `make -j`, `ninja`

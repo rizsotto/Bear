@@ -18,7 +18,7 @@
 use anyhow::{Context, Result};
 use intercept::Execution;
 use intercept::reporter::{Reporter, ReporterFactory};
-use intercept_supervisor::supervise::{Inherit, supervise_execution};
+use intercept_supervisor::supervise::{Inherit, signals, supervise_execution};
 use intercept_supervisor::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 
 /// Implementation of the wrapper process.
@@ -29,6 +29,8 @@ use intercept_supervisor::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfi
 /// the execution.
 fn main() -> Result<()> {
     intercept::logging::init("wrapper");
+    // Register before anything is spawned, so no signal is lost.
+    let signals = signals().with_context(|| "Failed to register signal handlers")?;
 
     // Capture the current process execution details
     let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
@@ -45,7 +47,7 @@ fn main() -> Result<()> {
     }
 
     // Execute the real executable with the same arguments
-    let exit_status = supervise_execution::<Inherit>(real_execution)?;
+    let exit_status = supervise_execution::<Inherit>(real_execution, signals)?;
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
 }

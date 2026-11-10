@@ -21,7 +21,7 @@ pub use collector::CollectorOnTcp;
 pub use context::{Context, ContextError};
 pub use installation::{InstallationLayout, LayoutError};
 pub use runner::{BuildEnvironment, ConfigurationError};
-pub use supervise::{GroupPolicy, Inherit, Leader, SuperviseError, supervise, supervise_execution};
+pub use supervise::{GroupPolicy, Inherit, Leader, SuperviseError, signals, supervise, supervise_execution};
 pub use wrapper::{
     CONFIG_FILENAME, ConfigError, WrapperConfig, WrapperConfigReader, WrapperDirectory,
     WrapperDirectoryBuilder, WrapperDirectoryError,
