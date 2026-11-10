@@ -14,7 +14,7 @@
 //! only the direct child.
 
 use std::ffi::c_int;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus};
 use thiserror::Error;
 
@@ -34,13 +34,14 @@ pub fn supervise<P: GroupPolicy>(
 
     let policy = P::prepare(command);
 
-    let mut child = command
+    let process = command
         .spawn()
         .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
+    let mut child = Supervised { process, executable };
 
     // Close the child-exited-early race: the child may already be gone
     // before we block on the signal source.
-    if let Some(status) = try_wait(&mut child, &executable)? {
+    if let Some(status) = child.try_wait()? {
         return Ok(status);
     }
 
@@ -51,17 +52,17 @@ pub fn supervise<P: GroupPolicy>(
         match signals.next() {
             Some(signal) if signal_hook::consts::TERM_SIGNALS.contains(&signal) => break signal,
             Some(_) => {
-                if let Some(status) = try_wait(&mut child, &executable)? {
+                if let Some(status) = child.try_wait()? {
                     return Ok(status);
                 }
             }
             // The source ended: nothing is left to forward, so block until
             // the child is reaped.
-            None => return wait(&mut child, &executable),
+            None => return child.wait(),
         }
     };
 
-    policy.teardown(&mut child, signal, &executable)
+    policy.teardown(&mut child, signal)
 }
 
 /// Registers the signals a supervision reacts to and returns them as a
@@ -93,12 +94,7 @@ pub trait GroupPolicy: Sized {
 
     /// Runs once, after the first termination signal; returns when the
     /// direct child is reaped.
-    fn teardown(
-        self,
-        child: &mut Child,
-        signal: c_int,
-        executable: &Path,
-    ) -> Result<ExitStatus, SuperviseError>;
+    fn teardown(self, child: &mut Supervised, signal: c_int) -> Result<ExitStatus, SuperviseError>;
 }
 
 /// The outermost supervisor (the driver). Creates a new process group with
@@ -138,35 +134,43 @@ pub enum SuperviseError {
     },
 }
 
-fn try_wait(child: &mut Child, executable: &Path) -> Result<Option<ExitStatus>, SuperviseError> {
-    match child.try_wait() {
-        Ok(Some(status)) => {
-            log::debug!("Child process exited: {status:?}");
-            Ok(Some(status))
-        }
-        Ok(None) => Ok(None),
-        Err(err) => {
-            log::error!("Error waiting for child process: {err}");
-            Err(SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
-        }
-    }
+/// The child [`supervise`] spawned, with its executable for the error
+/// messages. Only `supervise` builds one.
+pub struct Supervised {
+    process: Child,
+    executable: PathBuf,
 }
 
-fn wait(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseError> {
-    child
-        .wait()
-        .map_err(|err| SuperviseError::ProcessWait { executable: executable.to_path_buf(), source: err })
+impl Supervised {
+    fn try_wait(&mut self) -> Result<Option<ExitStatus>, SuperviseError> {
+        match self.process.try_wait() {
+            Ok(Some(status)) => {
+                log::debug!("Child process exited: {status:?}");
+                Ok(Some(status))
+            }
+            Ok(None) => Ok(None),
+            Err(err) => {
+                log::error!("Error waiting for child process: {err}");
+                Err(SuperviseError::ProcessWait { executable: self.executable.clone(), source: err })
+            }
+        }
+    }
+
+    fn wait(&mut self) -> Result<ExitStatus, SuperviseError> {
+        self.process
+            .wait()
+            .map_err(|err| SuperviseError::ProcessWait { executable: self.executable.clone(), source: err })
+    }
 }
 
 #[cfg(unix)]
 mod platform {
     use super::cgroup;
-    use super::{GroupPolicy, Inherit, Leader, SuperviseError, try_wait, wait};
+    use super::{GroupPolicy, Inherit, Leader, SuperviseError, Supervised};
     use signal_hook::consts::signal::SIGCHLD;
     use signal_hook::iterator::Signals;
     use std::ffi::c_int;
-    use std::path::Path;
-    use std::process::{Child, Command, ExitStatus};
+    use std::process::{Command, ExitStatus};
     use std::time::{Duration, Instant};
 
     /// How long the build's process tree is allowed to wind down on its own
@@ -211,13 +215,8 @@ mod platform {
         /// Deliver the real signal to the whole group, grant a grace window,
         /// then force whatever is still alive. The leader runs the single
         /// authoritative escalation timer for the supervision chain.
-        fn teardown(
-            self,
-            child: &mut Child,
-            signal: c_int,
-            executable: &Path,
-        ) -> Result<ExitStatus, SuperviseError> {
-            let pgid = child.id() as libc::pid_t;
+        fn teardown(self, child: &mut Supervised, signal: c_int) -> Result<ExitStatus, SuperviseError> {
+            let pgid = child.process.id() as libc::pid_t;
             log::debug!("Received signal {signal}, forwarding to process group {pgid}");
             send(SendTarget::Group(pgid), signal);
 
@@ -228,7 +227,7 @@ mod platform {
             let deadline = Instant::now() + GRACE;
             let mut exited = None;
             loop {
-                if let Some(status) = try_wait(child, executable)? {
+                if let Some(status) = child.try_wait()? {
                     exited = Some(status);
                     break;
                 }
@@ -270,7 +269,7 @@ mod platform {
             // blocking wait (not a poll loop) avoids burning CPU and does not hang
             // any worse than the kernel itself: if SIGKILL cannot collect the child
             // (e.g. uninterruptible sleep), no caller could have done better.
-            wait(child, executable)
+            child.wait()
         }
     }
 
@@ -282,20 +281,15 @@ mod platform {
         /// Relay the real signal to the direct child only and wait for it to
         /// be reaped. The leader's group kill is authoritative, so no grace
         /// or `SIGKILL` timer runs here.
-        fn teardown(
-            self,
-            child: &mut Child,
-            signal: c_int,
-            executable: &Path,
-        ) -> Result<ExitStatus, SuperviseError> {
-            let child_pid = child.id() as libc::pid_t;
+        fn teardown(self, child: &mut Supervised, signal: c_int) -> Result<ExitStatus, SuperviseError> {
+            let child_pid = child.process.id() as libc::pid_t;
             log::debug!("Received signal {signal}, forwarding to child {child_pid}");
             send(SendTarget::Process(child_pid), signal);
 
             // A repeated termination signal needs no second relay, and a
             // child that does not stop is reaped by the leader's group kill,
             // so a blocking wait is enough.
-            wait(child, executable)
+            child.wait()
         }
     }
 
@@ -333,10 +327,9 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    use super::{GroupPolicy, Inherit, Leader, SuperviseError, wait};
+    use super::{GroupPolicy, Inherit, Leader, SuperviseError, Supervised};
     use std::ffi::c_int;
-    use std::path::Path;
-    use std::process::{Child, Command, ExitStatus};
+    use std::process::{Command, ExitStatus};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
@@ -365,13 +358,8 @@ mod platform {
             Leader {}
         }
 
-        fn teardown(
-            self,
-            child: &mut Child,
-            _signal: c_int,
-            executable: &Path,
-        ) -> Result<ExitStatus, SuperviseError> {
-            kill(child, executable)
+        fn teardown(self, child: &mut Supervised, _signal: c_int) -> Result<ExitStatus, SuperviseError> {
+            kill(child)
         }
     }
 
@@ -380,25 +368,20 @@ mod platform {
             Inherit
         }
 
-        fn teardown(
-            self,
-            child: &mut Child,
-            _signal: c_int,
-            executable: &Path,
-        ) -> Result<ExitStatus, SuperviseError> {
-            kill(child, executable)
+        fn teardown(self, child: &mut Supervised, _signal: c_int) -> Result<ExitStatus, SuperviseError> {
+            kill(child)
         }
     }
 
     /// Process groups are out of scope here, so both policies stop only the
     /// direct child.
-    fn kill(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseError> {
+    fn kill(child: &mut Supervised) -> Result<ExitStatus, SuperviseError> {
         log::debug!("Received signal, forwarding to child process");
-        child.kill().map_err(|err| SuperviseError::ProcessKill {
-            executable: executable.to_path_buf(),
+        child.process.kill().map_err(|err| SuperviseError::ProcessKill {
+            executable: child.executable.clone(),
             source: err,
         })?;
-        wait(child, executable)
+        child.wait()
     }
 }
 
