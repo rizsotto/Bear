@@ -18,6 +18,63 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus};
 use thiserror::Error;
 
+/// This method supervises the execution of a command.
+///
+/// It starts the command and waits for its completion. While waiting it
+/// forwards termination signals from `signals` to the build so the build
+/// stops too, and propagates the build's exit status back to the caller.
+/// How the build is torn down is up to the policy `P`: [`Leader`] or
+/// [`Inherit`].
+pub fn supervise<P: GroupPolicy>(
+    command: &mut Command,
+    signals: impl IntoIterator<Item = c_int>,
+) -> Result<ExitStatus, SuperviseError> {
+    let executable = PathBuf::from(command.get_program());
+    let mut signals = signals.into_iter();
+
+    let policy = P::prepare(command);
+
+    let mut child = command
+        .spawn()
+        .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
+
+    // Close the child-exited-early race: the child may already be gone
+    // before we block on the signal source.
+    if let Some(status) = try_wait(&mut child, &executable)? {
+        return Ok(status);
+    }
+
+    // Wait for a termination signal, the teardown trigger. Any other item
+    // (`SIGCHLD` on Unix, a poll tick on Windows) means the child may have
+    // exited.
+    let signal = loop {
+        match signals.next() {
+            Some(signal) if signal_hook::consts::TERM_SIGNALS.contains(&signal) => break signal,
+            Some(_) => {
+                if let Some(status) = try_wait(&mut child, &executable)? {
+                    return Ok(status);
+                }
+            }
+            // The source ended: nothing is left to forward, so block until
+            // the child is reaped.
+            None => return wait(&mut child, &executable),
+        }
+    };
+
+    policy.teardown(&mut child, signal, &executable, &mut signals)
+}
+
+/// Registers the signals a supervision reacts to and returns them as a
+/// source for [`supervise`].
+///
+/// Call it once per process, before the first spawn: a signal that arrives
+/// after the registration waits in the source, so none is lost. The
+/// handlers stay installed for the life of the process. Every item that is
+/// not a termination signal means the child may have exited.
+pub fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+    platform::signals()
+}
+
 /// How a supervisor relates to the build's process group: it sets up the
 /// group before the spawn, and decides how the build is torn down after a
 /// termination signal.
@@ -73,61 +130,27 @@ mod policy {
     }
 }
 
-/// Registers the signals a supervision reacts to and returns them as a
-/// source for [`supervise`].
-///
-/// Call it once per process, before the first spawn: a signal that arrives
-/// after the registration waits in the source, so none is lost. The
-/// handlers stay installed for the life of the process. Every item that is
-/// not a termination signal means the child may have exited.
-pub fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
-    platform::signals()
-}
-
-/// This method supervises the execution of a command.
-///
-/// It starts the command and waits for its completion. While waiting it
-/// forwards termination signals from `signals` to the build so the build
-/// stops too, and propagates the build's exit status back to the caller.
-/// How the build is torn down is up to the policy `P`: [`Leader`] or
-/// [`Inherit`].
-pub fn supervise<P: GroupPolicy>(
-    command: &mut Command,
-    signals: impl IntoIterator<Item = c_int>,
-) -> Result<ExitStatus, SuperviseError> {
-    let executable = PathBuf::from(command.get_program());
-    let mut signals = signals.into_iter();
-
-    let policy = P::prepare(command);
-
-    let mut child = command
-        .spawn()
-        .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
-
-    // Close the child-exited-early race: the child may already be gone
-    // before we block on the signal source.
-    if let Some(status) = try_wait(&mut child, &executable)? {
-        return Ok(status);
-    }
-
-    // Wait for a termination signal, the teardown trigger. Any other item
-    // (`SIGCHLD` on Unix, a poll tick on Windows) means the child may have
-    // exited.
-    let signal = loop {
-        match signals.next() {
-            Some(signal) if signal_hook::consts::TERM_SIGNALS.contains(&signal) => break signal,
-            Some(_) => {
-                if let Some(status) = try_wait(&mut child, &executable)? {
-                    return Ok(status);
-                }
-            }
-            // The source ended: nothing is left to forward, so block until
-            // the child is reaped.
-            None => return wait(&mut child, &executable),
-        }
-    };
-
-    policy.teardown(&mut child, signal, &executable, &mut signals)
+/// Errors that can occur during process supervision.
+#[derive(Error, Debug)]
+pub enum SuperviseError {
+    #[error("cannot run '{executable}': {source}", executable = executable.display())]
+    ProcessSpawn {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("cannot kill '{executable}': {source}", executable = executable.display())]
+    ProcessKill {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("cannot wait for '{executable}': {source}", executable = executable.display())]
+    ProcessWait {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 fn try_wait(child: &mut Child, executable: &Path) -> Result<Option<ExitStatus>, SuperviseError> {
@@ -335,6 +358,80 @@ mod platform {
     }
 }
 
+#[cfg(not(unix))]
+mod platform {
+    use super::policy::Policy;
+    use super::{Inherit, Leader, SuperviseError, wait};
+    use std::ffi::c_int;
+    use std::path::Path;
+    use std::process::{Child, Command, ExitStatus};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::thread;
+    use std::time::Duration;
+
+    /// There is no `SIGCHLD` to wake the wait when the child exits, so the
+    /// source wakes it on this interval instead.
+    const POLL: Duration = Duration::from_millis(100);
+
+    /// A termination signal is recorded in a flag. The source sleeps one
+    /// `POLL`, then yields the recorded signal, or `0` when none arrived,
+    /// which the wait reads as "check the child".
+    pub(super) fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+        let signaled = Arc::new(AtomicUsize::new(0));
+        for signal in signal_hook::consts::TERM_SIGNALS {
+            signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)?;
+        }
+        Ok(std::iter::from_fn(move || {
+            thread::sleep(POLL);
+            Some(signaled.swap(0, Ordering::SeqCst) as c_int)
+        }))
+    }
+
+    impl Policy for Leader {
+        fn prepare(_command: &mut Command) -> Self {
+            Leader {}
+        }
+
+        fn teardown(
+            self,
+            child: &mut Child,
+            _signal: c_int,
+            executable: &Path,
+            _signals: &mut dyn Iterator<Item = c_int>,
+        ) -> Result<ExitStatus, SuperviseError> {
+            kill(child, executable)
+        }
+    }
+
+    impl Policy for Inherit {
+        fn prepare(_command: &mut Command) -> Self {
+            Inherit
+        }
+
+        fn teardown(
+            self,
+            child: &mut Child,
+            _signal: c_int,
+            executable: &Path,
+            _signals: &mut dyn Iterator<Item = c_int>,
+        ) -> Result<ExitStatus, SuperviseError> {
+            kill(child, executable)
+        }
+    }
+
+    /// Process groups are out of scope here, so both policies stop only the
+    /// direct child.
+    fn kill(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseError> {
+        log::debug!("Received signal, forwarding to child process");
+        child.kill().map_err(|err| SuperviseError::ProcessKill {
+            executable: executable.to_path_buf(),
+            source: err,
+        })?;
+        wait(child, executable)
+    }
+}
+
 /// Linux cgroup v2 teardown: closes the one hole process groups leave open -
 /// a descendant that calls `setsid` escapes the group but cannot leave the
 /// cgroup unprivileged, so killing the cgroup reaps it too.
@@ -506,103 +603,6 @@ mod cgroup {
     pub(crate) fn create_and_attach(_command: &mut std::process::Command) -> Option<Cgroup> {
         None
     }
-}
-
-#[cfg(not(unix))]
-mod platform {
-    use super::policy::Policy;
-    use super::{Inherit, Leader, SuperviseError, wait};
-    use std::ffi::c_int;
-    use std::path::Path;
-    use std::process::{Child, Command, ExitStatus};
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::thread;
-    use std::time::Duration;
-
-    /// There is no `SIGCHLD` to wake the wait when the child exits, so the
-    /// source wakes it on this interval instead.
-    const POLL: Duration = Duration::from_millis(100);
-
-    /// A termination signal is recorded in a flag. The source sleeps one
-    /// `POLL`, then yields the recorded signal, or `0` when none arrived,
-    /// which the wait reads as "check the child".
-    pub(super) fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
-        let signaled = Arc::new(AtomicUsize::new(0));
-        for signal in signal_hook::consts::TERM_SIGNALS {
-            signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)?;
-        }
-        Ok(std::iter::from_fn(move || {
-            thread::sleep(POLL);
-            Some(signaled.swap(0, Ordering::SeqCst) as c_int)
-        }))
-    }
-
-    impl Policy for Leader {
-        fn prepare(_command: &mut Command) -> Self {
-            Leader {}
-        }
-
-        fn teardown(
-            self,
-            child: &mut Child,
-            _signal: c_int,
-            executable: &Path,
-            _signals: &mut dyn Iterator<Item = c_int>,
-        ) -> Result<ExitStatus, SuperviseError> {
-            kill(child, executable)
-        }
-    }
-
-    impl Policy for Inherit {
-        fn prepare(_command: &mut Command) -> Self {
-            Inherit
-        }
-
-        fn teardown(
-            self,
-            child: &mut Child,
-            _signal: c_int,
-            executable: &Path,
-            _signals: &mut dyn Iterator<Item = c_int>,
-        ) -> Result<ExitStatus, SuperviseError> {
-            kill(child, executable)
-        }
-    }
-
-    /// Process groups are out of scope here, so both policies stop only the
-    /// direct child.
-    fn kill(child: &mut Child, executable: &Path) -> Result<ExitStatus, SuperviseError> {
-        log::debug!("Received signal, forwarding to child process");
-        child.kill().map_err(|err| SuperviseError::ProcessKill {
-            executable: executable.to_path_buf(),
-            source: err,
-        })?;
-        wait(child, executable)
-    }
-}
-
-/// Errors that can occur during process supervision.
-#[derive(Error, Debug)]
-pub enum SuperviseError {
-    #[error("cannot run '{executable}': {source}", executable = executable.display())]
-    ProcessSpawn {
-        executable: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("cannot kill '{executable}': {source}", executable = executable.display())]
-    ProcessKill {
-        executable: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("cannot wait for '{executable}': {source}", executable = executable.display())]
-    ProcessWait {
-        executable: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
 }
 
 #[cfg(all(test, unix))]
