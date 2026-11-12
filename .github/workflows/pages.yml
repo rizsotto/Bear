@@ -20,8 +20,8 @@ jobs:
     name: Build Documentation Site
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - name: Install mdBook
@@ -31,7 +31,7 @@ jobs:
       - name: Post-process for search and AI-assistant discovery
         run: ./scripts/postprocess-docs-site.sh
       - name: Upload site
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: site/book
           # mdBook emits site/book/.nojekyll, and v4 started dropping
@@ -54,4 +54,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v5.0.1

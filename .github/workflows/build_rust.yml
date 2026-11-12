@@ -11,6 +11,8 @@ env:
   TYPOS_VERSION: 1.51.1
   # Keep identical to the cargo-deny version in .deny.toml.
   CARGO_DENY_VERSION: 0.20.2
+  # Bump by hand: Dependabot does not see versions in run steps.
+  GH_ACTIONS_LOCK_VERSION: v0.4.1
 
 permissions:
   contents: read
@@ -27,8 +29,8 @@ jobs:
           - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           components: clippy,rustfmt
@@ -53,8 +55,8 @@ jobs:
             toolchain: stable
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
       - name: Install ccache on Ubuntu
@@ -74,7 +76,7 @@ jobs:
     steps:
       - name: Install build dependencies
         run: apk add --no-cache git build-base lld rust cargo ccache
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Expose rust toolchain versions
         run: |
           cargo --version
@@ -88,8 +90,8 @@ jobs:
     name: Compile (ubuntu-latest, stable, release)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - run: cargo build --release --locked
@@ -112,8 +114,8 @@ jobs:
             clang: armv7a-linux-androideabi24-clang
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -131,8 +133,8 @@ jobs:
     name: Generate Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - run: cargo doc --no-deps --locked
@@ -141,8 +143,8 @@ jobs:
     name: Spell Check Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@v7.0.1
+      - uses: taiki-e/install-action@v2.90.3
         with:
           tool: typos@${{ env.TYPOS_VERSION }}
       - run: typos
@@ -151,7 +153,7 @@ jobs:
     name: Requirements and crate-table coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - run: ./scripts/check-requirements-coverage.sh
       - run: ./scripts/check-requirements-references.sh
       - run: ./scripts/check-crate-table-coverage.sh
@@ -160,12 +162,24 @@ jobs:
     name: Dependency policy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2.90.3
         with:
           tool: cargo-deny@${{ env.CARGO_DENY_VERSION }}
       - name: Run Cargo Deny
         run: cargo deny check licenses bans sources
+
+  lockfile:
+    name: Actions lockfile
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: gh extension install github/gh-actions-lock --pin ${{ env.GH_ACTIONS_LOCK_VERSION }}
+      - run: gh actions-lock --verify
