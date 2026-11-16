@@ -153,17 +153,18 @@ fn forwards_the_exact_signal_received() -> Result<()> {
     Ok(())
 }
 
-/// Wrapper mode nests supervision: bear-driver -> sh -> bear-wrapper -> real
-/// cc. A compiler blocked mid-compile (reading a writer-less FIFO) is under
-/// the wrapper's supervision when the signal arrives. Signaling Bear's process
-/// group must still tear the whole nested tree down within the budget -- not
-/// leave Bear hanging on the blocked compiler -- so the contract holds in
-/// wrapper mode just as in preload mode.
+/// With the wrapper mechanism supervision is nested: bear-driver -> sh ->
+/// bear-wrapper -> real cc. A compiler blocked mid-compile (reading a
+/// writer-less FIFO) is under the wrapper's supervision when the signal
+/// arrives. A signal to the whole process group must tear the nested tree
+/// down within the budget. It reaches every process directly, so this test
+/// does not show that the wrapper relays anything; see
+/// `wrapper_relays_a_signal_to_its_compiler`.
 // Requirements: cli-signal-forwarding, interception-wrapper-mechanism
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
-fn signal_tears_down_nested_wrapper_supervision() -> Result<()> {
+fn group_signal_tears_down_the_wrapper_mechanism_tree() -> Result<()> {
     use crate::fixtures::infrastructure::signal_group;
 
     let env = TestEnvironment::new("signal_wrapper_teardown")?;
@@ -208,12 +209,100 @@ fn signal_tears_down_nested_wrapper_supervision() -> Result<()> {
     let status = child.wait().expect("failed to wait for bear");
     let elapsed = signal_time.elapsed();
 
-    assert!(!status.success(), "bear must report non-success after signaling a wrapper-mode build");
+    assert!(!status.success(), "bear must report non-success after signaling a wrapper-mechanism build");
     assert!(
         elapsed.as_secs() < 2,
-        "wrapper-mode teardown must reach the blocked compiler within budget, took {elapsed:?}"
+        "wrapper-mechanism teardown must reach the blocked compiler within budget, took {elapsed:?}"
     );
 
+    Ok(())
+}
+
+/// The wrapper relays a signal it gets to its compiler, though nothing else
+/// signals the compiler. The fake compiler traps `TERM`, records it, and exits
+/// 7. The test signals the wrapper's pid alone, so the marker can only come
+/// from the relay, and the wrapper must end like the compiler.
+// Requirements: cli-signal-forwarding, interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep))]
+fn wrapper_relays_a_signal_to_its_compiler() -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::process::CommandExt;
+
+    let env = TestEnvironment::new("signal_wrapper_relay")?;
+    let marker = env.test_dir().join("trap.marker");
+    let ready = env.test_dir().join("ready");
+    let wrapper_pid_file = env.test_dir().join("wrapper.pid");
+    let compiler_pid_file = env.test_dir().join("compiler.pid");
+    let status_file = env.test_dir().join("wrapper.status");
+    let shell_pid_file = env.test_dir().join("shell.pid");
+
+    let bin = env.test_dir().join("bin");
+    std::fs::create_dir(&bin)?;
+    let compiler = bin.join("gcc");
+    std::fs::write(
+        &compiler,
+        format!(
+            "#!{shell}\ntrap 'kill $! ; echo caught > {marker} ; exit 7' TERM\n\
+             echo $$ > {compiler_pid}\necho $PPID > {wrapper_pid}\n\
+             {sleep} 60 &\necho ready > {ready}\nwait\n",
+            shell = SHELL_PATH,
+            sleep = SLEEP_PATH,
+            marker = marker.display(),
+            compiler_pid = compiler_pid_file.display(),
+            wrapper_pid = wrapper_pid_file.display(),
+            ready = ready.display(),
+        ),
+    )?;
+    std::fs::set_permissions(&compiler, std::fs::Permissions::from_mode(0o755))?;
+
+    let script = env.create_shell_script(
+        "build.sh",
+        &format!(
+            "echo $$ > {shell}\ngcc -c x.c\ncode=$?\necho $code > {status}\nexit $code",
+            shell = shell_pid_file.display(),
+            status = status_file.display()
+        ),
+    )?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, "schema: \"4.2\"\n\nintercept:\n  mode: wrapper\n")?;
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
+
+    let mut child = env
+        .command_bear()
+        .current_dir(env.test_dir())
+        .env_remove("RUST_LOG")
+        .env("PATH", path)
+        .args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            script.to_str().unwrap(),
+        ])
+        .process_group(0)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    wait_for_file(&ready);
+    let wrapper_pid: i32 = std::fs::read_to_string(&wrapper_pid_file)?.trim().parse()?;
+    let compiler_pid: i32 = std::fs::read_to_string(&compiler_pid_file)?.trim().parse()?;
+    // The compiler's parent is the build shell when the wrapper is bypassed.
+    let shell_pid: i32 = std::fs::read_to_string(&shell_pid_file)?.trim().parse()?;
+    assert_ne!(wrapper_pid, shell_pid, "the compiler was not run by a wrapper");
+    assert_ne!(wrapper_pid, compiler_pid);
+
+    // SAFETY: `kill` takes plain integers and has no memory effects.
+    let rc = unsafe { libc::kill(wrapper_pid, libc::SIGTERM) };
+    assert_eq!(rc, 0, "kill failed: {}", std::io::Error::last_os_error());
+    let status = child.wait()?;
+
+    assert_eq!(std::fs::read_to_string(&marker).unwrap_or_default().trim(), "caught", "the relay never came");
+    assert_eq!(std::fs::read_to_string(&status_file).unwrap_or_default().trim(), "7", "wrapper status");
+    assert_eq!(status.code(), Some(7), "bear status: {status:?}");
     Ok(())
 }
 
@@ -538,6 +627,7 @@ fn interrupt_sent_to_bear_at_the_terminal_is_relayed() -> Result<()> {
 #[cfg(target_family = "unix")]
 fn signal_without_a_build_removes_the_temp_file() -> Result<()> {
     use crate::fixtures::infrastructure::signal_process;
+    use std::io::Read as _;
     use std::os::unix::process::{CommandExt, ExitStatusExt};
     use std::time::Duration;
 
@@ -555,13 +645,15 @@ fn signal_without_a_build_removes_the_temp_file() -> Result<()> {
         let mut child = env
             .command_bear()
             .current_dir(env.test_dir())
+            .env_remove("RUST_LOG")
             .args(args)
             .process_group(0)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
             .spawn()?;
         let stdin = child.stdin.take();
+        let mut stderr = child.stderr.take().expect("bear stderr was piped");
 
         let deadline = std::time::Instant::now() + Duration::from_secs(30);
         while !has_temp_file(env.test_dir()) {
@@ -581,8 +673,14 @@ fn signal_without_a_build_removes_the_temp_file() -> Result<()> {
             std::thread::sleep(Duration::from_millis(20));
         };
         drop(stdin);
+        let mut warnings = String::new();
+        stderr.read_to_string(&mut warnings)?;
 
         assert_eq!(sut.signal(), Some(libc::SIGTERM), "{name}: wait status {sut:?}");
+        assert_eq!(
+            warnings, "bear: warning: interrupted by SIGTERM; stopped before finishing\n",
+            "{name}: stderr"
+        );
         assert_eq!(std::fs::read_to_string(&output)?, known, "{name}: the output changed");
         assert!(!has_temp_file(env.test_dir()), "{name}: a temp file is left behind");
     }
@@ -735,6 +833,39 @@ fn interrupted_build_with_append_keeps_the_output() -> Result<()> {
     Ok(())
 }
 
+/// An appending run with no previous output that is interrupted publishes
+/// nothing, and the warning says so.
+// Requirements: output-append, output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn interrupted_build_with_append_and_no_output_writes_nothing() -> Result<()> {
+    let env = TestEnvironment::new("interrupted_append_no_output")?;
+    std::fs::write(env.test_dir().join("new.c"), "int main() { return 0; }\n")?;
+    let ready = env.test_dir().join("ready");
+    let script = format!(
+        "{cc} -c new.c; {SLEEP_PATH} 60 & echo ready > {ready}; wait",
+        cc = filename_of(COMPILER_C_PATH),
+        ready = ready.display()
+    );
+    let args = ["--output", "compile_commands.json", "--append", "--", SHELL_PATH, "-c", &script];
+
+    let (_status, stderr) = run_until_signalled(
+        &env,
+        "interrupted_append_no_output",
+        &args,
+        Some((&ready, "TERM", Target::Group)),
+    )?;
+
+    assert!(!env.test_dir().join("compile_commands.json").exists(), "an output was written");
+    assert!(!has_temp_file(env.test_dir()), "a temp file is left behind");
+    assert!(
+        stderr.contains("bear: warning: the build was interrupted; compile_commands.json was not written"),
+        "no warning; stderr:\n{stderr}"
+    );
+    Ok(())
+}
+
 // Requirements: output-append, output-atomic-write
 #[test]
 #[cfg(target_family = "unix")]
@@ -751,7 +882,7 @@ fn interrupted_build_with_overwrite_replaces_the_output() -> Result<()> {
     assert!(!sut.has_temp_file, "a temp file is left behind");
     assert!(
         sut.stderr.contains(
-            "bear: warning: the build was interrupted; compile_commands.json was replaced with a partial result (--overwrite)"
+            "bear: warning: the build was interrupted; compile_commands.json was replaced with a partial result"
         ),
         "no warning; stderr:\n{}",
         sut.stderr

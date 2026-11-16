@@ -158,7 +158,8 @@ impl Mode {
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
-                let (append, path) = (output.append, output.path.clone());
+                // Read before the consumer exists: it may create files beside the output.
+                let (append, path, existed) = (output.append, output.path.clone(), output.path.exists());
                 let consumer = impls::SemanticEventWriter::create(output, &config, hints, false)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
@@ -166,7 +167,7 @@ impl Mode {
                     Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
-                    execution::Output::database(path, append),
+                    execution::Output::database(path, append, existed),
                 );
 
                 Ok(Self::Intercept(intercept, input))

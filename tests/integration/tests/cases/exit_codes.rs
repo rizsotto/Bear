@@ -115,6 +115,22 @@ fn exit_code_propagates_exact_build_code() -> Result<()> {
     Ok(())
 }
 
+/// Windows exit codes are 32 bits wide, so Bear passes the build's code on whole
+/// instead of cutting it to 8 bits.
+// Requirements: cli-exit-codes
+#[test]
+#[cfg(windows)]
+fn exit_code_above_255_passes_through_on_windows() -> Result<()> {
+    let env = TestEnvironment::new("exit_code_above_255")?;
+
+    let combined = env.run_bear(&["--output", "compile_commands.json", "--", "cmd", "/c", "exit 300"])?;
+    let intercept = env.run_bear(&["intercept", "--output", "events.json", "--", "cmd", "/c", "exit 300"])?;
+
+    assert_eq!(combined.exit_code(), Some(300), "combined mode");
+    assert_eq!(intercept.exit_code(), Some(300), "intercept mode");
+    Ok(())
+}
+
 /// A build-running mode whose every candidate entry is dropped at output
 /// validation still exits with the build's exit code: an `--append` run
 /// feeds the existing database's entries back through output validation, so

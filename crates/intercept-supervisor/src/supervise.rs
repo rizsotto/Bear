@@ -163,10 +163,22 @@ fn relays(signal: c_int, from_kernel: bool, child_shares_group: bool) -> bool {
     !(terminal_key && from_kernel && child_shares_group)
 }
 
-/// Removes the tracked temporary artifacts, then ends the process by `signal`.
+/// Warns that `signal` aborted Bear, removes the tracked temporary artifacts,
+/// then ends the process by `signal`.
+///
+/// The warning goes through the logger, which drops a write error, so a
+/// closed stderr cannot stop the abort.
 pub fn abort(signal: c_int) -> ! {
+    // A stalled stderr reader blocks the abort here, before the cleanup.
+    log::warn!("{}", abort_warning(signal));
     crate::cleanup::remove_tracked();
     platform::die(signal)
+}
+
+/// The warning for an abort. It claims nothing about the output: stdout and
+/// special files are written in place, and the signal can land after the commit.
+fn abort_warning(signal: c_int) -> String {
+    format!("interrupted by {}; stopped before finishing", platform::signal_label(signal))
 }
 
 /// Ends the process like `status`: by the same signal on Unix, with the same
@@ -271,6 +283,10 @@ mod platform {
 
     pub(super) fn die(signal: c_int) -> ! {
         die_by(signal)
+    }
+
+    pub(super) fn signal_label(signal: c_int) -> &'static str {
+        signal_hook::low_level::signal_name(signal).unwrap_or("a signal")
     }
 
     pub(super) fn exit_like(status: ExitStatus) -> ! {
@@ -408,6 +424,10 @@ mod platform {
         std::process::exit(STATUS_CONTROL_C_EXIT as i32)
     }
 
+    pub(super) fn signal_label(signal: c_int) -> &'static str {
+        if signal == signal_hook::consts::SIGINT { "Ctrl-C" } else { "SIGTERM" }
+    }
+
     pub(super) fn exit_like(status: ExitStatus) -> ! {
         std::process::exit(status.code().unwrap_or(1))
     }
@@ -445,6 +465,21 @@ mod tests {
             for received in sut {
                 assert!(relays(received.signal, received.from_kernel, true), "{received:?} is skipped");
             }
+        }
+    }
+
+    #[test]
+    fn abort_warning_names_the_signal() {
+        let cases = [
+            (libc::SIGINT, "interrupted by SIGINT; stopped before finishing"),
+            (libc::SIGTERM, "interrupted by SIGTERM; stopped before finishing"),
+            (libc::SIGHUP, "interrupted by SIGHUP; stopped before finishing"),
+            (libc::SIGQUIT, "interrupted by SIGQUIT; stopped before finishing"),
+        ];
+        for (signal, expected) in cases {
+            let sut = abort_warning(signal);
+
+            assert_eq!(sut, expected, "signal: {signal}");
         }
     }
 

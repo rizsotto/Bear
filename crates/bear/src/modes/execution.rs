@@ -146,19 +146,20 @@ pub struct Interceptor {
 pub enum Output {
     /// The events file of intercept mode, always replaced.
     Events(PathBuf),
-    /// A database the run appends to.
-    Appended(PathBuf),
+    /// A database the run appends to. `existed` is read before the run starts.
+    Appended { path: PathBuf, existed: bool },
     /// A database the run overwrites.
     Replaced(PathBuf),
 }
 
 impl Output {
-    pub fn database(path: PathBuf, append: bool) -> Self {
-        if append { Self::Appended(path) } else { Self::Replaced(path) }
+    /// `existed` tells whether the database was there before the run.
+    pub fn database(path: PathBuf, append: bool, existed: bool) -> Self {
+        if append { Self::Appended { path, existed } } else { Self::Replaced(path) }
     }
 
     fn appends(&self) -> bool {
-        matches!(self, Self::Appended(_))
+        matches!(self, Self::Appended { .. })
     }
 
     fn interrupted_warning(&self) -> String {
@@ -166,11 +167,15 @@ impl Output {
             Self::Events(path) => {
                 format!("the build was interrupted; {} holds the events captured so far", path.display())
             }
-            Self::Appended(path) => format!("the build was interrupted; {} is unchanged", path.display()),
-            Self::Replaced(path) => format!(
-                "the build was interrupted; {} was replaced with a partial result (--overwrite)",
-                path.display()
-            ),
+            Self::Appended { path, existed: true } => {
+                format!("the build was interrupted; {} is unchanged", path.display())
+            }
+            Self::Appended { path, existed: false } => {
+                format!("the build was interrupted; {} was not written", path.display())
+            }
+            Self::Replaced(path) => {
+                format!("the build was interrupted; {} was replaced with a partial result", path.display())
+            }
         }
     }
 }
@@ -462,12 +467,20 @@ mod tests {
         // (output, expected)
         let cases = vec![
             (
-                Output::database(PathBuf::from("db.json"), true),
+                Output::database(PathBuf::from("db.json"), true, true),
                 "the build was interrupted; db.json is unchanged",
             ),
             (
-                Output::database(PathBuf::from("db.json"), false),
-                "the build was interrupted; db.json was replaced with a partial result (--overwrite)",
+                Output::database(PathBuf::from("db.json"), true, false),
+                "the build was interrupted; db.json was not written",
+            ),
+            (
+                Output::database(PathBuf::from("db.json"), false, true),
+                "the build was interrupted; db.json was replaced with a partial result",
+            ),
+            (
+                Output::database(PathBuf::from("db.json"), false, false),
+                "the build was interrupted; db.json was replaced with a partial result",
             ),
             (
                 Output::Events(PathBuf::from("events.json")),
