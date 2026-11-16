@@ -1,6 +1,6 @@
 ---
 title: Signals and the build
-status: accepted
+status: implemented
 ---
 
 ## Intent

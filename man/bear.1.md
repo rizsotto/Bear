@@ -514,11 +514,19 @@ entry, so a header with a real compilation entry is not duplicated.
 
 # EXIT STATUS
 
-In combined and intercept mode, Bear exits with the build command's exit
-code: 0 when the build succeeds, the same non-zero code when it fails.
-When the build is killed by a signal, Bear exits non-zero. When the
-build handles the signal and exits on its own, Bear exits with the
-build's code, 0 included.
+In combined and intercept mode, Bear ends the way the build ended. When
+the build exits on its own, Bear exits with the same code: 0 when the
+build succeeds, the same non-zero code when it fails. When the build
+handles a signal and exits on its own, Bear exits with the build's code,
+0 included. On Windows Bear exits with the build's full exit code.
+
+On Unix, when a signal kills the build, Bear ends by the same signal, with
+core dumps turned off for Bear. A shell shows the same signal name as for
+the build alone, without "(core dumped)". When a signal reaches Bear and
+no build is running, Bear ends by that signal on Unix and exits with
+`0xC000013A` on Windows.
+
+If Bear exits 0, it published the output.
 
 In semantic mode, Bear exits 0 on success and non-zero when the analysis
 fails.
@@ -531,6 +539,37 @@ so a run that understood nothing cannot pass for a successful one.
 
 If Bear itself encounters an internal error, it exits non-zero
 regardless of the build command's status.
+
+
+# SIGNALS
+
+Bear stands in for the build. The build runs in Bear's process group and
+session, so the terminal treats Bear and the build as one job. Ctrl-C,
+Ctrl-Z, terminal input and closing the terminal work as they do without
+Bear. A signal that was ignored when Bear started stays ignored for the
+build. The compiler wrapper follows the same rules.
+
+While the build runs, a termination signal belongs to the build. Bear
+passes `SIGHUP`, `SIGINT`, `SIGQUIT` and `SIGTERM` on to the process it
+started, unless the terminal already gave the signal to that process.
+Bear sends no signal of its own and waits for the build as long as it
+takes. It does not stop the other processes of the build, and it does not
+force a build that ignores signals to stop. On Windows only Ctrl-C and
+`SIGTERM` are seen, and Bear waits for the build.
+
+While no build runs, a signal aborts Bear. This covers semantic mode,
+parse-sh mode, and the time Bear writes the output. Bear removes its
+temporary files, leaves the output as it was, and ends by the signal.
+
+If a signal reaches Bear while the build runs, the build was interrupted.
+With `--append`, the existing output stays as it was. With `--overwrite`,
+the captured entries replace it. Bear prints one warning on standard
+error, for example `bear: warning: the build was interrupted; <output> is
+unchanged`. A build that exits 0 always publishes. A build killed by a
+signal that did not go through Bear is a failed build, and a failed build
+publishes.
+
+See EXIT STATUS for how Bear ends.
 
 
 # ENVIRONMENT

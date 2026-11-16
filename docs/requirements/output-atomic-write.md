@@ -1,6 +1,6 @@
 ---
 title: All-or-nothing output files
-status: accepted
+status: implemented
 ---
 
 ## Intent

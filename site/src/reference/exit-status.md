@@ -7,7 +7,7 @@ transform data report whether Bear understood its input.
 
 | Mode | Exit status |
 |---|---|
-| `bear -- <build>` (combined) | The build's exit code, byte for byte: `0` on success, the same non-zero code otherwise. |
+| `bear -- <build>` (combined) | The build's exit code, byte for byte: `0` on success, the same non-zero code otherwise. When a signal kills the build, Bear ends by the same signal. |
 | `bear intercept -- <build>` | Same as combined: the build's exit code. |
 | `bear semantic` | `0` when at least one input event was understood, or the input was empty. Non-zero when the input was non-empty and every event was rejected. |
 | `bear parse-sh` | `0` when at least one line parsed as a shell command, even when none of them named a recognized compiler, or when the input was empty. Non-zero when the input was non-empty and every line was skipped. |
@@ -19,12 +19,15 @@ See [command-line options](command-line.md) for what each mode does.
 
 ## Notes
 
-**A build killed by a signal never exits `0`, but the signal number is not
-encoded.** `bear -- sh -c 'kill -TERM $$'` exits `1`, and so does a build
-killed with `SIGKILL`. Bear does not follow the `128 + signal` shell
-convention: a caller that only inspects Bear's own exit code cannot tell a
-signalled build from an ordinary failing one. The signal itself still
-reaches the build unchanged.
+**A build killed by a signal ends Bear by the same signal (Unix).** A shell
+shows the same signal name and status as for the build alone: `130` for
+`SIGINT`, `143` for `SIGTERM`. Bear turns its own core dump off, so the
+shell does not print "(core dumped)" for Bear. A signal that reaches Bear
+while no build runs ends Bear by that signal too. On Windows Bear exits
+with the build's full exit code, and with `0xC000013A` when no build ran.
+
+**Exit `0` means the output was published.** A build that handles an
+interrupt and exits `0` still publishes.
 
 **Empty input is not an error.** An empty `semantic` or `parse-sh` run
 writes an empty database, exits `0`, and prints a notice on standard

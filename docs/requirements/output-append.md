@@ -1,6 +1,6 @@
 ---
 title: Appending to an existing compilation database
-status: accepted
+status: implemented
 ---
 
 ## Intent

@@ -1,6 +1,6 @@
 ---
 title: Exit codes by mode
-status: accepted
+status: implemented
 ---
 
 ## Intent
