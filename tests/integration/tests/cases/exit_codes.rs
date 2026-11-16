@@ -325,3 +325,81 @@ fn no_local_lookups_is_an_unknown_argument_where_the_build_runs() -> Result<()> 
 
     Ok(())
 }
+
+/// A build that kills itself by a signal ends Bear by the same signal. The
+/// shell that ran Bear then sees the signal the plain build would show.
+// Requirements: cli-exit-codes
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_executable_shell)]
+fn bear_ends_by_the_signal_that_killed_the_build() -> Result<()> {
+    use std::os::unix::process::ExitStatusExt;
+
+    for (name, signal) in [("TERM", libc::SIGTERM), ("INT", libc::SIGINT), ("KILL", libc::SIGKILL)] {
+        let env = TestEnvironment::new(&format!("exit_by_signal_{name}"))?;
+        let script = format!("kill -{name} $$");
+
+        let sut = env
+            .command_bear()
+            .current_dir(env.test_dir())
+            .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
+            .status()?;
+
+        assert_eq!(sut.signal(), Some(signal), "{name}: wait status {sut:?}");
+    }
+    Ok(())
+}
+
+/// SEGV dumps core for the plain build. Bear turns its own core dump off,
+/// so the wait status has no core flag.
+// Requirements: cli-exit-codes
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_executable_shell)]
+fn bear_ends_by_segv_without_a_core_dump() -> Result<()> {
+    use std::os::unix::process::ExitStatusExt;
+
+    let env = TestEnvironment::new("exit_by_segv")?;
+
+    let sut = env
+        .command_bear()
+        .current_dir(env.test_dir())
+        .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", "kill -SEGV $$"])
+        .status()?;
+
+    assert_eq!(sut.signal(), Some(libc::SIGSEGV), "wait status {sut:?}");
+    assert!(!sut.core_dumped(), "Bear must not dump core: {sut:?}");
+    Ok(())
+}
+
+/// In wrapper mode the wrapper ends by the compiler's signal, so the build
+/// script sees the shell's `128 + N` code.
+// Requirements: cli-exit-codes, interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_executable_shell)]
+fn wrapper_ends_by_the_signal_that_killed_the_compiler() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_exit_by_signal")?;
+    let compiler = env.create_shell_script("fake-cc", "kill -TERM $$\n")?;
+    let script = env.create_shell_script("build.sh", "\"$CC\" -c test.c\necho $? > code.txt\n")?;
+    let config = env.create_config("schema: \"4.2\"\n\nintercept:\n  mode: wrapper\n")?;
+
+    let sut = env
+        .command_bear()
+        .current_dir(env.test_dir())
+        .env("CC", &compiler)
+        .args([
+            "--config",
+            config.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            script.to_str().unwrap(),
+        ])
+        .status()?;
+
+    assert!(sut.success(), "the build script ends with echo: {sut:?}");
+    assert_eq!(env.read_file("code.txt")?.trim(), "143");
+    Ok(())
+}

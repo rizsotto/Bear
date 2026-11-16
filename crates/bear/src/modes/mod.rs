@@ -15,7 +15,7 @@ use intercept_supervisor::context;
 use intercept_supervisor::{CollectorOnTcp, SignalSource, abort_on_termination};
 use semantic::SpellingError;
 use semantic::{CompilerHints, CompilerRecognizer};
-use std::process::ExitCode;
+use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
 
 /// Represents the application execution modes.
@@ -184,12 +184,12 @@ impl Mode {
     /// source (event file or shell text) in replay mode. All errors returned
     /// are runtime errors that occur after valid arguments and configuration
     /// have been provided.
-    pub fn run(self, signals: SignalSource) -> ExitCode {
+    pub fn run(self, signals: SignalSource) -> Exit {
         let status = match self {
             Self::Intercept(interceptor, command) => interceptor.run(command, signals, abort_on_termination),
             Self::Replay(replayer) => {
                 abort_on_termination(signals);
-                replayer.run()
+                replayer.run().map(Exit::Own)
             }
             Self::PrintCompilers => {
                 abort_on_termination(signals);
@@ -198,14 +198,23 @@ impl Mode {
                     env!("CARGO_PKG_VERSION"),
                     semantic::print_compilers()
                 );
-                return ExitCode::SUCCESS;
+                return Exit::Own(ExitCode::SUCCESS);
             }
         };
         status.unwrap_or_else(|error| {
             log::error!("{error}");
-            ExitCode::FAILURE
+            Exit::Own(ExitCode::FAILURE)
         })
     }
+}
+
+/// How the process ends.
+#[derive(Debug)]
+pub enum Exit {
+    /// Bear's own result.
+    Own(ExitCode),
+    /// The build's end, to be copied by the caller.
+    Build(ExitStatus),
 }
 
 /// Converts the configured compilers into the semantic hint table.

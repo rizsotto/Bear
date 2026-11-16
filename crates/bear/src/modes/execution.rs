@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::Exit;
 use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
 use crate::output::AtomicFile;
@@ -163,14 +164,15 @@ impl Interceptor {
     ///   has ended, before the output is committed
     ///
     /// # Returns
-    /// * `Ok(ExitCode::SUCCESS)` - All operations completed successfully
+    /// * `Ok(Exit::Build(status))` - All operations completed, and the build
+    ///   ended with `status`
     /// * `Err(RuntimeError)` - An error occurred in any component
     pub fn run<S>(
         self,
         command: BuildCommand,
         mut signals: S,
         after_build: impl FnOnce(S),
-    ) -> Result<ExitCode, RuntimeError>
+    ) -> Result<Exit, RuntimeError>
     where
         S: Iterator<Item = c_int>,
     {
@@ -228,12 +230,7 @@ impl Interceptor {
             }
         }
 
-        // The exit code is not always available. When the process is killed by a signal,
-        // the exit code is not available. In this case, we return the `FAILURE` exit code.
-        let exit_code =
-            exit_status.code().map(|code| ExitCode::from(code as u8)).unwrap_or(ExitCode::FAILURE);
-
-        Ok(exit_code)
+        Ok(Exit::Build(exit_status))
     }
 }
 
@@ -326,10 +323,11 @@ mod tests {
         assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
     }
 
-    fn assert_is_failure(code: ExitCode) {
-        // Use inequality with SUCCESS rather than equality with FAILURE
-        // to avoid platform-specific differences in failure representation
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    fn build_status(exit: Exit) -> ExitStatus {
+        match exit {
+            Exit::Build(status) => status,
+            Exit::Own(code) => panic!("expected the build's status, got {code:?}"),
+        }
     }
 
     // Simple mock struct that implements both Producer and Cancellable
@@ -632,7 +630,7 @@ mod tests {
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
-        assert_is_success(result.expect("Failed to get result in interceptor happy path test"));
+        assert!(build_status(result.expect("Failed to get result in interceptor happy path test")).success());
 
         let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
@@ -799,7 +797,7 @@ mod tests {
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
-        assert_is_failure(result.expect("Failed to get result in non-zero exit code test"));
+        assert!(!build_status(result.expect("Failed to get result in non-zero exit code test")).success());
     }
 
     #[test]
@@ -840,7 +838,7 @@ mod tests {
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
-        assert_is_success(result.expect("Failed to get result in coordination timing test"));
+        assert!(build_status(result.expect("Failed to get result in coordination timing test")).success());
 
         let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 4);
@@ -964,7 +962,7 @@ mod tests {
         )
         .run(create_test_command(), std::iter::empty(), drop);
 
-        assert_is_failure(sut.expect("a failing build is not an error of Bear"));
+        assert!(!build_status(sut.expect("a failing build is not an error of Bear")).success());
         assert!(final_path.exists());
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "only the output may remain");
     }

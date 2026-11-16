@@ -18,12 +18,12 @@
 use anyhow::{Context, Result, bail};
 use intercept::Execution;
 use intercept::reporter::{Reporter, ReporterFactory};
-use intercept_supervisor::supervise::{Inherit, signals, supervise};
+use intercept_supervisor::supervise::{Inherit, exit_like, signals, supervise};
 use intercept_supervisor::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 
 /// Implementation of the wrapper process.
 ///
-/// The process exit code is the same as the executed process exit code.
+/// The process ends like the executed process: the same exit code, or the same signal on Unix.
 /// Besides the functionality described in the module documentation, the
 /// wrapper process logs the execution and the relevant steps leading to
 /// the execution.
@@ -49,8 +49,7 @@ fn main() -> Result<()> {
     // Execute the real executable with the same arguments
     let mut command = command_from_execution(real_execution)?;
     let exit_status = supervise::<Inherit>(&mut command, signals)?.status;
-    // Return the child process status code
-    std::process::exit(exit_status.code().unwrap_or(1));
+    exit_like(exit_status)
 }
 
 /// Builds a [`std::process::Command`] from an [`Execution`].

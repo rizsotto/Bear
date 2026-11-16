@@ -6,7 +6,7 @@
 //! context, derives the installation layout from the current executable, and
 //! parses the command line arguments. From those inputs it configures the
 //! selected mode -- which loads the configuration it needs -- and runs it,
-//! returning the build's exit code.
+//! ending like the build: the same exit code, or the same signal on Unix.
 //!
 //! The heavy lifting lives elsewhere: the `bear` library provides argument
 //! parsing, configuration, and the modes, while `intercept_supervisor`
@@ -14,7 +14,7 @@
 
 use anyhow::Context as _;
 use bear::{args, modes};
-use intercept_supervisor::{context, installation};
+use intercept_supervisor::{context, exit_like, installation};
 use std::env;
 use std::process::ExitCode;
 
@@ -27,13 +27,17 @@ fn main() -> ExitCode {
 
     // Report a startup error through the logger, so it gets the same
     // `bear: error:` format as every other diagnostic.
-    run().unwrap_or_else(|error| {
+    let exit = run().unwrap_or_else(|error| {
         log::error!("{error}");
-        ExitCode::FAILURE
-    })
+        modes::Exit::Own(ExitCode::FAILURE)
+    });
+    match exit {
+        modes::Exit::Own(code) => code,
+        modes::Exit::Build(status) => exit_like(status),
+    }
 }
 
-fn run() -> anyhow::Result<ExitCode> {
+fn run() -> anyhow::Result<modes::Exit> {
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");

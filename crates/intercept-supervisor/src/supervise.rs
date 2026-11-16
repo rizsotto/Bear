@@ -116,6 +116,12 @@ pub fn abort(signal: c_int) -> ! {
     platform::die(signal)
 }
 
+/// Ends the process like `status`: by the same signal on Unix, with the same
+/// code otherwise. Call it last, after every cleanup.
+pub fn exit_like(status: ExitStatus) -> ! {
+    platform::exit_like(status)
+}
+
 /// How a supervisor relates to the build's process group: it sets up the
 /// group before the spawn, and decides where a termination signal goes.
 ///
@@ -196,7 +202,8 @@ mod platform {
     use signal_hook::consts::signal::SIGCHLD;
     use signal_hook::iterator::Signals;
     use std::ffi::c_int;
-    use std::process::Command;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::{Command, ExitStatus};
 
     /// The termination signals plus `SIGCHLD`, so a wait on the source
     /// wakes on a termination signal to relay or when the child exits.
@@ -211,6 +218,13 @@ mod platform {
 
     pub(super) fn die(signal: c_int) -> ! {
         die_by(signal)
+    }
+
+    pub(super) fn exit_like(status: ExitStatus) -> ! {
+        match status.signal() {
+            Some(signal) => die_by(signal),
+            None => std::process::exit(status.code().unwrap_or(1)),
+        }
     }
 
     /// Ends the process as if `signal` had its default action, with core
@@ -304,7 +318,7 @@ mod platform {
 mod platform {
     use super::{GroupPolicy, Inherit, Leader, SignalSource, Supervised};
     use std::ffi::c_int;
-    use std::process::Command;
+    use std::process::{Command, ExitStatus};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
@@ -333,6 +347,10 @@ mod platform {
 
     pub(super) fn die(_signal: c_int) -> ! {
         std::process::exit(STATUS_CONTROL_C_EXIT as i32)
+    }
+
+    pub(super) fn exit_like(status: ExitStatus) -> ! {
+        std::process::exit(status.code().unwrap_or(1))
     }
 
     impl GroupPolicy for Leader {

@@ -23,8 +23,8 @@ pub use context::{Context, ContextError};
 pub use installation::{InstallationLayout, LayoutError};
 pub use runner::{BuildEnvironment, ConfigurationError};
 pub use supervise::{
-    GroupPolicy, Inherit, Leader, Outcome, SignalSource, SuperviseError, abort_on_termination, signals,
-    supervise,
+    GroupPolicy, Inherit, Leader, Outcome, SignalSource, SuperviseError, abort_on_termination, exit_like,
+    signals, supervise,
 };
 pub use wrapper::{
     CONFIG_FILENAME, ConfigError, WrapperConfig, WrapperConfigReader, WrapperDirectory,
