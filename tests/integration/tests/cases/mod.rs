@@ -49,3 +49,5 @@ pub mod parse_sh;
 #[cfg(all(has_preload_library, has_executable_compiler_c, has_executable_shell))]
 pub mod response_files;
 pub mod semantic;
+#[cfg(unix)]
+pub mod signals;

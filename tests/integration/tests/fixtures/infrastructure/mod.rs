@@ -37,6 +37,8 @@ pub use compilation_database::{CompilationDatabase, CompilationEntryMatcher};
 pub use install_environment::InstallEnvironment;
 pub use intercept_events::{EventMatcher, InterceptEvents};
 pub use test_environment::TestEnvironment;
+#[cfg(unix)]
+pub use test_environment::{reset_signals, signal_group, signal_process};
 
 use anyhow::Result;
 use serde_json::json;

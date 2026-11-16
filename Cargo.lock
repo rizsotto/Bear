@@ -592,6 +592,7 @@ dependencies = [
  "assert_fs",
  "bear-test-tools",
  "encoding_rs",
+ "libc",
  "platform-checks",
  "predicates",
  "serde-saphyr",

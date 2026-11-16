@@ -181,3 +181,50 @@ fn assert_min_count_test() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(all(unix, has_executable_shell))]
+mod reset_signals {
+    use super::*;
+    use crate::fixtures::constants::SHELL_PATH;
+    use std::os::unix::process::CommandExt;
+    use std::process::Command;
+
+    fn shell_that_trusts_its_trap() -> Command {
+        let mut command = Command::new(SHELL_PATH);
+        command.arg("-c").arg("trap 'echo trapped' INT; kill -INT $$; echo survived");
+        command
+    }
+
+    fn ignore_sigint(command: &mut Command) {
+        // SAFETY: runs between fork and exec and calls only `signal`, which is async-signal-safe.
+        unsafe {
+            command.pre_exec(|| {
+                libc::signal(libc::SIGINT, libc::SIG_IGN);
+                Ok(())
+            });
+        }
+    }
+
+    #[test]
+    fn restores_an_ignored_signal() {
+        let mut command = shell_that_trusts_its_trap();
+        ignore_sigint(&mut command);
+        reset_signals(&mut command);
+
+        let sut = command.output().unwrap();
+
+        let stdout = String::from_utf8_lossy(&sut.stdout);
+        assert!(stdout.contains("trapped"), "stdout: {stdout}");
+    }
+
+    #[test]
+    fn is_needed_when_the_signal_is_ignored() {
+        let mut command = shell_that_trusts_its_trap();
+        ignore_sigint(&mut command);
+
+        let sut = command.output().unwrap();
+
+        let stdout = String::from_utf8_lossy(&sut.stdout);
+        assert!(!stdout.contains("trapped"), "stdout: {stdout}");
+    }
+}

@@ -177,7 +177,36 @@ impl TestEnvironment {
     pub fn command_bear(&self) -> std::process::Command {
         let mut cmd = std::process::Command::new(self.install.path());
         cmd.env("XDG_CONFIG_HOME", self.user_config_dir());
+        #[cfg(unix)]
+        reset_signals(&mut cmd);
         cmd
+    }
+
+    /// Start bear in its own process group with stdin from `/dev/null`, so a
+    /// signal sent to the group cannot reach the test runner.
+    #[cfg(unix)]
+    pub fn spawn_bear_in_group(&self, args: &[&str]) -> Result<std::process::Child> {
+        use std::os::unix::process::CommandExt;
+        use std::process::Stdio;
+
+        self.command_bear()
+            .current_dir(self.test_dir())
+            .args(args)
+            .process_group(0)
+            .stdin(Stdio::null())
+            .spawn()
+            .context("Failed to spawn bear")
+    }
+
+    fn assert_command(&self) -> Command {
+        #[cfg(unix)]
+        {
+            let mut cmd = std::process::Command::new(self.install.path());
+            reset_signals(&mut cmd);
+            Command::from_std(cmd)
+        }
+        #[cfg(not(unix))]
+        Command::new(self.install.path())
     }
 
     /// Run bear with the given arguments.
@@ -190,7 +219,7 @@ impl TestEnvironment {
     /// `RUST_BACKTRACE=1` is always forced so panics in bear surface
     /// readable backtraces.
     pub fn run_bear(&self, args: &[&str]) -> Result<BearOutput> {
-        let mut cmd = Command::new(self.install.path());
+        let mut cmd = self.assert_command();
         cmd.current_dir(self.test_dir())
             .env("RUST_BACKTRACE", "1")
             .env("XDG_CONFIG_HOME", self.user_config_dir())
@@ -216,7 +245,7 @@ impl TestEnvironment {
     /// See `run_bear` for the `RUST_LOG`/`RUST_BACKTRACE` defaults; this
     /// mirrors that behaviour and only adds the stdin payload.
     pub fn run_bear_with_stdin(&self, args: &[&str], stdin_bytes: &[u8]) -> Result<BearOutput> {
-        let mut cmd = Command::new(self.install.path());
+        let mut cmd = self.assert_command();
         cmd.current_dir(self.test_dir())
             .env("RUST_BACKTRACE", "1")
             .env("XDG_CONFIG_HOME", self.user_config_dir())
@@ -245,7 +274,7 @@ impl TestEnvironment {
     /// regression in that built-in default. `RUST_BACKTRACE=1` is still
     /// forced so panics in bear surface readable backtraces.
     pub fn run_bear_with_stdin_default_log(&self, args: &[&str], stdin_bytes: &[u8]) -> Result<BearOutput> {
-        let mut cmd = Command::new(self.install.path());
+        let mut cmd = self.assert_command();
         cmd.current_dir(self.test_dir())
             .env("RUST_BACKTRACE", "1")
             .env("XDG_CONFIG_HOME", self.user_config_dir())
@@ -393,4 +422,47 @@ impl Drop for TestEnvironment {
     fn drop(&mut self) {
         self.preserve_on_panic();
     }
+}
+
+/// Resets the termination signals to their default action in the child, so a
+/// signal ignored by the test runner (`cargo test &`) does not leak into
+/// bear and change what the test sees.
+#[cfg(unix)]
+pub fn reset_signals(command: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+
+    // SAFETY: runs in the child between fork and exec, and calls only
+    // `signal`, which is async-signal-safe.
+    unsafe {
+        command.pre_exec(|| {
+            for signal in [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP] {
+                libc::signal(signal, libc::SIG_DFL);
+            }
+            Ok(())
+        });
+    }
+}
+
+#[cfg(unix)]
+fn send_signal(name: &str, target: String) {
+    let status = std::process::Command::new("kill")
+        .arg(format!("-{name}"))
+        .arg("--")
+        .arg(target)
+        .status()
+        .expect("Failed to run kill");
+    assert!(status.success(), "kill -{name} failed");
+}
+
+/// Send the named signal (`"TERM"`, `"INT"`, ...) to the child process.
+#[cfg(unix)]
+pub fn signal_process(child: &std::process::Child, name: &str) {
+    send_signal(name, child.id().to_string());
+}
+
+/// Send the named signal to the child's process group. The child must have
+/// been started with `spawn_bear_in_group`.
+#[cfg(unix)]
+pub fn signal_group(child: &std::process::Child, name: &str) {
+    send_signal(name, format!("-{}", child.id()));
 }
