@@ -17,8 +17,6 @@ pub const FALSE_PATH: &str = env!("FALSE_PATH");
 pub const ECHO_PATH: &str = env!("ECHO_PATH");
 #[cfg(has_executable_sleep)]
 pub const SLEEP_PATH: &str = env!("SLEEP_PATH");
-#[cfg(has_executable_setsid)]
-pub const SETSID_PATH: &str = env!("SETSID_PATH");
 #[cfg(has_executable_shell)]
 pub const SHELL_PATH: &str = env!("SHELL_PATH");
 #[cfg(has_executable_make)]

@@ -72,7 +72,6 @@ fn main() {
     check_executable_exists("false");
     check_executable_exists("echo");
     check_executable_exists("sleep");
-    check_executable_exists("setsid");
     check_executable_exists("cat");
     check_executable_exists("ls");
     check_executable_exists("mkdir");

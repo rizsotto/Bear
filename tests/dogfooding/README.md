@@ -54,7 +54,7 @@ are scale targets. The other two exercise specific toolchains on a real build:
 ## Prerequisites
 
 - **Rootless Podman** (developed against podman 5.8.3). The build container runs
-  with `--systemd=always` so Bear's cgroup-based process-tree teardown works;
+  with `--systemd=always`;
   this needs the host's delegated cgroup controllers
   (`/etc/systemd/system/user@.service.d/delegate.conf` with
   `Delegate=cpu cpuset io memory pids`).
