@@ -565,7 +565,8 @@ If a signal reaches Bear while the build runs, the build was interrupted.
 With `--append`, the existing output stays as it was. With `--overwrite`,
 the captured entries replace it. Bear prints one warning on standard
 error, for example `bear: warning: the build was interrupted; <output> is
-unchanged`. A build that exits 0 always publishes. A build killed by a
+unchanged`. In intercept mode, the event file holds the events captured so
+far. A build that exits 0 always publishes. A build killed by a
 signal that did not go through Bear is a failed build, and a failed build
 publishes.
 

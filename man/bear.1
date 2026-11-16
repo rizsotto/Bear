@@ -631,6 +631,7 @@ With \f[CR]\-\-append\f[R], the existing output stays as it was.
 With \f[CR]\-\-overwrite\f[R], the captured entries replace it.
 Bear prints one warning on standard error, for example
 \f[CR]bear: warning: the build was interrupted; <output> is unchanged\f[R].
+In intercept mode, the event file holds the events captured so far.
 A build that exits 0 always publishes.
 A build killed by a signal that did not go through Bear is a failed
 build, and a failed build publishes.

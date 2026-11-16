@@ -96,8 +96,7 @@ impl Mode {
                     Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
-                    false,
-                    output.path.clone(),
+                    execution::Output::Events(output.path.clone()),
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -167,8 +166,7 @@ impl Mode {
                     Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
-                    append,
-                    path,
+                    execution::Output::database(path, append),
                 );
 
                 Ok(Self::Intercept(intercept, input))

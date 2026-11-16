@@ -609,6 +609,44 @@ const KNOWN_ENTRY: &str = "old.c";
 #[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
 const NEW_ENTRY: &str = "new.c";
 
+/// Runs Bear with `args`. With `signal`, waits for the ready file, then sends
+/// the signal to Bear's group. Returns Bear's status and stderr.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn run_until_signalled(
+    env: &TestEnvironment,
+    name: &str,
+    args: &[&str],
+    signal: Option<(&std::path::Path, &str)>,
+) -> Result<(std::process::ExitStatus, String)> {
+    use crate::fixtures::infrastructure::signal_group;
+    use std::time::Duration;
+
+    let mut child = env.spawn_bear_in_group_with_stderr(args, Stdio::piped())?;
+    let mut stderr = child.stderr.take().expect("bear stderr was piped");
+    let drain = std::thread::spawn(move || {
+        let mut captured = String::new();
+        let _ = stderr.read_to_string(&mut captured);
+        captured
+    });
+
+    if let Some((ready, signal)) = signal {
+        wait_for_file(ready);
+        signal_group(&child, signal);
+    }
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill()?;
+            panic!("{name}: Bear did not end");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    Ok((status, drain.join().unwrap_or_default()))
+}
+
 /// Runs `build` under Bear with an existing output. With `signal`, waits for
 /// the build to write its ready file, then sends the signal to Bear's group.
 #[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
@@ -618,9 +656,6 @@ fn run_interrupted(
     build: &str,
     signal: Option<&str>,
 ) -> Result<(InterruptedRun, String)> {
-    use crate::fixtures::infrastructure::signal_group;
-    use std::time::Duration;
-
     let env = TestEnvironment::new(name)?;
     let output_path = env.test_dir().join("compile_commands.json");
     std::fs::write(env.test_dir().join(KNOWN_ENTRY), "int main() { return 0; }\n")?;
@@ -635,36 +670,13 @@ fn run_interrupted(
     let script = build
         .replace("READY", &ready.display().to_string())
         .replace("COMPILE", &format!("{} -c new.c", filename_of(COMPILER_C_PATH)));
-    let mut child = env.spawn_bear_in_group_with_stderr(
-        &["--output", "compile_commands.json", mode, "--", SHELL_PATH, "-c", &script],
-        Stdio::piped(),
-    )?;
-    let mut stderr = child.stderr.take().expect("bear stderr was piped");
-    let drain = std::thread::spawn(move || {
-        let mut captured = String::new();
-        let _ = stderr.read_to_string(&mut captured);
-        captured
-    });
-
-    if let Some(signal) = signal {
-        wait_for_file(&ready);
-        signal_group(&child, signal);
-    }
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
-        }
-        if Instant::now() >= deadline {
-            child.kill()?;
-            panic!("{name}: Bear did not end");
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    };
+    let args = ["--output", "compile_commands.json", mode, "--", SHELL_PATH, "-c", &script];
+    let (status, stderr) =
+        run_until_signalled(&env, name, &args, signal.map(|signal| (ready.as_path(), signal)))?;
 
     let run = InterruptedRun {
         status,
-        stderr: drain.join().unwrap_or_default(),
+        stderr,
         output: std::fs::read_to_string(&output_path)?,
         has_temp_file: has_temp_file(env.test_dir()),
     };
@@ -711,6 +723,36 @@ fn interrupted_build_with_overwrite_replaces_the_output() -> Result<()> {
         ),
         "no warning; stderr:\n{}",
         sut.stderr
+    );
+    Ok(())
+}
+
+/// Intercept mode always replaces the events file, so an interrupted build
+/// still leaves the events captured so far.
+// Requirements: interception-events-format
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn interrupted_build_in_intercept_mode_writes_the_captured_events() -> Result<()> {
+    let env = TestEnvironment::new("interrupted_intercept")?;
+    std::fs::write(env.test_dir().join(NEW_ENTRY), "int main() { return 0; }\n")?;
+    let ready = env.test_dir().join("ready");
+    let script = format!(
+        "{} -c {NEW_ENTRY}; {SLEEP_PATH} 60 & echo ready > {}; wait",
+        filename_of(COMPILER_C_PATH),
+        ready.display()
+    );
+    let args = ["intercept", "--output", "events.json", "--", SHELL_PATH, "-c", &script];
+    let (status, stderr) = run_until_signalled(&env, "interrupted_intercept", &args, Some((&ready, "TERM")))?;
+
+    let sut = std::fs::read_to_string(env.test_dir().join("events.json"))?;
+    assert!(!status.success(), "Bear ended with {status:?}; stderr:\n{stderr}");
+    assert!(sut.contains(NEW_ENTRY), "the compile event is missing: {sut}; stderr:\n{stderr}");
+    assert!(
+        stderr.contains(
+            "bear: warning: the build was interrupted; events.json holds the events captured so far"
+        ),
+        "no warning; stderr:\n{stderr}"
     );
     Ok(())
 }

@@ -136,11 +136,43 @@ pub struct Interceptor {
     producer: Arc<dyn CancellableProducer>,
     consumer: Box<dyn Consumer>,
     build: Box<dyn Executor>,
-    /// Whether the run appends to the output. An interrupted build
-    /// publishes only when it does not.
-    append: bool,
-    /// The output path, for the warning about an interrupted build.
-    output: PathBuf,
+    /// What the run writes. An interrupted build publishes unless the run
+    /// appends.
+    output: Output,
+}
+
+/// What a run writes, for the publish rule and the interrupted-build warning.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Output {
+    /// The events file of intercept mode, always replaced.
+    Events(PathBuf),
+    /// A database the run appends to.
+    Appended(PathBuf),
+    /// A database the run overwrites.
+    Replaced(PathBuf),
+}
+
+impl Output {
+    pub fn database(path: PathBuf, append: bool) -> Self {
+        if append { Self::Appended(path) } else { Self::Replaced(path) }
+    }
+
+    fn appends(&self) -> bool {
+        matches!(self, Self::Appended(_))
+    }
+
+    fn interrupted_warning(&self) -> String {
+        match self {
+            Self::Events(path) => {
+                format!("the build was interrupted; {} holds the events captured so far", path.display())
+            }
+            Self::Appended(path) => format!("the build was interrupted; {} is unchanged", path.display()),
+            Self::Replaced(path) => format!(
+                "the build was interrupted; {} was replaced with a partial result (--overwrite)",
+                path.display()
+            ),
+        }
+    }
 }
 
 impl Interceptor {
@@ -148,10 +180,9 @@ impl Interceptor {
         producer: Arc<dyn CancellableProducer>,
         consumer: Box<dyn Consumer>,
         build: Box<dyn Executor>,
-        append: bool,
-        output: PathBuf,
+        output: Output,
     ) -> Self {
-        Self { producer, consumer, build, append, output }
+        Self { producer, consumer, build, output }
     }
 
     /// Runs live command interception for the given build command.
@@ -215,18 +246,11 @@ impl Interceptor {
         let exit_status = outcome.status;
         producer_result?.map_err(RuntimeError::Producer)?;
         let output = consumer_result?.map_err(RuntimeError::Consumer)?;
-        if publishes(&outcome, self.append) {
+        if publishes(&outcome, self.output.appends()) {
             commit(output)?;
         }
         if outcome.interrupted && !exit_status.success() {
-            if self.append {
-                log::warn!("the build was interrupted; {} is unchanged", self.output.display());
-            } else {
-                log::warn!(
-                    "the build was interrupted; {} was replaced with a partial result (--overwrite)",
-                    self.output.display()
-                );
-            }
+            log::warn!("{}", self.output.interrupted_warning());
         }
 
         Ok(Exit::Build(exit_status))
@@ -432,6 +456,32 @@ mod tests {
         Outcome { status, interrupted: false }
     }
 
+    // Requirements: output-append, interception-events-format
+    #[test]
+    fn test_interrupted_warning_by_output() {
+        // (output, expected)
+        let cases = vec![
+            (
+                Output::database(PathBuf::from("db.json"), true),
+                "the build was interrupted; db.json is unchanged",
+            ),
+            (
+                Output::database(PathBuf::from("db.json"), false),
+                "the build was interrupted; db.json was replaced with a partial result (--overwrite)",
+            ),
+            (
+                Output::Events(PathBuf::from("events.json")),
+                "the build was interrupted; events.json holds the events captured so far",
+            ),
+        ];
+
+        for (output, expected) in cases {
+            let sut = output.interrupted_warning();
+
+            assert_eq!(sut, expected, "output: {output:?}");
+        }
+    }
+
     // Requirements: output-append, output-atomic-write
     #[test]
     fn test_publishes_by_outcome_and_output_mode() {
@@ -627,8 +677,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -669,8 +718,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -700,8 +748,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -730,8 +777,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -762,8 +808,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -794,8 +839,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -835,8 +879,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -936,8 +979,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         )
         .run(create_test_command(), std::iter::empty(), drop);
 
@@ -960,8 +1002,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         )
         .run(create_test_command(), std::iter::empty(), drop);
 
@@ -990,8 +1031,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            false,
-            PathBuf::new(),
+            Output::Events(PathBuf::new()),
         )
         .run(create_test_command(), std::iter::empty(), |_| {
             hook_ran = true;
