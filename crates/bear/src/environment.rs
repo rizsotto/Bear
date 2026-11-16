@@ -15,7 +15,6 @@ use intercept_supervisor::runner;
 use std::ffi::c_int;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::process::ExitStatus;
 
 pub use intercept_supervisor::ConfigurationError;
 
@@ -69,7 +68,7 @@ impl BuildEnvironment {
         &self,
         build_command: args::BuildCommand,
         signals: &mut dyn Iterator<Item = c_int>,
-    ) -> Result<ExitStatus, intercept_supervisor::SuperviseError> {
+    ) -> Result<intercept_supervisor::Outcome, intercept_supervisor::SuperviseError> {
         self.inner.run_build(&build_command.arguments, signals)
     }
 }

@@ -439,3 +439,203 @@ fn has_temp_file(dir: &std::path::Path) -> bool {
         })
     })
 }
+
+/// What one run of an interrupted-build scenario left behind.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+struct InterruptedRun {
+    status: std::process::ExitStatus,
+    stderr: String,
+    output: String,
+    has_temp_file: bool,
+}
+
+/// The entry the output holds before the run. A run that publishes drops it
+/// (overwrite) or keeps it (append). The build compiles `new.c`, so a
+/// published output also holds `NEW_ENTRY`.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+const KNOWN_ENTRY: &str = "old.c";
+
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+const NEW_ENTRY: &str = "new.c";
+
+/// Runs `build` under Bear with an existing output. With `signal`, waits for
+/// the build to write its ready file, then sends the signal to Bear's group.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn run_interrupted(
+    name: &str,
+    mode: &str,
+    build: &str,
+    signal: Option<&str>,
+) -> Result<(InterruptedRun, String)> {
+    use crate::fixtures::infrastructure::signal_group;
+    use std::time::Duration;
+
+    let env = TestEnvironment::new(name)?;
+    let output_path = env.test_dir().join("compile_commands.json");
+    std::fs::write(env.test_dir().join(KNOWN_ENTRY), "int main() { return 0; }\n")?;
+    let known = format!(
+        "[{{\"file\":\"{KNOWN_ENTRY}\",\"directory\":{dir:?},\"arguments\":[\"cc\",\"-c\",\"{KNOWN_ENTRY}\"]}}]\n",
+        dir = env.test_dir().to_str().unwrap()
+    );
+    std::fs::write(&output_path, &known)?;
+
+    let ready = env.test_dir().join("ready");
+    std::fs::write(env.test_dir().join("new.c"), "int main() { return 0; }\n")?;
+    let script = build
+        .replace("READY", &ready.display().to_string())
+        .replace("COMPILE", &format!("{COMPILER_C_PATH} -c new.c"));
+    let mut child = env.spawn_bear_in_group_with_stderr(
+        &["--output", "compile_commands.json", mode, "--", SHELL_PATH, "-c", &script],
+        Stdio::piped(),
+    )?;
+    let mut stderr = child.stderr.take().expect("bear stderr was piped");
+    let drain = std::thread::spawn(move || {
+        let mut captured = String::new();
+        let _ = stderr.read_to_string(&mut captured);
+        captured
+    });
+
+    if let Some(signal) = signal {
+        wait_for_file(&ready);
+        signal_group(&child, signal);
+    }
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill()?;
+            panic!("{name}: Bear did not end");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+
+    let run = InterruptedRun {
+        status,
+        stderr: drain.join().unwrap_or_default(),
+        output: std::fs::read_to_string(&output_path)?,
+        has_temp_file: has_temp_file(env.test_dir()),
+    };
+    Ok((run, known))
+}
+
+/// An interrupted build publishes only when the run overwrites the output.
+// Requirements: output-append, output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn interrupted_build_with_append_keeps_the_output() -> Result<()> {
+    let build = format!("COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
+
+    let (sut, known) = run_interrupted("interrupted_append", "--append", &build, Some("TERM"))?;
+
+    assert_eq!(sut.output, known, "the output changed; stderr:\n{}", sut.stderr);
+    assert!(!sut.output.contains(NEW_ENTRY), "the new entry was published: {}", sut.output);
+    assert!(!sut.has_temp_file, "a temp file is left behind");
+    assert!(
+        sut.stderr.contains("bear: warning: the build was interrupted; compile_commands.json is unchanged"),
+        "no warning; stderr:\n{}",
+        sut.stderr
+    );
+    Ok(())
+}
+
+// Requirements: output-append, output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn interrupted_build_with_overwrite_replaces_the_output() -> Result<()> {
+    let build = format!("COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
+
+    let (sut, known) = run_interrupted("interrupted_overwrite", "--overwrite", &build, Some("TERM"))?;
+
+    assert_ne!(sut.output, known, "the output was not replaced; stderr:\n{}", sut.stderr);
+    assert!(!sut.output.contains(KNOWN_ENTRY), "the old entry is still there: {}", sut.output);
+    assert!(sut.output.contains(NEW_ENTRY), "the new entry is missing: {}", sut.output);
+    assert!(!sut.has_temp_file, "a temp file is left behind");
+    assert!(
+        sut.stderr.contains(
+            "bear: warning: the build was interrupted; compile_commands.json was replaced with a partial result (--overwrite)"
+        ),
+        "no warning; stderr:\n{}",
+        sut.stderr
+    );
+    Ok(())
+}
+
+/// A build that survives the signal and exits 0 publishes in both modes, and
+/// Bear says nothing about an interruption.
+// Requirements: output-append, output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn interrupted_build_that_exits_zero_publishes() -> Result<()> {
+    let build = format!("trap 'kill $!; exit 0' TERM; COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
+
+    for mode in ["--append", "--overwrite"] {
+        let (sut, known) =
+            run_interrupted(&format!("interrupted_exit_zero{mode}"), mode, &build, Some("TERM"))?;
+
+        assert_eq!(sut.status.code(), Some(0), "{mode}: {:?}", sut.status);
+        assert!(!sut.has_temp_file, "{mode}: a temp file is left behind");
+        if mode == "--append" {
+            assert!(sut.output.contains(KNOWN_ENTRY), "{mode}: the old entry is gone: {}", sut.output);
+        } else {
+            assert_ne!(sut.output, known, "{mode}: the output was not published");
+        }
+        assert!(sut.output.contains(NEW_ENTRY), "{mode}: the new entry is missing: {}", sut.output);
+        assert!(!sut.stderr.contains("was interrupted"), "{mode}: unexpected warning:\n{}", sut.stderr);
+    }
+    Ok(())
+}
+
+/// An interrupted build that exits non-zero leaves an appended output as it
+/// was, and Bear passes the build's exit code on.
+// Requirements: output-append
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn interrupted_build_that_fails_keeps_the_appended_output() -> Result<()> {
+    let build = format!("trap 'kill $!; exit 3' TERM; COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
+
+    let (sut, known) = run_interrupted("interrupted_exit_three", "--append", &build, Some("TERM"))?;
+
+    assert_eq!(sut.status.code(), Some(3), "{:?}; stderr:\n{}", sut.status, sut.stderr);
+    assert_eq!(sut.output, known, "the output changed");
+    assert!(!sut.output.contains(NEW_ENTRY), "the new entry was published");
+    assert!(!sut.has_temp_file, "a temp file is left behind");
+    Ok(())
+}
+
+/// A build that ends badly with no signal to Bear is a failed build, and a
+/// failed build publishes, whatever the mode.
+// Requirements: output-append, output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
+fn failed_build_without_a_signal_publishes() -> Result<()> {
+    let cases = [("killed", "COMPILE; kill -KILL $$", None), ("exit_two", "COMPILE; exit 2", Some(2))];
+    for (name, build, code) in cases {
+        for mode in ["--append", "--overwrite"] {
+            let (sut, known) = run_interrupted(&format!("failed_build_{name}{mode}"), mode, build, None)?;
+
+            if let Some(code) = code {
+                assert_eq!(sut.status.code(), Some(code), "{name} {mode}: {:?}", sut.status);
+            }
+            assert!(!sut.has_temp_file, "{name} {mode}: a temp file is left behind");
+            assert!(!sut.stderr.contains("was interrupted"), "{name} {mode}: unexpected warning");
+            if mode == "--append" {
+                assert!(sut.output.contains(KNOWN_ENTRY), "{name} {mode}: the old entry is gone");
+            } else {
+                assert_ne!(sut.output, known, "{name} {mode}: the output was not published");
+            }
+            assert!(
+                sut.output.contains(NEW_ENTRY),
+                "{name} {mode}: the new entry is missing: {}",
+                sut.output
+            );
+        }
+    }
+    Ok(())
+}

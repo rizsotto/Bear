@@ -96,6 +96,8 @@ impl Mode {
                     Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
+                    false,
+                    output.path.clone(),
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -157,6 +159,7 @@ impl Mode {
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
+                let (append, path) = (output.append, output.path.clone());
                 let consumer = impls::SemanticEventWriter::create(output, &config, hints, false)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
@@ -164,6 +167,8 @@ impl Mode {
                     Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
+                    append,
+                    path,
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -265,12 +270,11 @@ mod impls {
     };
     use crate::{args, config, output, parse_sh};
     use intercept_supervisor::CollectorOnTcp;
-    use intercept_supervisor::SuperviseError;
+    use intercept_supervisor::{Outcome, SuperviseError};
     use semantic::CompilerHints;
     use std::collections::HashMap;
     use std::io::IsTerminal;
     use std::path::PathBuf;
-    use std::process::ExitStatus;
     use std::sync::Arc;
     use std::sync::mpsc::{Receiver, SyncSender};
     use std::{fs, io};
@@ -672,7 +676,7 @@ mod impls {
             &self,
             command: BuildCommand,
             signals: &mut dyn Iterator<Item = std::ffi::c_int>,
-        ) -> Result<ExitStatus, SuperviseError> {
+        ) -> Result<Outcome, SuperviseError> {
             self.environment.run_build(command, signals)
         }
     }

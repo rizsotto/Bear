@@ -22,16 +22,23 @@ use thiserror::Error;
 #[cfg(unix)]
 pub use platform::die_by;
 
+/// How a supervised child ended.
+pub struct Outcome {
+    pub status: ExitStatus,
+    /// A termination signal reached Bear while the child ran.
+    pub interrupted: bool,
+}
+
 /// This method supervises the execution of a command.
 ///
 /// It starts the command and waits for its completion. While waiting it
 /// relays every termination signal from `signals` to the build, and
-/// propagates the build's exit status back to the caller. Where the signal
+/// reports the build's exit status and whether it was interrupted back to the caller. Where the signal
 /// goes is up to the policy `P`: [`Leader`] or [`Inherit`].
 pub fn supervise<P: GroupPolicy>(
     command: &mut Command,
     signals: impl IntoIterator<Item = c_int>,
-) -> Result<ExitStatus, SuperviseError> {
+) -> Result<Outcome, SuperviseError> {
     let executable = PathBuf::from(command.get_program());
     let mut signals = signals.into_iter();
 
@@ -45,24 +52,26 @@ pub fn supervise<P: GroupPolicy>(
     // Close the child-exited-early race: the child may already be gone
     // before we block on the signal source.
     if let Some(status) = child.try_wait()? {
-        return Ok(status);
+        return Ok(Outcome { status, interrupted: false });
     }
 
     // Any item that is not a termination signal (`SIGCHLD` on Unix, a poll
     // tick on Windows) means the child may have exited.
+    let mut interrupted = false;
     loop {
         match signals.next() {
             Some(signal) if signal_hook::consts::TERM_SIGNALS.contains(&signal) => {
+                interrupted = true;
                 policy.relay(&child, signal);
             }
             Some(_) => {
                 if let Some(status) = child.try_wait()? {
-                    return Ok(status);
+                    return Ok(Outcome { status, interrupted });
                 }
             }
             // The source ended: nothing is left to forward, so block until
             // the child is reaped.
-            None => return child.wait(),
+            None => return child.wait().map(|status| Outcome { status, interrupted }),
         }
     }
 }
@@ -482,7 +491,7 @@ mod tests {
         for (code, expect_success) in cases {
             let (mut command, probe) = shell(&format!("echo $$; exit {code}"));
 
-            let sut = supervise::<Leader>(&mut command, probe.exits()).expect("supervise failed");
+            let sut = supervise::<Leader>(&mut command, probe.exits()).expect("supervise failed").status;
 
             assert_eq!(sut.success(), expect_success, "exit {code} success mismatch");
             assert_eq!(sut.code(), Some(code), "exit {code} code mismatch");
@@ -493,7 +502,7 @@ mod tests {
     fn ended_source_waits_for_the_child() {
         let (mut command, probe) = shell("read _; exit 3");
 
-        let sut = supervise::<Leader>(&mut command, probe.release()).expect("supervise failed");
+        let sut = supervise::<Leader>(&mut command, probe.release()).expect("supervise failed").status;
 
         assert_eq!(sut.code(), Some(3));
     }
@@ -505,7 +514,8 @@ mod tests {
         for signal in cases {
             let (mut command, probe) = shell("echo $$; exec cat");
 
-            let sut = supervise::<Leader>(&mut command, probe.signal(signal)).expect("supervise failed");
+            let sut =
+                supervise::<Leader>(&mut command, probe.signal(signal)).expect("supervise failed").status;
 
             assert_eq!(sut.signal(), Some(signal), "signal {signal}");
         }
@@ -518,7 +528,8 @@ mod tests {
         for signal in cases {
             let (mut command, probe) = shell("echo $$; exec cat");
 
-            let sut = supervise::<Inherit>(&mut command, probe.signal(signal)).expect("supervise failed");
+            let sut =
+                supervise::<Inherit>(&mut command, probe.signal(signal)).expect("supervise failed").status;
 
             assert_eq!(sut.signal(), Some(signal), "signal {signal}");
         }
@@ -535,7 +546,8 @@ mod tests {
 
         let sut = supervise::<Leader>(&mut command, probe.signal(libc::SIGTERM)).expect("supervise failed");
 
-        assert_eq!(sut.code(), Some(5));
+        assert!(sut.interrupted);
+        assert_eq!(sut.status.code(), Some(5));
     }
 
     #[test]
@@ -543,7 +555,8 @@ mod tests {
         let (mut command, probe) = shell("trap '' TERM; echo $$; read _; exit 3");
 
         let sut = supervise::<Leader>(&mut command, probe.signal_then_release(libc::SIGTERM))
-            .expect("supervise failed");
+            .expect("supervise failed")
+            .status;
 
         assert_eq!(sut.code(), Some(3));
     }

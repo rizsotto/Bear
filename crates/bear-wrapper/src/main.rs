@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 
     // Execute the real executable with the same arguments
     let mut command = command_from_execution(real_execution)?;
-    let exit_status = supervise::<Inherit>(&mut command, signals)?;
+    let exit_status = supervise::<Inherit>(&mut command, signals)?.status;
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
 }

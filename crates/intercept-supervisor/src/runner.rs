@@ -26,7 +26,6 @@ use std::env::consts::EXE_EXTENSION;
 use std::ffi::c_int;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::process::ExitStatus;
 
 use thiserror::Error;
 
@@ -336,13 +335,13 @@ impl BuildEnvironment {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(ExitStatus)` containing the exit status of the build command,
+    /// Returns `Ok(Outcome)` containing the exit status of the build command and whether Bear was interrupted,
     /// or `Err(SuperviseError)` if the command execution fails or cannot be supervised.
     pub fn run_build(
         &self,
         arguments: &[String],
         signals: impl IntoIterator<Item = c_int>,
-    ) -> Result<ExitStatus, supervise::SuperviseError> {
+    ) -> Result<supervise::Outcome, supervise::SuperviseError> {
         log::info!("Build command to run: {arguments:?}");
 
         let [executable, args @ ..] = arguments else {

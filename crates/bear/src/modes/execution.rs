@@ -3,9 +3,10 @@
 use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
 use crate::output::AtomicFile;
-use intercept_supervisor::SuperviseError;
+use intercept_supervisor::{Outcome, SuperviseError};
 use std::ffi::c_int;
-use std::process::{ExitCode, ExitStatus};
+use std::path::PathBuf;
+use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use thiserror::Error;
@@ -112,13 +113,14 @@ pub trait Executor {
     /// * `signals` - The process's signal source, forwarded to the build
     ///
     /// # Returns
-    /// * `Ok(ExitStatus)` - The build completed with the given exit status
+    /// * `Ok(Outcome)` - The build completed with the given exit status, and
+    ///   the outcome tells whether Bear was interrupted meanwhile
     /// * `Err(SuperviseError)` - An error occurred during execution
     fn run(
         &self,
         command: BuildCommand,
         signals: &mut dyn Iterator<Item = c_int>,
-    ) -> Result<ExitStatus, SuperviseError>;
+    ) -> Result<Outcome, SuperviseError>;
 }
 
 /// Coordinates live command interception during build execution.
@@ -134,6 +136,11 @@ pub struct Interceptor {
     producer: Arc<dyn CancellableProducer>,
     consumer: Box<dyn Consumer>,
     build: Box<dyn Executor>,
+    /// Whether the run appends to the output. An interrupted build
+    /// publishes only when it does not.
+    append: bool,
+    /// The output path, for the warning about an interrupted build.
+    output: PathBuf,
 }
 
 impl Interceptor {
@@ -141,8 +148,10 @@ impl Interceptor {
         producer: Arc<dyn CancellableProducer>,
         consumer: Box<dyn Consumer>,
         build: Box<dyn Executor>,
+        append: bool,
+        output: PathBuf,
     ) -> Self {
-        Self { producer, consumer, build }
+        Self { producer, consumer, build, append, output }
     }
 
     /// Runs live command interception for the given build command.
@@ -201,9 +210,23 @@ impl Interceptor {
         // Publish only when nothing failed on Bear's side; every early return
         // drops the output, which rolls it back. A build that ran and failed
         // is not such a failure: its exit status is returned below.
-        let exit_status = build_result?;
+        let outcome = build_result?;
+        let exit_status = outcome.status;
         producer_result?.map_err(RuntimeError::Producer)?;
-        commit(consumer_result?.map_err(RuntimeError::Consumer)?)?;
+        let output = consumer_result?.map_err(RuntimeError::Consumer)?;
+        if publishes(&outcome, self.append) {
+            commit(output)?;
+        }
+        if outcome.interrupted && !exit_status.success() {
+            if self.append {
+                log::warn!("the build was interrupted; {} is unchanged", self.output.display());
+            } else {
+                log::warn!(
+                    "the build was interrupted; {} was replaced with a partial result (--overwrite)",
+                    self.output.display()
+                );
+            }
+        }
 
         // The exit code is not always available. When the process is killed by a signal,
         // the exit code is not available. In this case, we return the `FAILURE` exit code.
@@ -264,6 +287,12 @@ impl Replayer {
     }
 }
 
+/// An interrupted build that did not exit `0` publishes only when the run
+/// overwrites the output. Any other build publishes.
+fn publishes(outcome: &Outcome, append: bool) -> bool {
+    outcome.status.success() || !outcome.interrupted || !append
+}
+
 fn commit(output: AtomicFile) -> Result<(), RuntimeError> {
     output.commit().map_err(|err| RuntimeError::Consumer(Box::new(err)))
 }
@@ -287,6 +316,7 @@ mod tests {
     use crate::output::{SerializationError, WriterError};
     use intercept::Execution;
     use std::collections::HashMap;
+    use std::process::ExitStatus;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -399,6 +429,41 @@ mod tests {
     fn create_failure_exit_status() -> ExitStatus {
         use std::os::windows::process::ExitStatusExt;
         ExitStatusExt::from_raw(1) // On Windows, use raw value 1 to get exit code 1
+    }
+
+    fn finished(status: ExitStatus) -> Outcome {
+        Outcome { status, interrupted: false }
+    }
+
+    // Requirements: output-append, output-atomic-write
+    #[test]
+    fn test_publishes_by_outcome_and_output_mode() {
+        // (name, status, interrupted, append, expected)
+        let mut cases = vec![
+            ("success", create_success_exit_status(), false, true, true),
+            ("success", create_success_exit_status(), false, false, true),
+            ("success, interrupted", create_success_exit_status(), true, true, true),
+            ("success, interrupted", create_success_exit_status(), true, false, true),
+            ("failure code", create_failure_exit_status(), false, true, true),
+            ("failure code", create_failure_exit_status(), false, false, true),
+            ("failure code, interrupted", create_failure_exit_status(), true, true, false),
+            ("failure code, interrupted", create_failure_exit_status(), true, false, true),
+        ];
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            let killed = ExitStatus::from_raw(libc::SIGKILL);
+            cases.push(("killed by a signal", killed, false, true, true));
+            cases.push(("killed by a signal", killed, false, false, true));
+            cases.push(("killed by a signal, interrupted", killed, true, true, false));
+            cases.push(("killed by a signal, interrupted", killed, true, false, true));
+        }
+
+        for (name, status, interrupted, append, expected) in cases {
+            let sut = publishes(&Outcome { status, interrupted }, append);
+
+            assert_eq!(sut, expected, "{name}, append: {append}");
+        }
     }
 
     #[test]
@@ -555,10 +620,15 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(finished(create_success_exit_status())));
 
-        let interceptor =
-            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock.clone(),
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
@@ -594,7 +664,13 @@ mod tests {
             })
         });
 
-        let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock,
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
@@ -617,10 +693,15 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(finished(create_success_exit_status())));
 
-        let interceptor =
-            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock.clone(),
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
@@ -642,10 +723,15 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(finished(create_success_exit_status())));
 
-        let interceptor =
-            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock.clone(),
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
@@ -669,10 +755,15 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(finished(create_success_exit_status())));
 
-        let interceptor =
-            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock.clone(),
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
@@ -696,9 +787,15 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_failure_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(finished(create_failure_exit_status())));
 
-        let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock,
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
@@ -730,11 +827,16 @@ mod tests {
         let mut executor_mock = MockExecutor::new();
         executor_mock.expect_run().times(1).returning(|_, _| {
             std::thread::sleep(Duration::from_millis(50));
-            Ok(create_success_exit_status())
+            Ok(finished(create_success_exit_status()))
         });
 
-        let interceptor =
-            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
+        let interceptor = Interceptor::new(
+            producer_mock.clone(),
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
@@ -829,8 +931,14 @@ mod tests {
             })
         });
 
-        let sut = Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock))
-            .run(create_test_command(), std::iter::empty(), drop);
+        let sut = Interceptor::new(
+            producer_mock.clone(),
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        )
+        .run(create_test_command(), std::iter::empty(), drop);
 
         assert!(matches!(sut, Err(RuntimeError::Executor(_))));
         assert_eq!(producer_mock.cancel_call_count(), 1);
@@ -845,13 +953,16 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
         let consumer_mock = consumer_with_pending_output(&final_path);
         let mut executor_mock = MockExecutor::new();
-        executor_mock.expect_run().times(1).returning(|_, _| Ok(create_failure_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_, _| Ok(finished(create_failure_exit_status())));
 
-        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock)).run(
-            create_test_command(),
-            std::iter::empty(),
-            drop,
-        );
+        let sut = Interceptor::new(
+            producer_mock,
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        )
+        .run(create_test_command(), std::iter::empty(), drop);
 
         assert_is_failure(sut.expect("a failing build is not an error of Bear"));
         assert!(final_path.exists());
@@ -870,19 +981,22 @@ mod tests {
         let mut executor_mock = MockExecutor::new();
         executor_mock.expect_run().times(1).returning(move |_, _| {
             build_done_in_executor.store(true, Ordering::SeqCst);
-            Ok(create_success_exit_status())
+            Ok(finished(create_success_exit_status()))
         });
 
         let mut hook_ran = false;
-        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock)).run(
-            create_test_command(),
-            std::iter::empty(),
-            |_| {
-                hook_ran = true;
-                assert!(build_done.load(Ordering::SeqCst), "the build must have ended");
-                assert!(!final_path.exists(), "the output must not be committed yet");
-            },
-        );
+        let sut = Interceptor::new(
+            producer_mock,
+            Box::new(consumer_mock),
+            Box::new(executor_mock),
+            false,
+            PathBuf::new(),
+        )
+        .run(create_test_command(), std::iter::empty(), |_| {
+            hook_ran = true;
+            assert!(build_done.load(Ordering::SeqCst), "the build must have ended");
+            assert!(!final_path.exists(), "the output must not be committed yet");
+        });
 
         assert!(sut.is_ok());
         assert!(hook_ran);

@@ -186,14 +186,27 @@ impl TestEnvironment {
     /// signal sent to the group cannot reach the test runner.
     #[cfg(unix)]
     pub fn spawn_bear_in_group(&self, args: &[&str]) -> Result<std::process::Child> {
+        self.spawn_bear_in_group_with_stderr(args, std::process::Stdio::inherit())
+    }
+
+    /// Like `spawn_bear_in_group`, with the given stderr. `RUST_LOG` is
+    /// removed, so the log format does not depend on the caller's setting.
+    #[cfg(unix)]
+    pub fn spawn_bear_in_group_with_stderr(
+        &self,
+        args: &[&str],
+        stderr: std::process::Stdio,
+    ) -> Result<std::process::Child> {
         use std::os::unix::process::CommandExt;
         use std::process::Stdio;
 
         self.command_bear()
             .current_dir(self.test_dir())
+            .env_remove("RUST_LOG")
             .args(args)
             .process_group(0)
             .stdin(Stdio::null())
+            .stderr(stderr)
             .spawn()
             .context("Failed to spawn bear")
     }
