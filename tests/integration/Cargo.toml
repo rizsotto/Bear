@@ -20,6 +20,9 @@ serde-saphyr.workspace = true
 encoding_rs.workspace = true
 libc.workspace = true
 
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { workspace = true, features = ["Win32_System_Console", "Win32_System_Threading"] }
+
 [build-dependencies]
 platform-checks = { path = "../../build-support/platform-checks" }
 which.workspace = true

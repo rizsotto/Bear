@@ -51,3 +51,5 @@ pub mod response_files;
 pub mod semantic;
 #[cfg(unix)]
 pub mod signals;
+#[cfg(windows)]
+pub mod signals_windows;

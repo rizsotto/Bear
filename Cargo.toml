@@ -35,6 +35,7 @@ tempfile = { version = "3.27", default-features = false }
 signal-hook = { version = "0.4", default-features = false }
 regex-lite = "0.1"
 libc = "0.2"
+windows-sys = "0.61.2"
 errno = "0.3"
 ctor = "1.0"
 which = "8.0"
