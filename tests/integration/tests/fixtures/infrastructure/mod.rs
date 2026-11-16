@@ -27,6 +27,8 @@ mod bear_output;
 mod compilation_database;
 mod install_environment;
 mod intercept_events;
+#[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
+mod terminal;
 mod test_environment;
 
 #[cfg(test)]
@@ -36,6 +38,8 @@ pub use bear_output::BearOutput;
 pub use compilation_database::{CompilationDatabase, CompilationEntryMatcher};
 pub use install_environment::InstallEnvironment;
 pub use intercept_events::{EventMatcher, InterceptEvents};
+#[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
+pub use terminal::{Terminal, open_pty};
 pub use test_environment::TestEnvironment;
 #[cfg(unix)]
 pub use test_environment::{reset_signals, signal_group, signal_process};

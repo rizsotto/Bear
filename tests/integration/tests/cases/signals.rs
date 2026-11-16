@@ -524,3 +524,35 @@ fn signal_escalates_when_build_ignores_it() -> Result<()> {
     );
     Ok(())
 }
+
+/// Ctrl-C typed at the terminal reaches the foreground process group. Bear
+/// and the build both end, and Bear reports a non-success status.
+// Requirements: cli-signal-forwarding
+#[test]
+#[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
+#[cfg(all(has_executable_shell, has_executable_sleep))]
+fn ctrl_c_at_the_terminal_ends_bear_and_the_build() -> Result<()> {
+    use crate::fixtures::infrastructure::Terminal;
+    use std::time::Duration;
+
+    let env = TestEnvironment::new("ctrl_c_at_the_terminal")?;
+    let script = env.create_shell_script("build.sh", &format!("echo build-started\n{SLEEP_PATH} 60\n"))?;
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir()).args([
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ]);
+    let Some(mut terminal) = Terminal::spawn_or_skip(cmd)? else {
+        return Ok(());
+    };
+    terminal.wait_for("build-started", Duration::from_secs(30))?;
+
+    terminal.type_bytes(&[0x03])?;
+    let sut = terminal.wait()?;
+
+    assert!(!sut.success(), "Bear must not report success after Ctrl-C: {sut:?}");
+    Ok(())
+}

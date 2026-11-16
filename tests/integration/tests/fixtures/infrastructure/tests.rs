@@ -228,3 +228,17 @@ mod reset_signals {
         assert!(!stdout.contains("trapped"), "stdout: {stdout}");
     }
 }
+
+/// CI sets `BEAR_TEST_REQUIRE_PTY`, so a host without a pty cannot skip every
+/// terminal test unnoticed.
+#[test]
+#[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
+fn pty_opens_when_required() {
+    if std::env::var_os("BEAR_TEST_REQUIRE_PTY").is_none() {
+        return;
+    }
+
+    let sut = open_pty();
+
+    assert!(sut.is_ok(), "BEAR_TEST_REQUIRE_PTY is set, but openpty failed: {:?}", sut.err());
+}

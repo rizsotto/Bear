@@ -29,6 +29,8 @@ const SYMBOL_PROBES: &[&str] = &[
     "popen",
     "system",
     "_NSGetEnviron",
+    "openpty",
+    "login_tty",
 ];
 
 const HEADER_PROBES: &[&str] = &["crt_externs.h"];
