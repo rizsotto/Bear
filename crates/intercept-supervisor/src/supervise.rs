@@ -22,6 +22,14 @@ use thiserror::Error;
 #[cfg(unix)]
 pub use platform::die_by;
 
+/// One received signal. `from_kernel` is true only when signal-hook
+/// reports `Cause::Kernel` (Linux terminal signals). Unknown is false.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Received {
+    pub signal: c_int,
+    pub from_kernel: bool,
+}
+
 /// How a supervised child ended.
 pub struct Outcome {
     pub status: ExitStatus,
@@ -37,7 +45,7 @@ pub struct Outcome {
 /// goes is up to the policy `P`: [`Leader`] or [`Inherit`].
 pub fn supervise<P: GroupPolicy>(
     command: &mut Command,
-    signals: impl IntoIterator<Item = c_int>,
+    signals: impl IntoIterator<Item = Received>,
 ) -> Result<Outcome, SuperviseError> {
     let executable = PathBuf::from(command.get_program());
     let mut signals = signals.into_iter();
@@ -60,9 +68,9 @@ pub fn supervise<P: GroupPolicy>(
     let mut interrupted = false;
     loop {
         match signals.next() {
-            Some(signal) if is_termination(signal) => {
+            Some(received) if is_termination(received.signal) => {
                 interrupted = true;
-                policy.relay(&child, signal);
+                policy.relay(&child, received);
             }
             Some(_) => {
                 if let Some(status) = child.try_wait()? {
@@ -78,12 +86,12 @@ pub fn supervise<P: GroupPolicy>(
 
 /// The registered signals, as a blocking iterator. Every item that is not
 /// a termination signal means the child may have exited.
-pub struct SignalSource(Box<dyn Iterator<Item = c_int> + Send>);
+pub struct SignalSource(Box<dyn Iterator<Item = Received> + Send>);
 
 impl Iterator for SignalSource {
-    type Item = c_int;
+    type Item = Received;
 
-    fn next(&mut self) -> Option<c_int> {
+    fn next(&mut self) -> Option<Received> {
         self.0.next()
     }
 }
@@ -100,11 +108,11 @@ pub fn signals() -> std::io::Result<SignalSource> {
 
 /// Starts the watcher thread for a process that runs no build: the first
 /// termination signal read from `signals` aborts the process.
-pub fn abort_on_termination(signals: impl Iterator<Item = c_int> + Send + 'static) {
+pub fn abort_on_termination(signals: impl Iterator<Item = Received> + Send + 'static) {
     std::thread::spawn(move || {
-        for signal in signals {
-            if is_termination(signal) {
-                abort(signal);
+        for received in signals {
+            if is_termination(received.signal) {
+                abort(received.signal);
             }
         }
     });
@@ -115,6 +123,14 @@ pub fn abort_on_termination(signals: impl Iterator<Item = c_int> + Send + 'stati
 /// Windows.
 fn is_termination(signal: c_int) -> bool {
     platform::TERMINATION.contains(&signal)
+}
+
+/// `from_kernel`: signal-hook reported `Cause::Kernel`.
+/// `child_shares_group`: the child is still in Bear's process group.
+#[cfg(unix)]
+fn relays(signal: c_int, from_kernel: bool, child_shares_group: bool) -> bool {
+    let terminal_key = signal == libc::SIGINT || signal == libc::SIGQUIT;
+    !(terminal_key && from_kernel && child_shares_group)
 }
 
 /// Removes the tracked temporary artifacts, then ends the process by `signal`.
@@ -146,7 +162,7 @@ pub trait GroupPolicy: Sized {
     fn prepare(command: &mut Command) -> Self;
 
     /// Runs for every termination signal, while the child runs.
-    fn relay(&self, child: &Supervised, signal: c_int);
+    fn relay(&self, child: &Supervised, received: Received);
 }
 
 /// The outermost supervisor (the driver). Creates a new process group with
@@ -205,9 +221,11 @@ impl Supervised {
 
 #[cfg(unix)]
 mod platform {
-    use super::{GroupPolicy, Inherit, Leader, SignalSource, Supervised};
+    use super::{GroupPolicy, Inherit, Leader, Received, SignalSource, Supervised, relays};
     use signal_hook::consts::signal::{SIGCHLD, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-    use signal_hook::iterator::Signals;
+    use signal_hook::iterator::SignalsInfo;
+    use signal_hook::iterator::exfiltrator::WithOrigin;
+    use signal_hook::low_level::siginfo::Cause;
     use std::ffi::c_int;
     use std::os::unix::process::ExitStatusExt;
     use std::process::{Command, ExitStatus};
@@ -224,8 +242,13 @@ mod platform {
         let mut watched: Vec<c_int> =
             TERMINATION.into_iter().filter(|signal| !ignored_at_entry(*signal)).collect();
         watched.push(SIGCHLD);
-        let mut signals = Signals::new(&watched)?;
-        Ok(SignalSource(Box::new(std::iter::from_fn(move || signals.forever().next()))))
+        let mut signals = SignalsInfo::<WithOrigin>::new(&watched)?;
+        Ok(SignalSource(Box::new(std::iter::from_fn(move || {
+            signals
+                .forever()
+                .next()
+                .map(|origin| Received { signal: origin.signal, from_kernel: origin.cause == Cause::Kernel })
+        }))))
     }
 
     fn ignored_at_entry(signal: c_int) -> bool {
@@ -284,10 +307,11 @@ mod platform {
             Leader
         }
 
-        fn relay(&self, child: &Supervised, signal: c_int) {
+        fn relay(&self, child: &Supervised, received: Received) {
             let pgid = child.process.id() as libc::pid_t;
-            log::debug!("Received signal {signal}, forwarding to process group {pgid}");
-            send(Target::Group(pgid), signal);
+            if decide(child, received) {
+                send(Target::Group(pgid), received.signal);
+            }
         }
     }
 
@@ -296,11 +320,38 @@ mod platform {
             Inherit
         }
 
-        fn relay(&self, child: &Supervised, signal: c_int) {
-            let child_pid = child.process.id() as libc::pid_t;
-            log::debug!("Received signal {signal}, forwarding to child {child_pid}");
-            send(Target::Process(child_pid), signal);
+        fn relay(&self, child: &Supervised, received: Received) {
+            if decide(child, received) {
+                send(Target::Process(child.process.id() as libc::pid_t), received.signal);
+            }
         }
+    }
+
+    /// Applies [`relays`] to `received` and logs the decision. Returns
+    /// whether to send. When the child's group cannot be read (the child is
+    /// gone), nothing is sent: the wait loop sees the exit next.
+    fn decide(child: &Supervised, received: Received) -> bool {
+        let pid = child.process.id() as libc::pid_t;
+        let Some(shares_group) = shares_group(pid) else {
+            return false;
+        };
+        let name = signal_hook::low_level::signal_name(received.signal).unwrap_or("unknown signal");
+        if relays(received.signal, received.from_kernel, shares_group) {
+            let cause = if received.from_kernel { "kernel" } else { "other" };
+            log::debug!("relayed {name} to pid {pid} (cause: {cause})");
+            true
+        } else {
+            log::debug!("skipped {name}, the child got it from the terminal");
+            false
+        }
+    }
+
+    /// Whether the child is still in Bear's process group. `None` when
+    /// `getpgid` fails.
+    fn shares_group(pid: libc::pid_t) -> Option<bool> {
+        // SAFETY: both calls take no pointers and only read process state.
+        let (child, own) = unsafe { (libc::getpgid(pid), libc::getpgrp()) };
+        (child != -1).then_some(child == own)
     }
 
     enum Target {
@@ -337,7 +388,7 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    use super::{GroupPolicy, Inherit, Leader, SignalSource, Supervised};
+    use super::{GroupPolicy, Inherit, Leader, Received, SignalSource, Supervised};
     use std::ffi::c_int;
     use std::process::{Command, ExitStatus};
     use std::sync::Arc;
@@ -361,7 +412,7 @@ mod platform {
         }
         Ok(SignalSource(Box::new(std::iter::from_fn(move || {
             thread::sleep(POLL);
-            Some(signaled.swap(0, Ordering::SeqCst) as c_int)
+            Some(Received { signal: signaled.swap(0, Ordering::SeqCst) as c_int, from_kernel: false })
         }))))
     }
 
@@ -381,7 +432,7 @@ mod platform {
             Leader
         }
 
-        fn relay(&self, _child: &Supervised, _signal: c_int) {}
+        fn relay(&self, _child: &Supervised, _received: Received) {}
     }
 
     impl GroupPolicy for Inherit {
@@ -389,7 +440,7 @@ mod platform {
             Inherit
         }
 
-        fn relay(&self, _child: &Supervised, _signal: c_int) {}
+        fn relay(&self, _child: &Supervised, _received: Received) {}
     }
 }
 
@@ -435,8 +486,8 @@ mod tests {
             // only `signal`, which is async-signal-safe.
             unsafe {
                 command.pre_exec(|| {
-                    for signal in signal_hook::consts::TERM_SIGNALS {
-                        libc::signal(*signal, libc::SIG_DFL);
+                    for signal in super::super::platform::TERMINATION {
+                        libc::signal(signal, libc::SIG_DFL);
                     }
                     Ok(())
                 });
@@ -447,19 +498,19 @@ mod tests {
         impl Probe {
             /// Stands in for `SIGCHLD` only: every item comes once the
             /// child has exited.
-            pub(super) fn exits(self) -> impl Iterator<Item = c_int> {
+            pub(super) fn exits(self) -> impl Iterator<Item = Received> {
                 self.signal_then_exits(None)
             }
 
             /// `signal` once the child is ready, then the `SIGCHLD`
             /// stand-in.
-            pub(super) fn signal(self, signal: c_int) -> impl Iterator<Item = c_int> {
-                self.signal_then_exits(Some(signal))
+            pub(super) fn signal(self, signal: c_int) -> impl Iterator<Item = Received> {
+                self.signal_then_exits(Some(Received { signal, from_kernel: false }))
             }
 
             /// Lets the child past its `read`, then ends, so supervise
             /// is left with nothing to wait on but the child itself.
-            pub(super) fn release(mut self) -> impl Iterator<Item = c_int> {
+            pub(super) fn release(mut self) -> impl Iterator<Item = Received> {
                 iter::from_fn(move || {
                     self.stdin.write_all(b"go\n").expect("write to the child");
                     None
@@ -468,20 +519,23 @@ mod tests {
 
             /// `signal` once the child is ready. Asked for the next item,
             /// lets the child past its `read` and ends.
-            pub(super) fn signal_then_release(mut self, signal: c_int) -> impl Iterator<Item = c_int> {
+            pub(super) fn signal_then_release(
+                mut self,
+                received: Received,
+            ) -> impl Iterator<Item = Received> {
                 let mut ready = false;
                 iter::from_fn(move || {
                     if !ready {
                         self.ready();
                         ready = true;
-                        return Some(signal);
+                        return Some(received);
                     }
                     self.stdin.write_all(b"go\n").expect("write to the child");
                     None
                 })
             }
 
-            fn signal_then_exits(mut self, signal: Option<c_int>) -> impl Iterator<Item = c_int> {
+            fn signal_then_exits(mut self, signal: Option<Received>) -> impl Iterator<Item = Received> {
                 let mut pid = None;
                 iter::from_fn(move || match pid {
                     None => {
@@ -506,7 +560,7 @@ mod tests {
 
         /// Blocks until `pid` has exited, and leaves it unreaped
         /// (`WNOWAIT`), so supervise still collects its status.
-        fn wait_for_exit(pid: libc::pid_t) -> Option<c_int> {
+        fn wait_for_exit(pid: libc::pid_t) -> Option<Received> {
             // SAFETY: an all-zero `siginfo_t` is a valid value; waitid only
             // writes into it.
             let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
@@ -517,7 +571,7 @@ mod tests {
                     libc::waitid(libc::P_PID, pid as libc::id_t, &mut info, libc::WEXITED | libc::WNOWAIT)
                 };
                 if rc == 0 {
-                    return Some(libc::SIGCHLD);
+                    return Some(Received { signal: libc::SIGCHLD, from_kernel: false });
                 }
                 let err = std::io::Error::last_os_error();
                 assert_eq!(err.raw_os_error(), Some(libc::EINTR), "waitid failed: {err}");
@@ -595,10 +649,92 @@ mod tests {
     fn leader_waits_for_a_build_that_ignores_the_signal() {
         let (mut command, probe) = shell("trap '' TERM; echo $$; read _; exit 3");
 
-        let sut = supervise::<Leader>(&mut command, probe.signal_then_release(libc::SIGTERM))
-            .expect("supervise failed")
-            .status;
+        let sut = supervise::<Leader>(
+            &mut command,
+            probe.signal_then_release(Received { signal: libc::SIGTERM, from_kernel: false }),
+        )
+        .expect("supervise failed")
+        .status;
 
         assert_eq!(sut.code(), Some(3));
+    }
+
+    #[test]
+    fn relay_rule_skips_only_a_terminal_key_the_child_got() {
+        // arrange / act / assert per case: (signal, from kernel, shares group, relayed)
+        let cases = [
+            (libc::SIGINT, true, true, false),
+            (libc::SIGQUIT, true, true, false),
+            (libc::SIGINT, true, false, true),
+            (libc::SIGQUIT, true, false, true),
+            (libc::SIGINT, false, true, true),
+            (libc::SIGQUIT, false, false, true),
+            (libc::SIGTERM, true, true, true),
+            (libc::SIGTERM, false, true, true),
+            (libc::SIGTERM, true, false, true),
+            (libc::SIGHUP, true, true, true),
+            (libc::SIGHUP, false, true, true),
+            (libc::SIGHUP, true, false, true),
+        ];
+        for (signal, from_kernel, shares_group, expected) in cases {
+            let sut = relays(signal, from_kernel, shares_group);
+
+            assert_eq!(sut, expected, "signal {signal}, kernel {from_kernel}, shares group {shares_group}");
+        }
+    }
+
+    /// The child ends with 3 when the test releases it, and with 4 when a
+    /// relayed signal reaches its trap. A trap, not the default action: a
+    /// shell may ignore `SIGQUIT` until it has exec'd.
+    const WAITS_FOR_RELEASE: &str = "trap 'exit 4' HUP INT QUIT; echo $$; read _; exit 3";
+
+    #[test]
+    fn kernel_signal_is_skipped_for_a_child_in_the_same_group() {
+        // arrange / act / assert per case: the terminal key reached the child already
+        let cases = [libc::SIGINT, libc::SIGQUIT];
+        for signal in cases {
+            let (mut command, probe) = shell(WAITS_FOR_RELEASE);
+            let received = Received { signal, from_kernel: true };
+
+            let sut = supervise::<Inherit>(&mut command, probe.signal_then_release(received))
+                .expect("supervise failed");
+
+            assert!(sut.interrupted);
+            assert_eq!(sut.status.code(), Some(3), "signal {signal} was relayed");
+        }
+    }
+
+    #[test]
+    fn kernel_signal_is_relayed_to_a_child_in_its_own_group() {
+        // arrange / act / assert per case: the terminal did not reach the child
+        let cases = [libc::SIGINT, libc::SIGQUIT];
+        for signal in cases {
+            let (mut command, probe) = shell(WAITS_FOR_RELEASE);
+            let received = Received { signal, from_kernel: true };
+
+            let sut = supervise::<Leader>(&mut command, probe.signal_then_release(received))
+                .expect("supervise failed");
+
+            assert_eq!(sut.status.code(), Some(4), "signal {signal}");
+        }
+    }
+
+    #[test]
+    fn process_signal_and_kernel_hangup_are_relayed_in_both_groups() {
+        // arrange / act / assert per case: (signal, from kernel)
+        let cases = [(libc::SIGINT, false), (libc::SIGHUP, true)];
+        for (signal, from_kernel) in cases {
+            let received = Received { signal, from_kernel };
+
+            let (mut command, probe) = shell(WAITS_FOR_RELEASE);
+            let inherit = supervise::<Inherit>(&mut command, probe.signal_then_release(received))
+                .expect("supervise failed");
+            let (mut command, probe) = shell(WAITS_FOR_RELEASE);
+            let leader = supervise::<Leader>(&mut command, probe.signal_then_release(received))
+                .expect("supervise failed");
+
+            assert_eq!(inherit.status.code(), Some(4), "inherit, {received:?}");
+            assert_eq!(leader.status.code(), Some(4), "leader, {received:?}");
+        }
     }
 }

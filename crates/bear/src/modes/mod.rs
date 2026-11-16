@@ -684,7 +684,7 @@ mod impls {
         fn run(
             &self,
             command: BuildCommand,
-            signals: &mut dyn Iterator<Item = std::ffi::c_int>,
+            signals: &mut dyn Iterator<Item = intercept_supervisor::Received>,
         ) -> Result<Outcome, SuperviseError> {
             self.environment.run_build(command, signals)
         }

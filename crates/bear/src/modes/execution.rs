@@ -5,7 +5,6 @@ use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
 use crate::output::AtomicFile;
 use intercept_supervisor::{Outcome, SuperviseError};
-use std::ffi::c_int;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -120,7 +119,7 @@ pub trait Executor {
     fn run(
         &self,
         command: BuildCommand,
-        signals: &mut dyn Iterator<Item = c_int>,
+        signals: &mut dyn Iterator<Item = intercept_supervisor::Received>,
     ) -> Result<Outcome, SuperviseError>;
 }
 
@@ -174,7 +173,7 @@ impl Interceptor {
         after_build: impl FnOnce(S),
     ) -> Result<Exit, RuntimeError>
     where
-        S: Iterator<Item = c_int>,
+        S: Iterator<Item = intercept_supervisor::Received>,
     {
         let (sender, receiver) = sync_channel::<intercept::Execution>(INTERCEPT_CHANNEL_CAPACITY);
 

@@ -1043,6 +1043,7 @@ version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b29ffa27d3d59a049bb328258de100f8012848d1b08d444e08bbc02ac468435e"
 dependencies = [
+ "cc",
  "libc",
  "signal-hook-registry",
 ]

@@ -23,7 +23,6 @@ use std::collections::HashMap;
 use std::env::JoinPathsError;
 #[cfg(windows)]
 use std::env::consts::EXE_EXTENSION;
-use std::ffi::c_int;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -340,7 +339,7 @@ impl BuildEnvironment {
     pub fn run_build(
         &self,
         arguments: &[String],
-        signals: impl IntoIterator<Item = c_int>,
+        signals: impl IntoIterator<Item = supervise::Received>,
     ) -> Result<supervise::Outcome, supervise::SuperviseError> {
         log::info!("Build command to run: {arguments:?}");
 

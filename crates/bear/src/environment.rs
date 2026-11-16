@@ -12,7 +12,6 @@
 use crate::{args, config};
 use intercept_supervisor::context;
 use intercept_supervisor::runner;
-use std::ffi::c_int;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -67,7 +66,7 @@ impl BuildEnvironment {
     pub fn run_build(
         &self,
         build_command: args::BuildCommand,
-        signals: &mut dyn Iterator<Item = c_int>,
+        signals: &mut dyn Iterator<Item = intercept_supervisor::Received>,
     ) -> Result<intercept_supervisor::Outcome, intercept_supervisor::SuperviseError> {
         self.inner.run_build(&build_command.arguments, signals)
     }
