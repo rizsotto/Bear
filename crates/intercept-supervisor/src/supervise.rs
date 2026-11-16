@@ -89,6 +89,11 @@ pub fn supervise(
 /// kernel: a terminal key that arrived before the child existed never
 /// reached it, so it must be relayed. A key that lands in the instant of
 /// the spawn may reach the child twice.
+///
+/// When the child changes state, the termination signals already queued
+/// come before that news. A group signal can kill the child and reach
+/// Bear in either order; read this way, it counts as received while the
+/// child ran.
 pub struct SignalSource {
     inner: platform::Inner,
     queued: Option<VecDeque<Received>>,
@@ -99,8 +104,16 @@ impl Iterator for SignalSource {
 
     fn next(&mut self) -> Option<Received> {
         let inner = &mut self.inner;
-        let queued = self.queued.get_or_insert_with(|| queued(platform::pending(inner)).into());
-        queued.pop_front().or_else(|| platform::next(inner))
+        let buffer = self.queued.get_or_insert_with(|| queued(platform::pending(inner)).into());
+        if let Some(received) = buffer.pop_front() {
+            return Some(received);
+        }
+        let received = platform::next(inner)?;
+        if is_termination(received.signal) {
+            return Some(received);
+        }
+        buffer.extend(termination_first(platform::pending(inner), received));
+        buffer.pop_front()
     }
 }
 
@@ -110,15 +123,25 @@ impl SignalSource {
     /// those are `SIGCHLD`, which nothing waits on yet. A signal read here is
     /// consumed, so the caller must act on it.
     pub fn pending_termination(&mut self) -> Option<c_int> {
-        first_termination(&platform::pending(&mut self.inner))
+        let signals: Vec<c_int> = platform::pending(&mut self.inner).iter().map(|r| r.signal).collect();
+        first_termination(&signals)
     }
 }
 
 /// Signals found queued as `supervise` starts reading, as [`Received`].
 /// None is from the kernel: the child did not exist when it arrived, so
 /// the terminal did not give it a copy.
-fn queued(signals: Vec<c_int>) -> Vec<Received> {
-    signals.into_iter().map(|signal| Received { signal, from_kernel: false }).collect()
+fn queued(signals: Vec<Received>) -> Vec<Received> {
+    signals.into_iter().map(|received| Received { from_kernel: false, ..received }).collect()
+}
+
+/// The queued signals, then `changed` (the item that woke the source),
+/// with every termination signal first and the order kept otherwise.
+fn termination_first(queued: Vec<Received>, changed: Received) -> Vec<Received> {
+    let mut batch = queued;
+    batch.push(changed);
+    batch.sort_by_key(|received| !is_termination(received.signal));
+    batch
 }
 
 /// The first termination signal in `signals`.
@@ -268,8 +291,11 @@ mod platform {
             .map(|origin| Received { signal: origin.signal, from_kernel: origin.cause == Cause::Kernel })
     }
 
-    pub(super) fn pending(signals: &mut Inner) -> Vec<c_int> {
-        signals.pending().map(|origin| origin.signal).collect()
+    pub(super) fn pending(signals: &mut Inner) -> Vec<Received> {
+        signals
+            .pending()
+            .map(|origin| Received { signal: origin.signal, from_kernel: origin.cause == Cause::Kernel })
+            .collect()
     }
 
     fn ignored_at_entry(signal: c_int) -> bool {
@@ -413,8 +439,8 @@ mod platform {
         Some(Received { signal: signaled.swap(0, Ordering::SeqCst) as c_int, from_kernel: false })
     }
 
-    pub(super) fn pending(signaled: &mut Inner) -> Vec<c_int> {
-        vec![signaled.swap(0, Ordering::SeqCst) as c_int]
+    pub(super) fn pending(signaled: &mut Inner) -> Vec<Received> {
+        vec![Received { signal: signaled.swap(0, Ordering::SeqCst) as c_int, from_kernel: false }]
     }
 
     /// What a console program stopped by Ctrl-C returns.
@@ -457,7 +483,10 @@ mod tests {
         // arrange / act / assert per case: what was queued, in order
         let cases: [&[c_int]; 3] = [&[libc::SIGINT], &[libc::SIGCHLD, libc::SIGQUIT, libc::SIGTERM], &[]];
         for signals in cases {
-            let sut = queued(signals.to_vec());
+            let from_kernel =
+                signals.iter().map(|signal| Received { signal: *signal, from_kernel: true }).collect();
+
+            let sut = queued(from_kernel);
 
             let expected: Vec<Received> =
                 signals.iter().map(|signal| Received { signal: *signal, from_kernel: false }).collect();
@@ -465,6 +494,28 @@ mod tests {
             for received in sut {
                 assert!(relays(received.signal, received.from_kernel, true), "{received:?} is skipped");
             }
+        }
+    }
+
+    #[test]
+    fn termination_signals_come_before_the_child_change() {
+        let kernel = |signal| Received { signal, from_kernel: true };
+        let sent = |signal| Received { signal, from_kernel: false };
+        let cases = [
+            (vec![], sent(libc::SIGCHLD), vec![sent(libc::SIGCHLD)]),
+            (vec![sent(libc::SIGTERM)], sent(libc::SIGCHLD), vec![sent(libc::SIGTERM), sent(libc::SIGCHLD)]),
+            (
+                vec![sent(libc::SIGCHLD), kernel(libc::SIGINT), sent(libc::SIGHUP)],
+                sent(libc::SIGCHLD),
+                vec![kernel(libc::SIGINT), sent(libc::SIGHUP), sent(libc::SIGCHLD), sent(libc::SIGCHLD)],
+            ),
+        ];
+        for (queued, changed, expected) in cases {
+            let input = format!("{queued:?} then {changed:?}");
+
+            let sut = termination_first(queued, changed);
+
+            assert_eq!(sut, expected, "{input}");
         }
     }
 
