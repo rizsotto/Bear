@@ -1,127 +1,124 @@
-# Supervise the build
+# Do not supervise the build
 
 ## Context
 
 When Bear runs a build (`bear -- make`), `bear-driver` starts the build
-and supervises it as the leader. It waits for the build to end and
-passes its exit status back. When a termination signal arrives, the
-whole process tree under the build must stop within the budget that
-[cli-signal-forwarding](../requirements/cli-signal-forwarding.md) sets.
-Bear should still write the partial `compile_commands.json` it has
-collected. The first `supervise()` only sent `SIGKILL` to the direct
-child. Grandchildren were reparented to init and kept running. And
-`SIGKILL` cannot be trapped, so neither the build's own trap nor running
-compilers got a chance to wind down.
+and waits for it. Earlier, Bear acted as the build's supervisor. It put
+the build in its own process group and, on Linux, in a cgroup. On a
+termination signal it forwarded the signal to the group, waited 800ms,
+then killed the group or the cgroup. The goal was to stop the whole tree
+within a time budget.
 
-The leader's job has four steps.
+That design broke what the terminal does for a build. Job control works
+per process group. With the build in its own group, it could not read the
+terminal, Ctrl-Z did not stop it, and a closed terminal did not reach it.
+No amount of forwarding fixes those, because they are not signals Bear
+can forward. The grace window made the build behave differently than
+without Bear, and it caused
+[#713](https://github.com/rizsotto/Bear/issues/713), where a trap on a
+starved CI runner needed more time. Its tests needed retry loops.
 
-**Start.** The leader puts the build in its own process group. On Linux
-it also puts the build in a fresh cgroup. Three mechanisms can stop a
-whole tree:
+The goal now is that a build runs the same with and without Bear. Bear
+stands in for the build. It does not supervise it.
 
-| Platform | Mechanism | Can a child escape? |
-|---|---|---|
-| any unix | process group (`setpgid`/`setsid`) + `killpg` | yes, by calling `setsid` itself |
-| Linux | cgroup v2 `cgroup.kill` | no, unprivileged moves are denied |
-| Windows | Job Object (`KILL_ON_JOB_CLOSE`) | no |
+Options for the build's place:
 
-Process groups work on every unix and need no new dependency (`libc` is
-already there). Their one gap is a child that calls `setsid` to
-daemonize. cgroups close that gap, but they need cgroup v2, a writable
-(delegated) cgroup directory, and a kernel with `cgroup.kill`.
-`std::process::Command` cannot start a child in a cgroup, so the child
-writes its own pid to `cgroup.procs` in a `pre_exec` hook. When any of
-this is missing, Bear falls back to the process group at runtime. Job
-Objects need a `windows-sys` dependency, and Bear has too few Windows
-users to justify that path.
+- Keep the own group and forward, as before. Rejected: it cannot fix
+  terminal input or Ctrl-Z.
+- Keep the own group and hand the terminal to it (`tcsetpgrp`, watch the
+  child for stops, stop Bear, take the terminal back on `fg`). Rejected:
+  it is a job-control shell inside Bear. Much `unsafe` code, many corner
+  cases (Bear in the background, no terminal, nested shells), and still
+  not the same as no Bear.
+- Choose at runtime: own group only when there is no terminal. Rejected:
+  two behaviors are twice the tests and half the predictability.
 
-The group is made with the safe `Command::process_group(0)`. The
-compiler version probe uses `setsid` instead, for a reason given in a
-comment next to the probe code.
+Options for the relay:
 
-**Wait.** The leader blocks until the build exits or a signal arrives.
-`Child::wait()` blocks and cannot watch for a signal at the same time.
-Options:
+- Relay to the whole process group. Rejected: from a script Bear shares
+  its group with the script and maybe the CI runner. A group kill from
+  Bear would hit its own parents.
+- Relay to the group only when Bear is the group leader. Rejected: it
+  works more often, but is wrong in a pipeline (`bear -- make | tee log`
+  would signal `tee`).
+- Never relay `SIGINT` and `SIGQUIT`. Rejected: it breaks the caller
+  that sends `SIGINT` to the pid it started.
+- Always relay. Rejected: a terminal Ctrl-C then reaches the top process
+  of the build twice. A tool that counts presses, where a second Ctrl-C
+  means "force quit", would be affected.
+- Skip when the child's group is the terminal's foreground group.
+  Rejected: it drops real signals, such as `kill -INT <bear pid>` from
+  another terminal.
+- Skip when the sender is the child or in the child's group (the rule of
+  `sudo`). Rejected: it drops the `SIGTERM` that make sends to its jobs.
+- Skip when there is no sender pid, or pid 0. Rejected: a `kill` from
+  outside a PID namespace (`docker stop`) arrives with pid 0, and Bear
+  would wait forever.
 
-- Poll with `try_wait()` and a sleep, as the old loop did with 100ms.
-  Rejected: every signal can wait up to one full sleep.
-- A `poll()` over a `pidfd` and a `signalfd`. Rejected: Linux 5.3+ only
-  and more `libc` code.
-- A blocking loop on `SIGCHLD` plus the termination signals, using the
-  `signal-hook` crate Bear already has. Chosen: portable and no polling.
+Options for the end of the wait:
 
-On unix the termination signals are `SIGTERM`, `SIGINT` and `SIGQUIT`.
-Windows has no `SIGCHLD`, so there the wait wakes every 100ms to check
-the child.
-
-The signals are registered once per process, by the code that runs the
-build, and `supervise()` reads them from a source the caller passes in.
-It does not register them itself, for two reasons. Signal handlers are
-global to the process, so a unit test could not drive `supervise()`
-without hitting the tests that run beside it. And a dropped signal-hook
-handler does not restore the default action, so registering per call
-leaves the process ignoring the signal once the call returns. The modes
-that run no build register nothing, so they keep the default action.
-
-**Forward.** The leader sends the real signal it got to the whole
-process group, not a substitute. Build tools such as `make -j`, `ninja`
-and `cmake --build` stop their own workers when signaled, and the
-build's traps can tell `SIGINT` from `SIGTERM`.
-
-**Grace and kill.** The leader then gives the tree a grace window of
-800ms to wind down. [#713](https://github.com/rizsotto/Bear/issues/713)
-sized it: a trap on a starved CI runner needed the headroom, and 800ms
-still keeps a build that ignores the signal inside the budget. During
-the window the leader checks the direct child with `try_wait()` every
-10ms. If the child exits, the window ends early. Then comes the kill.
-With a cgroup, the leader always writes `cgroup.kill`, even when the
-child exited in time, to reach a descendant that left the group. Without
-a cgroup, it sends `SIGKILL` to the group only if the direct child is
-still there.
-
-A `pidfd` for the grace window was drafted and dropped. It was a
-Linux-only path with a runtime fallback for `ENOSYS` and `EPERM`, about
-a hundred extra lines and three `unsafe` blocks. The gain was at most 10ms and
-one wakeup instead of about 80, and only after a signal. Next to an
-800ms grace window nobody would notice.
-
-The wrapper mechanism runs the same `supervise()` deeper in the tree.
-That part is in [supervise-a-compiler-call](supervise-a-compiler-call.md).
+- Keep the grace window and the kill. Rejected: see above.
+- A longer or configurable grace window. Rejected: still a behavior the
+  build does not have without Bear, and a new flag.
+- Keep the cgroup only to sweep leftovers. Rejected: it is Linux only,
+  it leaks a directory when a daemon survives, and killing a daemon the
+  build started on purpose is not Bear's call.
 
 ## Decision
 
-The leader starts the build in its own process group and, on Linux, in
-a fresh cgroup, then waits on `SIGCHLD` and the termination signals. On
-a signal it forwards the real signal to the group and gives it 800ms.
-Then it kills the cgroup, or sends `SIGKILL` to the group if the child
-is still there.
+The build stays in Bear's process group and session. It is a plain child.
+Bear relays every termination signal to its direct child and to nothing
+else. It skips a relay only when all three hold: the signal is `SIGINT`
+or `SIGQUIT`, the signal came from the kernel (a terminal key), and the
+child is still in Bear's process group. In that case the terminal
+already reached the child. Bear sends no signal of its own, and waits as
+long as the build takes.
+
+Why the proof of the kernel as the sender is needed: a kill from outside
+a PID namespace and, on macOS, every signal, carry no usable sender. An
+unknown sender must relay, because a missed signal leaves the build
+running and a double one at worst runs a trap twice.
+
+`SIGHUP` and `SIGTERM` are always relayed. The terminal never sends
+`SIGTERM`. On a hang-up the kernel signals the session leader only, and
+the rest of the group gets it later. When Bear is the leader, skipping
+would leave Bear waiting for a child that never gets the signal.
+
+A signal that was ignored when Bear started stays ignored, and `SIGHUP`
+is watched. Ignored signals survive `exec`. A handler does not. If Bear
+registered a handler for an ignored signal, it would un-ignore that
+signal for the build, as in `bear -- make &` from a script.
+
+On Windows the console gives Ctrl-C to every attached process, so Bear
+relays nothing. It notes the interrupt, waits, cleans up, and ends like
+the build.
 
 ## Consequences
 
-- No new dependency. The wait reacts at signal speed, inside the budget.
-- Forwarding the real signal keeps the build tools' own worker cleanup
-  working, so Bear does not reimplement it per tool. This is why the
-  requirement says Bear must not interfere with the build tool's own
-  signal handling.
-- The graceful phase is group-based because `cgroup.kill` can only send
-  `SIGKILL`. A descendant that detached with `setsid` gets no grace
-  window, only the final `cgroup.kill`. Accepted: a daemon that detaches
-  on purpose gives up the graceful wind-down.
-- Without a usable cgroup (not Linux, no cgroup v2, no delegated
-  directory, kernel without `cgroup.kill`) the `setsid` hole stays open
-  and teardown falls back to the process group.
-- The build leaves Bear's process group, so the terminal no longer sends
-  Ctrl-C to the build directly. Bear is the only path for the signal.
-  This is what makes tree teardown and real-signal forwarding reliable,
-  and it fixes traps in the non-terminal case (CI `SIGTERM`). The cost is
-  that a gap in Bear's forwarding has no terminal backstop. Accepted.
-- Each build creates and removes one cgroup directory. Killed processes
-  are reaped by init later, so removal after a kill retries briefly.
-- Outside unix, Bear still kills only the direct child. Revisit with a
-  Job Object if Windows users report builds that outlive Bear.
+- Terminal input, Ctrl-Z, terminal close, and signals sent to the process
+  group work with no code, because the kernel does them.
+- Bear no longer stops the whole tree, and no longer stops a build that
+  ignores a signal. Nobody does that without Bear either.
+- The relay decision is one pure function that a table test covers with
+  no processes. The `GroupPolicy` trait, its two implementations, and the
+  generic parameter go. A trait whose second implementation is a test
+  double does not earn its place, and two names for one behavior invite
+  someone to make them differ again.
+- A signal can reach the top process of the build twice: when a process
+  signals the whole group, and on macOS and BSD, where no signal is
+  proven to come from the kernel. Accepted. It is the safe way to fail.
+- The sender is known through signal-hook's `extended-siginfo` feature,
+  which needs a small C file built with the `cc` crate. The workspace
+  already needs a C compiler. Revisit the macOS rule if a reliable marker
+  for terminal signals shows up there.
+- A build tool that moves itself to its own process group (`timeout`)
+  ends up in the background under Bear. Ctrl-C still reaches it through
+  the relay. Bear cannot `exec` the build, so this stays.
 
 ## References
 
 - [cli-signal-forwarding](../requirements/cli-signal-forwarding.md), the requirement this supports
-- [supervise-a-compiler-call](supervise-a-compiler-call.md), the nested supervisor under the wrapper mechanism
-- [#713](https://github.com/rizsotto/Bear/issues/713), the starved CI runner that sized the grace window
+- [supervise-a-compiler-call](supervise-a-compiler-call.md), the wrapper under the same rules
+- [end-like-the-build](end-like-the-build.md), how Bear ends after the build
+- [abort-on-signal](abort-on-signal.md), a signal when no build runs
+- [#713](https://github.com/rizsotto/Bear/issues/713), the starved CI runner that the old grace window hit

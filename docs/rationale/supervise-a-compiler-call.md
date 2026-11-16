@@ -4,46 +4,58 @@
 
 With the wrapper mechanism the chain is `bear-driver` -> `make` ->
 `bear-wrapper` -> real `cc`. The wrapper reports the call, then runs the
-real compiler under the same `supervise()` the driver uses. So
-supervision nests: the driver is the leader at the top, and each wrapper
-is a supervisor of one compiler call further down. How the leader
-starts, waits, forwards and kills is in
-[process-tree-teardown](process-tree-teardown.md). This entry covers
-only what the wrapper does differently.
+real compiler. Bear does not supervise the build
+([process-tree-teardown](process-tree-teardown.md)), and the wrapper is
+a stand-in for the compiler in the same way. This entry covers only what
+the wrapper does differently.
 
-The forces are the leader's: one signal to Bear must stop the whole tree
-within the budget of
-[cli-signal-forwarding](../requirements/cli-signal-forwarding.md), and
-the build's own signal handling must keep working. Options:
+The force is the same as for the driver: a build runs the same with and
+without Bear. make sends `SIGTERM` to its jobs by pid, and make is in
+the compiler's process group. A wrapper that did not relay it would
+leave the compiler running.
 
-- Each wrapper makes its own process group, like the leader. Rejected:
-  the build splits into many groups. A top-level `killpg` then misses
-  the processes below each wrapper, which reopens the hole grouping is
-  meant to close.
-- Each wrapper runs its own grace window and `SIGKILL`. Rejected: the
-  leader's group kill (or `cgroup.kill`) is the real teardown, and it
-  already reaches the wrapper's child. A second timer adds nothing.
-- The wrapper stays in the group and cgroup it inherits, relays a signal
-  to its direct child only, and waits. Chosen.
+Options:
+
+- Each wrapper makes its own process group. Rejected: the build splits
+  into many groups, and the terminal's job control no longer reaches the
+  compiler.
+- Each wrapper runs its own grace window and `SIGKILL`. Rejected: Bear
+  sends no signal of its own anywhere.
+- A different relay rule for the wrapper. Rejected: two rules for one
+  situation.
+- The wrapper uses the same relay rule and the same exit as the driver.
+  Chosen.
 
 ## Decision
 
-The wrapper does not create a process group or a cgroup. On a signal it
-relays the signal to its direct child, waits for it, and passes the
-child's exit code back. The leader owns the only escalation timer.
+The wrapper uses the same `supervise` and the same exit function as the
+driver. It stays in the group it inherits, relays a termination signal
+to its direct child by the rule of
+[process-tree-teardown](process-tree-teardown.md), waits for the child
+without a limit, and ends like the child
+([end-like-the-build](end-like-the-build.md)).
+
+A terminal Ctrl-C reaches the compiler from the terminal, and the
+wrapper skips it. The `SIGTERM` from make is relayed, because a process
+sent it.
+
+The wrapper has no artifacts to clean, so it registers the signals right
+before it starts the compiler. Before that point the default action
+applies, which is what the compiler would have done.
 
 ## Consequences
 
-- The wrapper and the compiler stay in the leader's process group, so
-  the leader's forward and `SIGKILL` reach them with one `killpg`.
-- The wrapper inherits the leader's cgroup through its parent, so one
-  `cgroup.kill` from the leader reaches the whole tree.
-- A compiler that ignores the signal is stopped by the leader when the
-  grace window ends, not by the wrapper. The wrapper just waits until
-  then.
+- Under make, a signal to the group stops the compiler through the
+  group. A signal to the wrapper's pid alone reaches the compiler
+  through the relay.
+- A compiler that ignores the signal keeps the wrapper waiting. The
+  wrapper does not force it.
+- The wrapper and the driver share one signal rule, so a change to it is
+  one change.
 
 ## References
 
 - [cli-signal-forwarding](../requirements/cli-signal-forwarding.md), the requirement this supports
-- [process-tree-teardown](process-tree-teardown.md), how the leader supervises the build
+- [process-tree-teardown](process-tree-teardown.md), the rules the wrapper follows
+- [end-like-the-build](end-like-the-build.md), how the wrapper ends
 - [wrapper-mode-design-decisions](wrapper-mode-design-decisions.md), the wrapper mechanism itself

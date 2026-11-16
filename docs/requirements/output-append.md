@@ -1,6 +1,6 @@
 ---
 title: Appending to an existing compilation database
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -45,6 +45,23 @@ Bear run. When appending, Bear merges the new entries with the existing
   read permission is denied), **when** a run that is appending starts,
   **then** Bear reports an error before the build runs and writes no
   output.
+- **Given** an existing database and a build that is interrupted, which
+  means Bear itself got a termination signal while the build ran,
+  **when** a run that is appending ends, **then** the existing database
+  is unchanged.
+- **Given** the same interrupted build, **when** a run that is
+  appending ends, **then** Bear prints one warning that the build was
+  interrupted and the output is unchanged.
+- **Given** the same interrupted build, **when** a run that is
+  overwriting ends, **then** the database holds what was captured, and
+  Bear prints one warning that the output was replaced with a partial
+  result.
+- **Given** an interrupted build that still exits `0`, **when** Bear
+  ends, **then** the output is published, appending or not. If Bear
+  exits `0`, the output was published.
+- **Given** a build killed by a signal that did not go through Bear,
+  **when** Bear ends, **then** the build is a failed build, not an
+  interrupted one, and it publishes.
 - Which entry survives when a file is in both the new and the existing
   entries is owned by `output-duplicate-detection`.
 
@@ -52,8 +69,12 @@ Bear run. When appending, Bear merges the new entries with the existing
 
 - An interrupted run does not corrupt the database. That is owned by
   `output-atomic-write`.
+- A signal that reaches Bear while it writes the output, or in semantic
+  mode or parse-sh mode, never publishes, in either case. That is owned
+  by `output-atomic-write`.
 
 ## Rationale
 
 - [Latest compilation wins for a rebuilt file](../rationale/duplicate-latest-flags-win.md)
 - [Naming the overwrite behaviour before it stops being the default](../rationale/append-default-migration.md)
+- [An interrupted build and the output mode](../rationale/interrupted-build-and-output-mode.md)

@@ -1,6 +1,6 @@
 ---
 title: Exit codes by mode
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -20,7 +20,10 @@ requirements.
 | any | the command line is malformed | non-zero, before any work runs |
 | any | an error of Bear's own (an input cannot be read, the output cannot be created or written, the build cannot start) | non-zero |
 | combined, intercept | the build exits on its own | the build's code |
-| combined, intercept | the build is killed by a signal | non-zero |
+| combined, intercept | the build is killed by a signal (Unix) | Bear ends by the same signal, with core dumps turned off |
+| combined, intercept | the build ends with an exit code (Windows) | the build's full exit code |
+| any | a termination signal reaches Bear while no build runs (Unix) | Bear ends by that signal |
+| any | a termination signal reaches Bear while no build runs (Windows) | `0xC000013A` |
 | combined, intercept | entries are dropped by output validation | the build's code |
 | semantic, parse-sh | the input is empty, or is understood even when the output is empty | `0` |
 | semantic, parse-sh | non-empty input in which nothing is understood | non-zero |
@@ -36,9 +39,18 @@ for the event-file usage errors.
   either mode, **then** Bear exits `42`. Codes in the portable range
   (0-255 on Unix) pass through unchanged.
 - **Given** a build killed by a signal, so it has no exit code, **when**
-  Bear finishes, **then** Bear exits non-zero, never `0`. How the signal
-  reaches the build is owned by
+  Bear finishes on Unix, **then** Bear ends by the same signal, as the
+  build did, and a shell that ran Bear sees the same signal name it would
+  see for the build alone. Bear's own core dump is turned off, so the
+  shell does not print "(core dumped)" for Bear. A caller that reads the
+  exit code sees a non-success status, never `0`. How the signal reaches
+  the build is owned by
   [`cli-signal-forwarding`](cli-signal-forwarding.md).
+- **Given** a build that exits with a code above 255 on Windows, **when**
+  Bear finishes, **then** Bear exits with the build's full exit code.
+- **Given** a termination signal that reaches Bear while no build runs,
+  **when** Bear ends, **then** it ends by that signal on Unix, and with
+  `0xC000013A` on Windows (Ctrl-C or `SIGTERM`).
 - **Given** a build that handles a forwarded signal and exits on its own,
   **when** Bear finishes, **then** Bear exits with the build's code, `0`
   included.
@@ -72,15 +84,19 @@ for the event-file usage errors.
   **when** the user runs it, **then** Bear prints the usage and exits
   `0`.
 
+Whether a run that exits `0` published its output is owned by
+[`output-append`](output-append.md).
+
 The skip-and-continue rule for input lines is owned by
 [`interception-events-format`](interception-events-format.md).
 
 ## Known limitations
 
-- Bear does not encode the signal that killed a build in its exit code
-  (no `128 + signal number`), so a caller that reads only the exit code
-  cannot tell a killed build from a failed one. The build still gets the
-  real signal.
 - Nested Bear runs (Bear running under another Bear) are not supported,
   and their exit code is undefined. The exclusion is owned by
   [`cli-signal-forwarding`](cli-signal-forwarding.md).
+
+## Rationale
+
+- [End like the build](../rationale/end-like-the-build.md)
+- [An interrupted build and the output mode](../rationale/interrupted-build-and-output-mode.md)

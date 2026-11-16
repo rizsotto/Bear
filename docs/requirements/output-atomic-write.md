@@ -1,6 +1,6 @@
 ---
 title: All-or-nothing output files
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -24,6 +24,14 @@ events file.
 - **Given** a build that runs and fails, **when** Bear finishes, **then**
   the output is replaced with what was captured. A failed build is not an
   error of Bear's own.
+- **Given** a run that is interrupted by a termination signal, in any
+  mode, **when** Bear ends, **then** no temporary artifact is left
+  behind: not the temporary file, not the wrapper directory.
+- **Given** an existing output and a termination signal that reaches
+  Bear while Bear writes the output, or in semantic mode or parse-sh
+  mode, **when** Bear ends, **then** the previous output is unchanged.
+  Whether a build interrupted while it runs publishes is owned by
+  [`output-append`](output-append.md).
 - **Given** a run that ends in an error of Bear's own (the build command
   cannot start or be supervised, interception fails, the input cannot be
   read, or writing fails), with or without an existing output file,
@@ -61,9 +69,12 @@ events file.
   it, but the run that finishes last wins.
 - The output directory must already exist. Bear does not create missing
   parent directories.
-- If Bear is killed by a signal it cannot catch, or cannot stop the
-  interception after a failure, the temporary file may be left behind
-  (empty or partial).
+- If Bear is killed by a signal it cannot catch, or crashes, or cannot
+  stop the interception after a failure, the temporary file may be left
+  behind (empty or partial).
+- Output to standard output cannot be taken back. A reader gets what was
+  written so far, as with any UNIX filter. The rules above are about
+  file outputs.
 - When interception fails partway through a build that did start, the
   entries captured before the failure are lost. The previous output
   stays.
@@ -71,3 +82,5 @@ events file.
 ## Rationale
 
 - [A failed build still publishes its output](../rationale/failed-build-still-publishes.md)
+- [Abort on a signal when no build runs](../rationale/abort-on-signal.md)
+- [An interrupted build and the output mode](../rationale/interrupted-build-and-output-mode.md)
