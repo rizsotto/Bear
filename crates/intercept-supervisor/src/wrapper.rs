@@ -11,6 +11,7 @@ pub const CONFIG_FILENAME: &str = "wrappers.cfg";
 /// The directory name used for wrapper executables in the current working directory.
 pub(crate) const WRAPPER_DIR_NAME: &str = ".bear";
 
+use crate::cleanup;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -46,7 +47,7 @@ impl ManagedDirectory {
         }
 
         // Create fresh directory
-        std::fs::create_dir_all(&path)?;
+        cleanup::track(&path, || std::fs::create_dir_all(&path))?;
 
         Ok(Self { path })
     }
@@ -60,9 +61,11 @@ impl ManagedDirectory {
 impl Drop for ManagedDirectory {
     fn drop(&mut self) {
         // Best-effort cleanup - ignore errors
-        if self.path.exists() {
-            let _ = std::fs::remove_dir_all(&self.path);
-        }
+        cleanup::untrack(&self.path, || {
+            if self.path.exists() {
+                let _ = std::fs::remove_dir_all(&self.path);
+            }
+        });
     }
 }
 
@@ -320,6 +323,7 @@ pub enum ConfigError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::io::Cursor;
     use std::net::{IpAddr, Ipv4Addr};
     use tempfile::TempDir;
@@ -328,6 +332,19 @@ mod tests {
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)
     }
 
+    #[test]
+    fn test_managed_directory_is_tracked_until_dropped() {
+        let temp = tempfile::tempdir().unwrap();
+
+        let sut = ManagedDirectory::create(temp.path()).unwrap();
+        let path = sut.path().to_path_buf();
+        let tracked_while_alive = cleanup::is_tracked(&path);
+        drop(sut);
+
+        assert!(tracked_while_alive);
+        assert!(!cleanup::is_tracked(&path));
+        assert!(!path.exists());
+    }
     #[test]
     fn test_wrapper_config_new() {
         let config = WrapperConfig::new(address());

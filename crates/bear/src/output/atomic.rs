@@ -66,7 +66,10 @@ impl AtomicFile {
             name.push(format!(".{}.{:016x}.tmp", std::process::id(), random()));
             let temp_path = directory.join(name);
 
-            match fs::OpenOptions::new().write(true).create_new(true).open(&temp_path) {
+            let opened = intercept_supervisor::cleanup::track(&temp_path, || {
+                fs::OpenOptions::new().write(true).create_new(true).open(&temp_path)
+            });
+            match opened {
                 Ok(file) => {
                     let staged = Staged { temp_path, final_path: final_path.to_path_buf() };
                     return Ok((Self(Some(staged)), file));
@@ -92,10 +95,12 @@ impl AtomicFile {
         let Some(Staged { temp_path, final_path }) = self.0.take() else {
             return Ok(());
         };
-        fs::rename(&temp_path, &final_path).map_err(|err| {
-            log::warn!("Kept the temporary file for debugging: {}", temp_path.display());
-            WriterError::Io(final_path, SerializationError::Io(err))
-        })
+        intercept_supervisor::cleanup::untrack(&temp_path, || fs::rename(&temp_path, &final_path)).map_err(
+            |err| {
+                log::warn!("Kept the temporary file for debugging: {}", temp_path.display());
+                WriterError::Io(final_path, SerializationError::Io(err))
+            },
+        )
     }
 }
 
@@ -110,7 +115,9 @@ fn random() -> u64 {
 impl Drop for AtomicFile {
     fn drop(&mut self) {
         if let Some(staged) = self.0.take() {
-            let _ = fs::remove_file(staged.temp_path);
+            intercept_supervisor::cleanup::untrack(&staged.temp_path, || {
+                let _ = fs::remove_file(&staged.temp_path);
+            });
         }
     }
 }

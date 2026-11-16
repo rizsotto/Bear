@@ -10,6 +10,7 @@
 //! cdylib - which depends on `intercept` only - never compiles supervisor-only
 //! dependencies (`signal-hook`, `which`).
 
+pub mod cleanup;
 pub mod collector;
 pub mod context;
 pub mod installation;
