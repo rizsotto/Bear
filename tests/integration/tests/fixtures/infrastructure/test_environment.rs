@@ -456,26 +456,32 @@ pub fn reset_signals(command: &mut std::process::Command) {
     }
 }
 
+/// Calls `kill(2)` directly: busybox `kill` (Alpine) rejects `--` before a
+/// negative process group id.
 #[cfg(unix)]
-fn send_signal(name: &str, target: String) {
-    let status = std::process::Command::new("kill")
-        .arg(format!("-{name}"))
-        .arg("--")
-        .arg(target)
-        .status()
-        .expect("Failed to run kill");
-    assert!(status.success(), "kill -{name} failed");
+fn send_signal(name: &str, target: libc::pid_t) {
+    let signal = match name {
+        "HUP" => libc::SIGHUP,
+        "INT" => libc::SIGINT,
+        "QUIT" => libc::SIGQUIT,
+        "TERM" => libc::SIGTERM,
+        "KILL" => libc::SIGKILL,
+        _ => panic!("unknown signal name: {name}"),
+    };
+    // SAFETY: `kill` takes plain integers and has no memory effects.
+    let rc = unsafe { libc::kill(target, signal) };
+    assert_eq!(rc, 0, "kill -{name} {target} failed: {}", std::io::Error::last_os_error());
 }
 
 /// Send the named signal (`"TERM"`, `"INT"`, ...) to the child process.
 #[cfg(unix)]
 pub fn signal_process(child: &std::process::Child, name: &str) {
-    send_signal(name, child.id().to_string());
+    send_signal(name, child.id() as libc::pid_t);
 }
 
 /// Send the named signal to the child's process group. The child must have
 /// been started with `spawn_bear_in_group`.
 #[cfg(unix)]
 pub fn signal_group(child: &std::process::Child, name: &str) {
-    send_signal(name, format!("-{}", child.id()));
+    send_signal(name, -(child.id() as libc::pid_t));
 }

@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn test_publishes_by_outcome_and_output_mode() {
         // (name, status, interrupted, append, expected)
-        let mut cases = vec![
+        let cases = vec![
             ("success", create_success_exit_status(), false, true, true),
             ("success", create_success_exit_status(), false, false, true),
             ("success, interrupted", create_success_exit_status(), true, true, true),
@@ -447,16 +447,20 @@ mod tests {
             ("failure code, interrupted", create_failure_exit_status(), true, false, true),
         ];
         #[cfg(unix)]
-        {
+        let killed_cases = {
             use std::os::unix::process::ExitStatusExt;
             let killed = ExitStatus::from_raw(libc::SIGKILL);
-            cases.push(("killed by a signal", killed, false, true, true));
-            cases.push(("killed by a signal", killed, false, false, true));
-            cases.push(("killed by a signal, interrupted", killed, true, true, false));
-            cases.push(("killed by a signal, interrupted", killed, true, false, true));
-        }
+            vec![
+                ("killed by a signal", killed, false, true, true),
+                ("killed by a signal", killed, false, false, true),
+                ("killed by a signal, interrupted", killed, true, true, false),
+                ("killed by a signal, interrupted", killed, true, false, true),
+            ]
+        };
+        #[cfg(not(unix))]
+        let killed_cases = vec![];
 
-        for (name, status, interrupted, append, expected) in cases {
+        for (name, status, interrupted, append, expected) in cases.into_iter().chain(killed_cases) {
             let sut = publishes(&Outcome { status, interrupted }, append);
 
             assert_eq!(sut, expected, "{name}, append: {append}");

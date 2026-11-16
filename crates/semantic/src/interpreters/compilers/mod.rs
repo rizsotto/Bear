@@ -590,8 +590,8 @@ mod tests {
             );
             let result = sut.recognize(execution);
             if let RecognizeResult::Recognized(cmd) = result {
-                for i in 1..=3 {
-                    assert_eq!(cmd.arguments[i].kind(), configures(CompilerPass::Linking));
+                for argument in &cmd.arguments[1..=3] {
+                    assert_eq!(argument.kind(), configures(CompilerPass::Linking));
                 }
             }
 
@@ -1238,8 +1238,8 @@ mod tests {
             );
             if let RecognizeResult::Recognized(cmd) = sut.recognize(execution) {
                 assert_eq!(cmd.arguments.len(), 13);
-                for i in 1..12 {
-                    match cmd.arguments[i].kind() {
+                for (i, argument) in cmd.arguments.iter().enumerate().take(12).skip(1) {
+                    match argument.kind() {
                         Other(PassEffect::Configures(_))
                         | Other(PassEffect::StopsAt(_))
                         | Other(PassEffect::None) => {}
@@ -1270,8 +1270,8 @@ mod tests {
             );
             if let RecognizeResult::Recognized(cmd) = sut.recognize(execution) {
                 assert_eq!(cmd.arguments.len(), 6);
-                for i in 1..5 {
-                    assert_eq!(cmd.arguments[i].kind(), configures(CompilerPass::Compiling));
+                for argument in &cmd.arguments[1..5] {
+                    assert_eq!(argument.kind(), configures(CompilerPass::Compiling));
                 }
             } else {
                 panic!("Expected compiler command");
@@ -1296,8 +1296,8 @@ mod tests {
             );
             if let RecognizeResult::Recognized(cmd) = sut.recognize(execution) {
                 assert_eq!(cmd.arguments.len(), 7);
-                for i in 1..6 {
-                    assert_eq!(cmd.arguments[i].kind(), configures(CompilerPass::Compiling));
+                for argument in &cmd.arguments[1..6] {
+                    assert_eq!(argument.kind(), configures(CompilerPass::Compiling));
                 }
                 assert_eq!(cmd.arguments[6].kind(), Source { binary: false });
             } else {

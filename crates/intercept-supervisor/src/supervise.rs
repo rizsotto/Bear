@@ -279,6 +279,7 @@ mod platform {
             libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0);
         }
         #[cfg(not(has_symbol_prctl))]
+        // SAFETY: the pointer is to a local that outlives the call.
         unsafe {
             let limit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
             libc::setrlimit(libc::RLIMIT_CORE, &limit);

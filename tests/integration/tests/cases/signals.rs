@@ -634,7 +634,7 @@ fn run_interrupted(
     std::fs::write(env.test_dir().join("new.c"), "int main() { return 0; }\n")?;
     let script = build
         .replace("READY", &ready.display().to_string())
-        .replace("COMPILE", &format!("{COMPILER_C_PATH} -c new.c"));
+        .replace("COMPILE", &format!("{} -c new.c", filename_of(COMPILER_C_PATH)));
     let mut child = env.spawn_bear_in_group_with_stderr(
         &["--output", "compile_commands.json", mode, "--", SHELL_PATH, "-c", &script],
         Stdio::piped(),
@@ -887,10 +887,11 @@ fn hangup_runs_the_build_trap_and_cleans_up() -> Result<()> {
     Ok(())
 }
 
-/// Ctrl-Z at a job-control shell stops Bear and the build together, and `fg`
-/// continues both. A stop only works under a job-control shell, so the
-/// terminal runs `bash` with `set -m`. The script reads the states with `ps`
-/// while both are stopped.
+/// Ctrl-Z at a job-control shell stops Bear and the build together, and
+/// they continue together. A stop only works under a job-control shell, so
+/// the terminal runs `bash` with `set -m`. The test reads the states with
+/// `ps` itself: macOS `/bin/bash` 3.2 never reports the stopped job, so a
+/// check in the script after the stop would never run there.
 // Requirements: cli-signal-forwarding
 #[test]
 #[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
@@ -901,7 +902,8 @@ fn ctrl_z_at_the_terminal_stops_and_continues_bear_and_the_build() -> Result<()>
 
     let env = TestEnvironment::new("ctrl_z_at_the_terminal")?;
     let dir = env.test_dir();
-    let (build_pid, bear_pid, marker) = (dir.join("build.pid"), dir.join("bear.pid"), dir.join("marker"));
+    let (build_pid, bear_pid, marker, go) =
+        (dir.join("build.pid"), dir.join("bear.pid"), dir.join("marker"), dir.join("go"));
     let build = env.create_shell_script(
         "build.sh",
         &format!(
@@ -911,23 +913,17 @@ fn ctrl_z_at_the_terminal_stops_and_continues_bear_and_the_build() -> Result<()>
             m = marker.display()
         ),
     )?;
-    let state_of = |file: &std::path::Path| {
-        format!(
-            "for ((i=0; i<300; i++)); do s=$({ps} -o state= -p $(cat {f})); s=${{s// /}}; s=${{s:0:1}}; \
-             case $s in T) break;; esac; {sleep} 0.1; done; echo -n $s",
-            ps = PS_PATH,
-            sleep = SLEEP_PATH,
-            f = file.display()
-        )
-    };
+    // Keeps bash alive, so the session survives, until the job is done.
     let script = format!(
         "set -m\n{bear} --output compile_commands.json -- {shell} {build}\n\
-         echo \"states build:$({build_state}) bear:$({bear_state}) end\"\nfg\n",
+         while [ ! -e {go} ]; do {sleep} 0.1; done\n\
+         for ((i=0; i<50; i++)); do jobs -p > {jobs}; [ -s {jobs} ] || break; fg; done\n",
         bear = env.bear_path().display(),
         shell = SHELL_PATH,
         build = build.display(),
-        build_state = state_of(&build_pid),
-        bear_state = state_of(&bear_pid),
+        go = go.display(),
+        jobs = dir.join("jobs").display(),
+        sleep = SLEEP_PATH,
     );
     let mut cmd = std::process::Command::new(BASH_PATH);
     crate::fixtures::infrastructure::reset_signals(&mut cmd);
@@ -939,22 +935,53 @@ fn ctrl_z_at_the_terminal_stops_and_continues_bear_and_the_build() -> Result<()>
         return Ok(());
     };
     terminal.wait_for("build-ready", Duration::from_secs(30))?;
+    let read_pid = |file: &std::path::Path| -> Result<libc::pid_t> {
+        Ok(std::fs::read_to_string(file)?.trim().parse()?)
+    };
+    let (build, bear) = (read_pid(&build_pid)?, read_pid(&bear_pid)?);
+    let state_of = |pid: libc::pid_t| -> String {
+        let output = std::process::Command::new(PS_PATH)
+            .args(["-o", "state=", "-p", &pid.to_string()])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default();
+        output.trim().chars().take(1).collect()
+    };
 
     terminal.type_bytes(&[0x1a])?;
-    terminal.wait_for("states build:", Duration::from_secs(60))?;
-    terminal.wait_for(" end", Duration::from_secs(60))?;
-    assert!(
-        terminal.output().contains("states build:T bear:T end"),
-        "Bear and the build must both be stopped; output:\n{}",
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let states = loop {
+        let states = (state_of(build), state_of(bear));
+        if states == ("T".to_string(), "T".to_string()) || Instant::now() >= deadline {
+            break states;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(
+        states,
+        ("T".to_string(), "T".to_string()),
+        "Bear and the build must both be stopped (build, bear); output:\n{}",
         terminal.output()
     );
     assert!(!marker.exists(), "the build ran on while stopped");
 
+    // bash 5 saw the stop and took the terminal back, so only its `fg`
+    // gives the job the terminal again. bash 3.2 saw nothing and is still
+    // waiting, so the job needs the `SIGCONT` from here. If the `SIGCONT`
+    // comes first under bash 5, the build stops again on its read and the
+    // script runs `fg` once more.
+    std::fs::write(&go, "")?;
+    // SAFETY: `kill` takes plain integers. Bear leads the job's group.
+    let rc = unsafe { libc::kill(-bear, libc::SIGCONT) };
+    assert_eq!(rc, 0, "SIGCONT failed: {}", std::io::Error::last_os_error());
     terminal.type_bytes(b"\n")?;
-    let sut = terminal.wait()?;
+    terminal.wait()?;
 
-    assert!(sut.success(), "Bear must end like the build after fg: {sut:?}\n{}", terminal.output());
-    assert!(marker.exists(), "the build did not finish after fg; output:\n{}", terminal.output());
+    assert!(
+        marker.exists(),
+        "the build did not finish after it was continued; output:\n{}",
+        terminal.output()
+    );
     assert!(dir.join("compile_commands.json").is_file(), "the output was not published");
     assert!(!has_temp_file(dir), "a temp file is left behind");
     Ok(())

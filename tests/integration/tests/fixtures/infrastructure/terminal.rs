@@ -48,7 +48,13 @@ pub fn open_pty() -> std::io::Result<(OwnedFd, OwnedFd)> {
     let (mut master, mut slave) = (0, 0);
     // SAFETY: the out-pointers are valid and the optional arguments are null.
     let rc = unsafe {
-        libc::openpty(&mut master, &mut slave, std::ptr::null_mut(), std::ptr::null(), std::ptr::null())
+        libc::openpty(
+            &mut master,
+            &mut slave,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
     };
     if rc != 0 {
         return Err(std::io::Error::last_os_error());
