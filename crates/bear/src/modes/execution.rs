@@ -272,8 +272,6 @@ pub enum RuntimeError {
     Executor(#[from] SuperviseError),
     #[error("Internal error: {0}")]
     Thread(&'static str),
-    #[error("cannot register signal handlers: {0}")]
-    SignalRegistration(std::io::Error),
 }
 
 #[cfg(test)]

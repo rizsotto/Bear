@@ -12,6 +12,7 @@
 //! parsing, configuration, and the modes, while `intercept_supervisor`
 //! supplies the application context and installation layout.
 
+use anyhow::Context as _;
 use bear::{args, modes};
 use intercept_supervisor::{context, installation};
 use std::env;
@@ -53,11 +54,15 @@ fn run() -> anyhow::Result<ExitCode> {
     let arguments = args::Arguments::try_from(matches)?;
     log::info!("{arguments}");
 
+    // Register the signals before `configure` creates the first temporary
+    // artifact, so a signal can never find one that nothing cleans up.
+    let signals = intercept_supervisor::signals().context("cannot register signal handlers")?;
+
     // Run the application. Configuration is loaded per mode inside `configure`
     // (parse-sh consults none, so it loads none).
     let application = modes::Mode::configure(context, arguments)?;
     log::debug!("Configuration complete, running the build now...");
-    let result = application.run();
+    let result = application.run(signals);
     log::debug!("Exit code: {result:?}");
 
     Ok(result)

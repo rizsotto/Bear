@@ -19,6 +19,11 @@ const PRELOAD_NAME: &str = "libexec.dylib";
 const PRELOAD_NAME: &str = "libexec.so";
 
 fn main() {
+    // `supervise.rs` gates the core-dump step of `die_by` on `has_symbol_prctl`.
+    let detected = platform_checks::detect();
+    platform_checks::emit_cfg(&detected);
+    platform_checks::emit_check_cfg();
+
     // `src/installation.rs` resolves the runtime install layout from these
     // compile-time names via `env!()` (its tests also read `DRIVER_NAME`).
     // `INTERCEPT_LIBDIR` is validated here and forwarded the same way

@@ -637,6 +637,7 @@ dependencies = [
  "intercept",
  "libc",
  "log",
+ "platform-checks",
  "serde",
  "serde_json",
  "signal-hook",

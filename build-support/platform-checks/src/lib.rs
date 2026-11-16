@@ -31,6 +31,7 @@ const SYMBOL_PROBES: &[&str] = &[
     "_NSGetEnviron",
     "openpty",
     "login_tty",
+    "prctl",
 ];
 
 const HEADER_PROBES: &[&str] = &["crt_externs.h"];

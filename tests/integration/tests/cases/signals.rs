@@ -556,3 +556,74 @@ fn ctrl_c_at_the_terminal_ends_bear_and_the_build() -> Result<()> {
     assert!(!sut.success(), "Bear must not report success after Ctrl-C: {sut:?}");
     Ok(())
 }
+
+/// With no build running, a termination signal ends Bear by that signal and
+/// leaves no temporary file next to the output, which stays as it was.
+// Requirements: cli-signal-forwarding, output-atomic-write, cli-exit-codes
+#[test]
+#[cfg(target_family = "unix")]
+fn signal_without_a_build_removes_the_temp_file() -> Result<()> {
+    use crate::fixtures::infrastructure::signal_process;
+    use std::os::unix::process::{CommandExt, ExitStatusExt};
+    use std::time::Duration;
+
+    let cases: [(&str, &[&str]); 2] = [
+        ("semantic", &["semantic", "--output", "out.json"]),
+        ("parse_sh", &["parse-sh", "--output", "out.json"]),
+    ];
+    for (name, args) in cases {
+        let env = TestEnvironment::new(&format!("signal_without_build_{name}"))?;
+        let output = env.test_dir().join("out.json");
+        let known = "[]\n";
+        std::fs::write(&output, known)?;
+
+        // The test keeps the write end of stdin open, so Bear stays blocked reading it.
+        let mut child = env
+            .command_bear()
+            .current_dir(env.test_dir())
+            .args(args)
+            .process_group(0)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()?;
+        let stdin = child.stdin.take();
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        while !has_temp_file(env.test_dir()) {
+            assert!(std::time::Instant::now() < deadline, "{name}: the temp file never showed up");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        signal_process(&child, "TERM");
+        let sut = loop {
+            if let Some(status) = child.try_wait()? {
+                break status;
+            }
+            if std::time::Instant::now() >= deadline {
+                child.kill()?;
+                panic!("{name}: Bear did not stop after SIGTERM");
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        drop(stdin);
+
+        assert_eq!(sut.signal(), Some(libc::SIGTERM), "{name}: wait status {sut:?}");
+        assert_eq!(std::fs::read_to_string(&output)?, known, "{name}: the output changed");
+        assert!(!has_temp_file(env.test_dir()), "{name}: a temp file is left behind");
+    }
+    Ok(())
+}
+
+/// Whether the directory holds one of Bear's output temp files
+/// (`.{pid}.{random}.tmp`).
+#[cfg(target_family = "unix")]
+fn has_temp_file(dir: &std::path::Path) -> bool {
+    std::fs::read_dir(dir).is_ok_and(|entries| {
+        entries.flatten().any(|entry| {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            name.starts_with('.') && name.ends_with(".tmp")
+        })
+    })
+}

@@ -18,6 +18,9 @@ use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus};
 use thiserror::Error;
 
+#[cfg(unix)]
+pub use platform::die_by;
+
 /// This method supervises the execution of a command.
 ///
 /// It starts the command and waits for its completion. While waiting it
@@ -65,15 +68,44 @@ pub fn supervise<P: GroupPolicy>(
     policy.teardown(&mut child, signal)
 }
 
+/// The registered signals, as a blocking iterator. Every item that is not
+/// a termination signal means the child may have exited.
+pub struct SignalSource(Box<dyn Iterator<Item = c_int> + Send>);
+
+impl Iterator for SignalSource {
+    type Item = c_int;
+
+    fn next(&mut self) -> Option<c_int> {
+        self.0.next()
+    }
+}
+
 /// Registers the signals a supervision reacts to and returns them as a
-/// source for [`supervise`].
+/// source for [`supervise`] or [`abort_on_termination`].
 ///
-/// Call it once per process, before the first spawn: a signal that arrives
-/// after the registration waits in the source, so none is lost. The
-/// handlers stay installed for the life of the process. Every item that is
-/// not a termination signal means the child may have exited.
-pub fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+/// Call it once per process, before anything creates a temporary artifact:
+/// a signal that arrives after the registration waits in the source, so
+/// none is lost. The handlers stay installed for the life of the process.
+pub fn signals() -> std::io::Result<SignalSource> {
     platform::signals()
+}
+
+/// Starts the watcher thread for a process that runs no build: the first
+/// termination signal read from `signals` aborts the process.
+pub fn abort_on_termination(signals: impl Iterator<Item = c_int> + Send + 'static) {
+    std::thread::spawn(move || {
+        for signal in signals {
+            if signal_hook::consts::TERM_SIGNALS.contains(&signal) {
+                abort(signal);
+            }
+        }
+    });
+}
+
+/// Removes the tracked temporary artifacts, then ends the process by `signal`.
+pub fn abort(signal: c_int) -> ! {
+    crate::cleanup::remove_tracked();
+    platform::die(signal)
 }
 
 /// How a supervisor relates to the build's process group: it sets up the
@@ -166,7 +198,7 @@ impl Supervised {
 #[cfg(unix)]
 mod platform {
     use super::cgroup;
-    use super::{GroupPolicy, Inherit, Leader, SuperviseError, Supervised};
+    use super::{GroupPolicy, Inherit, Leader, SignalSource, SuperviseError, Supervised};
     use signal_hook::consts::signal::SIGCHLD;
     use signal_hook::iterator::Signals;
     use std::ffi::c_int;
@@ -187,11 +219,40 @@ mod platform {
     /// wakes when the build wants to be torn down or the child exits.
     /// signal-hook's self-pipe keeps a signal delivered after the
     /// registration until it is read.
-    pub(super) fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+    pub(super) fn signals() -> std::io::Result<SignalSource> {
         let mut watched = signal_hook::consts::TERM_SIGNALS.to_vec();
         watched.push(SIGCHLD);
         let mut signals = Signals::new(&watched)?;
-        Ok(std::iter::from_fn(move || signals.forever().next()))
+        Ok(SignalSource(Box::new(std::iter::from_fn(move || signals.forever().next()))))
+    }
+
+    pub(super) fn die(signal: c_int) -> ! {
+        die_by(signal)
+    }
+
+    /// Ends the process as if `signal` had its default action, with core
+    /// dumps off. Falls back to `128 + signal` when the signal cannot be
+    /// raised.
+    pub fn die_by(signal: c_int) -> ! {
+        disable_core_dumps();
+        let _ = signal_hook::low_level::emulate_default_handler(signal);
+        std::process::exit(128 + signal)
+    }
+
+    /// `setrlimit` alone leaves the core flag in the wait status when the
+    /// core pattern is a pipe, so `prctl` is used where it exists.
+    fn disable_core_dumps() {
+        // SAFETY: both calls take plain integers or a pointer to a local
+        // that outlives the call, and only lower this process's own limits.
+        #[cfg(has_symbol_prctl)]
+        unsafe {
+            libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0);
+        }
+        #[cfg(not(has_symbol_prctl))]
+        unsafe {
+            let limit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+            libc::setrlimit(libc::RLIMIT_CORE, &limit);
+        }
     }
 
     impl GroupPolicy for Leader {
@@ -327,7 +388,7 @@ mod platform {
 
 #[cfg(not(unix))]
 mod platform {
-    use super::{GroupPolicy, Inherit, Leader, SuperviseError, Supervised};
+    use super::{GroupPolicy, Inherit, Leader, SignalSource, SuperviseError, Supervised};
     use std::ffi::c_int;
     use std::process::{Command, ExitStatus};
     use std::sync::Arc;
@@ -342,15 +403,22 @@ mod platform {
     /// A termination signal is recorded in a flag. The source sleeps one
     /// `POLL`, then yields the recorded signal, or `0` when none arrived,
     /// which the wait reads as "check the child".
-    pub(super) fn signals() -> std::io::Result<impl Iterator<Item = c_int>> {
+    pub(super) fn signals() -> std::io::Result<SignalSource> {
         let signaled = Arc::new(AtomicUsize::new(0));
         for signal in signal_hook::consts::TERM_SIGNALS {
             signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)?;
         }
-        Ok(std::iter::from_fn(move || {
+        Ok(SignalSource(Box::new(std::iter::from_fn(move || {
             thread::sleep(POLL);
             Some(signaled.swap(0, Ordering::SeqCst) as c_int)
-        }))
+        }))))
+    }
+
+    /// What a console program stopped by Ctrl-C returns.
+    const STATUS_CONTROL_C_EXIT: u32 = 0xC000013A;
+
+    pub(super) fn die(_signal: c_int) -> ! {
+        std::process::exit(STATUS_CONTROL_C_EXIT as i32)
     }
 
     impl GroupPolicy for Leader {

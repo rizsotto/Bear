@@ -11,8 +11,8 @@ mod execution;
 use crate::args::is_stdio;
 use crate::environment;
 use crate::{args, config, output};
-use intercept_supervisor::CollectorOnTcp;
 use intercept_supervisor::context;
+use intercept_supervisor::{CollectorOnTcp, SignalSource, abort_on_termination};
 use semantic::SpellingError;
 use semantic::{CompilerHints, CompilerRecognizer};
 use std::process::ExitCode;
@@ -179,16 +179,15 @@ impl Mode {
     /// source (event file or shell text) in replay mode. All errors returned
     /// are runtime errors that occur after valid arguments and configuration
     /// have been provided.
-    pub fn run(self) -> ExitCode {
+    pub fn run(self, mut signals: SignalSource) -> ExitCode {
         let status = match self {
-            // Only the modes that run a build register the signals: in the
-            // others nobody would read them, so a signal would be ignored.
-            Self::Intercept(interceptor, command) => match intercept_supervisor::signals() {
-                Ok(mut signals) => interceptor.run(command, &mut signals),
-                Err(error) => Err(execution::RuntimeError::SignalRegistration(error)),
-            },
-            Self::Replay(replayer) => replayer.run(),
+            Self::Intercept(interceptor, command) => interceptor.run(command, &mut signals),
+            Self::Replay(replayer) => {
+                abort_on_termination(signals);
+                replayer.run()
+            }
             Self::PrintCompilers => {
+                abort_on_termination(signals);
                 print!(
                     "Bear {} recognizes the following compilers:\n\n{}",
                     env!("CARGO_PKG_VERSION"),
