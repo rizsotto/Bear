@@ -639,3 +639,99 @@ fn failed_build_without_a_signal_publishes() -> Result<()> {
     }
     Ok(())
 }
+
+/// A signal that is ignored when Bear starts stays ignored for the build,
+/// as with a script that starts Bear with `&`. A shell cannot trap a signal
+/// that was ignored when it started, so the marker says `survived`.
+// Requirements: cli-signal-forwarding
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_executable_shell)]
+fn ignored_signal_stays_ignored_in_the_build() -> Result<()> {
+    use std::os::unix::process::CommandExt;
+
+    let env = TestEnvironment::new("ignored_signal_stays_ignored")?;
+    let marker = env.test_dir().join("marker");
+    let script = format!(
+        "trap 'echo trapped > {m}; exit 3' INT; kill -INT $$; echo survived > {m}",
+        m = marker.display()
+    );
+    let mut command = env.command_bear();
+    // SAFETY: runs in the child between fork and exec, and calls only
+    // `signal`, which is async-signal-safe. It runs after the harness reset.
+    unsafe {
+        command.pre_exec(|| {
+            libc::signal(libc::SIGINT, libc::SIG_IGN);
+            Ok(())
+        });
+    }
+
+    let sut = command
+        .current_dir(env.test_dir())
+        .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
+        .stdin(Stdio::null())
+        .output()?;
+
+    assert_eq!(
+        std::fs::read_to_string(&marker)?.trim(),
+        "survived",
+        "stderr:\n{}",
+        String::from_utf8_lossy(&sut.stderr)
+    );
+    Ok(())
+}
+
+/// SIGHUP is a termination signal: Bear relays it, the build's trap runs and
+/// its exit code passes through, and the wrapper directory is removed.
+// Requirements: cli-signal-forwarding, interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_shell, has_executable_sleep))]
+fn hangup_runs_the_build_trap_and_cleans_up() -> Result<()> {
+    use crate::fixtures::infrastructure::signal_group;
+
+    let env = TestEnvironment::new("hangup_runs_the_build_trap")?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, "schema: \"4.2\"\n\nintercept:\n  mode: wrapper\n")?;
+    let marker = env.test_dir().join("marker");
+    let ready = env.test_dir().join("ready");
+    let script = format!(
+        "trap 'kill $!; echo trapped > {m}; exit 7' HUP; {sleep} 60 & echo ready > {r}; wait",
+        m = marker.display(),
+        r = ready.display(),
+        sleep = SLEEP_PATH
+    );
+    let mut child = env.spawn_bear_in_group_with_stderr(
+        &[
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            "-c",
+            &script,
+        ],
+        Stdio::null(),
+    )?;
+
+    wait_for_file(&ready);
+    assert!(env.test_dir().join(".bear").is_dir(), "the wrapper mechanism is not active");
+    signal_group(&child, "HUP");
+    let deadline = Instant::now() + std::time::Duration::from_secs(30);
+    let sut = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill()?;
+            panic!("Bear did not end after SIGHUP");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
+
+    assert_eq!(std::fs::read_to_string(&marker).unwrap_or_default().trim(), "trapped");
+    assert_eq!(sut.code(), Some(7), "{sut:?}");
+    assert!(!env.test_dir().join(".bear").exists(), ".bear is left behind");
+    Ok(())
+}

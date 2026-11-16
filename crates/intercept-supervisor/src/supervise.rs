@@ -60,7 +60,7 @@ pub fn supervise<P: GroupPolicy>(
     let mut interrupted = false;
     loop {
         match signals.next() {
-            Some(signal) if signal_hook::consts::TERM_SIGNALS.contains(&signal) => {
+            Some(signal) if is_termination(signal) => {
                 interrupted = true;
                 policy.relay(&child, signal);
             }
@@ -103,11 +103,18 @@ pub fn signals() -> std::io::Result<SignalSource> {
 pub fn abort_on_termination(signals: impl Iterator<Item = c_int> + Send + 'static) {
     std::thread::spawn(move || {
         for signal in signals {
-            if signal_hook::consts::TERM_SIGNALS.contains(&signal) {
+            if is_termination(signal) {
                 abort(signal);
             }
         }
     });
+}
+
+/// Whether `signal` is one the build or the watcher reacts to: `SIGHUP`,
+/// `SIGINT`, `SIGQUIT` and `SIGTERM` on Unix, `SIGINT` and `SIGTERM` on
+/// Windows.
+fn is_termination(signal: c_int) -> bool {
+    platform::TERMINATION.contains(&signal)
 }
 
 /// Removes the tracked temporary artifacts, then ends the process by `signal`.
@@ -199,21 +206,35 @@ impl Supervised {
 #[cfg(unix)]
 mod platform {
     use super::{GroupPolicy, Inherit, Leader, SignalSource, Supervised};
-    use signal_hook::consts::signal::SIGCHLD;
+    use signal_hook::consts::signal::{SIGCHLD, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
     use signal_hook::iterator::Signals;
     use std::ffi::c_int;
     use std::os::unix::process::ExitStatusExt;
     use std::process::{Command, ExitStatus};
 
-    /// The termination signals plus `SIGCHLD`, so a wait on the source
-    /// wakes on a termination signal to relay or when the child exits.
-    /// signal-hook's self-pipe keeps a signal delivered after the
-    /// registration until it is read.
+    pub(super) const TERMINATION: [c_int; 4] = [SIGHUP, SIGINT, SIGQUIT, SIGTERM];
+
+    /// The termination signals that are not ignored at entry, plus
+    /// `SIGCHLD`, so a wait on the source wakes on a termination signal to
+    /// relay or when the child exits. A signal that is ignored at entry is
+    /// left alone, so it stays ignored in the build too. signal-hook's
+    /// self-pipe keeps a signal delivered after the registration until it
+    /// is read.
     pub(super) fn signals() -> std::io::Result<SignalSource> {
-        let mut watched = signal_hook::consts::TERM_SIGNALS.to_vec();
+        let mut watched: Vec<c_int> =
+            TERMINATION.into_iter().filter(|signal| !ignored_at_entry(*signal)).collect();
         watched.push(SIGCHLD);
         let mut signals = Signals::new(&watched)?;
         Ok(SignalSource(Box::new(std::iter::from_fn(move || signals.forever().next()))))
+    }
+
+    fn ignored_at_entry(signal: c_int) -> bool {
+        // SAFETY: with a null new action, `sigaction` only writes the
+        // current action into `old`, a zeroed local that outlives the call.
+        unsafe {
+            let mut old: libc::sigaction = std::mem::zeroed();
+            libc::sigaction(signal, std::ptr::null(), &mut old) == 0 && old.sa_sigaction == libc::SIG_IGN
+        }
     }
 
     pub(super) fn die(signal: c_int) -> ! {
@@ -324,6 +345,8 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
+    pub(super) const TERMINATION: [c_int; 2] = [signal_hook::consts::SIGINT, signal_hook::consts::SIGTERM];
+
     /// There is no `SIGCHLD` to wake the wait when the child exits, so the
     /// source wakes it on this interval instead.
     const POLL: Duration = Duration::from_millis(100);
@@ -333,8 +356,8 @@ mod platform {
     /// which the wait reads as "check the child".
     pub(super) fn signals() -> std::io::Result<SignalSource> {
         let signaled = Arc::new(AtomicUsize::new(0));
-        for signal in signal_hook::consts::TERM_SIGNALS {
-            signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)?;
+        for signal in TERMINATION {
+            signal_hook::flag::register_usize(signal, Arc::clone(&signaled), signal as usize)?;
         }
         Ok(SignalSource(Box::new(std::iter::from_fn(move || {
             thread::sleep(POLL);
