@@ -36,6 +36,10 @@ const SYMBOL_PROBES: &[&str] = &[
 
 const HEADER_PROBES: &[&str] = &["crt_externs.h"];
 
+/// Macros to probe, as (macro, header that should define it). The key is
+/// `has_macro_` plus the macro name.
+const MACRO_PROBES: &[(&str, &str)] = &[("SI_KERNEL", "signal.h")];
+
 /// Feature macros that autoconf's `AC_USE_SYSTEM_EXTENSIONS` defines
 /// unconditionally on every system, as (name, value). Consumers pass them to
 /// the C compiler so their C sources need no `#define` of their own.
@@ -63,6 +67,7 @@ pub const SYSTEM_EXTENSIONS: &[(&str, &str)] = &[
 pub struct Detected {
     pub symbols: Vec<&'static str>,
     pub headers: Vec<&'static str>,
+    pub macros: Vec<&'static str>,
 }
 
 /// Probe the target C toolchain and return the symbols and headers it
@@ -76,7 +81,7 @@ pub fn detect() -> Detected {
 
     let family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_default();
     if !family.split(',').any(|f| f == "unix") {
-        return Detected { symbols: Vec::new(), headers: Vec::new() };
+        return Detected { symbols: Vec::new(), headers: Vec::new(), macros: Vec::new() };
     }
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
@@ -103,10 +108,15 @@ pub fn detect() -> Detected {
         .copied()
         .filter(|header| check_header_exists(header, probe_dir.path()).is_ok())
         .collect();
-    Detected { symbols, headers }
+    let macros: Vec<&'static str> = MACRO_PROBES
+        .iter()
+        .filter(|(name, header)| check_macro_defined(name, header, probe_dir.path()).is_ok())
+        .map(|(name, _)| *name)
+        .collect();
+    Detected { symbols, headers, macros }
 }
 
-/// Emit `cargo:rustc-cfg=has_symbol_*` and `has_header_*` directives
+/// Emit `cargo:rustc-cfg=has_symbol_*`, `has_header_*` and `has_macro_*` directives
 /// for everything detected. Call this from a
 /// consumer's `build.rs` so the directives apply to that crate.
 pub fn emit_cfg(detected: &Detected) {
@@ -115,6 +125,9 @@ pub fn emit_cfg(detected: &Detected) {
     }
     for header in &detected.headers {
         println!("cargo:rustc-cfg={}", header_cfg_name(header));
+    }
+    for name in &detected.macros {
+        println!("cargo:rustc-cfg=has_macro_{name}");
     }
 }
 
@@ -127,6 +140,9 @@ pub fn emit_check_cfg() {
     }
     for header in HEADER_PROBES {
         println!("cargo:rustc-check-cfg=cfg({})", header_cfg_name(header));
+    }
+    for (name, _) in MACRO_PROBES {
+        println!("cargo:rustc-check-cfg=cfg(has_macro_{name})");
     }
 }
 
@@ -187,6 +203,24 @@ fn check_header_exists(header: &str, probe_dir: &Path) -> Result<(), String> {
     let result = run_probe(&name, &check_code, probe_dir, false);
     let outcome = if result.is_ok() { "found" } else { "missing" };
     println!("cargo:warning=Checking for header: {header} ... {outcome}");
+    result
+}
+
+/// Compile a source that fails unless the header defines the macro.
+fn check_macro_defined(name: &str, header: &str, probe_dir: &Path) -> Result<(), String> {
+    let check_code = format!(
+        r#"
+        #include <{header}>
+        #ifndef {name}
+        #error {name} is not defined
+        #endif
+        int main(void) {{ return 0; }}
+        "#
+    );
+
+    let result = run_probe(&format!("check_macro_{name}"), &check_code, probe_dir, false);
+    let outcome = if result.is_ok() { "found" } else { "missing" };
+    println!("cargo:warning=Checking for macro: {name} ... {outcome}");
     result
 }
 

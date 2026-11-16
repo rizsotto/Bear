@@ -2,8 +2,8 @@
 
 Build-time helper library. Each consumer calls it from its own
 `build.rs`, and it probes the C toolchain of that consumer's target for
-symbols. Probes run once per consumer. The probe list and the API are in
-`src/lib.rs`. `SYSTEM_EXTENSIONS` there is the feature-macro list
+symbols, headers and macros. Probes run once per consumer. The probe
+list and the API are in `src/lib.rs`. `SYSTEM_EXTENSIONS` there is the feature-macro list
 for probes and consumer C sources.
 
 ## Constraints
@@ -25,6 +25,9 @@ for probes and consumer C sources.
    `#include` and the key is `has_header_` plus the name with every
    non-alphanumeric character as `_` (`crt_externs.h` is
    `has_header_crt_externs_h`).
+   For a C macro, add `(macro, header)` to `MACRO_PROBES`; the probe compiles
+   an `#include` and fails on `#ifndef`, and the key is `has_macro_` plus the
+   macro name (`SI_KERNEL` is `has_macro_SI_KERNEL`).
 2. Reference the resulting `cfg(has_symbol_X)` from consumer source.
 3. Provided the consumer's `build.rs` calls
    `platform_checks::emit_check_cfg()`, the lint allowlist is covered

@@ -473,7 +473,10 @@ fn relayed_as_other(output: &str) -> bool {
 
 /// Ctrl-C reaches the build from the terminal. Bear does not relay it a
 /// second time. The check is on Bear's debug log, not on the count of trap
-/// runs: two pending `SIGINT` merge into one.
+/// runs: two pending `SIGINT` merge into one. Where signal-hook reports a
+/// kernel cause (`SI_KERNEL` is defined), Bear must skip the signal and log
+/// no relay at all. Elsewhere it may skip or relay it as `other`, never as
+/// `kernel`.
 // Requirements: cli-signal-forwarding
 #[test]
 #[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
@@ -489,6 +492,14 @@ fn ctrl_c_at_the_terminal_is_not_relayed_again() -> Result<()> {
 
     assert!(log.contains('x'), "the trap did not run; output:\n{output}");
     assert!(!output.contains("(cause: kernel)"), "a kernel signal was relayed; output:\n{output}");
+    #[cfg(has_macro_SI_KERNEL)]
+    {
+        assert!(
+            output.contains("skipped SIGINT, the child got it from the terminal"),
+            "the terminal signal was not skipped; output:\n{output}"
+        );
+        assert!(!output.contains("relayed SIGINT"), "the terminal signal was relayed; output:\n{output}");
+    }
     let skipped = output.contains("skipped SIGINT, the child got it from the terminal");
     let relayed = relayed_as_other(&output);
     assert!(skipped || relayed, "no decision line; output:\n{output}");
