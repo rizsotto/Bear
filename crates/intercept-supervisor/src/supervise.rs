@@ -11,6 +11,7 @@
 //! source to every supervision. On Unix the source blocks on `SIGCHLD` and
 //! the termination signals; on Windows it polls, and nothing is relayed.
 
+use std::collections::VecDeque;
 use std::ffi::c_int;
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus};
@@ -82,23 +83,42 @@ pub fn supervise(
 
 /// The registered signals, as a blocking iterator. Every item that is not
 /// a termination signal means the child may have exited.
-pub struct SignalSource(platform::Inner);
+///
+/// The first item is read only after [`supervise`] has spawned the child.
+/// Signals queued by then come first and are marked as not from the
+/// kernel: a terminal key that arrived before the child existed never
+/// reached it, so it must be relayed. A key that lands in the instant of
+/// the spawn may reach the child twice.
+pub struct SignalSource {
+    inner: platform::Inner,
+    queued: Option<VecDeque<Received>>,
+}
 
 impl Iterator for SignalSource {
     type Item = Received;
 
     fn next(&mut self) -> Option<Received> {
-        platform::next(&mut self.0)
+        let inner = &mut self.inner;
+        let queued = self.queued.get_or_insert_with(|| queued(platform::pending(inner)).into());
+        queued.pop_front().or_else(|| platform::next(inner))
     }
 }
 
 impl SignalSource {
     /// Without blocking, a termination signal that arrived since the
     /// registration, if any. Every other signal read here is dropped: on Unix
-    /// those are `SIGCHLD`, which nothing waits on yet.
+    /// those are `SIGCHLD`, which nothing waits on yet. A signal read here is
+    /// consumed, so the caller must act on it.
     pub fn pending_termination(&mut self) -> Option<c_int> {
-        first_termination(&platform::pending(&mut self.0))
+        first_termination(&platform::pending(&mut self.inner))
     }
+}
+
+/// Signals found queued as `supervise` starts reading, as [`Received`].
+/// None is from the kernel: the child did not exist when it arrived, so
+/// the terminal did not give it a copy.
+fn queued(signals: Vec<c_int>) -> Vec<Received> {
+    signals.into_iter().map(|signal| Received { signal, from_kernel: false }).collect()
 }
 
 /// The first termination signal in `signals`.
@@ -226,7 +246,7 @@ mod platform {
         let mut watched: Vec<c_int> =
             TERMINATION.into_iter().filter(|signal| !ignored_at_entry(*signal)).collect();
         watched.push(SIGCHLD);
-        Ok(SignalSource(SignalsInfo::<WithOrigin>::new(&watched)?))
+        Ok(SignalSource { inner: SignalsInfo::<WithOrigin>::new(&watched)?, queued: None })
     }
 
     pub(super) fn next(signals: &mut Inner) -> Option<Received> {
@@ -369,7 +389,7 @@ mod platform {
         for signal in TERMINATION {
             signal_hook::flag::register_usize(signal, Arc::clone(&signaled), signal as usize)?;
         }
-        Ok(SignalSource(signaled))
+        Ok(SignalSource { inner: signaled, queued: None })
     }
 
     pub(super) fn next(signaled: &mut Inner) -> Option<Received> {
@@ -411,6 +431,22 @@ mod tests {
     use super::*;
     use fixture::{shell, shell_in_own_group};
     use std::os::unix::process::ExitStatusExt;
+
+    #[test]
+    fn queued_signals_are_never_from_the_kernel() {
+        // arrange / act / assert per case: what was queued, in order
+        let cases: [&[c_int]; 3] = [&[libc::SIGINT], &[libc::SIGCHLD, libc::SIGQUIT, libc::SIGTERM], &[]];
+        for signals in cases {
+            let sut = queued(signals.to_vec());
+
+            let expected: Vec<Received> =
+                signals.iter().map(|signal| Received { signal: *signal, from_kernel: false }).collect();
+            assert_eq!(sut, expected, "signals: {signals:?}");
+            for received in sut {
+                assert!(relays(received.signal, received.from_kernel, true), "{received:?} is skipped");
+            }
+        }
+    }
 
     #[test]
     fn first_termination_picks_the_first_termination_signal() {
