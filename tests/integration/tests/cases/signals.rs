@@ -820,7 +820,7 @@ fn ignored_signal_stays_ignored_in_the_build() -> Result<()> {
     let sut = command
         .current_dir(env.test_dir())
         .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
-        .stdin(Stdio::null())
+        .stdin(std::process::Stdio::null())
         .output()?;
 
     assert_eq!(
@@ -884,5 +884,172 @@ fn hangup_runs_the_build_trap_and_cleans_up() -> Result<()> {
     assert_eq!(std::fs::read_to_string(&marker).unwrap_or_default().trim(), "trapped");
     assert_eq!(sut.code(), Some(7), "{sut:?}");
     assert!(!env.test_dir().join(".bear").exists(), ".bear is left behind");
+    Ok(())
+}
+
+/// Ctrl-Z at a job-control shell stops Bear and the build together, and `fg`
+/// continues both. A stop only works under a job-control shell, so the
+/// terminal runs `bash` with `set -m`. The script reads the states with `ps`
+/// while both are stopped.
+// Requirements: cli-signal-forwarding
+#[test]
+#[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
+#[cfg(all(has_executable_shell, has_executable_bash, has_executable_ps, has_executable_sleep))]
+fn ctrl_z_at_the_terminal_stops_and_continues_bear_and_the_build() -> Result<()> {
+    use crate::fixtures::infrastructure::Terminal;
+    use std::time::Duration;
+
+    let env = TestEnvironment::new("ctrl_z_at_the_terminal")?;
+    let dir = env.test_dir();
+    let (build_pid, bear_pid, marker) = (dir.join("build.pid"), dir.join("bear.pid"), dir.join("marker"));
+    let build = env.create_shell_script(
+        "build.sh",
+        &format!(
+            "echo $$ > {b}\necho $PPID > {p}\necho build-ready\nread line\necho done > {m}\n",
+            b = build_pid.display(),
+            p = bear_pid.display(),
+            m = marker.display()
+        ),
+    )?;
+    let state_of = |file: &std::path::Path| {
+        format!(
+            "for ((i=0; i<300; i++)); do s=$({ps} -o state= -p $(cat {f})); s=${{s// /}}; s=${{s:0:1}}; \
+             case $s in T) break;; esac; {sleep} 0.1; done; echo -n $s",
+            ps = PS_PATH,
+            sleep = SLEEP_PATH,
+            f = file.display()
+        )
+    };
+    let script = format!(
+        "set -m\n{bear} --output compile_commands.json -- {shell} {build}\n\
+         echo \"states build:$({build_state}) bear:$({bear_state}) end\"\nfg\n",
+        bear = env.bear_path().display(),
+        shell = SHELL_PATH,
+        build = build.display(),
+        build_state = state_of(&build_pid),
+        bear_state = state_of(&bear_pid),
+    );
+    let mut cmd = std::process::Command::new(BASH_PATH);
+    crate::fixtures::infrastructure::reset_signals(&mut cmd);
+    cmd.current_dir(dir)
+        .env("XDG_CONFIG_HOME", env.user_config_dir())
+        .env_remove("RUST_LOG")
+        .args(["-c", &script]);
+    let Some(mut terminal) = Terminal::spawn_or_skip(cmd)? else {
+        return Ok(());
+    };
+    terminal.wait_for("build-ready", Duration::from_secs(30))?;
+
+    terminal.type_bytes(&[0x1a])?;
+    terminal.wait_for("states build:", Duration::from_secs(60))?;
+    terminal.wait_for(" end", Duration::from_secs(60))?;
+    assert!(
+        terminal.output().contains("states build:T bear:T end"),
+        "Bear and the build must both be stopped; output:\n{}",
+        terminal.output()
+    );
+    assert!(!marker.exists(), "the build ran on while stopped");
+
+    terminal.type_bytes(b"\n")?;
+    let sut = terminal.wait()?;
+
+    assert!(sut.success(), "Bear must end like the build after fg: {sut:?}\n{}", terminal.output());
+    assert!(marker.exists(), "the build did not finish after fg; output:\n{}", terminal.output());
+    assert!(dir.join("compile_commands.json").is_file(), "the output was not published");
+    assert!(!has_temp_file(dir), "a temp file is left behind");
+    Ok(())
+}
+
+/// A closed terminal hangs up the session. Bear is the session leader, so
+/// the kernel signals only Bear: it must relay SIGHUP. The build's trap
+/// runs, its exit code passes through, and nothing is left behind. The logger
+/// must also survive a dead stderr.
+// Requirements: cli-signal-forwarding, interception-wrapper-mechanism, output-atomic-write
+#[test]
+#[cfg(all(unix, has_symbol_openpty, has_symbol_login_tty))]
+#[cfg(all(has_executable_shell, has_executable_sleep))]
+fn hang_up_at_the_terminal_runs_the_build_trap_and_cleans_up() -> Result<()> {
+    use crate::fixtures::infrastructure::Terminal;
+
+    let env = TestEnvironment::new("hang_up_at_the_terminal")?;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, "schema: \"4.2\"\n\nintercept:\n  mode: wrapper\n")?;
+    let marker = env.test_dir().join("marker");
+    let ready = env.test_dir().join("ready");
+    let script = format!(
+        "trap 'kill $!; echo trapped > {m}; exit 7' HUP; {sleep} 60 & echo ready > {r}; wait",
+        m = marker.display(),
+        r = ready.display(),
+        sleep = SLEEP_PATH
+    );
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir()).env_remove("RUST_LOG").args([
+        "--config",
+        config_path.to_str().unwrap(),
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        "-c",
+        &script,
+    ]);
+    let Some(mut terminal) = Terminal::spawn_or_skip(cmd)? else {
+        return Ok(());
+    };
+    wait_for_file(&ready);
+    assert!(env.test_dir().join(".bear").is_dir(), "the wrapper mechanism is not active");
+
+    terminal.hang_up();
+    let sut = terminal.wait()?;
+
+    assert_eq!(std::fs::read_to_string(&marker).unwrap_or_default().trim(), "trapped");
+    assert_eq!(sut.code(), Some(7), "{sut:?}");
+    assert!(!env.test_dir().join(".bear").exists(), ".bear is left behind");
+    assert!(!has_temp_file(env.test_dir()), "a temp file is left behind");
+    Ok(())
+}
+
+/// `bear -- build &` in a script: the shell has no job control, so it starts
+/// the background job with SIGINT ignored. Bear keeps that for the build,
+/// as without Bear, so the marker says `survived`.
+// Requirements: cli-signal-forwarding
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_executable_shell)]
+fn background_from_a_script_keeps_sigint_ignored() -> Result<()> {
+    let env = TestEnvironment::new("background_from_a_script")?;
+    let marker = env.test_dir().join("marker");
+    let build = env.create_shell_script(
+        "build.sh",
+        &format!(
+            "trap 'echo trapped > {m}; exit 3' INT; kill -INT $$; echo survived > {m}\n",
+            m = marker.display()
+        ),
+    )?;
+    let script = format!(
+        "{bear} --output compile_commands.json -- {shell} {build} & wait $!",
+        bear = env.bear_path().display(),
+        shell = SHELL_PATH,
+        build = build.display()
+    );
+
+    let mut command = std::process::Command::new(SHELL_PATH);
+    crate::fixtures::infrastructure::reset_signals(&mut command);
+    let sut = command
+        .current_dir(env.test_dir())
+        .env("XDG_CONFIG_HOME", env.user_config_dir())
+        .env_remove("RUST_LOG")
+        .args(["-c", &script])
+        .stdin(std::process::Stdio::null())
+        .output()?;
+
+    assert_eq!(
+        std::fs::read_to_string(&marker).unwrap_or_default().trim(),
+        "survived",
+        "stderr:\n{}",
+        String::from_utf8_lossy(&sut.stderr)
+    );
+    assert!(sut.status.success(), "{:?}\nstderr:\n{}", sut.status, String::from_utf8_lossy(&sut.stderr));
+    assert!(env.test_dir().join("compile_commands.json").is_file(), "the output was not published");
     Ok(())
 }

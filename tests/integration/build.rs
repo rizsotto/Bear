@@ -89,6 +89,8 @@ fn main() {
     check_executable_exists("valgrind");
     check_executable_exists("ar");
     check_executable_exists("env");
+    check_executable_exists("bash");
+    check_executable_exists("ps");
 
     // Check for preload library availability
     check_preload_library_availability(&preload_path);

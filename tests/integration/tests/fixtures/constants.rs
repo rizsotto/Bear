@@ -17,6 +17,10 @@ pub const FALSE_PATH: &str = env!("FALSE_PATH");
 pub const ECHO_PATH: &str = env!("ECHO_PATH");
 #[cfg(has_executable_sleep)]
 pub const SLEEP_PATH: &str = env!("SLEEP_PATH");
+#[cfg(has_executable_bash)]
+pub const BASH_PATH: &str = env!("BASH_PATH");
+#[cfg(has_executable_ps)]
+pub const PS_PATH: &str = env!("PS_PATH");
 #[cfg(has_executable_shell)]
 pub const SHELL_PATH: &str = env!("SHELL_PATH");
 #[cfg(has_executable_make)]
