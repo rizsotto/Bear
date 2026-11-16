@@ -357,7 +357,7 @@ impl BuildEnvironment {
             command.env(key, value);
         }
 
-        supervise::supervise::<supervise::Leader>(&mut command, signals)
+        supervise::supervise(&mut command, signals)
     }
 }
 

@@ -24,12 +24,14 @@ same variable and default and rejects an empty or absolute value. It does
 not trim before the absolute check and has no `$LIB` case. Keep the two
 in step. The user-facing side is in `INSTALL.md`.
 
-## Process-group nesting
+## The build stays in Bear's process group
 
-Supervision chains nest in wrapper mode, so only the outermost
-supervisor creates a process group (`Leader` policy in
-`supervise.rs`); nested ones `Inherit`. Governed by requirement
-`cli-signal-forwarding`; rationale in
+Never call `process_group(0)` or `setsid` on the build, at any nesting
+level. The terminal's job control works per process group, so a build
+in its own group cannot read the terminal and Ctrl-Z misses it. Bear
+relays to the direct child only (`relays` in `supervise.rs`). Governed
+by requirement `cli-signal-forwarding`; rationale in
+`docs/rationale/process-tree-teardown.md` and
 `docs/rationale/supervise-a-compiler-call.md`.
 
 ## Wrapper directory

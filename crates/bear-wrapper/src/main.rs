@@ -18,7 +18,7 @@
 use anyhow::{Context, Result, bail};
 use intercept::Execution;
 use intercept::reporter::{Reporter, ReporterFactory};
-use intercept_supervisor::supervise::{Inherit, exit_like, signals, supervise};
+use intercept_supervisor::supervise::{exit_like, signals, supervise};
 use intercept_supervisor::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 
 /// Implementation of the wrapper process.
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 
     // Execute the real executable with the same arguments
     let mut command = command_from_execution(real_execution)?;
-    let exit_status = supervise::<Inherit>(&mut command, signals)?.status;
+    let exit_status = supervise(&mut command, signals)?.status;
     exit_like(exit_status)
 }
 

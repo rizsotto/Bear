@@ -255,11 +255,11 @@ mod unix {
             // spawns. Without this, SIGKILL on a `#!/bin/sh ; sleep 30` script
             // would kill sh but leave sleep holding the stdout/stderr pipes
             // open, blocking wait_with_output() for the script's full runtime.
-            // Use setsid, not the safe process_group(0) the build supervisor
-            // uses. process_group(0) leaves the probe a background group in
-            // the caller's terminal session, and under the parallel probe
-            // tests it gave intermittent misclassification (3 of 8 runs
-            // failed, against 0 of 13 with setsid).
+            // Use setsid, not the safe process_group(0). process_group(0)
+            // leaves the probe a background group in the caller's terminal
+            // session, and under the parallel probe tests it gave
+            // intermittent misclassification (3 of 8 runs failed, against 0
+            // of 13 with setsid).
             // SAFETY: the closure runs in the forked child before exec. It
             // calls only setsid(), which is async-signal-safe, and builds an
             // io::Error from errno without allocating. It touches no locks or
