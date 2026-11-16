@@ -150,15 +150,21 @@ impl Interceptor {
     /// # Arguments
     /// * `command` - The build command to execute with interception
     /// * `signals` - The process's signal source, forwarded to the build
+    /// * `after_build` - Takes the signal source back as soon as the build
+    ///   has ended, before the output is committed
     ///
     /// # Returns
     /// * `Ok(ExitCode::SUCCESS)` - All operations completed successfully
     /// * `Err(RuntimeError)` - An error occurred in any component
-    pub fn run(
+    pub fn run<S>(
         self,
         command: BuildCommand,
-        signals: &mut dyn Iterator<Item = c_int>,
-    ) -> Result<ExitCode, RuntimeError> {
+        mut signals: S,
+        after_build: impl FnOnce(S),
+    ) -> Result<ExitCode, RuntimeError>
+    where
+        S: Iterator<Item = c_int>,
+    {
         let (sender, receiver) = sync_channel::<intercept::Execution>(INTERCEPT_CHANNEL_CAPACITY);
 
         // Inject the initial command as the first execution
@@ -174,7 +180,8 @@ impl Interceptor {
             std::thread::spawn(move || consumer.consume(receiver))
         };
 
-        let build_result = self.build.run(command, signals);
+        let build_result = self.build.run(command, &mut signals);
+        after_build(signals);
 
         // Stop the interception whatever the build did, so both threads
         // finish and the output can be committed or rolled back. A failed
@@ -280,6 +287,7 @@ mod tests {
     use crate::output::{SerializationError, WriterError};
     use intercept::Execution;
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
@@ -551,7 +559,7 @@ mod tests {
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in interceptor happy path test"));
@@ -587,7 +595,7 @@ mod tests {
         });
 
         let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Executor(_)));
@@ -613,7 +621,7 @@ mod tests {
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
@@ -638,7 +646,7 @@ mod tests {
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Consumer(_)));
@@ -665,7 +673,7 @@ mod tests {
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), RuntimeError::Producer(_)));
@@ -691,7 +699,7 @@ mod tests {
         executor_mock.expect_run().times(1).returning(|_, _| Ok(create_failure_exit_status()));
 
         let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
         assert_is_failure(result.expect("Failed to get result in non-zero exit code test"));
@@ -727,7 +735,7 @@ mod tests {
 
         let interceptor =
             Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
-        let result = interceptor.run(create_test_command(), &mut std::iter::empty());
+        let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in coordination timing test"));
@@ -822,7 +830,7 @@ mod tests {
         });
 
         let sut = Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock))
-            .run(create_test_command(), &mut std::iter::empty());
+            .run(create_test_command(), std::iter::empty(), drop);
 
         assert!(matches!(sut, Err(RuntimeError::Executor(_))));
         assert_eq!(producer_mock.cancel_call_count(), 1);
@@ -839,12 +847,46 @@ mod tests {
         let mut executor_mock = MockExecutor::new();
         executor_mock.expect_run().times(1).returning(|_, _| Ok(create_failure_exit_status()));
 
-        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock))
-            .run(create_test_command(), &mut std::iter::empty());
+        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock)).run(
+            create_test_command(),
+            std::iter::empty(),
+            drop,
+        );
 
         assert_is_failure(sut.expect("a failing build is not an error of Bear"));
         assert!(final_path.exists());
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "only the output may remain");
+    }
+
+    // Requirements: cli-signal-forwarding
+    #[test]
+    fn test_interceptor_hook_runs_after_build_and_before_commit() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
+        let consumer_mock = consumer_with_pending_output(&final_path);
+        let build_done = Arc::new(AtomicBool::new(false));
+        let build_done_in_executor = Arc::clone(&build_done);
+        let mut executor_mock = MockExecutor::new();
+        executor_mock.expect_run().times(1).returning(move |_, _| {
+            build_done_in_executor.store(true, Ordering::SeqCst);
+            Ok(create_success_exit_status())
+        });
+
+        let mut hook_ran = false;
+        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock)).run(
+            create_test_command(),
+            std::iter::empty(),
+            |_| {
+                hook_ran = true;
+                assert!(build_done.load(Ordering::SeqCst), "the build must have ended");
+                assert!(!final_path.exists(), "the output must not be committed yet");
+            },
+        );
+
+        assert!(sut.is_ok());
+        assert!(hook_ran);
+        assert!(final_path.exists());
     }
 
     // Requirements: output-atomic-write

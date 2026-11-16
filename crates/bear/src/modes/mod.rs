@@ -179,9 +179,9 @@ impl Mode {
     /// source (event file or shell text) in replay mode. All errors returned
     /// are runtime errors that occur after valid arguments and configuration
     /// have been provided.
-    pub fn run(self, mut signals: SignalSource) -> ExitCode {
+    pub fn run(self, signals: SignalSource) -> ExitCode {
         let status = match self {
-            Self::Intercept(interceptor, command) => interceptor.run(command, &mut signals),
+            Self::Intercept(interceptor, command) => interceptor.run(command, signals, abort_on_termination),
             Self::Replay(replayer) => {
                 abort_on_termination(signals);
                 replayer.run()
