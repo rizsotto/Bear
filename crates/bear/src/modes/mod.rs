@@ -12,7 +12,7 @@ use crate::args::is_stdio;
 use crate::environment;
 use crate::{args, config, output};
 use intercept_supervisor::context;
-use intercept_supervisor::{CollectorOnTcp, SignalSource, abort_on_termination};
+use intercept_supervisor::{CollectorOnTcp, SignalSource, abort, abort_on_termination};
 use semantic::SpellingError;
 use semantic::{CompilerHints, CompilerRecognizer};
 use std::process::{ExitCode, ExitStatus};
@@ -184,9 +184,14 @@ impl Mode {
     /// source (event file or shell text) in replay mode. All errors returned
     /// are runtime errors that occur after valid arguments and configuration
     /// have been provided.
-    pub fn run(self, signals: SignalSource) -> Exit {
+    pub fn run(self, mut signals: SignalSource) -> Exit {
         let status = match self {
-            Self::Intercept(interceptor, command) => interceptor.run(command, signals, abort_on_termination),
+            Self::Intercept(interceptor, command) => {
+                if let Some(signal) = signals.pending_termination() {
+                    abort(signal);
+                }
+                interceptor.run(command, signals, abort_on_termination)
+            }
             Self::Replay(replayer) => {
                 abort_on_termination(signals);
                 replayer.run().map(Exit::Own)

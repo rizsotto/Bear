@@ -82,14 +82,28 @@ pub fn supervise(
 
 /// The registered signals, as a blocking iterator. Every item that is not
 /// a termination signal means the child may have exited.
-pub struct SignalSource(Box<dyn Iterator<Item = Received> + Send>);
+pub struct SignalSource(platform::Inner);
 
 impl Iterator for SignalSource {
     type Item = Received;
 
     fn next(&mut self) -> Option<Received> {
-        self.0.next()
+        platform::next(&mut self.0)
     }
+}
+
+impl SignalSource {
+    /// Without blocking, a termination signal that arrived since the
+    /// registration, if any. Every other signal read here is dropped: on Unix
+    /// those are `SIGCHLD`, which nothing waits on yet.
+    pub fn pending_termination(&mut self) -> Option<c_int> {
+        first_termination(&platform::pending(&mut self.0))
+    }
+}
+
+/// The first termination signal in `signals`.
+fn first_termination(signals: &[c_int]) -> Option<c_int> {
+    signals.iter().copied().find(|signal| is_termination(*signal))
 }
 
 /// Registers the signals a supervision reacts to and returns them as a
@@ -198,6 +212,8 @@ mod platform {
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
 
+    pub(super) type Inner = SignalsInfo<WithOrigin>;
+
     pub(super) const TERMINATION: [c_int; 4] = [SIGHUP, SIGINT, SIGQUIT, SIGTERM];
 
     /// The termination signals that are not ignored at entry, plus
@@ -210,13 +226,18 @@ mod platform {
         let mut watched: Vec<c_int> =
             TERMINATION.into_iter().filter(|signal| !ignored_at_entry(*signal)).collect();
         watched.push(SIGCHLD);
-        let mut signals = SignalsInfo::<WithOrigin>::new(&watched)?;
-        Ok(SignalSource(Box::new(std::iter::from_fn(move || {
-            signals
-                .forever()
-                .next()
-                .map(|origin| Received { signal: origin.signal, from_kernel: origin.cause == Cause::Kernel })
-        }))))
+        Ok(SignalSource(SignalsInfo::<WithOrigin>::new(&watched)?))
+    }
+
+    pub(super) fn next(signals: &mut Inner) -> Option<Received> {
+        signals
+            .forever()
+            .next()
+            .map(|origin| Received { signal: origin.signal, from_kernel: origin.cause == Cause::Kernel })
+    }
+
+    pub(super) fn pending(signals: &mut Inner) -> Vec<c_int> {
+        signals.pending().map(|origin| origin.signal).collect()
     }
 
     fn ignored_at_entry(signal: c_int) -> bool {
@@ -331,6 +352,8 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
+    pub(super) type Inner = Arc<AtomicUsize>;
+
     pub(super) const TERMINATION: [c_int; 2] = [signal_hook::consts::SIGINT, signal_hook::consts::SIGTERM];
 
     /// There is no `SIGCHLD` to wake the wait when the child exits, so the
@@ -345,10 +368,16 @@ mod platform {
         for signal in TERMINATION {
             signal_hook::flag::register_usize(signal, Arc::clone(&signaled), signal as usize)?;
         }
-        Ok(SignalSource(Box::new(std::iter::from_fn(move || {
-            thread::sleep(POLL);
-            Some(Received { signal: signaled.swap(0, Ordering::SeqCst) as c_int, from_kernel: false })
-        }))))
+        Ok(SignalSource(signaled))
+    }
+
+    pub(super) fn next(signaled: &mut Inner) -> Option<Received> {
+        thread::sleep(POLL);
+        Some(Received { signal: signaled.swap(0, Ordering::SeqCst) as c_int, from_kernel: false })
+    }
+
+    pub(super) fn pending(signaled: &mut Inner) -> Vec<c_int> {
+        vec![signaled.swap(0, Ordering::SeqCst) as c_int]
     }
 
     /// What a console program stopped by Ctrl-C returns.
@@ -381,6 +410,21 @@ mod tests {
     use super::*;
     use fixture::{shell, shell_in_own_group};
     use std::os::unix::process::ExitStatusExt;
+
+    #[test]
+    fn first_termination_picks_the_first_termination_signal() {
+        let cases: [(&[c_int], Option<c_int>); 4] = [
+            (&[libc::SIGCHLD, libc::SIGTERM, libc::SIGINT], Some(libc::SIGTERM)),
+            (&[libc::SIGHUP], Some(libc::SIGHUP)),
+            (&[libc::SIGCHLD, libc::SIGCHLD], None),
+            (&[], None),
+        ];
+        for (signals, expected) in cases {
+            let sut = first_termination(signals);
+
+            assert_eq!(sut, expected, "signals: {signals:?}");
+        }
+    }
 
     mod fixture {
         use super::*;

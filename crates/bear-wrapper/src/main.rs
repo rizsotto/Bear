@@ -29,9 +29,6 @@ use intercept_supervisor::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfi
 /// the execution.
 fn main() -> Result<()> {
     intercept::logging::init("wrapper");
-    // Register before anything is spawned, so no signal is lost.
-    let signals = signals().with_context(|| "Failed to register signal handlers")?;
-
     // Capture the current process execution details
     let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
     // Load configuration
@@ -48,6 +45,8 @@ fn main() -> Result<()> {
 
     // Execute the real executable with the same arguments
     let mut command = command_from_execution(real_execution)?;
+    // Register before the child is spawned, so no signal is lost.
+    let signals = signals().with_context(|| "Failed to register signal handlers")?;
     let exit_status = supervise(&mut command, signals)?.status;
     exit_like(exit_status)
 }
