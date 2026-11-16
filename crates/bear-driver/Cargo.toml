@@ -6,7 +6,6 @@ description = "Build supervisor binary for Bear that orchestrates interception a
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
-homepage.workspace = true
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true

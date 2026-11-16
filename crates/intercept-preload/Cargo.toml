@@ -6,7 +6,6 @@ description = "Dynamic library to be used with Bear for LD_PRELOAD interception"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
-homepage.workspace = true
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true

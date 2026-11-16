@@ -11,7 +11,6 @@ resolver = "3"
 version = "4.2.4"
 authors = ["László Nagy <rizsotto at gmail dot com>"]
 repository = "https://github.com/rizsotto/Bear"
-homepage = "https://github.com/rizsotto/Bear"
 license = "GPL-3.0-or-later"
 edition = "2024"
 rust-version = "1.89"
