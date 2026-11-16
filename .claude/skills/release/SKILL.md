@@ -45,6 +45,10 @@ the release, posting the announcement).
 Run the checks in root `CLAUDE.md` (Workflow step 6) from the repo root
 on `next`. All must pass before tagging.
 
+Run the test suite once more with no controlling terminal, the way a
+distro build sandbox runs it: `setsid -w cargo test`. The terminal tests
+must skip there, not fail.
+
 Then verify the release metadata:
 
 | Item | Where | Check |

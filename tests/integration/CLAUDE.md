@@ -35,6 +35,29 @@ fn single_file_compilation() -> Result<()> {
 }
 ```
 
+## Signal and terminal tests
+
+These rules keep the signal tests in `tests/cases/signals.rs` stable on
+every CI runner.
+
+- Order comes from the program under test: the build writes a ready
+  file or line, and the test waits for it. Never order with a sleep. A
+  deadline only turns a hang into a failure.
+- A build that traps the signal kills its background job in the trap
+  (`kill $!`); an orphaned `sleep` holds stderr open and blocks the test.
+- Send the signal to a build that traps it through Bear's pid only
+  (`signal_process`). A group signal reaches it twice, once directly and
+  once relayed, and the second copy can kill the shell as it exits from
+  its trap. A build without a trap gets the group signal
+  (`signal_group`), so its background `sleep` ends too.
+- `spawn_bear_in_group` and its variants remove `RUST_LOG` for Bear, so
+  warning texts do not depend on the caller's setting (CI runs with
+  `RUST_LOG=debug`). A test that asserts on debug lines sets
+  `RUST_LOG=debug` itself.
+- Terminal tests use the pty fixture (`fixtures/infrastructure/terminal.rs`)
+  and skip with a message when no pty can be opened. CI sets
+  `BEAR_TEST_REQUIRE_PTY=1`, so the skip cannot hide them there.
+
 ## Linking tests to requirements
 
 Tests that protect a requirement cite its ID with a `Requirements:` tag. This
