@@ -89,6 +89,11 @@ Scenarios:
   output, and no file named `-` is created. Standard output as the
   database destination is owned by
   [`output-json-compilation-database`](output-json-compilation-database.md).
+- **Given** intercept mode, **when** the build is interrupted through
+  Bear, **then** the events file holds the events captured up to the
+  interrupt. The events file is always replaced; it has no append
+  behavior (appending to a database is owned by
+  [`output-append`](output-append.md)).
 - The events file is written all or nothing, as owned by
   [`output-atomic-write`](output-atomic-write.md).
 
@@ -103,3 +108,4 @@ Scenarios:
 ## Rationale
 
 - [No implicit event-file name: intercept names it, semantic reads stdin](../rationale/event-file-defaults.md)
+- [An interrupted build and the output mode](../rationale/interrupted-build-and-output-mode.md)

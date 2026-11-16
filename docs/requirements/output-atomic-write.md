@@ -31,7 +31,8 @@ events file.
   Bear while Bear writes the output, or in semantic mode or parse-sh
   mode, **when** Bear ends, **then** the previous output is unchanged.
   Whether a build interrupted while it runs publishes is owned by
-  [`output-append`](output-append.md).
+  [`output-append`](output-append.md) and, for intercept mode, by
+  [`interception-events-format`](interception-events-format.md).
 - **Given** a run that ends in an error of Bear's own (the build command
   cannot start or be supervised, interception fails, the input cannot be
   read, or writing fails), with or without an existing output file,

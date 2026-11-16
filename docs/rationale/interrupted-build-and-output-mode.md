@@ -35,6 +35,10 @@ When appending, an interrupted build leaves the existing output as it
 was. When overwriting, it publishes what was captured, as it does
 today. Bear prints one warning line that says which one happened.
 
+Intercept mode always publishes. It has no append mode. The file the
+user names is only a previous capture. Partial events are useful to
+semantic mode, and Bear's death by the signal tells a script.
+
 A build that exits `0` always publishes, in both modes. This keeps one
 invariant a script can rely on: if Bear exits `0`, the output was
 published. Without it, a Ctrl-C that the build ignored, or one that came
@@ -60,6 +64,7 @@ finishing a half-written file.
 ## References
 
 - [output-append](../requirements/output-append.md), the requirement this supports
+- [interception-events-format](../requirements/interception-events-format.md), intercept mode publishes
 - [output-atomic-write](../requirements/output-atomic-write.md), the write that never publishes on an interrupt
 - [cli-exit-codes](../requirements/cli-exit-codes.md), exit 0 means published
 - [failed-build-still-publishes](failed-build-still-publishes.md), the failed build
