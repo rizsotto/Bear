@@ -609,16 +609,28 @@ const KNOWN_ENTRY: &str = "old.c";
 #[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
 const NEW_ENTRY: &str = "new.c";
 
+/// Where a test sends its signal. A build without a trap needs the whole
+/// group, so its background `sleep` ends too. A build with a trap gets the
+/// signal through Bear alone: a group signal would reach it twice, once
+/// directly and once relayed, and the second copy can kill the shell while
+/// it exits from its trap.
+#[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep))]
+#[derive(Clone, Copy)]
+enum Target {
+    Bear,
+    Group,
+}
+
 /// Runs Bear with `args`. With `signal`, waits for the ready file, then sends
-/// the signal to Bear's group. Returns Bear's status and stderr.
+/// the signal to the target. Returns Bear's status and stderr.
 #[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
 fn run_until_signalled(
     env: &TestEnvironment,
     name: &str,
     args: &[&str],
-    signal: Option<(&std::path::Path, &str)>,
+    signal: Option<(&std::path::Path, &str, Target)>,
 ) -> Result<(std::process::ExitStatus, String)> {
-    use crate::fixtures::infrastructure::signal_group;
+    use crate::fixtures::infrastructure::{signal_group, signal_process};
     use std::time::Duration;
 
     let mut child = env.spawn_bear_in_group_with_stderr(args, Stdio::piped())?;
@@ -629,9 +641,12 @@ fn run_until_signalled(
         captured
     });
 
-    if let Some((ready, signal)) = signal {
+    if let Some((ready, signal, target)) = signal {
         wait_for_file(ready);
-        signal_group(&child, signal);
+        match target {
+            Target::Bear => signal_process(&child, signal),
+            Target::Group => signal_group(&child, signal),
+        }
     }
     let deadline = Instant::now() + Duration::from_secs(30);
     let status = loop {
@@ -648,13 +663,13 @@ fn run_until_signalled(
 }
 
 /// Runs `build` under Bear with an existing output. With `signal`, waits for
-/// the build to write its ready file, then sends the signal to Bear's group.
+/// the build to write its ready file, then sends the signal to the target.
 #[cfg(all(target_family = "unix", has_executable_shell, has_executable_sleep, has_executable_compiler_c))]
 fn run_interrupted(
     name: &str,
     mode: &str,
     build: &str,
-    signal: Option<&str>,
+    signal: Option<(&str, Target)>,
 ) -> Result<(InterruptedRun, String)> {
     let env = TestEnvironment::new(name)?;
     let output_path = env.test_dir().join("compile_commands.json");
@@ -671,8 +686,12 @@ fn run_interrupted(
         .replace("READY", &ready.display().to_string())
         .replace("COMPILE", &format!("{} -c new.c", filename_of(COMPILER_C_PATH)));
     let args = ["--output", "compile_commands.json", mode, "--", SHELL_PATH, "-c", &script];
-    let (status, stderr) =
-        run_until_signalled(&env, name, &args, signal.map(|signal| (ready.as_path(), signal)))?;
+    let (status, stderr) = run_until_signalled(
+        &env,
+        name,
+        &args,
+        signal.map(|(signal, target)| (ready.as_path(), signal, target)),
+    )?;
 
     let run = InterruptedRun {
         status,
@@ -691,7 +710,8 @@ fn run_interrupted(
 fn interrupted_build_with_append_keeps_the_output() -> Result<()> {
     let build = format!("COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
 
-    let (sut, known) = run_interrupted("interrupted_append", "--append", &build, Some("TERM"))?;
+    let (sut, known) =
+        run_interrupted("interrupted_append", "--append", &build, Some(("TERM", Target::Group)))?;
 
     assert_eq!(sut.output, known, "the output changed; stderr:\n{}", sut.stderr);
     assert!(!sut.output.contains(NEW_ENTRY), "the new entry was published: {}", sut.output);
@@ -711,7 +731,8 @@ fn interrupted_build_with_append_keeps_the_output() -> Result<()> {
 fn interrupted_build_with_overwrite_replaces_the_output() -> Result<()> {
     let build = format!("COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
 
-    let (sut, known) = run_interrupted("interrupted_overwrite", "--overwrite", &build, Some("TERM"))?;
+    let (sut, known) =
+        run_interrupted("interrupted_overwrite", "--overwrite", &build, Some(("TERM", Target::Group)))?;
 
     assert_ne!(sut.output, known, "the output was not replaced; stderr:\n{}", sut.stderr);
     assert!(!sut.output.contains(KNOWN_ENTRY), "the old entry is still there: {}", sut.output);
@@ -743,7 +764,8 @@ fn interrupted_build_in_intercept_mode_writes_the_captured_events() -> Result<()
         ready.display()
     );
     let args = ["intercept", "--output", "events.json", "--", SHELL_PATH, "-c", &script];
-    let (status, stderr) = run_until_signalled(&env, "interrupted_intercept", &args, Some((&ready, "TERM")))?;
+    let (status, stderr) =
+        run_until_signalled(&env, "interrupted_intercept", &args, Some((&ready, "TERM", Target::Group)))?;
 
     let sut = std::fs::read_to_string(env.test_dir().join("events.json"))?;
     assert!(!status.success(), "Bear ended with {status:?}; stderr:\n{stderr}");
@@ -767,8 +789,12 @@ fn interrupted_build_that_exits_zero_publishes() -> Result<()> {
     let build = format!("trap 'kill $!; exit 0' TERM; COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
 
     for mode in ["--append", "--overwrite"] {
-        let (sut, known) =
-            run_interrupted(&format!("interrupted_exit_zero{mode}"), mode, &build, Some("TERM"))?;
+        let (sut, known) = run_interrupted(
+            &format!("interrupted_exit_zero{mode}"),
+            mode,
+            &build,
+            Some(("TERM", Target::Bear)),
+        )?;
 
         assert_eq!(sut.status.code(), Some(0), "{mode}: {:?}", sut.status);
         assert!(!sut.has_temp_file, "{mode}: a temp file is left behind");
@@ -792,7 +818,8 @@ fn interrupted_build_that_exits_zero_publishes() -> Result<()> {
 fn interrupted_build_that_fails_keeps_the_appended_output() -> Result<()> {
     let build = format!("trap 'kill $!; exit 3' TERM; COMPILE; {SLEEP_PATH} 60 & echo ready > READY; wait");
 
-    let (sut, known) = run_interrupted("interrupted_exit_three", "--append", &build, Some("TERM"))?;
+    let (sut, known) =
+        run_interrupted("interrupted_exit_three", "--append", &build, Some(("TERM", Target::Bear)))?;
 
     assert_eq!(sut.status.code(), Some(3), "{:?}; stderr:\n{}", sut.status, sut.stderr);
     assert_eq!(sut.output, known, "the output changed");
@@ -881,7 +908,7 @@ fn ignored_signal_stays_ignored_in_the_build() -> Result<()> {
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_shell, has_executable_sleep))]
 fn hangup_runs_the_build_trap_and_cleans_up() -> Result<()> {
-    use crate::fixtures::infrastructure::signal_group;
+    use crate::fixtures::infrastructure::signal_process;
 
     let env = TestEnvironment::new("hangup_runs_the_build_trap")?;
     let config_path = env.test_dir().join("config.yaml");
@@ -910,7 +937,8 @@ fn hangup_runs_the_build_trap_and_cleans_up() -> Result<()> {
 
     wait_for_file(&ready);
     assert!(env.test_dir().join(".bear").is_dir(), "the wrapper mechanism is not active");
-    signal_group(&child, "HUP");
+    // To Bear alone, so the build gets SIGHUP once, through the relay.
+    signal_process(&child, "HUP");
     let deadline = Instant::now() + std::time::Duration::from_secs(30);
     let sut = loop {
         if let Some(status) = child.try_wait()? {
