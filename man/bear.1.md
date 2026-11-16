@@ -547,7 +547,8 @@ Bear stands in for the build. The build runs in Bear's process group and
 session, so the terminal treats Bear and the build as one job. Ctrl-C,
 Ctrl-Z, terminal input and closing the terminal work as they do without
 Bear. A signal that was ignored when Bear started stays ignored for the
-build. The compiler wrapper follows the same rules.
+build, except `SIGPIPE` and `SIGCHLD`, which the build always starts with
+at their default action. The compiler wrapper follows the same rules.
 
 While the build runs, a termination signal belongs to the build. Bear
 passes `SIGHUP`, `SIGINT`, `SIGQUIT` and `SIGTERM` on to the process it
@@ -559,14 +560,25 @@ force a build that ignores signals to stop. On Windows only Ctrl-C and
 
 While no build runs, a signal aborts Bear. This covers semantic mode,
 parse-sh mode, and the time Bear writes the output. Bear removes its
-temporary files, leaves the output as it was, and ends by the signal.
+temporary files, leaves an output file as it was, and ends by the
+signal. Entries already written to standard output stay written.
+Before it ends, Bear prints one line on standard error: `bear: warning:
+interrupted by <SIG>; stopped before finishing`. On Windows the name is
+`Ctrl-C` or `SIGTERM`.
 
 If a signal reaches Bear while the build runs, the build was interrupted.
 With `--append`, the existing output stays as it was. With `--overwrite`,
-the captured entries replace it. Bear prints one warning on standard
-error, for example `bear: warning: the build was interrupted; <output> is
-unchanged`. In intercept mode, the event file holds the events captured so
-far. A build that exits 0 always publishes. A build killed by a
+the captured entries replace it. When the interrupted build does not exit
+0, Bear prints one warning on standard error. The text depends on the
+case:
+
+- Appending, and the output existed: `<output> is unchanged`.
+- Appending, and the output did not exist: `<output> was not written`.
+- Overwriting: `<output> was replaced with a partial result`.
+- Intercept mode: `<output> holds the events captured so far`.
+
+Each line starts with `bear: warning: the build was interrupted;`. A build
+that exits 0 always publishes and prints no warning. A build killed by a
 signal that did not go through Bear is a failed build, and a failed build
 publishes.
 

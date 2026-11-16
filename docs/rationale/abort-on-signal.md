@@ -9,7 +9,11 @@ drops never run. This is also true for `SIGHUP` on a closed terminal,
 if Bear does not watch it.
 
 "No build runs" covers the semantic and parse-sh modes, the start of a
-build run before the build, and the end of it while Bear writes.
+build run up to Bear's last check before the build is spawned, and the
+end of it while Bear writes. A signal that comes after that check and
+before the spawn is already queued when the build starts. Bear relays it
+to the build, whatever its cause. A terminal key that lands in that
+instant may reach the build twice.
 
 Options:
 
@@ -33,6 +37,8 @@ creates an artifact. When no build runs, a small watcher thread reads
 the signal source. On a signal it removes the temporary artifacts and
 ends like a killed child would
 ([end-like-the-build](end-like-the-build.md)): it dies by that signal.
+Before it dies it prints one warning line, so the user sees why Bear
+stopped.
 
 The artifacts are known through a small process-wide list, the cleanup
 registry. The file writer and the `.bear/` directory add their path when

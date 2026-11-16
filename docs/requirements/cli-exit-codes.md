@@ -51,7 +51,7 @@ for the event-file usage errors.
 - **Given** a termination signal that reaches Bear while no build runs,
   **when** Bear ends, **then** it ends by that signal on Unix, and with
   `0xC000013A` on Windows (Ctrl-C or `SIGTERM`).
-- **Given** a build that handles a forwarded signal and exits on its own,
+- **Given** a build that handles a signal that Bear passes on and exits on its own,
   **when** Bear finishes, **then** Bear exits with the build's code, `0`
   included.
 - **Given** a build that exits `0` and an output destination that becomes

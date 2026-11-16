@@ -105,8 +105,11 @@ the build.
   double does not earn its place, and two names for one behavior invite
   someone to make them differ again.
 - A signal can reach the top process of the build twice: when a process
-  signals the whole group, and on macOS and BSD, where no signal is
-  proven to come from the kernel. Accepted. It is the safe way to fail.
+  signals the whole group, and on macOS, NetBSD, OpenBSD and DragonFly,
+  where no terminal signal is marked as coming from the kernel. Linux
+  and FreeBSD mark it with `SI_KERNEL`, so Bear skips the relay there.
+  FreeBSD is not tested. A terminal key that lands in the instant of the
+  spawn may reach the build twice on any platform. Accepted. It is the safe way to fail.
 - The sender is known through signal-hook's `extended-siginfo` feature,
   which needs a small C file built with the `cc` crate. The workspace
   already needs a C compiler. Revisit the macOS rule if a reliable marker

@@ -49,6 +49,11 @@ New entries are placed before the existing ones, so a later rebuild's
 entry for a given file takes precedence over the stale one (see the
 `duplicates` section below).
 
+An interrupted run that appends adds nothing. Ctrl-C while the build runs
+leaves the database as it was, and Bear prints a warning that the output
+is unchanged (or was not written, when no database existed). The
+[exit status](../reference/exit-status.md) page says how such a run ends.
+
 ### A file you know is compiled twice shows up once
 
 If a project compiles the same source file more than once - once for a

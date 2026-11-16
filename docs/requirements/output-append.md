@@ -70,8 +70,9 @@ Bear run. When appending, Bear merges the new entries with the existing
 - An interrupted run does not corrupt the database. That is owned by
   `output-atomic-write`.
 - A signal that reaches Bear while it writes the output, or in semantic
-  mode or parse-sh mode, never publishes, in either case. That is owned
-  by `output-atomic-write`.
+  mode or parse-sh mode, never publishes, in either case. If the rename
+  already happened when the signal arrives, the new output is whole and
+  in place. That is owned by `output-atomic-write`.
 
 ## Rationale
 

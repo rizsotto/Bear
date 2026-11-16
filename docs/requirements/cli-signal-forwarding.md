@@ -65,7 +65,8 @@ owned by
   and the blocked compiler both end within the time budget.
 - **Given** a build run under Bear on Linux, **when** the user presses
   Ctrl-C or Ctrl-\ in the terminal, **then** the top process of the build
-  gets the signal once.
+  gets the signal once (see the known limitation about the instant of
+  the spawn).
 - **Given** a signal that is ignored when Bear starts (as in a script
   that starts Bear in the background), **when** the build runs, **then**
   the build starts with that signal ignored, and a signal sent to Bear
@@ -115,8 +116,13 @@ owned by
   signals the whole process group, the build gets it from the sender and
   again from Bear. On a hang-up, when Bear is not the session leader,
   the build gets `SIGHUP` from the kernel and from Bear.
-- On macOS and BSD, Ctrl-C and Ctrl-\ in a terminal reach the top
-  process of the build twice.
+- A terminal key that lands in the instant the build is spawned may
+  reach the top process of the build twice, on Linux too. Bear relays a
+  signal that was already queued at the spawn, whatever its cause.
+- On Linux and FreeBSD, where the C headers define `SI_KERNEL`, Bear
+  skips the terminal's Ctrl-C and Ctrl-\. On macOS, NetBSD, OpenBSD and
+  DragonFly it relays them, so the top process of the build gets them
+  twice. FreeBSD is not tested.
 - A build tool that moves itself to a process group of its own (`timeout`
   without its foreground option) runs in the background under Bear and
   cannot read the terminal. Ctrl-C still reaches it.

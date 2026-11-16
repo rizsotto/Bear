@@ -605,7 +605,9 @@ The build runs in Bear\(cqs process group and session, so the terminal
 treats Bear and the build as one job.
 Ctrl\-C, Ctrl\-Z, terminal input and closing the terminal work as they
 do without Bear.
-A signal that was ignored when Bear started stays ignored for the build.
+A signal that was ignored when Bear started stays ignored for the build,
+except \f[CR]SIGPIPE\f[R] and \f[CR]SIGCHLD\f[R], which the build always
+starts with at their default action.
 The compiler wrapper follows the same rules.
 .PP
 While the build runs, a termination signal belongs to the build.
@@ -622,17 +624,33 @@ for the build.
 While no build runs, a signal aborts Bear.
 This covers semantic mode, parse\-sh mode, and the time Bear writes the
 output.
-Bear removes its temporary files, leaves the output as it was, and ends
-by the signal.
+Bear removes its temporary files, leaves an output file as it was, and
+ends by the signal.
+Entries already written to standard output stay written.
+Before it ends, Bear prints one line on standard error:
+\f[CR]bear: warning: interrupted by <SIG>; stopped before finishing\f[R].
+On Windows the name is \f[CR]Ctrl\-C\f[R] or \f[CR]SIGTERM\f[R].
 .PP
 If a signal reaches Bear while the build runs, the build was
 interrupted.
 With \f[CR]\-\-append\f[R], the existing output stays as it was.
 With \f[CR]\-\-overwrite\f[R], the captured entries replace it.
-Bear prints one warning on standard error, for example
-\f[CR]bear: warning: the build was interrupted; <output> is unchanged\f[R].
-In intercept mode, the event file holds the events captured so far.
-A build that exits 0 always publishes.
+When the interrupted build does not exit 0, Bear prints one warning on
+standard error.
+The text depends on the case:
+.IP \(bu 2
+Appending, and the output existed: \f[CR]<output> is unchanged\f[R].
+.IP \(bu 2
+Appending, and the output did not exist:
+\f[CR]<output> was not written\f[R].
+.IP \(bu 2
+Overwriting: \f[CR]<output> was replaced with a partial result\f[R].
+.IP \(bu 2
+Intercept mode: \f[CR]<output> holds the events captured so far\f[R].
+.PP
+Each line starts with
+\f[CR]bear: warning: the build was interrupted;\f[R].
+A build that exits 0 always publishes and prints no warning.
 A build killed by a signal that did not go through Bear is a failed
 build, and a failed build publishes.
 .PP
