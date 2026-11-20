@@ -63,16 +63,20 @@ alternative, and the build does not run.
 ## From an intercepted call to the driver
 
 Both mechanisms report through the same channel: the process running
-the build (`bear-driver`, from the `bear-driver` binary) opens a TCP
-listener on the loopback interface, and every preload library instance
+the build (`bear-driver`, from the `bear-driver` binary) opens a UNIX
+domain socket in a private directory, and every preload library instance
 or wrapper process connects to it and writes one length-prefixed JSON
-event per execution. This keeps the reporting side dependency-free and
+event per execution. On Windows the driver listens on the loopback
+interface instead, and it does the same when no directory for the
+socket is usable. The [configuration
+reference](../reference/configuration.md#intercept) says where the
+socket goes and who may connect. This keeps the reporting side dependency-free and
 lets interception and semantic analysis live in separate processes when
 running as `bear intercept` and `bear semantic`, with the event stream
 as the file in between. The shared pieces of this runtime (the
 execution type, the wire encoding, environment-variable filtering) live
 in the `intercept` crate; the driver-side half that supervises the
-build, runs the TCP collector, and prepares the wrapper directory or
+build, runs the collector, and prepares the wrapper directory or
 preload environment lives in `intercept-supervisor`; the injected
 library itself is `intercept-preload`, and the wrapper executable's own
 code is `bear-wrapper`.

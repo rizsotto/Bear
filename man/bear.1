@@ -336,6 +336,9 @@ The example below shows every section:
 schema\f[B]:\f[R] \(dq4.2\(dq
 intercept\f[B]:\f[R]
   mode\f[B]:\f[R] wrapper\f[I]              # default: preload on Linux and the BSDs\f[R]
+  socket\f[B]:\f[R]\f[I]                    # not on Windows\f[R]
+    dir\f[B]:\f[R] /run/build\f[I]          # default: see below\f[R]
+    access\f[B]:\f[R] owner\f[I]            # default: owner, or all when run as root\f[R]
 compilers\f[B]:\f[R]
   \f[B]\-\f[R] path\f[B]:\f[R] /usr/bin/cc
     as\f[B]:\f[R] gcc
@@ -378,6 +381,37 @@ Controls the interception method (see DESCRIPTION for the trade\-offs):
 .IP \(bu 2
 \f[B]mode\f[R]: \f[CR]preload\f[R] (default on Linux and the BSDs) or
 \f[CR]wrapper\f[R] (default on macOS and Windows; works everywhere).
+.IP \(bu 2
+\f[B]socket\f[R]: Where the report socket lives and who may use it.
+Both methods report each execution to Bear over a UNIX domain socket,
+except on Windows, where Bear listens on the loopback interface and this
+section is a configuration error.
+Bear makes a directory named \f[CR]bear\-\f[R] followed by eight hex
+digits inside a base directory, puts the socket there, and removes both
+when it ends.
+Without this section, the base is the first of
+\f[CR]XDG_RUNTIME_DIR\f[R], \f[CR]TMPDIR\f[R] and \f[CR]/tmp\f[R] that
+is set and works.
+If none works, Bear reports over the loopback interface.
+Any key in this section turns that fallback off: when the socket cannot
+be made, Bear does not run the build and exits with an error.
+.RS 2
+.IP \(bu 2
+\f[B]socket.dir\f[R]: The base directory.
+It must be an absolute path to a directory that exists.
+Bear tries no other base.
+.IP \(bu 2
+\f[B]socket.access\f[R]: \f[CR]owner\f[R] or \f[CR]all\f[R].
+With \f[CR]owner\f[R], only the user who runs Bear can connect (the
+directory is mode 0700).
+With \f[CR]all\f[R], every user can (directory mode 0711, socket mode
+0777), so a build step that runs as another user is still captured.
+With \f[CR]all\f[R], the base and every directory above it must let
+other users enter.
+A default base that does not is skipped, and a \f[CR]socket.dir\f[R]
+that does not is an error.
+Default: \f[CR]owner\f[R], or \f[CR]all\f[R] when Bear runs as root.
+.RE
 .SS compilers
 Hints for compiler recognition.
 Bear recognizes GCC\- and Clang\-compatible drivers (including
@@ -656,6 +690,12 @@ build, and a failed build publishes.
 .PP
 See EXIT STATUS for how Bear ends.
 .SH ENVIRONMENT
+.TP
+\f[B]XDG_RUNTIME_DIR\f[R], \f[B]TMPDIR\f[R]
+Bear makes the directory for its report socket under the first of these
+that is set and works, else under \f[CR]/tmp\f[R].
+The \f[CR]intercept.socket.dir\f[R] key overrides them.
+See CONFIGURATION.
 .TP
 \f[B]RUST_LOG\f[R]
 Selects the diagnostic format and verbosity on standard error.

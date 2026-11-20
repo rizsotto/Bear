@@ -11,7 +11,9 @@ instead.
 
 ## WSL2
 
-If `.wslconfig` sets `networkingMode=mirrored`, the loopback connection
+This applies only when Bear falls back to the loopback interface, which
+happens when no directory for its report socket is usable. If
+`.wslconfig` sets `networkingMode=mirrored`, the loopback connection
 intercepted processes use to report back to `bear-driver` breaks,
 producing an empty or short `compile_commands.json` with no other
 error. Remove the setting and restart WSL2 (`wsl --shutdown`).

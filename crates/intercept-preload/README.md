@@ -25,7 +25,7 @@ On unsupported platforms (e.g. Windows), the build displays a warning and skips 
 - Intercepts `exec` family calls, `posix_spawn`, `popen`, and `system`
   (not `popen` and `system` on Android)
 - Automatically "doctors" child process environments to maintain interception across `exec` calls
-- Reports intercepted executions to a TCP collector
+- Reports intercepted executions to the collector
 - Platform capability detection at build time (only intercepts functions available on the host)
 
 ## Building

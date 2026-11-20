@@ -39,6 +39,27 @@ intercept:
 - **`intercept.mode`**: `preload` or `wrapper`. Default: `preload` on
   Linux and the BSDs, `wrapper` on macOS and Windows.
 
+```yaml
+intercept:
+  socket:
+    dir: /run/build
+    access: all
+```
+
+- **`intercept.socket.dir`**: the directory in which Bear makes its
+  report socket. An absolute path to a directory that exists. Default:
+  the first of `XDG_RUNTIME_DIR`, `TMPDIR` and `/tmp` that is set and
+  works.
+- **`intercept.socket.access`**: `owner` or `all`. `owner` lets only the
+  user who runs Bear connect. `all` lets every user connect, so the base
+  directory and every directory above it must let other users enter. A
+  default base that does not is skipped, a configured `dir` that does not
+  is an error. Default: `owner`, or `all` when Bear runs as root.
+
+The socket is on Linux, macOS and the BSDs. On Windows the section is a
+configuration error. Any key in the section turns off the fallback to
+the loopback interface, so a socket that cannot be made stops the build.
+
 ## compilers
 
 ```yaml

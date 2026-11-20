@@ -49,6 +49,23 @@ New entries are placed before the existing ones, so a later rebuild's
 entry for a given file takes precedence over the stale one (see the
 `duplicates` section below).
 
+Two cases lose entries because the build cannot reach the report
+socket.
+
+- A build step runs as another user while Bear does not run as root.
+  The socket allows only the user who runs Bear. Set
+  [`intercept.socket.access`](../reference/configuration.md#intercept)
+  to `all`.
+- A build step hides `/tmp`, in a private mount namespace for example.
+  Point `XDG_RUNTIME_DIR` or `TMPDIR`, or
+  [`intercept.socket.dir`](../reference/configuration.md#intercept),
+  at a directory the step can see.
+
+A build that deletes the report socket, by cleaning `/tmp` for example,
+makes Bear end with `cannot reach the report socket` and write no
+output. Point the socket at a directory the build leaves alone, as
+above.
+
 An interrupted run that appends adds nothing. Ctrl-C while the build runs
 leaves the database as it was, and Bear prints a warning that the output
 is unchanged (or was not written, when no database existed). The

@@ -57,4 +57,4 @@ own entry in all three places.
 ## Before modifying
 
 - The "doctor" logic that maintains interception across `exec` calls is subtle - read it fully before changing
-- Reports go to the TCP collector in `crates/intercept-supervisor`, in the wire format from `crates/intercept` (`wire.rs`) - do not change the protocol without updating the collector
+- Reports go to the collector in `crates/intercept-supervisor`, in the wire format from `crates/intercept` (`wire.rs`) - do not change the protocol without updating the collector

@@ -313,6 +313,9 @@ optional. The example below shows every section:
 schema: "4.2"
 intercept:
   mode: wrapper              # default: preload on Linux and the BSDs
+  socket:                    # not on Windows
+    dir: /run/build          # default: see below
+    access: owner            # default: owner, or all when run as root
 compilers:
   - path: /usr/bin/cc
     as: gcc
@@ -356,6 +359,25 @@ Controls the interception method (see DESCRIPTION for the trade-offs):
 
 - **mode**: `preload` (default on Linux and the BSDs) or `wrapper`
 (default on macOS and Windows; works everywhere).
+- **socket**: Where the report socket lives and who may use it. Both
+methods report each execution to Bear over a UNIX domain socket, except
+on Windows, where Bear listens on the loopback interface and this
+section is a configuration error. Bear makes a directory named
+`bear-` followed by eight hex digits inside a base directory, puts the
+socket there, and removes both when it ends. Without this section, the
+base is the first of `XDG_RUNTIME_DIR`, `TMPDIR` and `/tmp` that is set
+and works. If none works, Bear reports over the loopback interface. Any
+key in this section turns that fallback off: when the socket cannot be
+made, Bear does not run the build and exits with an error.
+  - **socket.dir**: The base directory. It must be an absolute path to
+  a directory that exists. Bear tries no other base.
+  - **socket.access**: `owner` or `all`. With `owner`, only the user who
+  runs Bear can connect (the directory is mode 0700). With `all`, every
+  user can (directory mode 0711, socket mode 0777), so a build step that
+  runs as another user is still captured. With `all`, the base and every
+  directory above it must let other users enter. A default base that
+  does not is skipped, and a `socket.dir` that does not is an error.
+  Default: `owner`, or `all` when Bear runs as root.
 
 ## compilers
 
@@ -586,6 +608,11 @@ See EXIT STATUS for how Bear ends.
 
 
 # ENVIRONMENT
+
+**XDG_RUNTIME_DIR**, **TMPDIR**
+: Bear makes the directory for its report socket under the first of
+these that is set and works, else under `/tmp`. The `intercept.socket.dir`
+key overrides them. See CONFIGURATION.
 
 **RUST_LOG**
 : Selects the diagnostic format and verbosity on standard error. When

@@ -12,7 +12,7 @@ keeps the ones it recognizes as compiler calls, and writes them out.
 | `crates/semantic` | Compiler recognition and flag parsing; owns the `compilers/*.yaml` definitions |
 | `crates/bear-driver` | Driver/supervisor binary; orchestrates interception and output |
 | `crates/intercept` | Shared/agent-side interception runtime (Execution, reporter, wire, env helpers) |
-| `crates/intercept-supervisor` | Driver-side interception (supervise, TCP collector, build environment) |
+| `crates/intercept-supervisor` | Driver-side interception (supervise, collector, build environment) |
 | `crates/intercept-preload` | `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` shared library |
 | `crates/bear-wrapper` | Compiler wrapper binary; reports intercepted executions |
 | `crates/bear-completions` | Shell-completion script generator |

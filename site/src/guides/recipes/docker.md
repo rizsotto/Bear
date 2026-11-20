@@ -67,11 +67,12 @@ dynamic-linker feature, not a ptrace-based interception, so it needs no
   build tool never loads the dynamic linker, so its own `exec()` calls
   are invisible to preload the same way they are on a bare host; this is
   not a Docker-specific limitation.
-- working loopback networking, for the TCP connection intercepted
-  processes use to report back to `bear-driver`. Bear binds this on
-  `127.0.0.1` (or `[::1]`), and the driver and the processes it observes
-  are in the same network namespace, so the connection stays inside the
-  container whichever `--network` mode started it.
+
+When Bear runs as root, as it does in most containers, it opens the
+report socket to all users, so a build that drops to a build user is
+still captured. Set
+[`intercept.socket.access`](../../reference/configuration.md#intercept)
+to `owner` to lock it down.
 
 ## When to fall back to wrapper mode
 
