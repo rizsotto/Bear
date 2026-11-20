@@ -5,7 +5,7 @@
 use crate::Execution;
 use crate::reporter::{Reporter, ReporterError};
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
 #[cfg(unix)]
 use std::path::PathBuf;
@@ -24,7 +24,7 @@ pub struct ExecutionWireSerializer;
 
 impl ExecutionWireSerializer {
     /// Read an execution from a reader using LV format.
-    pub fn read(reader: &mut impl Read) -> Result<Execution, ReporterError> {
+    pub fn read(reader: &mut impl std::io::Read) -> Result<Execution, ReporterError> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -36,16 +36,12 @@ impl ExecutionWireSerializer {
         Ok(execution)
     }
 
-    /// Write an execution to a writer using LV format.
-    pub fn write(writer: &mut impl Write, execution: Execution) -> Result<u32, ReporterError> {
-        let serialized = serde_json::to_string(&execution)?;
-        let bytes = serialized.into_bytes();
-        let length = bytes.len() as u32;
-
-        writer.write_all(&length.to_be_bytes())?;
-        writer.write_all(&bytes)?;
-
-        Ok(length)
+    /// Encode an execution as one LV record, to send with a single write.
+    pub fn encode(execution: Execution) -> Result<Vec<u8>, ReporterError> {
+        let json = serde_json::to_vec(&execution)?;
+        let mut record = (json.len() as u32).to_be_bytes().to_vec();
+        record.extend_from_slice(&json);
+        Ok(record)
     }
 }
 
@@ -132,25 +128,45 @@ impl Reporter for SocketReporter {
     ///
     /// The execution's environment is trimmed to the variables relevant for
     /// compilation database generation before serialization.
-    /// The connection is opened and closed for each execution.
+    /// The connection is opened and closed for each execution. The record
+    /// is encoded before the connect and sent in one write, so the collector,
+    /// which waits a short time for a silent peer, gets it at once.
     fn report(&self, execution: Execution) -> Result<(), ReporterError> {
         let execution = execution.trim();
         log::debug!("Execution report: {execution:?}");
+        let record = ExecutionWireSerializer::encode(execution)?;
 
         match &self.destination {
-            Address::Tcp(address) => {
-                ExecutionWireSerializer::write(&mut TcpStream::connect(address)?, execution)?;
-            }
+            Address::Tcp(address) => TcpStream::connect(address)?.write_all(&record)?,
             #[cfg(unix)]
-            Address::Unix(path) => {
-                ExecutionWireSerializer::write(
-                    &mut std::os::unix::net::UnixStream::connect(path)?,
-                    execution,
-                )?;
-            }
+            Address::Unix(path) => connect_unix(path)?.write_all(&record)?,
         }
 
         Ok(())
+    }
+}
+
+/// Connects to a UNIX socket, retrying while the collector's queue is full.
+///
+/// macOS and the BSDs refuse a connect with `ECONNREFUSED` when the listen
+/// queue is full, where TCP would have resent the SYN. A short backoff
+/// (1, 2, 4 ... 128 ms) rides out a burst. A stale socket file gives the same
+/// error, so the wait is bounded at 255 ms. Any other error returns at once.
+#[cfg(unix)]
+pub fn connect_unix(path: &std::path::Path) -> std::io::Result<std::os::unix::net::UnixStream> {
+    use std::io::ErrorKind;
+    use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    let mut delay = Duration::from_millis(1);
+    loop {
+        match UnixStream::connect(path) {
+            Err(err) if err.kind() == ErrorKind::ConnectionRefused && delay <= Duration::from_millis(128) => {
+                std::thread::sleep(delay);
+                delay *= 2;
+            }
+            result => return result,
+        }
     }
 }
 
@@ -191,7 +207,7 @@ mod tests {
             let expected = sample_executions();
             let mut written = Vec::new();
             for execution in expected.iter() {
-                ExecutionWireSerializer::write(&mut written, execution.clone()).unwrap();
+                written.extend(ExecutionWireSerializer::encode(execution.clone()).unwrap());
             }
 
             let mut reader = Cursor::new(written);
@@ -199,6 +215,56 @@ mod tests {
                 let sut = ExecutionWireSerializer::read(&mut reader);
 
                 assert_eq!(sut.unwrap(), execution.clone());
+            }
+        }
+
+        #[cfg(unix)]
+        mod sigpipe {
+            use super::*;
+            use std::io::ErrorKind;
+            use std::os::unix::net::{UnixListener, UnixStream};
+            use std::sync::atomic::{AtomicBool, Ordering};
+
+            static SIGPIPE_SEEN: AtomicBool = AtomicBool::new(false);
+
+            extern "C" fn on_sigpipe(_: libc::c_int) {
+                SIGPIPE_SEEN.store(true, Ordering::SeqCst);
+            }
+
+            // Guard, not a "fails first" test: with the MSRV at 1.90 std's write
+            // is `send` with MSG_NOSIGNAL, so this passes from the start. It
+            // catches a later switch to `write_vectored` or a raw `write`.
+            //
+            // Requirements: interception-report-channel
+            #[test]
+            fn write_to_a_vanished_collector_raises_no_sigpipe() {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join("s");
+                let listener = UnixListener::bind(&path).unwrap();
+                let mut stream = UnixStream::connect(&path).unwrap();
+                drop(listener);
+                let execution = Execution::from_strings("/usr/bin/cc", vec!["cc"], "/tmp", HashMap::new());
+                let record = ExecutionWireSerializer::encode(execution).unwrap();
+                // SAFETY: a zeroed sigaction is a valid starting value; the
+                // handler only stores to an atomic. The old action is restored.
+                let (sut, previous) = unsafe {
+                    let mut action: libc::sigaction = std::mem::zeroed();
+                    action.sa_sigaction = on_sigpipe as extern "C" fn(libc::c_int) as usize;
+                    let mut previous: libc::sigaction = std::mem::zeroed();
+                    libc::sigaction(libc::SIGPIPE, &action, &mut previous);
+                    SIGPIPE_SEEN.store(false, Ordering::SeqCst);
+                    let result = stream.write_all(&record);
+                    (result, previous)
+                };
+                let seen = SIGPIPE_SEEN.load(Ordering::SeqCst);
+                // SAFETY: restores the action saved above.
+                unsafe { libc::sigaction(libc::SIGPIPE, &previous, std::ptr::null_mut()) };
+
+                assert!(!seen, "SIGPIPE was raised");
+                match sut {
+                    Err(err) => assert_eq!(err.kind(), ErrorKind::BrokenPipe),
+                    other => panic!("expected BrokenPipe, got {other:?}"),
+                }
             }
         }
     }
@@ -269,6 +335,62 @@ mod tests {
 
             sender.join().unwrap().expect("report should succeed");
             assert_eq!(sut, compiler_call());
+        }
+    }
+
+    #[cfg(unix)]
+    mod connect {
+        use super::*;
+        use std::io::ErrorKind;
+        use std::os::unix::net::UnixListener;
+        use std::time::{Duration, Instant};
+
+        fn stale_socket(directory: &std::path::Path) -> PathBuf {
+            let path = directory.join("s");
+            drop(UnixListener::bind(&path).unwrap());
+            path
+        }
+
+        // Requirements: interception-report-channel
+        #[test]
+        fn retries_while_the_connection_is_refused() {
+            let directory = tempfile::tempdir().unwrap();
+            let path = stale_socket(directory.path());
+            let replacement = directory.path().join("r");
+            let listener = UnixListener::bind(&replacement).unwrap();
+            let target = path.clone();
+            let swapper = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(20));
+                std::fs::rename(&replacement, &target).unwrap();
+            });
+
+            let sut = connect_unix(&path);
+
+            swapper.join().unwrap();
+            assert!(sut.is_ok(), "{sut:?}");
+            drop(listener);
+        }
+
+        #[test]
+        fn gives_up_on_a_stale_socket() {
+            let directory = tempfile::tempdir().unwrap();
+            let path = stale_socket(directory.path());
+
+            let sut = connect_unix(&path);
+
+            assert_eq!(sut.unwrap_err().kind(), ErrorKind::ConnectionRefused);
+        }
+
+        #[test]
+        fn fails_fast_on_a_missing_path() {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("missing");
+            let started = Instant::now();
+
+            let sut = connect_unix(&path);
+
+            assert_eq!(sut.unwrap_err().kind(), ErrorKind::NotFound);
+            assert!(started.elapsed() < Duration::from_millis(100));
         }
     }
 }
