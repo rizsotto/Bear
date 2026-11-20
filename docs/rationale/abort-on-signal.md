@@ -2,8 +2,8 @@
 
 ## Context
 
-Bear creates temporary artifacts: the output temp file and the wrapper
-directory `.bear/`. A termination signal that arrives when no build runs
+Bear creates temporary artifacts: the output temp file, the wrapper
+directory `.bear/`, and the directory of the report socket. A termination signal that arrives when no build runs
 would, with the default action, kill Bear and leave them behind. Their
 drops never run. This is also true for `SIGHUP` on a closed terminal,
 if Bear does not watch it.
@@ -54,13 +54,15 @@ The wrapper registers on its own schedule
 ## Consequences
 
 - Every mode has the same rules. One registration, in every mode.
-- `SIGKILL` and `SIGSTOP` cannot be caught. The temp file and `.bear/`
-  may stay. `.bear/` is wiped by the next run. The temp file is not.
+- `SIGKILL` and `SIGSTOP` cannot be caught. The temp file, `.bear/` and
+  the socket directory may stay. `.bear/` is wiped by the next run. The
+  other two are not.
 - A new place that creates an artifact must use the registry.
 
 ## References
 
 - [output-atomic-write](../requirements/output-atomic-write.md), the requirement this supports
+- [interception-report-channel](../requirements/interception-report-channel.md), the socket directory it removes
 - [cli-signal-forwarding](../requirements/cli-signal-forwarding.md), the signal rules
 - [interrupted-build-and-output-mode](interrupted-build-and-output-mode.md), the interrupt during the build
 - [end-like-the-build](end-like-the-build.md), how Bear dies

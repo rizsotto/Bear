@@ -11,7 +11,8 @@ the build. The user does not change the build system or install
 compiler wrappers; any build tool that spawns compilers works. Linux and
 the BSDs use `LD_PRELOAD`; macOS uses `DYLD_INSERT_LIBRARIES`. Which
 mechanism runs is owned by `interception-mechanism-selection`, and so
-is the promise that interception leaves the build's output alone.
+is the promise that interception leaves the build's output alone. How a
+report reaches Bear is owned by `interception-report-channel`.
 
 ## Acceptance criteria
 

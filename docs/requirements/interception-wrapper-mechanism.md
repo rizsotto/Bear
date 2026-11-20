@@ -12,7 +12,8 @@ of the real compiler. The wrapper reports the execution to Bear and runs
 the real compiler. The user gets a compilation database without changing
 the build system. Which mechanism runs is owned by
 `interception-mechanism-selection`, and so is the promise that
-interception leaves the build's output alone.
+interception leaves the build's output alone. How a report reaches Bear
+is owned by `interception-report-channel`.
 
 The compiler program variables are the variables that name a program.
 From make's implicit variables: `CC`, `CXX`, `CPP`, `FC`, `AR`, `AS`,
