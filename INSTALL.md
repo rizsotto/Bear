@@ -36,8 +36,8 @@ source. Follow the steps below.
 
 Bear is now implemented in Rust, so the Rust toolchain is required.
 
-**Rust toolchain** (1.89 or later): Bear uses the Rust 2024 edition and
-language features stabilized up to Rust 1.89. Install Rust using
+**Rust toolchain** (1.90 or later): Bear uses the Rust 2024 edition and
+language features stabilized up to Rust 1.90. Install Rust using
 [rustup](https://rustup.rs/):
 
    ```sh
@@ -47,7 +47,7 @@ language features stabilized up to Rust 1.89. Install Rust using
 Ensure that `cargo` and `rustc` are available in your `PATH`:
 
    ```sh
-   rustc --version   # must be >= 1.89
+   rustc --version   # must be >= 1.90
    cargo --version
    ```
 

@@ -13,7 +13,7 @@ authors = ["László Nagy <rizsotto at gmail dot com>"]
 repository = "https://github.com/rizsotto/Bear"
 license = "GPL-3.0-or-later"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.90"
 
 [workspace.lints.clippy]
 allow_attributes_without_reason = "warn"
