@@ -144,14 +144,14 @@ mod tests {
             "preload",
             4242,
             log::Level::Debug,
-            "intercept::tcp",
+            "intercept::wire",
             "sent",
         )
         .unwrap();
         let sut = String::from_utf8(buf).unwrap();
 
         // assert
-        assert_eq!(sut, "[01:02:03.004 DEBUG preload[4242] intercept::tcp] sent\n");
+        assert_eq!(sut, "[01:02:03.004 DEBUG preload[4242] intercept::wire] sent\n");
     }
 
     // Requirements: cli-diagnostic-format

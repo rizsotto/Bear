@@ -12,10 +12,10 @@ pub const CONFIG_FILENAME: &str = "wrappers.cfg";
 pub(crate) const WRAPPER_DIR_NAME: &str = ".bear";
 
 use crate::cleanup;
+use intercept::wire::Address;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -79,12 +79,12 @@ pub struct WrapperConfig {
     /// Map from wrapper executable name to the real executable path
     pub executables: HashMap<String, PathBuf>,
     /// The address of the collector to report intercepted events to
-    pub collector_address: SocketAddr,
+    pub collector_address: Address,
 }
 
 impl WrapperConfig {
     /// Creates a new wrapper configuration with the specified collector address.
-    pub fn new(collector_address: SocketAddr) -> Self {
+    pub fn new(collector_address: Address) -> Self {
         Self { executables: HashMap::new(), collector_address }
     }
 
@@ -192,7 +192,7 @@ impl WrapperDirectoryBuilder {
     pub fn create(
         wrapper_executable_path: &Path,
         working_dir: &Path,
-        collector_address: SocketAddr,
+        collector_address: Address,
     ) -> Result<Self, WrapperDirectoryError> {
         let wrapper_dir =
             ManagedDirectory::create(working_dir).map_err(WrapperDirectoryError::DirCreation)?;
@@ -325,11 +325,11 @@ mod tests {
     use super::*;
 
     use std::io::Cursor;
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use tempfile::TempDir;
 
-    fn address() -> SocketAddr {
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)
+    fn address() -> Address {
+        Address::Tcp(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080))
     }
 
     #[test]
@@ -460,6 +460,19 @@ mod tests {
         };
 
         assert_eq!(original_config, read_config);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_wrapper_config_roundtrip_with_unix_address() {
+        let original_config =
+            WrapperConfig::new(Address::Unix(PathBuf::from("/run/user/1000/bear-1a2b3c4d/sock")));
+        let mut buffer = Vec::new();
+        WrapperConfigWriter::write(&original_config, &mut buffer).unwrap();
+
+        let sut = WrapperConfigReader::read(Cursor::new(buffer)).unwrap();
+
+        assert_eq!(sut, original_config);
     }
 
     #[test]

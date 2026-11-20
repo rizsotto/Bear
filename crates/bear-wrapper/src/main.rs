@@ -74,7 +74,7 @@ fn command_from_execution(execution: Execution) -> Result<std::process::Command>
 
 /// Report the execution to the remote collector.
 fn report(config: &WrapperConfig, real_execution: &Execution) -> Result<()> {
-    let reporter = ReporterFactory::create(config.collector_address);
+    let reporter = ReporterFactory::create(config.collector_address.clone());
     reporter.report(real_execution.clone())?;
 
     Ok(())

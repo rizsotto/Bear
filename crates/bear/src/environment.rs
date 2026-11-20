@@ -10,9 +10,9 @@
 //! primitive calls.
 
 use crate::{args, config};
+use intercept::wire::Address;
 use intercept_supervisor::context;
 use intercept_supervisor::runner;
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 pub use intercept_supervisor::ConfigurationError;
@@ -29,7 +29,7 @@ impl BuildEnvironment {
     ///
     /// This method dispatches to the appropriate specialized creation method based on the
     /// configuration type (wrapper or preload mode). In both modes, the interceptor will
-    /// report execution events via TCP sockets to the specified address.
+    /// report execution events over a socket to the specified address.
     ///
     /// # Arguments
     ///
@@ -46,7 +46,7 @@ impl BuildEnvironment {
         context: &context::Context,
         intercept: &config::Intercept,
         compilers: &[config::Compiler],
-        address: SocketAddr,
+        address: Address,
         is_compiler: impl Fn(&Path) -> bool,
     ) -> Result<Self, ConfigurationError> {
         let inner = match intercept {

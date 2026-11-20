@@ -5,13 +5,13 @@
 //! The collector is the receiver half of the interception wire protocol. It
 //! listens on a loopback TCP port, accepts one connection per reported
 //! execution, and reads each record using the shared
-//! [`intercept::tcp::ExecutionWireSerializer`] wire format that the reporter
-//! (`intercept::tcp::ReporterOnTcp`) writes.
+//! [`intercept::wire::ExecutionWireSerializer`] wire format that the reporter
+//! (`intercept::wire::SocketReporter`) writes.
 
 use intercept::Execution;
 use intercept::reporter::ReporterError;
-use intercept::tcp::ExecutionWireSerializer;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use intercept::wire::{Address, ExecutionWireSerializer};
+use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -26,13 +26,13 @@ impl CollectorOnTcp {
     ///
     /// The collector listens to a random port on the loopback interface.
     /// The address of the collector can be obtained by the `address` method.
-    pub fn new() -> Result<(Self, SocketAddr), std::io::Error> {
+    pub fn new() -> Result<(Self, Address), std::io::Error> {
         let shutdown = Arc::new(AtomicBool::new(false));
         // Try IPv4 loopback first, fall back to IPv6 loopback if IPv4 is unavailable.
         let listener = TcpListener::bind("127.0.0.1:0").or_else(|_| TcpListener::bind("[::1]:0"))?;
         let address = listener.local_addr()?;
 
-        Ok((Self { shutdown, listener }, address))
+        Ok((Self { shutdown, listener }, Address::Tcp(address)))
     }
 
     /// Single-threaded implementation of the collector.
@@ -140,7 +140,7 @@ impl CollectorOnTcp {
 mod tests {
     use super::*;
     use intercept::reporter::Reporter;
-    use intercept::tcp::ReporterOnTcp;
+    use intercept::wire::SocketReporter;
     use std::collections::HashMap;
 
     fn executions() -> Vec<Execution> {
@@ -204,7 +204,7 @@ mod tests {
 
         // Send executions to the reporter.
         for execution in expected.iter() {
-            let reporter = ReporterOnTcp::new(address);
+            let reporter = SocketReporter::new(address.clone());
             let result = reporter.report(execution.clone());
             assert!(result.is_ok());
         }
@@ -248,7 +248,7 @@ mod tests {
         // opens a connection, writes the whole record, and closes, each report
         // ends up queued in the accept backlog before we ever accept.
         for execution in expected.iter() {
-            let reporter = ReporterOnTcp::new(address);
+            let reporter = SocketReporter::new(address.clone());
             reporter.report(execution.clone()).expect("report should succeed");
         }
 

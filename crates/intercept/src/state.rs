@@ -2,7 +2,7 @@
 
 //! Preload interception state passed from the supervisor to the preload library.
 
-use std::net::SocketAddr;
+use crate::wire::Address;
 use std::path::PathBuf;
 
 /// Represents the state information needed for preload-based interception.
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct PreloadState {
     /// The socket address where execution events should be reported
-    pub destination: SocketAddr,
+    pub destination: Address,
     /// The path to the preload library itself
     pub library: PathBuf,
 }

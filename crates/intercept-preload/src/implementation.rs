@@ -33,7 +33,7 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 use ctor::ctor;
 use intercept::Execution;
 use intercept::reporter::{Reporter, ReporterFactory};
-use intercept::tcp::ReporterOnTcp;
+use intercept::wire::SocketReporter;
 use libc::{RTLD_NEXT, c_char, c_int};
 #[cfg(any(
     has_symbol_posix_spawn,
@@ -148,10 +148,10 @@ static POPEN_CHILDREN: std::sync::Mutex<std::collections::BTreeMap<usize, pid_t>
 /// Reporter for sending execution events to the collector.
 /// Initialized once by `rust_session_init` when called from the C shim constructor.
 /// Using `OnceLock` ensures safe single-initialization without raw pointers and
-/// provides `&ReporterOnTcp` references that are sound across threads (since
-/// `ReporterOnTcp` is `Sync` — it only holds a `SocketAddr` and creates a fresh
-/// `TcpStream` per report call).
-static REPORTER: OnceLock<ReporterOnTcp> = OnceLock::new();
+/// provides `&SocketReporter` references that are sound across threads (since
+/// `SocketReporter` is `Sync` — it only holds an `Address` and creates a fresh
+/// connection per report call).
+static REPORTER: OnceLock<SocketReporter> = OnceLock::new();
 
 /// Initialize the session from the environment.
 ///

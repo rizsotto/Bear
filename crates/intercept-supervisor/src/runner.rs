@@ -5,7 +5,7 @@
 //! This module builds the environment overrides that inject Bear's
 //! interception (a wrapper directory placed on `PATH`, or a preload library)
 //! and runs the build command under supervision. It works in terms of
-//! primitives only (`context`, `&[PathBuf]`, `SocketAddr`, an
+//! primitives only (`context`, `&[PathBuf]`, `Address`, an
 //! `impl Fn(&Path) -> bool` predicate), so it carries no `config`, `args`, or
 //! `clap` dependency. The thin `config`-to-primitive adapter lives in `bear`.
 
@@ -19,11 +19,11 @@ use intercept::environment::{KEY_INTERCEPT_STATE, KEY_OS_PATH, insert_to_path};
 #[cfg(target_os = "macos")]
 use intercept::environment::{KEY_OS_MACOS_FLAT_NAMESPACE, KEY_OS_MACOS_PRELOAD_PATH};
 use intercept::state::PreloadState;
+use intercept::wire::Address;
 use std::collections::HashMap;
 use std::env::JoinPathsError;
 #[cfg(windows)]
 use std::env::consts::EXE_EXTENSION;
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
@@ -85,7 +85,7 @@ impl BuildEnvironment {
     pub fn create_as_wrapper(
         context: &context::Context,
         executables: &[std::path::PathBuf],
-        address: SocketAddr,
+        address: Address,
         is_compiler: impl Fn(&Path) -> bool,
     ) -> Result<Self, ConfigurationError> {
         let layout = InstallationLayout::try_from(context.current_executable.as_path())
@@ -258,7 +258,7 @@ impl BuildEnvironment {
     /// process. This will result in all dynamically linked executables reporting back, but
     /// post processing will filter the relevant compiler executions.
     ///
-    /// The interceptor will report executions via TCP sockets to the specified address,
+    /// The interceptor will report executions over a socket to the specified address,
     /// which is advertised via a specific environment variable.
     ///
     /// # Arguments
@@ -272,7 +272,7 @@ impl BuildEnvironment {
     /// if validation fails or the preload library path is invalid.
     pub fn create_as_preload(
         context: &context::Context,
-        address: SocketAddr,
+        address: Address,
     ) -> Result<Self, ConfigurationError> {
         // Check if preload is supported on this system
         if !context.preload_supported {
@@ -559,8 +559,8 @@ mod test {
         use tempfile::TempDir;
 
         /// Standard test socket address.
-        pub fn test_address() -> SocketAddr {
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)
+        pub fn test_address() -> Address {
+            Address::Tcp(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080))
         }
 
         /// Platform-appropriate fake-compiler basename.
@@ -722,8 +722,6 @@ mod test {
     #[test]
     fn test_build_environment_create_preload() {
         use std::collections::HashMap;
-        use std::net::{IpAddr, Ipv4Addr};
-
         let sut = {
             let context = {
                 let environment = {
@@ -742,7 +740,7 @@ mod test {
                     confstr_path: String::from("/usr/bin:/bin"),
                 }
             };
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let address = fixture::test_address();
 
             BuildEnvironment::create_as_preload(&context, address).unwrap()
         };
@@ -769,6 +767,19 @@ mod test {
         }
 
         assert!(sut._wrapper_directory.is_none());
+    }
+
+    // Requirements: interception-report-channel
+    #[cfg(unix)]
+    #[test]
+    fn test_create_preload_carries_a_unix_address_in_the_state() {
+        let fx = fixture::Fixture::new().with_preload_supported(true);
+        let address = Address::Unix(PathBuf::from("/run/user/1000/bear-1a2b3c4d/sock"));
+
+        let sut = BuildEnvironment::create_as_preload(&fx.context(), address).unwrap();
+
+        let state = sut.environment_overrides.get(KEY_INTERCEPT_STATE).unwrap();
+        assert!(state.contains(r#""destination":"unix:/run/user/1000/bear-1a2b3c4d/sock""#), "{state}");
     }
 
     // Requirements: interception-mechanism-selection
@@ -820,8 +831,8 @@ mod test {
 
         let executables = vec![cc_path.clone(), clang_path.clone()];
         let address = fixture::test_address();
-        let sut =
-            BuildEnvironment::create_as_wrapper(&fx.context(), &executables, address, |_| true).unwrap();
+        let sut = BuildEnvironment::create_as_wrapper(&fx.context(), &executables, address.clone(), |_| true)
+            .unwrap();
 
         let path = sut.environment_overrides.get("PATH").unwrap();
         assert_first_path_entry(&get_wrapper_dir_path(fx.current_dir_tempdir()), path);

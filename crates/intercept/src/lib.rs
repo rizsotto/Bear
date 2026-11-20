@@ -50,7 +50,7 @@ pub mod environment;
 pub mod logging;
 pub mod reporter;
 pub mod state;
-pub mod tcp;
+pub mod wire;
 
 use crate::environment::relevant_env;
 use std::collections::HashMap;

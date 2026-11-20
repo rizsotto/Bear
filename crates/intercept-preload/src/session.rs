@@ -32,8 +32,8 @@
 //! time, which may already reflect modifications by earlier constructors in other
 //! preload libraries.
 
+use intercept::wire::Address;
 use std::ffi::{CStr, CString};
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -330,7 +330,7 @@ impl DoctoredEnvironment {
 /// # Safety
 /// The `envp` pointer must be a valid null-terminated array of null-terminated
 /// C strings in "KEY=VALUE" format, or null.
-pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<SocketAddr> {
+pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Address> {
     if envp.is_null() {
         log::info!("session init failed: environ is null pointer");
         return None;
@@ -344,7 +344,7 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
             None
         }
         Some(session) => {
-            let destination = session.destination;
+            let destination = session.destination.clone();
 
             // Capture and normalize the preload variable before anything modifies it.
             // This preserves co-resident libraries (e.g. libsandbox.so).
@@ -378,6 +378,10 @@ mod tests {
     /// Default test library path.
     const TEST_LIBRARY_PATH: &str = "/usr/lib/libear.so";
 
+    fn test_destination() -> Address {
+        Address::Tcp(TEST_DESTINATION)
+    }
+
     /// Helper struct to manage C-style environment arrays for testing.
     /// This ensures the CStrings stay alive while we use pointers to them.
     struct TestEnvp {
@@ -403,7 +407,7 @@ mod tests {
 
     /// Helper function to create a test PreloadState with default destination and library.
     fn create_test_state() -> PreloadState {
-        PreloadState { destination: TEST_DESTINATION, library: PathBuf::from(TEST_LIBRARY_PATH) }
+        PreloadState { destination: test_destination(), library: PathBuf::from(TEST_LIBRARY_PATH) }
     }
 
     /// Helper function to create a test SessionContext with no startup preload.
@@ -544,7 +548,8 @@ mod tests {
     fn test_in_session_returns_false_when_state_differs() {
         let ctx = create_test_ctx();
         let envp = {
-            let different_destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 54321);
+            let different_destination =
+                Address::Tcp(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 54321));
             let different_state = PreloadState {
                 destination: different_destination,
                 library: PathBuf::from(TEST_LIBRARY_PATH),
@@ -858,7 +863,8 @@ mod tests {
     #[test]
     fn test_from_envp_with_ipv6_address() {
         let ipv6_addr = SocketAddr::new(IpAddr::V6(std::net::Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8080);
-        let state = PreloadState { destination: ipv6_addr, library: PathBuf::from(TEST_LIBRARY_PATH) };
+        let state =
+            PreloadState { destination: Address::Tcp(ipv6_addr), library: PathBuf::from(TEST_LIBRARY_PATH) };
         let envp = {
             let state_json = state_to_json(&state);
             let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
@@ -873,7 +879,27 @@ mod tests {
 
         let parsed = result.unwrap();
         assert_eq!(parsed, state);
-        assert!(parsed.destination.ip().is_ipv6());
+        assert!(matches!(parsed.destination, Address::Tcp(address) if address.ip().is_ipv6()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_from_envp_with_unix_address() {
+        let state = PreloadState {
+            destination: Address::Unix(PathBuf::from("/run/user/1000/bear-1a2b3c4d/sock")),
+            library: PathBuf::from(TEST_LIBRARY_PATH),
+        };
+        let envp = {
+            let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_to_json(&state));
+
+            TestEnvp::new(&[&intercept_entry])
+        };
+
+        // SAFETY: envp holds the CStrings it points into, and it outlives this
+        // call. The array is null-terminated.
+        let sut = unsafe { from_envp(envp.as_ptr()) };
+
+        assert_eq!(sut, Some(state));
     }
 
     #[test]

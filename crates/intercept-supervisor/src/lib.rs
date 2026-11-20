@@ -3,7 +3,7 @@
 //! The driver-side (supervisor) half of the interception runtime.
 //!
 //! This crate owns the consumer side of the mechanism: it supervises the build
-//! process, collects the executions reported over TCP, and sets up the build
+//! process, collects the executions reported over a socket, and sets up the build
 //! environment that injects the interception (wrapper directory or preload
 //! library). It depends on `intercept` for the shared `Execution` type and the
 //! wire serialization, but never on `bear`, `config`, or `clap`, so the preload
