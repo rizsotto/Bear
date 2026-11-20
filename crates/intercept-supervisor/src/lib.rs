@@ -18,7 +18,7 @@ pub mod runner;
 pub mod supervise;
 pub mod wrapper;
 
-pub use collector::CollectorOnTcp;
+pub use collector::{Collector, SocketAccess};
 pub use context::{Context, ContextError};
 pub use installation::{InstallationLayout, LayoutError};
 pub use runner::{BuildEnvironment, ConfigurationError};

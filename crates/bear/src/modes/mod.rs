@@ -12,7 +12,7 @@ use crate::args::is_stdio;
 use crate::environment;
 use crate::{args, config, output};
 use intercept_supervisor::context;
-use intercept_supervisor::{CollectorOnTcp, SignalSource, abort, abort_on_termination};
+use intercept_supervisor::{Collector, SignalSource, SocketAccess, abort, abort_on_termination};
 use semantic::SpellingError;
 use semantic::{CompilerHints, CompilerRecognizer};
 use std::process::{ExitCode, ExitStatus};
@@ -76,8 +76,7 @@ impl Mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept build and write events");
 
-                let (producer, address) =
-                    CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
+                let (producer, address) = create_collector(&context, &config.intercept)?;
 
                 let recognizer = CompilerRecognizer::new_with_hints(hints);
                 let build = environment::BuildEnvironment::create(
@@ -93,7 +92,7 @@ impl Mode {
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
-                    Arc::new(impls::TcpEventProducer::create(producer)),
+                    Arc::new(impls::SocketEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
                     execution::Output::Events(output.path.clone()),
@@ -145,8 +144,7 @@ impl Mode {
                     ));
                 }
 
-                let (producer, address) =
-                    CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
+                let (producer, address) = create_collector(&context, &config.intercept)?;
 
                 let recognizer = CompilerRecognizer::new_with_hints(hints.clone());
                 let build = environment::BuildEnvironment::create(
@@ -164,7 +162,7 @@ impl Mode {
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
-                    Arc::new(impls::TcpEventProducer::create(producer)),
+                    Arc::new(impls::SocketEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
                     execution::Output::database(path, append, existed),
@@ -221,6 +219,31 @@ pub enum Exit {
     Build(ExitStatus),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigurationError {
+    #[error("cannot listen for intercepted commands: {0}")]
+    CollectorCreation(std::io::Error),
+    #[error(transparent)]
+    ExecutorCreation(environment::ConfigurationError),
+    #[error(transparent)]
+    ConsumerCreation(output::WriterCreationError),
+    #[error("cannot read {0}: {1}")]
+    InputAccess(std::path::PathBuf, std::io::Error),
+    #[error("{0}")]
+    InvalidConfiguration(String),
+    #[error(transparent)]
+    ConfigLoad(Box<config::ConfigError>),
+    /// Names the offending entry: serde used to point at the file and line,
+    /// and the path is the equivalent locator now that the schema layer no
+    /// longer resolves the spelling.
+    #[error("Invalid compiler configuration for '{path}': {source}")]
+    CompilerSpelling {
+        path: String,
+        #[source]
+        source: SpellingError,
+    },
+}
+
 /// Converts the configured compilers into the semantic hint table.
 ///
 /// Every entry has its `as:` spelling resolved, including the ones marked
@@ -247,29 +270,52 @@ fn compiler_hints(
     Ok(hints)
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ConfigurationError {
-    #[error("cannot listen for intercepted commands: {0}")]
-    CollectorCreation(std::io::Error),
-    #[error(transparent)]
-    ExecutorCreation(environment::ConfigurationError),
-    #[error(transparent)]
-    ConsumerCreation(output::WriterCreationError),
-    #[error("cannot read {0}: {1}")]
-    InputAccess(std::path::PathBuf, std::io::Error),
-    #[error("{0}")]
-    InvalidConfiguration(String),
-    #[error(transparent)]
-    ConfigLoad(Box<config::ConfigError>),
-    /// Names the offending entry: serde used to point at the file and line,
-    /// and the path is the equivalent locator now that the schema layer no
-    /// longer resolves the spelling.
-    #[error("Invalid compiler configuration for '{path}': {source}")]
-    CompilerSpelling {
-        path: String,
-        #[source]
-        source: SpellingError,
-    },
+/// Creates the collector from the context and the `intercept.socket` section.
+fn create_collector(
+    context: &context::Context,
+    intercept: &config::Intercept,
+) -> Result<(Collector, intercept::wire::Address), ConfigurationError> {
+    let section = intercept.effective_socket();
+    let bases = socket_bases(&context.environment, section.and_then(|socket| socket.dir.as_deref()));
+    let access = socket_access(section.and_then(|socket| socket.access), context.effective_uid);
+    if access == SocketAccess::All {
+        let reason =
+            if section.and_then(|socket| socket.access).is_some() { "configured" } else { "running as root" };
+        log::info!("report socket open to all users ({reason})");
+    }
+    // An explicit setting fails loudly instead of being replaced by TCP.
+    let fallback = section.is_none();
+    Collector::new(&bases, access, fallback).map_err(ConfigurationError::CollectorCreation)
+}
+
+/// The directories to try for the socket directory, in order.
+///
+/// A configured directory is the only one. Otherwise `XDG_RUNTIME_DIR`, `TMPDIR` and `/tmp`,
+/// read from Bear's own environment, which the build cannot change.
+fn socket_bases(
+    environment: &std::collections::HashMap<String, String>,
+    configured: Option<&std::path::Path>,
+) -> Vec<std::path::PathBuf> {
+    if let Some(dir) = configured {
+        return vec![dir.to_path_buf()];
+    }
+    ["XDG_RUNTIME_DIR", "TMPDIR"]
+        .into_iter()
+        .filter_map(|name| environment.get(name))
+        .filter(|value| !value.is_empty())
+        .map(std::path::PathBuf::from)
+        .chain(std::iter::once(std::path::PathBuf::from("/tmp")))
+        .collect()
+}
+
+/// Who may connect: the configured value, else everybody when Bear runs as root (so a build
+/// that drops to another user still reports), else the user who runs Bear.
+fn socket_access(configured: Option<config::SocketAccess>, effective_uid: Option<u32>) -> SocketAccess {
+    match (configured, effective_uid) {
+        (Some(config::SocketAccess::Owner), _) => SocketAccess::Owner,
+        (Some(config::SocketAccess::All), _) | (None, Some(0)) => SocketAccess::All,
+        (None, _) => SocketAccess::Owner,
+    }
 }
 
 mod impls {
@@ -282,7 +328,7 @@ mod impls {
         AtomicFile, ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError,
     };
     use crate::{args, config, output, parse_sh};
-    use intercept_supervisor::CollectorOnTcp;
+    use intercept_supervisor::Collector;
     use intercept_supervisor::{Outcome, SuperviseError};
     use semantic::CompilerHints;
     use std::collections::HashMap;
@@ -293,47 +339,55 @@ mod impls {
     use std::{fs, io};
     use thiserror::Error;
 
-    pub(super) struct TcpEventProducer {
-        source: CollectorOnTcp,
+    pub(super) struct SocketEventProducer {
+        source: Collector,
     }
 
-    impl TcpEventProducer {
-        pub(super) fn create(source: CollectorOnTcp) -> Self {
+    impl SocketEventProducer {
+        pub(super) fn create(source: Collector) -> Self {
             Self { source }
         }
     }
 
-    impl execution::Producer for TcpEventProducer {
+    impl execution::Producer for SocketEventProducer {
         fn produce(&self, destination: SyncSender<intercept::Execution>) -> Result<(), DynError> {
-            for execution in self.source.executions() {
-                match execution {
-                    Ok(execution) => {
-                        // A disconnected destination means the consumer finished
-                        // (normal shutdown) or failed (already logged upstream).
-                        // Break out quietly rather than spamming an error line
-                        // per remaining intercepted execution.
-                        if destination.send(execution).is_err() {
-                            log::debug!("Consumer channel closed; stopping execution forwarding");
-                            break;
-                        }
-                    }
-                    Err(error) => {
-                        log::warn!("cannot receive an intercepted command: {error}");
-                    }
-                }
-            }
-
+            forward(self.source.executions(), &destination);
             Ok(())
         }
     }
 
-    impl execution::Cancellable for TcpEventProducer {
+    impl execution::Cancellable for SocketEventProducer {
         fn cancel(&self) -> Result<(), DynError> {
             self.source.shutdown().map_err(Into::into)
         }
     }
 
-    impl execution::CancellableProducer for TcpEventProducer {}
+    impl execution::CancellableProducer for SocketEventProducer {}
+
+    /// Passes the reports on until the iterator ends.
+    ///
+    /// When the consumer is gone, the iterator is still read to its end and the reports are
+    /// dropped. The collector's queue must keep draining until shutdown, or a reporter that
+    /// connects to a full queue blocks, and so does the build.
+    pub(super) fn forward(
+        executions: impl Iterator<Item = Result<intercept::Execution, intercept::reporter::ReporterError>>,
+        destination: &SyncSender<intercept::Execution>,
+    ) {
+        let mut closed = false;
+        for execution in executions {
+            match execution {
+                Ok(execution) => {
+                    if !closed && destination.send(execution).is_err() {
+                        log::debug!("Consumer channel closed; discarding the remaining executions");
+                        closed = true;
+                    }
+                }
+                Err(error) => {
+                    log::warn!("cannot receive an intercepted command: {error}");
+                }
+            }
+        }
+    }
 
     /// Fails before the run when a named input file cannot be read.
     fn check_input_file(path: &std::path::Path) -> Result<(), ConfigurationError> {
@@ -830,5 +884,82 @@ mod tests {
 
         assert_eq!(sut.recognize(Path::new("/opt/toolchain/quiet-tool")), None);
         assert!(sut.recognize(Path::new("/opt/toolchain/loud-tool")).is_some());
+    }
+
+    fn environment_with(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs.iter().map(|(key, value)| (key.to_string(), value.to_string())).collect()
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn socket_bases_follow_the_order_and_skip_unset_and_empty() {
+        let cases = [
+            ("none set", environment_with(&[]), vec!["/tmp"]),
+            (
+                "runtime dir",
+                environment_with(&[("XDG_RUNTIME_DIR", "/run/user/1")]),
+                vec!["/run/user/1", "/tmp"],
+            ),
+            ("tmpdir", environment_with(&[("TMPDIR", "/var/t")]), vec!["/var/t", "/tmp"]),
+            (
+                "both",
+                environment_with(&[("XDG_RUNTIME_DIR", "/run/user/1"), ("TMPDIR", "/var/t")]),
+                vec!["/run/user/1", "/var/t", "/tmp"],
+            ),
+            ("empty ones", environment_with(&[("XDG_RUNTIME_DIR", ""), ("TMPDIR", "")]), vec!["/tmp"]),
+        ];
+
+        for (case, environment, expected) in cases {
+            let sut = socket_bases(&environment, None);
+
+            let expected: Vec<PathBuf> = expected.into_iter().map(PathBuf::from).collect();
+            assert_eq!(sut, expected, "case: {case}");
+        }
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn a_configured_socket_dir_is_the_only_base() {
+        let environment = environment_with(&[("XDG_RUNTIME_DIR", "/run/user/1"), ("TMPDIR", "/var/t")]);
+
+        let sut = socket_bases(&environment, Some(Path::new("/run/build")));
+
+        assert_eq!(sut, vec![PathBuf::from("/run/build")]);
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn socket_access_follows_the_configuration_then_the_user() {
+        use config::SocketAccess as Configured;
+        let cases = [
+            ("unset, root", None, Some(0), SocketAccess::All),
+            ("unset, user", None, Some(1000), SocketAccess::Owner),
+            ("unset, no uid", None, None, SocketAccess::Owner),
+            ("owner, root", Some(Configured::Owner), Some(0), SocketAccess::Owner),
+            ("all, user", Some(Configured::All), Some(1000), SocketAccess::All),
+        ];
+
+        for (case, configured, uid, expected) in cases {
+            let sut = socket_access(configured, uid);
+
+            assert_eq!(sut, expected, "case: {case}");
+        }
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn reports_are_read_to_the_end_when_the_consumer_is_gone() {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        drop(receiver);
+        let mut pulled = 0;
+        let executions = std::iter::repeat_with(|| {
+            pulled += 1;
+            Ok(intercept::Execution::from_strings("/usr/bin/cc", vec!["cc"], "/tmp", HashMap::new()))
+        })
+        .take(10);
+
+        impls::forward(executions, &sender);
+
+        assert_eq!(pulled, 10);
     }
 }

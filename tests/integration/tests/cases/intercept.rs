@@ -911,18 +911,18 @@ intercept:
 
 /// Reporting failures must not affect the build. In wrapper mode the
 /// collector address reaches the agents through the wrapper configuration
-/// file (`.bear/wrappers.cfg`), which every wrapper invocation re-reads --
-/// so the build script can repoint it at a closed port (port 1 refuses
-/// connections) before invoking the compiler. The wrapper's report then
+/// file (`.bear/wrappers.cfg`), which every wrapper invocation re-reads.
+/// So the build script can repoint it at an endpoint nothing listens on
+/// (port 1 refuses connections, and a missing socket path does too)
+/// before invoking the compiler. The wrapper's report then
 /// fails, yet the real compiler still runs and produces its object file,
 /// and Bear's exit code reflects the build alone.
 ///
-/// (The preload mechanism carries the same "reporting failures do not
-/// affect the build" contract, but its endpoint cannot be made unreachable
-/// end-to-end here: the collector lives inside the Bear process, and the
-/// preload library actively restores the session state in child
-/// environments -- see the restoration policy in
-/// `crates/intercept-preload/src/session.rs`.)
+/// The preload mechanism carries the same contract, but its endpoint cannot
+/// be made unreachable end-to-end here. The collector lives inside the Bear
+/// process, and the preload library restores the session state in child
+/// environments. See the restoration policy in
+/// `crates/intercept-preload/src/session.rs`.
 // Requirements: interception-wrapper-mechanism
 #[test]
 #[cfg(target_family = "unix")]
@@ -933,8 +933,9 @@ fn wrapper_reporting_failure_does_not_affect_build() -> Result<()> {
 
     // Rewrite the collector address to a port nothing listens on, then
     // compile via $CC so the wrapper is exercised with the dead endpoint.
-    // The rewrite handles both loopback forms the collector may bind.
-    let build = r#"sed -e 's/127\.0\.0\.1:[0-9]*/127.0.0.1:1/' -e 's/::1\]:[0-9]*/::1]:1/' .bear/wrappers.cfg > .bear/wrappers.cfg.tmp
+    // The rewrite handles the UNIX socket form and both loopback forms
+    // (the TCP fallback can still happen).
+    let build = r#"sed -e 's|unix:[^"]*|unix:/nonexistent/bear/sock|' -e 's/127\.0\.0\.1:[0-9]*/127.0.0.1:1/' -e 's/::1\]:[0-9]*/::1]:1/' .bear/wrappers.cfg > .bear/wrappers.cfg.tmp
 mv .bear/wrappers.cfg.tmp .bear/wrappers.cfg
 $CC -c test.c -o test.o
 "#;

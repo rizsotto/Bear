@@ -24,6 +24,7 @@ pub struct ExecutionWireSerializer;
 
 impl ExecutionWireSerializer {
     /// Read an execution from a reader using LV format.
+    #[cfg(test)]
     pub fn read(reader: &mut impl std::io::Read) -> Result<Execution, ReporterError> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
