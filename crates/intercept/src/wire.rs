@@ -5,45 +5,67 @@
 use crate::Execution;
 use crate::reporter::{Reporter, ReporterError};
 use std::fmt;
-use std::io::Write;
+use std::io::{self, Write};
 use std::net::{SocketAddr, TcpStream};
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 
-/// The serializer for executions to transmit over the network.
+/// The wire format of an execution report. Pure byte work, no I/O.
 ///
-/// The executions are serialized using LV (Length-Value) format.
-/// The length is a 4-byte big-endian integer, and the value is the JSON
-/// representation of the execution.
-///
-/// Both the reporter (sender, in this crate) and the collector (receiver, in
-/// `intercept-supervisor`) share this wire format, so the type is `pub`.
+/// A record is a 4-byte big-endian length followed by that many bytes of the
+/// execution's JSON. A record of length zero ends a stream: no reporter sends
+/// one. The reporter (`SocketReporter`, below) and the collector (in
+/// `intercept-supervisor`) do the I/O around these functions.
 pub struct ExecutionWireSerializer;
 
 impl ExecutionWireSerializer {
-    /// Read an execution from a reader using LV format.
-    #[cfg(test)]
-    pub fn read(reader: &mut impl std::io::Read) -> Result<Execution, ReporterError> {
-        let mut length_bytes = [0; 4];
-        reader.read_exact(&mut length_bytes)?;
-        let length = u32::from_be_bytes(length_bytes) as usize;
+    /// The size of a record header.
+    pub const HEADER_SIZE: usize = 4;
+    /// The end-of-stream record.
+    pub const END_OF_STREAM: [u8; Self::HEADER_SIZE] = [0; Self::HEADER_SIZE];
+    /// A record that announces more bytes than this is not from a reporter.
+    const MAX_BODY: u64 = 16 * 1024 * 1024;
 
-        let mut buffer = vec![0; length];
-        reader.read_exact(&mut buffer)?;
-        let execution = serde_json::from_slice(buffer.as_ref())?;
-
-        Ok(execution)
-    }
-
-    /// Encode an execution as one LV record, to send with a single write.
-    pub fn encode(execution: Execution) -> Result<Vec<u8>, ReporterError> {
-        let json = serde_json::to_vec(&execution)?;
+    /// Encodes one execution as a whole record, header and body.
+    pub fn encode(execution: &Execution) -> Result<Vec<u8>, ReporterError> {
+        let json = serde_json::to_vec(execution)?;
+        if json.len() as u64 > Self::MAX_BODY {
+            let message = format!("a record of {} bytes is too long", json.len());
+            return Err(io::Error::new(io::ErrorKind::InvalidData, message).into());
+        }
         let mut record = (json.len() as u32).to_be_bytes().to_vec();
         record.extend_from_slice(&json);
         Ok(record)
     }
+
+    /// Decodes a record header. A length over the limit is an error, so the
+    /// reader never allocates for it.
+    pub fn decode_header(header: [u8; Self::HEADER_SIZE]) -> Result<RecordHeader, ReporterError> {
+        match u64::from(u32::from_be_bytes(header)) {
+            0 => Ok(RecordHeader::End),
+            length if length > Self::MAX_BODY => {
+                let message = format!("a record of {length} bytes is too long");
+                Err(io::Error::new(io::ErrorKind::InvalidData, message).into())
+            }
+            length => Ok(RecordHeader::Body(length)),
+        }
+    }
+
+    /// Decodes a record body.
+    pub fn decode_body(body: &[u8]) -> Result<Execution, ReporterError> {
+        Ok(serde_json::from_slice(body)?)
+    }
+}
+
+/// What a record header announces.
+#[derive(Debug, PartialEq, Eq)]
+pub enum RecordHeader {
+    /// The end-of-stream record.
+    End,
+    /// A body of this many bytes follows.
+    Body(u64),
 }
 
 /// Where the collector listens: a loopback TCP address, or a UNIX domain
@@ -129,20 +151,20 @@ impl Reporter for SocketReporter {
     ///
     /// The execution's environment is trimmed to the variables relevant for
     /// compilation database generation before serialization.
-    /// The connection is opened and closed for each execution. The record
-    /// is encoded before the connect and sent in one write, so the collector,
-    /// which waits a short time for a silent peer, gets it at once.
+    /// The connection is opened and closed for each execution. The record is
+    /// encoded before the connect, so a bad record opens no connection, and
+    /// sent in one `write_all`, so the collector, which waits a short time
+    /// for a silent peer, gets it at once. Never a vectored write:
+    /// `write_vectored` on a UNIX socket does not suppress `SIGPIPE`.
     fn report(&self, execution: Execution) -> Result<(), ReporterError> {
         let execution = execution.trim();
         log::debug!("Execution report: {execution:?}");
-        let record = ExecutionWireSerializer::encode(execution)?;
-
+        let record = ExecutionWireSerializer::encode(&execution)?;
         match &self.destination {
             Address::Tcp(address) => TcpStream::connect(address)?.write_all(&record)?,
             #[cfg(unix)]
             Address::Unix(path) => connect_unix(path)?.write_all(&record)?,
         }
-
         Ok(())
     }
 }
@@ -200,73 +222,48 @@ mod tests {
 
     mod serializer {
         use super::*;
-        use std::io::Cursor;
 
-        // The executions are written to a buffer and read back.
+        fn decode(record: &[u8]) -> Execution {
+            let (header, body) = record.split_at(ExecutionWireSerializer::HEADER_SIZE);
+            let length = ExecutionWireSerializer::decode_header(header.try_into().unwrap()).unwrap();
+            assert_eq!(length, RecordHeader::Body(body.len() as u64));
+            ExecutionWireSerializer::decode_body(body).unwrap()
+        }
+
         #[test]
-        fn read_write_works() {
-            let expected = sample_executions();
-            let mut written = Vec::new();
-            for execution in expected.iter() {
-                written.extend(ExecutionWireSerializer::encode(execution.clone()).unwrap());
-            }
+        fn encode_and_decode_round_trip() {
+            for execution in sample_executions() {
+                let record = ExecutionWireSerializer::encode(&execution).unwrap();
 
-            let mut reader = Cursor::new(written);
-            for execution in expected.iter() {
-                let sut = ExecutionWireSerializer::read(&mut reader);
+                let sut = decode(&record);
 
-                assert_eq!(sut.unwrap(), execution.clone());
+                assert_eq!(sut, execution);
             }
         }
 
-        #[cfg(unix)]
-        mod sigpipe {
-            use super::*;
-            use std::io::ErrorKind;
-            use std::os::unix::net::{UnixListener, UnixStream};
-            use std::sync::atomic::{AtomicBool, Ordering};
+        #[test]
+        fn decode_header_reads_the_length() {
+            let max = ExecutionWireSerializer::MAX_BODY as u32;
+            let cases = [
+                ("end of stream", ExecutionWireSerializer::END_OF_STREAM, Some(RecordHeader::End)),
+                ("a body", 10u32.to_be_bytes(), Some(RecordHeader::Body(10))),
+                ("at the limit", max.to_be_bytes(), Some(RecordHeader::Body(max as u64))),
+                ("over the limit", (max + 1).to_be_bytes(), None),
+                ("the largest length", u32::MAX.to_be_bytes(), None),
+            ];
 
-            static SIGPIPE_SEEN: AtomicBool = AtomicBool::new(false);
+            for (case, header, expected) in cases {
+                let sut = ExecutionWireSerializer::decode_header(header);
 
-            extern "C" fn on_sigpipe(_: libc::c_int) {
-                SIGPIPE_SEEN.store(true, Ordering::SeqCst);
+                assert_eq!(sut.ok(), expected, "case: {case}");
             }
+        }
 
-            // Guard, not a "fails first" test: with the MSRV at 1.90 std's write
-            // is `send` with MSG_NOSIGNAL, so this passes from the start. It
-            // catches a later switch to `write_vectored` or a raw `write`.
-            //
-            // Requirements: interception-report-channel
-            #[test]
-            fn write_to_a_vanished_collector_raises_no_sigpipe() {
-                let directory = tempfile::tempdir().unwrap();
-                let path = directory.path().join("s");
-                let listener = UnixListener::bind(&path).unwrap();
-                let mut stream = UnixStream::connect(&path).unwrap();
-                drop(listener);
-                let execution = Execution::from_strings("/usr/bin/cc", vec!["cc"], "/tmp", HashMap::new());
-                let record = ExecutionWireSerializer::encode(execution).unwrap();
-                // SAFETY: a zeroed sigaction is a valid starting value; the
-                // handler only stores to an atomic. The old action is restored.
-                let (sut, previous) = unsafe {
-                    let mut action: libc::sigaction = std::mem::zeroed();
-                    action.sa_sigaction = on_sigpipe as extern "C" fn(libc::c_int) as usize;
-                    let mut previous: libc::sigaction = std::mem::zeroed();
-                    libc::sigaction(libc::SIGPIPE, &action, &mut previous);
-                    SIGPIPE_SEEN.store(false, Ordering::SeqCst);
-                    let result = stream.write_all(&record);
-                    (result, previous)
-                };
-                let seen = SIGPIPE_SEEN.load(Ordering::SeqCst);
-                // SAFETY: restores the action saved above.
-                unsafe { libc::sigaction(libc::SIGPIPE, &previous, std::ptr::null_mut()) };
+        #[test]
+        fn decode_body_rejects_garbage() {
+            let sut = ExecutionWireSerializer::decode_body(b"xxxxx");
 
-                assert!(!seen, "SIGPIPE was raised");
-                match sut {
-                    Err(err) => assert_eq!(err.kind(), ErrorKind::BrokenPipe),
-                    other => panic!("expected BrokenPipe, got {other:?}"),
-                }
-            }
+            assert!(sut.is_err(), "{sut:?}");
         }
     }
 
@@ -306,6 +303,14 @@ mod tests {
 
     mod reporter {
         use super::*;
+        use std::io::Read;
+
+        /// The record that the reporter sent before it closed the connection.
+        fn received(connection: &mut impl Read) -> Execution {
+            let mut record = Vec::new();
+            connection.read_to_end(&mut record).unwrap();
+            ExecutionWireSerializer::decode_body(&record[ExecutionWireSerializer::HEADER_SIZE..]).unwrap()
+        }
 
         #[test]
         fn writes_a_readable_record_over_tcp() {
@@ -316,7 +321,7 @@ mod tests {
             });
 
             let (mut connection, _) = listener.accept().unwrap();
-            let sut = ExecutionWireSerializer::read(&mut connection).unwrap();
+            let sut = received(&mut connection);
 
             sender.join().unwrap().expect("report should succeed");
             assert_eq!(sut, compiler_call());
@@ -332,10 +337,60 @@ mod tests {
                 std::thread::spawn(move || SocketReporter::new(Address::Unix(path)).report(compiler_call()));
 
             let (mut connection, _) = listener.accept().unwrap();
-            let sut = ExecutionWireSerializer::read(&mut connection).unwrap();
+            let sut = received(&mut connection);
 
             sender.join().unwrap().expect("report should succeed");
             assert_eq!(sut, compiler_call());
+        }
+
+        #[cfg(unix)]
+        mod sigpipe {
+            use super::*;
+            use std::io::ErrorKind;
+            use std::os::unix::net::{UnixListener, UnixStream};
+            use std::sync::atomic::{AtomicBool, Ordering};
+
+            static SIGPIPE_SEEN: AtomicBool = AtomicBool::new(false);
+
+            extern "C" fn on_sigpipe(_: libc::c_int) {
+                SIGPIPE_SEEN.store(true, Ordering::SeqCst);
+            }
+
+            // Guard, not a "fails first" test: with the MSRV at 1.90 std's write
+            // is `send` with MSG_NOSIGNAL, so this passes from the start. It
+            // catches a later switch to `write_vectored` or a raw `write`.
+            //
+            // Requirements: interception-report-channel
+            #[test]
+            fn write_to_a_vanished_collector_raises_no_sigpipe() {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join("s");
+                let listener = UnixListener::bind(&path).unwrap();
+                let mut stream = UnixStream::connect(&path).unwrap();
+                drop(listener);
+                let execution = Execution::from_strings("/usr/bin/cc", vec!["cc"], "/tmp", HashMap::new());
+                // SAFETY: a zeroed sigaction is a valid starting value; the
+                // handler only stores to an atomic. The old action is restored.
+                let (sut, previous) = unsafe {
+                    let mut action: libc::sigaction = std::mem::zeroed();
+                    action.sa_sigaction = on_sigpipe as extern "C" fn(libc::c_int) as usize;
+                    let mut previous: libc::sigaction = std::mem::zeroed();
+                    libc::sigaction(libc::SIGPIPE, &action, &mut previous);
+                    SIGPIPE_SEEN.store(false, Ordering::SeqCst);
+                    let record = ExecutionWireSerializer::encode(&execution).unwrap();
+                    let result = stream.write_all(&record);
+                    (result, previous)
+                };
+                let seen = SIGPIPE_SEEN.load(Ordering::SeqCst);
+                // SAFETY: restores the action saved above.
+                unsafe { libc::sigaction(libc::SIGPIPE, &previous, std::ptr::null_mut()) };
+
+                assert!(!seen, "SIGPIPE was raised");
+                match sut {
+                    Err(err) => assert_eq!(err.kind(), ErrorKind::BrokenPipe),
+                    other => panic!("expected BrokenPipe, got {other:?}"),
+                }
+            }
         }
     }
 

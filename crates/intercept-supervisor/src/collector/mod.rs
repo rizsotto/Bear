@@ -17,7 +17,7 @@ mod unix;
 
 use intercept::Execution;
 use intercept::reporter::ReporterError;
-use intercept::wire::Address;
+use intercept::wire::{Address, ExecutionWireSerializer, RecordHeader};
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
@@ -26,8 +26,6 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-/// A record that announces more bytes than this is not from a reporter.
-const MAX_RECORD: u64 = 16 * 1024 * 1024;
 /// How long a read waits for a silent peer: under the 255 ms that a reporter
 /// retries a refused UNIX connect, so a full queue does not lose reports.
 #[cfg(unix)]
@@ -40,8 +38,6 @@ const TCP_READ_TIMEOUT: Duration = Duration::from_secs(1);
 const ACCEPT_PAUSE: Duration = Duration::from_millis(10);
 /// After `shutdown`, how long `accept` may keep failing before the loop ends.
 const ACCEPT_GIVE_UP: Duration = Duration::from_secs(1);
-/// The record that `shutdown` sends. No reporter sends a record of length zero.
-const END_OF_QUEUE: [u8; 4] = [0; 4];
 
 /// Receives the executions that the interception agents report over a socket.
 pub struct Collector {
@@ -128,7 +124,7 @@ impl Collector {
                 #[cfg(unix)]
                 Address::Unix(path) => Box::new(intercept::wire::connect_unix(path)?),
             };
-            stream.write_all(&END_OF_QUEUE)
+            stream.write_all(&ExecutionWireSerializer::END_OF_STREAM)
         };
         wake().map_err(|err| {
             io::Error::new(err.kind(), format!("cannot reach the report socket {}: {err}", self.address))
@@ -180,6 +176,25 @@ impl Listener {
     }
 }
 
+/// Reads one record from a connection. `None` is the end-of-stream record.
+///
+/// The body buffer grows with the bytes that arrive, so a bad length does not
+/// allocate up front. A connection that closes early is an error.
+fn read_record(mut connection: impl Read) -> Result<Option<Execution>, ReporterError> {
+    let mut header = [0; ExecutionWireSerializer::HEADER_SIZE];
+    connection.read_exact(&mut header)?;
+    let length = match ExecutionWireSerializer::decode_header(header)? {
+        RecordHeader::End => return Ok(None),
+        RecordHeader::Body(length) => length,
+    };
+    let mut body = Vec::new();
+    connection.take(length).read_to_end(&mut body)?;
+    if body.len() as u64 != length {
+        return Err(io::Error::from(io::ErrorKind::UnexpectedEof).into());
+    }
+    Ok(Some(ExecutionWireSerializer::decode_body(&body)?))
+}
+
 /// macOS refuses `setsockopt` with EINVAL when the peer already closed. Its
 /// bytes can still be read, then EOF, so the read cannot hang.
 fn allow_closed_peer(result: io::Result<()>) -> io::Result<()> {
@@ -187,27 +202,6 @@ fn allow_closed_peer(result: io::Result<()>) -> io::Result<()> {
         Err(err) if err.kind() == io::ErrorKind::InvalidInput => Ok(()),
         other => other,
     }
-}
-
-/// Reads one record. `None` is the zero length that `shutdown` sends.
-fn read_record(mut connection: impl Read) -> Result<Option<Execution>, ReporterError> {
-    let mut header = [0; 4];
-    connection.read_exact(&mut header)?;
-    let length = u64::from(u32::from_be_bytes(header));
-    if length == 0 {
-        return Ok(None);
-    }
-    if length > MAX_RECORD {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("a record of {length} bytes is too long"),
-        )
-        .into());
-    }
-    // The buffer grows with the bytes that arrive, so a bad length does not allocate up front.
-    let mut buffer = Vec::new();
-    connection.take(length).read_to_end(&mut buffer)?;
-    Ok(Some(serde_json::from_slice(&buffer)?))
 }
 
 /// Binds an ephemeral loopback port: IPv4 first, IPv6 when IPv4 is unavailable.
@@ -218,15 +212,17 @@ fn bind_loopback() -> io::Result<TcpListener> {
 #[cfg(test)]
 mod tests {
     use self::fixture::*;
+    use intercept::Execution;
     use intercept::reporter::Reporter;
     use intercept::wire::SocketReporter;
+    use std::collections::HashMap;
     use std::io::Write;
     use std::time::Duration;
 
     pub(crate) mod fixture {
         use super::super::*;
         use intercept::reporter::Reporter;
-        use intercept::wire::{ExecutionWireSerializer, SocketReporter};
+        use intercept::wire::SocketReporter;
         use std::collections::HashMap;
         use std::sync::Arc;
         use std::time::Duration;
@@ -334,11 +330,6 @@ mod tests {
                 executions.iter().map(|execution| execution.arguments.clone()).collect();
             commands.sort();
             commands
-        }
-
-        /// The bytes of one record, as a reporter writes them.
-        pub(crate) fn record_bytes(execution: &Execution) -> Vec<u8> {
-            ExecutionWireSerializer::encode(execution.clone()).unwrap()
         }
 
         pub(crate) fn connect(address: &Address) -> Box<dyn std::io::Write + Send> {
@@ -483,20 +474,18 @@ mod tests {
         }
     }
 
+    // A record larger than the socket buffer (8 KiB for a UNIX socket on macOS
+    // and the BSDs, about 208 KiB on Linux) takes several sends and reads.
+    //
     // Requirements: interception-report-channel
     #[test]
-    fn reads_a_record_that_arrives_in_pieces() {
+    fn reads_a_record_larger_than_the_socket_buffer() {
         for fixture in Fixture::all() {
-            let expected = numbered(1);
-            let bytes = record_bytes(&expected);
+            let long = "x".repeat(1024 * 1024);
+            let expected = Execution::from_strings("/usr/bin/cc", vec!["cc", &long], "/tmp", HashMap::new());
             let worker = fixture.collect_in_thread();
 
-            let mut client = connect(&fixture.address);
-            for piece in [&bytes[..1], &bytes[1..4], &bytes[4..10], &bytes[10..]] {
-                client.write_all(piece).unwrap();
-                client.flush().unwrap();
-            }
-            drop(client);
+            fixture.report(&expected);
             fixture.collector.shutdown().unwrap();
             let sut = join_within(worker, Duration::from_secs(5));
 
@@ -541,12 +530,58 @@ mod tests {
         }
     }
 
+    mod read_record {
+        use super::super::{ExecutionWireSerializer, read_record};
+        use super::fixture::numbered;
+        use std::io::{Cursor, Read};
+
+        /// Hands out one byte per call, as a socket may when a record
+        /// arrives in pieces.
+        struct OneByteAtATime(Cursor<Vec<u8>>);
+
+        impl Read for OneByteAtATime {
+            fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+                let end = buffer.len().min(1);
+                self.0.read(&mut buffer[..end])
+            }
+        }
+
+        #[test]
+        fn takes_a_record_that_arrives_in_pieces() {
+            let record = ExecutionWireSerializer::encode(&numbered(1)).unwrap();
+
+            let sut = read_record(OneByteAtATime(Cursor::new(record)));
+
+            assert_eq!(sut.unwrap(), Some(numbered(1)));
+        }
+
+        #[test]
+        fn returns_none_for_the_end_of_stream() {
+            let sut = read_record(Cursor::new(ExecutionWireSerializer::END_OF_STREAM));
+
+            assert_eq!(sut.unwrap(), None);
+        }
+
+        #[test]
+        fn rejects_a_connection_that_closes_early() {
+            let record = ExecutionWireSerializer::encode(&numbered(1)).unwrap();
+            let cases = [("in the header", &record[..2]), ("in the body", &record[..record.len() - 1])];
+
+            for (case, bytes) in cases {
+                let sut = read_record(Cursor::new(bytes.to_vec()));
+
+                assert!(sut.is_err(), "case: {case}: {sut:?}");
+            }
+        }
+    }
+
     // Requirements: interception-report-channel
     #[test]
     fn skips_a_bad_connection_and_reads_the_next() {
-        let record = record_bytes(&numbered(1));
-        let cases =
-            [("a zero length before shutdown", vec![0u8; 4]), ("a record cut short", record[..10].to_vec())];
+        let cases: [(&str, Vec<u8>); 2] = [
+            ("a zero length before shutdown", vec![0; 4]),
+            ("a garbage payload", vec![0, 0, 0, 5, b'x', b'x', b'x', b'x', b'x']),
+        ];
 
         for (case, bytes) in cases {
             for fixture in Fixture::all() {
