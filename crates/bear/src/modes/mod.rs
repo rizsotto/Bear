@@ -15,6 +15,7 @@ use intercept_supervisor::context;
 use intercept_supervisor::{Collector, SignalSource, SocketAccess, abort, abort_on_termination};
 use semantic::SpellingError;
 use semantic::{CompilerHints, CompilerRecognizer};
+use std::path::Path;
 use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
 
@@ -95,7 +96,7 @@ impl Mode {
                     Arc::new(impls::SocketEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
-                    execution::Output::Events(output.path.clone()),
+                    events_when_interrupted(&output.path),
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -165,7 +166,7 @@ impl Mode {
                     Arc::new(impls::SocketEventProducer::create(producer)),
                     Box::new(consumer),
                     Box::new(impls::BuildExecutor::create(build)),
-                    execution::Output::database(path, append, existed),
+                    database_when_interrupted(&path, append, existed),
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -316,6 +317,25 @@ fn socket_access(configured: Option<config::SocketAccess>, effective_uid: Option
         (Some(config::SocketAccess::All), _) | (None, Some(0)) => SocketAccess::All,
         (None, _) => SocketAccess::Owner,
     }
+}
+
+/// An interrupted intercept run keeps the events captured so far.
+fn events_when_interrupted(path: &Path) -> execution::WhenInterrupted {
+    let warning = format!("the build was interrupted; {} holds the events captured so far", path.display());
+    execution::WhenInterrupted { publish: true, warning }
+}
+
+/// An interrupted run that appends leaves the database as it was, so a
+/// partial build does not drop entries. One that replaces publishes the
+/// partial result.
+fn database_when_interrupted(path: &Path, append: bool, existed: bool) -> execution::WhenInterrupted {
+    let path = path.display();
+    let warning = match (append, existed) {
+        (true, true) => format!("the build was interrupted; {path} is unchanged"),
+        (true, false) => format!("the build was interrupted; {path} was not written"),
+        (false, _) => format!("the build was interrupted; {path} was replaced with a partial result"),
+    };
+    execution::WhenInterrupted { publish: !append, warning }
 }
 
 mod impls {
@@ -753,7 +773,51 @@ mod impls {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
+
+    // Requirements: output-append, interception-events-format
+    #[test]
+    fn interrupted_run_keeps_or_publishes_by_output() {
+        let db = Path::new("db.json");
+        // (case, sut, publish, warning)
+        let cases = [
+            (
+                "appended, existed",
+                database_when_interrupted(db, true, true),
+                false,
+                "the build was interrupted; db.json is unchanged",
+            ),
+            (
+                "appended, new",
+                database_when_interrupted(db, true, false),
+                false,
+                "the build was interrupted; db.json was not written",
+            ),
+            (
+                "replaced, existed",
+                database_when_interrupted(db, false, true),
+                true,
+                "the build was interrupted; db.json was replaced with a partial result",
+            ),
+            (
+                "replaced, new",
+                database_when_interrupted(db, false, false),
+                true,
+                "the build was interrupted; db.json was replaced with a partial result",
+            ),
+            (
+                "events",
+                events_when_interrupted(Path::new("events.json")),
+                true,
+                "the build was interrupted; events.json holds the events captured so far",
+            ),
+        ];
+
+        for (case, sut, publish, warning) in cases {
+            assert_eq!(sut.publish, publish, "case: {case}");
+            assert_eq!(sut.warning, warning, "case: {case}");
+        }
+    }
 
     mod fixture {
         use super::*;

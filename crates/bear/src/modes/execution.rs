@@ -5,7 +5,6 @@ use crate::args::BuildCommand;
 use crate::environment::execution_from_build_command;
 use crate::output::AtomicFile;
 use intercept_supervisor::{Outcome, SuperviseError};
-use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
@@ -136,48 +135,17 @@ pub struct Interceptor {
     producer: Arc<dyn CancellableProducer>,
     consumer: Box<dyn Consumer>,
     build: Box<dyn Executor>,
-    /// What the run writes. An interrupted build publishes unless the run
-    /// appends.
-    output: Output,
+    when_interrupted: WhenInterrupted,
 }
 
-/// What a run writes, for the publish rule and the interrupted-build warning.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Output {
-    /// The events file of intercept mode, always replaced.
-    Events(PathBuf),
-    /// A database the run appends to. `existed` is read before the run starts.
-    Appended { path: PathBuf, existed: bool },
-    /// A database the run overwrites.
-    Replaced(PathBuf),
-}
-
-impl Output {
-    /// `existed` tells whether the database was there before the run.
-    pub fn database(path: PathBuf, append: bool, existed: bool) -> Self {
-        if append { Self::Appended { path, existed } } else { Self::Replaced(path) }
-    }
-
-    fn appends(&self) -> bool {
-        matches!(self, Self::Appended { .. })
-    }
-
-    fn interrupted_warning(&self) -> String {
-        match self {
-            Self::Events(path) => {
-                format!("the build was interrupted; {} holds the events captured so far", path.display())
-            }
-            Self::Appended { path, existed: true } => {
-                format!("the build was interrupted; {} is unchanged", path.display())
-            }
-            Self::Appended { path, existed: false } => {
-                format!("the build was interrupted; {} was not written", path.display())
-            }
-            Self::Replaced(path) => {
-                format!("the build was interrupted; {} was replaced with a partial result", path.display())
-            }
-        }
-    }
+/// What an interrupted build that did not exit `0` does to the output. The
+/// mode that picks the output decides it.
+#[derive(Debug)]
+pub struct WhenInterrupted {
+    /// Whether the partial result is published.
+    pub publish: bool,
+    /// Tells the user what happened to the output.
+    pub warning: String,
 }
 
 impl Interceptor {
@@ -185,9 +153,9 @@ impl Interceptor {
         producer: Arc<dyn CancellableProducer>,
         consumer: Box<dyn Consumer>,
         build: Box<dyn Executor>,
-        output: Output,
+        when_interrupted: WhenInterrupted,
     ) -> Self {
-        Self { producer, consumer, build, output }
+        Self { producer, consumer, build, when_interrupted }
     }
 
     /// Runs live command interception for the given build command.
@@ -251,11 +219,11 @@ impl Interceptor {
         let exit_status = outcome.status;
         producer_result?.map_err(RuntimeError::Producer)?;
         let output = consumer_result?.map_err(RuntimeError::Consumer)?;
-        if publishes(&outcome, self.output.appends()) {
+        if publishes(&outcome, self.when_interrupted.publish) {
             commit(output)?;
         }
         if outcome.interrupted && !exit_status.success() {
-            log::warn!("{}", self.output.interrupted_warning());
+            log::warn!("{}", self.when_interrupted.warning);
         }
 
         Ok(Exit::Build(exit_status))
@@ -312,10 +280,10 @@ impl Replayer {
     }
 }
 
-/// An interrupted build that did not exit `0` publishes only when the run
-/// overwrites the output. Any other build publishes.
-fn publishes(outcome: &Outcome, append: bool) -> bool {
-    outcome.status.success() || !outcome.interrupted || !append
+/// An interrupted build that did not exit `0` publishes only when the mode
+/// says so. Any other build publishes.
+fn publishes(outcome: &Outcome, publish_when_interrupted: bool) -> bool {
+    outcome.status.success() || !outcome.interrupted || publish_when_interrupted
 }
 
 fn commit(output: AtomicFile) -> Result<(), RuntimeError> {
@@ -457,76 +425,46 @@ mod tests {
         ExitStatusExt::from_raw(1) // On Windows, use raw value 1 to get exit code 1
     }
 
+    fn when_interrupted() -> WhenInterrupted {
+        WhenInterrupted { publish: true, warning: "interrupted".to_string() }
+    }
+
     fn finished(status: ExitStatus) -> Outcome {
         Outcome { status, interrupted: false }
     }
 
-    // Requirements: output-append, interception-events-format
-    #[test]
-    fn test_interrupted_warning_by_output() {
-        // (output, expected)
-        let cases = vec![
-            (
-                Output::database(PathBuf::from("db.json"), true, true),
-                "the build was interrupted; db.json is unchanged",
-            ),
-            (
-                Output::database(PathBuf::from("db.json"), true, false),
-                "the build was interrupted; db.json was not written",
-            ),
-            (
-                Output::database(PathBuf::from("db.json"), false, true),
-                "the build was interrupted; db.json was replaced with a partial result",
-            ),
-            (
-                Output::database(PathBuf::from("db.json"), false, false),
-                "the build was interrupted; db.json was replaced with a partial result",
-            ),
-            (
-                Output::Events(PathBuf::from("events.json")),
-                "the build was interrupted; events.json holds the events captured so far",
-            ),
-        ];
-
-        for (output, expected) in cases {
-            let sut = output.interrupted_warning();
-
-            assert_eq!(sut, expected, "output: {output:?}");
-        }
-    }
-
     // Requirements: output-append, output-atomic-write
     #[test]
-    fn test_publishes_by_outcome_and_output_mode() {
-        // (name, status, interrupted, append, expected)
+    fn test_publishes_by_outcome() {
+        // (name, status, interrupted, publish when interrupted, expected)
         let cases = vec![
-            ("success", create_success_exit_status(), false, true, true),
             ("success", create_success_exit_status(), false, false, true),
-            ("success, interrupted", create_success_exit_status(), true, true, true),
+            ("success", create_success_exit_status(), false, true, true),
             ("success, interrupted", create_success_exit_status(), true, false, true),
-            ("failure code", create_failure_exit_status(), false, true, true),
+            ("success, interrupted", create_success_exit_status(), true, true, true),
             ("failure code", create_failure_exit_status(), false, false, true),
-            ("failure code, interrupted", create_failure_exit_status(), true, true, false),
-            ("failure code, interrupted", create_failure_exit_status(), true, false, true),
+            ("failure code", create_failure_exit_status(), false, true, true),
+            ("failure code, interrupted", create_failure_exit_status(), true, false, false),
+            ("failure code, interrupted", create_failure_exit_status(), true, true, true),
         ];
         #[cfg(unix)]
         let killed_cases = {
             use std::os::unix::process::ExitStatusExt;
             let killed = ExitStatus::from_raw(libc::SIGKILL);
             vec![
-                ("killed by a signal", killed, false, true, true),
                 ("killed by a signal", killed, false, false, true),
-                ("killed by a signal, interrupted", killed, true, true, false),
-                ("killed by a signal, interrupted", killed, true, false, true),
+                ("killed by a signal", killed, false, true, true),
+                ("killed by a signal, interrupted", killed, true, false, false),
+                ("killed by a signal, interrupted", killed, true, true, true),
             ]
         };
         #[cfg(not(unix))]
         let killed_cases = vec![];
 
-        for (name, status, interrupted, append, expected) in cases.into_iter().chain(killed_cases) {
-            let sut = publishes(&Outcome { status, interrupted }, append);
+        for (name, status, interrupted, publish, expected) in cases.into_iter().chain(killed_cases) {
+            let sut = publishes(&Outcome { status, interrupted }, publish);
 
-            assert_eq!(sut, expected, "{name}, append: {append}");
+            assert_eq!(sut, expected, "{name}, publish when interrupted: {publish}");
         }
     }
 
@@ -690,7 +628,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -731,7 +669,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -761,7 +699,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -790,7 +728,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -821,7 +759,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -852,7 +790,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -892,7 +830,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         );
         let result = interceptor.run(create_test_command(), std::iter::empty(), drop);
 
@@ -992,7 +930,7 @@ mod tests {
             producer_mock.clone(),
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         )
         .run(create_test_command(), std::iter::empty(), drop);
 
@@ -1015,13 +953,35 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         )
         .run(create_test_command(), std::iter::empty(), drop);
 
         assert!(!build_status(sut.expect("a failing build is not an error of Bear")).success());
         assert!(final_path.exists());
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "only the output may remain");
+    }
+
+    // Requirements: output-append
+    #[test]
+    fn test_interceptor_rolls_back_an_interrupted_build_when_told_not_to_publish() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("output.json");
+        let producer_mock = Arc::new(MockCancellableProducer::new(vec![]));
+        let consumer_mock = consumer_with_pending_output(&final_path);
+        let mut executor_mock = MockExecutor::new();
+        executor_mock
+            .expect_run()
+            .times(1)
+            .returning(|_, _| Ok(Outcome { status: create_failure_exit_status(), interrupted: true }));
+        let keep = WhenInterrupted { publish: false, warning: "interrupted".to_string() };
+
+        let sut = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock), keep)
+            .run(create_test_command(), std::iter::empty(), drop);
+
+        assert!(!build_status(sut.expect("an interrupted build is not an error of Bear")).success());
+        assert!(!final_path.exists());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0, "the partial output is rolled back");
     }
 
     // Requirements: cli-signal-forwarding
@@ -1044,7 +1004,7 @@ mod tests {
             producer_mock,
             Box::new(consumer_mock),
             Box::new(executor_mock),
-            Output::Events(PathBuf::new()),
+            when_interrupted(),
         )
         .run(create_test_command(), std::iter::empty(), |_| {
             hook_ran = true;
