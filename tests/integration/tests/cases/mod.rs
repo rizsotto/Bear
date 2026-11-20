@@ -46,6 +46,7 @@ pub mod intercept_posix;
 // the feature and its integration tests are Unix-only.
 #[cfg(unix)]
 pub mod parse_sh;
+pub mod report_channel;
 #[cfg(all(has_preload_library, has_executable_compiler_c, has_executable_shell))]
 pub mod response_files;
 pub mod semantic;

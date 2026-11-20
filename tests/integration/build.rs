@@ -91,6 +91,8 @@ fn main() {
     check_executable_exists("env");
     check_executable_exists("bash");
     check_executable_exists("ps");
+    check_executable_exists("unshare");
+    check_executable_exists("setpriv");
 
     // Check for preload library availability
     check_preload_library_availability(&preload_path);

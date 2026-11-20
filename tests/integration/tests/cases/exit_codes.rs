@@ -175,8 +175,12 @@ fn exit_code_when_signaled() -> Result<()> {
     // And should terminate the child process and return immediately.
     let env = TestEnvironment::new("exit_code_when_signaled")?;
 
+    // SIGKILL leaves the socket directory behind; keep it inside the test directory.
+    let runtime = env.test_dir().join("runtime");
+    std::fs::create_dir(&runtime)?;
     let mut cmd = env.command_bear();
     cmd.current_dir(env.test_dir())
+        .env("XDG_RUNTIME_DIR", &runtime)
         .arg("--")
         .arg(SLEEP_PATH)
         .arg("10")
@@ -354,10 +358,14 @@ fn bear_ends_by_the_signal_that_killed_the_build() -> Result<()> {
     for (name, signal) in [("TERM", libc::SIGTERM), ("INT", libc::SIGINT), ("KILL", libc::SIGKILL)] {
         let env = TestEnvironment::new(&format!("exit_by_signal_{name}"))?;
         let script = format!("kill -{name} $$");
+        // SIGKILL leaves the socket directory behind; keep it inside the test directory.
+        let runtime = env.test_dir().join("runtime");
+        std::fs::create_dir(&runtime)?;
 
         let sut = env
             .command_bear()
             .current_dir(env.test_dir())
+            .env("XDG_RUNTIME_DIR", &runtime)
             .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
             .status()?;
 

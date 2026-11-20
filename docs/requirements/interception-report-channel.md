@@ -1,6 +1,6 @@
 ---
 title: Report channel between the build and Bear
-status: accepted
+status: implemented
 ---
 
 ## Intent
