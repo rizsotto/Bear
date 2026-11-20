@@ -56,6 +56,9 @@
 //!
 //! intercept:
 //!   mode: preload
+//!   socket:
+//!     dir: /run/build
+//!     access: all
 //!
 //! format:
 //!   paths:

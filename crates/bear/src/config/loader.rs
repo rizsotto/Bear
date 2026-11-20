@@ -214,7 +214,7 @@ mod test {
 
         let expected = Main {
             schema: String::from("4.2"),
-            intercept: Intercept::Wrapper,
+            intercept: Intercept { mode: InterceptMode::Wrapper, socket: None },
             compilers: vec![
                 Compiler {
                     path: PathBuf::from("/usr/local/bin/cc"),
@@ -272,7 +272,7 @@ mod test {
 
         let expected = Main {
             schema: String::from("4.2"),
-            intercept: Intercept::Wrapper,
+            intercept: Intercept { mode: InterceptMode::Wrapper, socket: None },
             compilers: vec![],
             sources: SourceFilter { only_existing_files: true, directories: vec![], files: vec![] },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::Directory, OutputFields::File] },
@@ -305,7 +305,7 @@ mod test {
 
         let expected = Main {
             schema: String::from("4.2"),
-            intercept: Intercept::Preload,
+            intercept: Intercept { mode: InterceptMode::Preload, socket: None },
             compilers: vec![],
             sources: SourceFilter { only_existing_files: true, directories: vec![], files: vec![] },
             duplicates: DuplicateFilter { match_on: vec![OutputFields::Directory, OutputFields::File] },
@@ -338,7 +338,7 @@ mod test {
 
         let expected = Main {
             schema: String::from("4.2"),
-            intercept: Intercept::Wrapper,
+            intercept: Intercept { mode: InterceptMode::Wrapper, socket: None },
             compilers: vec![],
             sources: SourceFilter::default(),
             duplicates: DuplicateFilter::default(),

@@ -21,6 +21,10 @@ pub enum ValidationError {
     DuplicateEntry { field: &'static str, idx: usize },
     #[error("Setting {key} needs files on this machine; it cannot be used with --no-local-lookups")]
     NeedsLocalFiles { key: &'static str },
+    #[error("Setting intercept.socket is not supported on this platform")]
+    SocketUnsupported,
+    #[error("Setting intercept.socket.dir must be an absolute path: '{path}'")]
+    SocketDirNotAbsolute { path: String },
     #[error("Path format error: {message}")]
     PathFormatError { message: &'static str },
     #[error("Invalid glob pattern for field '{field}': {message}")]
@@ -65,11 +69,28 @@ impl Validator<Main> for Main {
             }
         }
 
+        extend_with(&mut errors, check_socket(&config.intercept, cfg!(unix)));
         extend_with(&mut errors, SourceFilter::validate(&config.sources));
         extend_with(&mut errors, DuplicateFilter::validate(&config.duplicates));
         extend_with(&mut errors, PathFormat::validate(&config.format.paths));
 
         collapse(errors)
+    }
+}
+
+/// The report socket needs UNIX sockets, and its directory must not depend on where Bear starts.
+fn check_socket(intercept: &Intercept, unix: bool) -> Result<(), ValidationError> {
+    let Some(socket) = intercept.effective_socket() else {
+        return Ok(());
+    };
+    if !unix {
+        return Err(ValidationError::SocketUnsupported);
+    }
+    match &socket.dir {
+        Some(dir) if !dir.is_absolute() => {
+            Err(ValidationError::SocketDirNotAbsolute { path: dir.display().to_string() })
+        }
+        _ => Ok(()),
     }
 }
 
@@ -242,6 +263,38 @@ mod tests {
             let sut = Main::validate(&config);
 
             assert!(sut.is_ok(), "{case}: {sut:?}");
+        }
+    }
+
+    fn intercept_with_socket(dir: Option<&str>, access: Option<SocketAccess>) -> Intercept {
+        Intercept {
+            socket: Some(Socket { dir: dir.map(std::path::PathBuf::from), access }),
+            ..Intercept::default()
+        }
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn test_check_socket() {
+        let absent = Intercept::default();
+        let empty = intercept_with_socket(None, None);
+        let access = intercept_with_socket(None, Some(SocketAccess::All));
+        let absolute =
+            intercept_with_socket(Some(if cfg!(windows) { "C:\\run\\build" } else { "/run/build" }), None);
+        let relative = intercept_with_socket(Some("run/build"), None);
+        let cases = [
+            ("absent, unix", &absent, true, true),
+            ("empty, windows", &empty, false, true),
+            ("access, unix", &access, true, true),
+            ("access, windows", &access, false, false),
+            ("absolute dir, unix", &absolute, true, true),
+            ("relative dir, unix", &relative, true, false),
+        ];
+
+        for (case, intercept, unix, ok) in cases {
+            let sut = check_socket(intercept, unix);
+
+            assert_eq!(sut.is_ok(), ok, "case: {case}");
         }
     }
 

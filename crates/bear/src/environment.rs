@@ -49,12 +49,12 @@ impl BuildEnvironment {
         address: Address,
         is_compiler: impl Fn(&Path) -> bool,
     ) -> Result<Self, ConfigurationError> {
-        let inner = match intercept {
-            config::Intercept::Wrapper => {
+        let inner = match intercept.mode {
+            config::InterceptMode::Wrapper => {
                 let executables = wrapped_executables(compilers);
                 runner::BuildEnvironment::create_as_wrapper(context, &executables, address, is_compiler)?
             }
-            config::Intercept::Preload => runner::BuildEnvironment::create_as_preload(context, address)?,
+            config::InterceptMode::Preload => runner::BuildEnvironment::create_as_preload(context, address)?,
         };
         Ok(Self { inner })
     }

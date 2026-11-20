@@ -52,10 +52,28 @@ impl fmt::Display for Main {
     }
 }
 
-/// Simplified intercept configuration with mode.
+/// The interception configuration: the mechanism and the report socket.
+#[derive(Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct Intercept {
+    #[serde(default)]
+    pub mode: InterceptMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub socket: Option<Socket>,
+}
+
+impl Intercept {
+    /// The `socket` section, or `None` when it is absent or has no key.
+    ///
+    /// An empty section counts as absent, so it does not turn off the
+    /// fallback to the loopback interface.
+    pub fn effective_socket(&self) -> Option<&Socket> {
+        self.socket.as_ref().filter(|socket| socket.dir.is_some() || socket.access.is_some())
+    }
+}
+
+/// How the interception is injected into the build.
 #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(tag = "mode")]
-pub enum Intercept {
+pub enum InterceptMode {
     #[serde(rename = "wrapper")]
     Wrapper,
     #[serde(rename = "preload")]
@@ -63,16 +81,36 @@ pub enum Intercept {
 }
 
 /// The default intercept mode is varying based on the target operating system.
-impl Default for Intercept {
+impl Default for InterceptMode {
     #[cfg(any(target_os = "macos", target_os = "ios", target_os = "windows"))]
     fn default() -> Self {
-        Intercept::Wrapper
+        InterceptMode::Wrapper
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows")))]
     fn default() -> Self {
-        Intercept::Preload
+        InterceptMode::Preload
     }
+}
+
+/// The `intercept.socket` section: where the report socket lives and who may use it.
+#[derive(Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct Socket {
+    /// An existing absolute directory. Bear makes its own directory inside it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dir: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access: Option<SocketAccess>,
+}
+
+/// Who may connect to the report socket.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SocketAccess {
+    /// The user who runs Bear.
+    Owner,
+    /// Every user.
+    All,
 }
 
 /// Represents compiler configuration matching the YAML format.
@@ -354,6 +392,64 @@ mod tests {
             let sut: Compiler = serde_saphyr::from_str(&yaml).unwrap();
 
             assert_eq!(sut.as_.as_deref(), Some(spelling), "case: as: {spelling}");
+        }
+    }
+
+    fn parse_intercept(yaml: &str) -> Intercept {
+        serde_saphyr::from_str(yaml).unwrap()
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn test_intercept_without_socket_parses() {
+        let cases = [("mode: wrapper", InterceptMode::Wrapper), ("mode: preload", InterceptMode::Preload)];
+
+        for (yaml, mode) in cases {
+            let sut = parse_intercept(yaml);
+
+            assert_eq!(sut, Intercept { mode, socket: None }, "case: {yaml}");
+        }
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn test_intercept_socket_keys_parse() {
+        let cases = [
+            ("dir: /run/build", Some(PathBuf::from("/run/build")), None),
+            ("access: owner", None, Some(SocketAccess::Owner)),
+            ("access: all", None, Some(SocketAccess::All)),
+            ("dir: /run/build\n    access: all", Some(PathBuf::from("/run/build")), Some(SocketAccess::All)),
+        ];
+
+        for (keys, dir, access) in cases {
+            let yaml = format!("mode: preload\nsocket:\n    {keys}");
+
+            let sut = parse_intercept(&yaml);
+
+            assert_eq!(sut.socket, Some(Socket { dir, access }), "case: {keys}");
+            assert!(sut.effective_socket().is_some(), "case: {keys}");
+        }
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn test_intercept_rejects_a_bad_access_value() {
+        let yaml = "mode: preload\nsocket:\n    access: group";
+
+        let sut: Result<Intercept, _> = serde_saphyr::from_str(yaml);
+
+        assert!(sut.is_err());
+    }
+
+    // Requirements: interception-report-channel
+    #[test]
+    fn test_empty_socket_section_counts_as_absent() {
+        let cases = ["mode: preload\nsocket:", "mode: preload\nsocket: {}", "mode: preload"];
+
+        for yaml in cases {
+            let sut = parse_intercept(yaml);
+
+            assert!(sut.effective_socket().is_none(), "case: {yaml}");
         }
     }
 }
