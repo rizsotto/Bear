@@ -35,6 +35,10 @@ pub struct Context {
     /// Default executable search path from `confstr(_CS_PATH)`.
     /// Used as a fallback when a process's environment lacks `PATH`.
     pub confstr_path: String,
+    /// Effective user id of the Bear process. It picks the default socket
+    /// access: root opens the socket to every user. `None` where there is no
+    /// such thing (Windows).
+    pub effective_uid: Option<u32>,
 }
 
 impl Context {
@@ -51,8 +55,16 @@ impl Context {
 
         let preload_supported = is_preload_supported();
         let confstr_path = get_confstr_cs_path();
+        let effective_uid = get_effective_uid();
 
-        Ok(Context { current_executable, current_directory, environment, preload_supported, confstr_path })
+        Ok(Context {
+            current_executable,
+            current_directory,
+            environment,
+            preload_supported,
+            confstr_path,
+            effective_uid,
+        })
     }
 
     /// Returns the PATH environment variable key and value.
@@ -78,6 +90,10 @@ impl fmt::Display for Context {
         writeln!(f, "  Current Executable: {}", self.current_executable.display())?;
         writeln!(f, "  Current Directory: {}", self.current_directory.display())?;
         writeln!(f, "  Preload Supported: {}", self.preload_supported)?;
+        match self.effective_uid {
+            Some(uid) => writeln!(f, "  Effective UID: {uid}")?,
+            None => writeln!(f, "  Effective UID: not available")?,
+        }
         writeln!(f, "  Total Environment Variables: {} entries", self.environment.len())?;
 
         // Display relevant environment variables by iterating directly
@@ -174,6 +190,17 @@ fn get_confstr_cs_path() -> String {
     "/usr/bin:/bin".to_string()
 }
 
+#[cfg(unix)]
+fn get_effective_uid() -> Option<u32> {
+    // SAFETY: geteuid takes no arguments and cannot fail.
+    Some(unsafe { libc::geteuid() })
+}
+
+#[cfg(not(unix))]
+fn get_effective_uid() -> Option<u32> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +215,7 @@ mod tests {
         // Basic assertions that should always be true
         assert!(ctx.current_directory.is_absolute());
         assert!(ctx.current_executable.is_absolute());
+        assert_eq!(ctx.effective_uid.is_some(), cfg!(unix));
     }
 
     #[test]
@@ -198,6 +226,7 @@ mod tests {
         assert!(display_output.contains("Application Context:"));
         assert!(display_output.contains("Current Directory:"));
         assert!(display_output.contains("Current Executable:"));
+        assert!(display_output.contains("Effective UID:"));
         assert!(display_output.contains("Relevant Environment Variables:"));
         assert!(display_output.contains("Total Environment Variables:"));
     }
@@ -219,6 +248,7 @@ mod tests {
             environment: test_env,
             preload_supported: is_preload_supported(),
             confstr_path: get_confstr_cs_path(),
+            effective_uid: None,
         };
 
         let display_output = format!("{}", context);
@@ -251,6 +281,7 @@ mod tests {
             environment: test_env,
             preload_supported: is_preload_supported(),
             confstr_path: get_confstr_cs_path(),
+            effective_uid: None,
         };
 
         let display_output = format!("{}", context);

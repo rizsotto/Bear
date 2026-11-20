@@ -713,6 +713,7 @@ mod test {
                     environment: self.environment.clone(),
                     preload_supported: self.preload_supported,
                     confstr_path: self.confstr_path.clone(),
+                    effective_uid: None,
                 }
             }
         }
@@ -738,6 +739,7 @@ mod test {
                     environment,
                     preload_supported: true,
                     confstr_path: String::from("/usr/bin:/bin"),
+                    effective_uid: None,
                 }
             };
             let address = fixture::test_address();
@@ -1199,6 +1201,7 @@ mod test {
             environment,
             preload_supported: true,
             confstr_path: String::new(),
+            effective_uid: None,
         };
 
         let resolved = BuildEnvironment::resolve_program_path(&context, masq_gcc.to_str().unwrap());

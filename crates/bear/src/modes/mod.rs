@@ -751,6 +751,7 @@ mod tests {
                     environment: HashMap::new(),
                     preload_supported: false,
                     confstr_path: String::new(),
+                    effective_uid: None,
                 }
             }
 
