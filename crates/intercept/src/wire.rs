@@ -195,8 +195,11 @@ pub fn retry_on_reset(mut send: impl FnMut() -> io::Result<()>) -> io::Result<()
 ///
 /// macOS and the BSDs refuse a connect with `ECONNREFUSED` when the listen
 /// queue is full, where TCP would have resent the SYN. A short backoff
-/// (1, 2, 4 ... 128 ms) rides out a burst. A stale socket file gives the same
-/// error, so the wait is bounded at 255 ms. Any other error returns at once.
+/// (1, 2, 4 ... 256 ms) rides out a burst. A stale socket file gives the same
+/// error, so the wait is bounded at 511 ms. Any other error returns at once.
+/// The collector's UNIX read timeout must stay below this budget, so a stuck
+/// peer cannot outlast the reporters waiting behind it. 511 ms covers two
+/// stuck peers in a row at the 200 ms read timeout.
 #[cfg(unix)]
 pub fn connect_unix(path: &std::path::Path) -> std::io::Result<std::os::unix::net::UnixStream> {
     use std::io::ErrorKind;
@@ -206,7 +209,7 @@ pub fn connect_unix(path: &std::path::Path) -> std::io::Result<std::os::unix::ne
     let mut delay = Duration::from_millis(1);
     loop {
         match UnixStream::connect(path) {
-            Err(err) if err.kind() == ErrorKind::ConnectionRefused && delay <= Duration::from_millis(128) => {
+            Err(err) if err.kind() == ErrorKind::ConnectionRefused && delay <= Duration::from_millis(256) => {
                 std::thread::sleep(delay);
                 delay *= 2;
             }

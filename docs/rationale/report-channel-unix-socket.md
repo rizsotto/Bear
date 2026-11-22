@@ -92,9 +92,9 @@ marker it has read every report that was complete before the stop.
   report is visible to the user: then a private socket for root, plus
   a clear warning, becomes the better trade.
 - A full accept queue blocks the reporter on Linux. On macOS and the
-  BSDs it refuses the connection, so the reporter retries for a short
-  time. A stale socket also refuses, so a build that outlives a killed
-  Bear pays that wait on every execution.
+  BSDs it refuses the connection, so the reporter retries for up to
+  511 ms. A stale socket also refuses, so a build that outlives a
+  killed Bear pays that wait on every execution.
 - On TCP, FreeBSD resets a connection when the accept queue is full,
   and the reporter's connect or write fails. The reporter tries a reset
   send again a few times, 15 ms in all. A retry cannot add a record
@@ -111,15 +111,20 @@ marker it has read every report that was complete before the stop.
   output. A workaround would need state the loop does not have, for a
   case no user reported.
 - One connection is read at a time. A silent connection holds up the
-  others for the read timeout: 100 ms on a UNIX socket, under the
-  255 ms that a reporter retries a refused connect on macOS. On TCP it
-  is 1 s, because Linux drops the last handshake packet when the
-  accept queue is full, and that report comes on a resend 200 ms or
-  more later. The kernel retries a TCP connect to a full queue, so
-  there is no reporter retry budget to stay under. The reporter
-  encodes the record before it connects and sends it in one write, so
-  an honest reporter is not cut off by the timeout. A connection cut
-  off without a complete record is a lost entry, and Bear warns.
+  others for the read timeout. On a UNIX socket it is 200 ms. The rule:
+  it stays below the 511 ms that a reporter retries a refused connect
+  on macOS and the BSDs, so a stuck peer cannot outlast the reporters
+  waiting behind it. The 511 ms budget covers two stuck peers in a row
+  at 200 ms, as 255 ms did at the earlier 100 ms. On TCP it is 1 s, because Linux drops the last
+  handshake packet when the accept queue is full, and that report
+  comes on a resend 200 ms or more later. The kernel retries a TCP
+  connect to a full queue, so there is no reporter retry budget to
+  stay under. The reporter encodes the record before it connects and
+  sends it in one write, so an honest reporter is rarely cut off. On a
+  loaded machine it still can be: with a 100 ms timeout a Yocto build
+  lost 2 of about 50000 reports. A connection cut off without a
+  complete record is a lost entry, and Bear warns with how long it
+  waited and how many bytes of the record came.
 - The timeout is per read, so a peer that sends a byte just under
   every timeout is not bounded. Only a hostile local process does
   that; accepted.

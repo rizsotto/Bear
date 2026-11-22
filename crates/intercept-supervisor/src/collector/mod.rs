@@ -26,10 +26,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-/// How long a read waits for a silent peer: under the 255 ms that a reporter
-/// retries a refused UNIX connect, so a full queue does not lose reports.
+/// How long a read waits for a silent peer. It must stay below the 511 ms that
+/// a reporter retries a refused UNIX connect, so a stuck peer cannot outlast
+/// the reporters waiting behind it.
 #[cfg(unix)]
-const UNIX_READ_TIMEOUT: Duration = Duration::from_millis(100);
+const UNIX_READ_TIMEOUT: Duration = Duration::from_millis(200);
 /// When the accept queue is full, Linux drops the client's last handshake
 /// packet, and the record comes on a resend 200 ms or more later. A shorter
 /// wait lost reports in a burst. TCP has no reporter retry budget to stay under.
@@ -101,11 +102,12 @@ impl Collector {
                     }
                 };
                 failing_since = None;
+                let started = Instant::now();
                 match read_record(connection) {
                     Ok(Some(execution)) => return Some(Ok(execution)),
                     Ok(None) if self.stop_requested.load(Ordering::Acquire) => return None,
                     Ok(None) => log::debug!("skipping an empty record"),
-                    Err(err) => log::warn!("lost a report, the connection sent no complete record: {err}"),
+                    Err(err) => log::warn!("lost a report after {} ms: {err}", started.elapsed().as_millis()),
                 }
             }
         })
@@ -177,22 +179,29 @@ impl Listener {
 }
 
 /// Reads one record from a connection. `None` is the end-of-stream record.
-///
-/// The body buffer grows with the bytes that arrive, so a bad length does not
-/// allocate up front. A connection that closes early is an error.
 fn read_record(mut connection: impl Read) -> Result<Option<Execution>, ReporterError> {
-    let mut header = [0; ExecutionWireSerializer::HEADER_SIZE];
-    connection.read_exact(&mut header)?;
+    let header = read_part(&mut connection, ExecutionWireSerializer::HEADER_SIZE as u64, "header")?;
+    let header = header.try_into().expect("read_part returns exactly the bytes asked for");
     let length = match ExecutionWireSerializer::decode_header(header)? {
         RecordHeader::End => return Ok(None),
         RecordHeader::Body(length) => length,
     };
-    let mut body = Vec::new();
-    connection.take(length).read_to_end(&mut body)?;
-    if body.len() as u64 != length {
-        return Err(io::Error::from(io::ErrorKind::UnexpectedEof).into());
-    }
+    let body = read_part(&mut connection, length, "body")?;
     Ok(Some(ExecutionWireSerializer::decode_body(&body)?))
+}
+
+/// Reads exactly `length` bytes. The error says how many bytes came.
+///
+/// The buffer grows with the bytes that arrive, so a bad length does not
+/// allocate up front. A connection that closes early is an error.
+fn read_part(connection: impl Read, length: u64, part: &str) -> io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let err = match connection.take(length).read_to_end(&mut bytes) {
+        Ok(_) if bytes.len() as u64 == length => return Ok(bytes),
+        Ok(_) => io::Error::from(io::ErrorKind::UnexpectedEof),
+        Err(err) => err,
+    };
+    Err(io::Error::new(err.kind(), format!("{} of {length} {part} bytes received: {err}", bytes.len())))
 }
 
 /// macOS refuses `setsockopt` with EINVAL when the peer already closed. Its
@@ -619,12 +628,21 @@ mod tests {
         #[test]
         fn rejects_a_connection_that_closes_early() {
             let record = ExecutionWireSerializer::encode(&numbered(1)).unwrap();
-            let cases = [("in the header", &record[..2]), ("in the body", &record[..record.len() - 1])];
+            let body = record.len() - ExecutionWireSerializer::HEADER_SIZE;
+            let cases = [
+                ("in the header", &record[..2], "2 of 4 header bytes received".to_string()),
+                (
+                    "in the body",
+                    &record[..record.len() - 1],
+                    format!("{} of {body} body bytes received", body - 1),
+                ),
+            ];
 
-            for (case, bytes) in cases {
+            for (case, bytes, expected) in cases {
                 let sut = read_record(Cursor::new(bytes.to_vec()));
 
-                assert!(sut.is_err(), "case: {case}: {sut:?}");
+                let message = sut.unwrap_err().to_string();
+                assert!(message.contains(&expected), "case: {case}: {message}");
             }
         }
     }
