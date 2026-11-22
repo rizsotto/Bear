@@ -443,34 +443,88 @@ mod tests {
         }
     }
 
-    // Requirements: interception-mechanism-selection
+    // Each transport is checked on its own and every one runs, so a CI log
+    // from a platform we cannot run says which transport failed and how.
+    //
+    // Requirements: interception-mechanism-selection, interception-report-channel
     #[test]
     fn loses_no_report_in_a_burst() {
+        const THREADS: usize = 16;
+        const PER_THREAD: usize = 500;
+        const REPORTS: usize = THREADS * PER_THREAD;
+        let mut failures = Vec::new();
         for fixture in Fixture::all() {
-            let worker = fixture.collect_in_thread();
+            eprintln!("{}: sending {REPORTS} reports", fixture.name);
+            let worker = collect_results_in_thread(&fixture.collector);
 
-            let senders: Vec<_> = (0..16)
+            let senders: Vec<_> = (0..THREADS)
                 .map(|thread| {
                     let address = fixture.address.clone();
                     std::thread::spawn(move || {
-                        for index in 0..500 {
+                        let mut failed = Failures::default();
+                        for index in 0..PER_THREAD {
                             let reporter = SocketReporter::new(address.clone());
-                            reporter.report(numbered(thread * 500 + index)).expect("report should succeed");
+                            if let Err(err) = reporter.report(numbered(thread * PER_THREAD + index)) {
+                                failed.add(err);
+                            }
                         }
+                        failed
                     })
                 })
                 .collect();
+            let mut sent = Failures::default();
             for sender in senders {
-                sender.join().unwrap();
+                sent.merge(sender.join().unwrap());
             }
             fixture.collector.shutdown().unwrap();
             let sut = join_within(worker, Duration::from_secs(120));
 
-            assert_eq!(sut.len(), 8000, "case: {}", fixture.name);
-            let mut seen: Vec<_> = sut.iter().map(|execution| execution.arguments[1].clone()).collect();
+            let mut collector = Failures::default();
+            let mut seen = Vec::new();
+            for result in sut {
+                match result {
+                    Ok(execution) => seen.push(execution.arguments[1].clone()),
+                    Err(err) => collector.add(err),
+                }
+            }
+            let collected = seen.len();
             seen.sort();
             seen.dedup();
-            assert_eq!(seen.len(), 8000, "case: {}", fixture.name);
+            let mut problems = Vec::new();
+            if let Some(error) = sent.first {
+                problems.push(format!("{} of {REPORTS} reports failed, first error: {error}", sent.count));
+            }
+            if let Some(error) = collector.first {
+                problems
+                    .push(format!("the collector reported {} errors, first error: {error}", collector.count));
+            }
+            if collected != REPORTS || seen.len() != REPORTS {
+                problems.push(format!("collected {collected} of {REPORTS} reports, {} distinct", seen.len()));
+            }
+            if !problems.is_empty() {
+                failures.push(format!("{}: {}", fixture.name, problems.join("; ")));
+            }
+        }
+
+        assert!(failures.is_empty(), "\n{}", failures.join("\n"));
+    }
+
+    /// How many calls failed, and the text of the first failure.
+    #[derive(Default)]
+    struct Failures {
+        count: usize,
+        first: Option<String>,
+    }
+
+    impl Failures {
+        fn add(&mut self, err: intercept::reporter::ReporterError) {
+            self.count += 1;
+            self.first.get_or_insert_with(|| err.to_string());
+        }
+
+        fn merge(&mut self, other: Failures) {
+            self.count += other.count;
+            self.first = self.first.take().or(other.first);
         }
     }
 
