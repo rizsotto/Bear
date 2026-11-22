@@ -95,6 +95,13 @@ marker it has read every report that was complete before the stop.
   BSDs it refuses the connection, so the reporter retries for a short
   time. A stale socket also refuses, so a build that outlives a killed
   Bear pays that wait on every execution.
+- On TCP, FreeBSD resets a connection when the accept queue is full,
+  and the reporter's connect or write fails. The reporter tries a reset
+  send again a few times, 15 ms in all. A retry cannot add a record
+  twice: the collector keeps a record only once it has read all of it,
+  and a reset send did not deliver all of it. The retry is best
+  effort: a reset that comes after the write returned is not seen, and
+  that report is lost.
 - The minimum Rust version is 1.90. The preload library runs in
   processes that die on `SIGPIPE`, and the standard library's UNIX
   socket write suppresses it only from 1.90. Its vectored write still
