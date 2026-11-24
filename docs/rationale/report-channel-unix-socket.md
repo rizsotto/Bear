@@ -55,6 +55,13 @@ Options considered:
   interleave), cost about 500 lines, and took several macOS CI rounds
   to get right. The blocking loop it replaced never caused a user
   problem.
+- A reporter retry on a reset connection. Rejected: it cannot see a
+  reset that arrives after the write returned, which is how FreeBSD
+  loses reports in a burst, and its effect was never measured.
+- A delivery acknowledgement: the collector answers each record and
+  the reporter waits for it. It is the only real fix for a silent loss.
+  Rejected: it changes the timing of every report on every platform,
+  not worth it for a fallback.
 - UNIX sockets on Windows too. Rejected for now: the standard library
   has them only behind a feature flag
   ([rust-lang/rust#150487](https://github.com/rust-lang/rust/issues/150487)).
@@ -95,13 +102,11 @@ marker it has read every report that was complete before the stop.
   BSDs it refuses the connection, so the reporter retries for up to
   511 ms. A stale socket also refuses, so a build that outlives a
   killed Bear pays that wait on every execution.
-- On TCP, FreeBSD resets a connection when the accept queue is full,
-  and the reporter's connect or write fails. The reporter tries a reset
-  send again a few times, 15 ms in all. A retry cannot add a record
-  twice: the collector keeps a record only once it has read all of it,
-  and a reset send did not deliver all of it. The retry is best
-  effort: a reset that comes after the write returned is not seen, and
-  that report is lost.
+- On TCP, FreeBSD loses reports in a burst that overflows the accept
+  queue, mostly with no error on either side. In CI, 16 threads sending
+  500 reports each delivered 3033 of 8000. We believe the kernel resets
+  the overflowing connections after the reporter's write returned; this
+  is not verified.
 - The minimum Rust version is 1.90. The preload library runs in
   processes that die on `SIGPIPE`, and the standard library's UNIX
   socket write suppresses it only from 1.90. Its vectored write still
