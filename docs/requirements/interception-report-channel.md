@@ -1,6 +1,6 @@
 ---
 title: Report channel between the build and Bear
-status: proposed
+status: implemented
 ---
 
 ## Intent
@@ -95,7 +95,7 @@ socket or its directory (for example by cleaning `/tmp`), Bear ends
 with an error when the build ends and writes no output. The empty
 socket directory may stay behind.
 
-**A burst of reports over the loopback fallback**: when Bear reports
+**A burst of reports over the loopback interface**: when Bear reports
 over the loopback interface, a burst of reports that overflows the
 connection queue can lose reports with no warning. This was seen on
 FreeBSD.

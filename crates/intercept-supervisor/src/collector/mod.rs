@@ -452,8 +452,9 @@ mod tests {
         }
     }
 
-    // Each transport is checked on its own and every one runs, so a CI log
-    // from a platform we cannot run says which transport failed and how.
+    // Each transport is checked on its own and every one runs, except tcp on
+    // FreeBSD, so a CI log from a platform we cannot run says which transport
+    // failed and how.
     //
     // Requirements: interception-mechanism-selection, interception-report-channel
     #[test]

@@ -55,9 +55,10 @@ Options considered:
   interleave), cost about 500 lines, and took several macOS CI rounds
   to get right. The blocking loop it replaced never caused a user
   problem.
-- A reporter retry on a reset connection. Rejected: it cannot see a
-  reset that arrives after the write returned, which is how FreeBSD
-  loses reports in a burst, and its effect was never measured.
+- A reporter retry on a reset connection. Rejected: it only sees a
+  reset the reporter gets as an error. With the retry in place, FreeBSD
+  CI still lost 4967 of 8000 reports, all but one with no error on the
+  sender.
 - A delivery acknowledgement: the collector answers each record and
   the reporter waits for it. It is the only real fix for a silent loss.
   Rejected: it changes the timing of every report on every platform,
@@ -103,7 +104,7 @@ marker it has read every report that was complete before the stop.
   511 ms. A stale socket also refuses, so a build that outlives a
   killed Bear pays that wait on every execution.
 - On TCP, FreeBSD loses reports in a burst that overflows the accept
-  queue, mostly with no error on either side. In CI, 16 threads sending
+  queue, mostly with no error on the sender. In CI, 16 threads sending
   500 reports each delivered 3033 of 8000. We believe the kernel resets
   the overflowing connections after the reporter's write returned; this
   is not verified.
