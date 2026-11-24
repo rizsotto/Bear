@@ -128,7 +128,7 @@ impl Collector {
             };
             stream.write_all(&ExecutionWireSerializer::END_OF_STREAM)
         };
-        intercept::wire::retry_on_reset(wake).map_err(|err| {
+        wake().map_err(|err| {
             io::Error::new(err.kind(), format!("cannot reach the report socket {}: {err}", self.address))
                 .into()
         })

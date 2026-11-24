@@ -160,34 +160,12 @@ impl Reporter for SocketReporter {
         let execution = execution.trim();
         log::debug!("Execution report: {execution:?}");
         let record = ExecutionWireSerializer::encode(&execution)?;
-        retry_on_reset(|| match &self.destination {
-            Address::Tcp(address) => TcpStream::connect(address)?.write_all(&record),
+        match &self.destination {
+            Address::Tcp(address) => TcpStream::connect(address)?.write_all(&record)?,
             #[cfg(unix)]
-            Address::Unix(path) => connect_unix(path)?.write_all(&record),
-        })?;
-        Ok(())
-    }
-}
-
-/// Runs a send again while its connection is reset.
-///
-/// FreeBSD resets a TCP connection whose handshake completed when the
-/// collector's accept queue is full, so the connect or the write fails with
-/// `ECONNRESET`. A short backoff (1, 2, 4, 8 ms) rides out a burst. Any other
-/// error returns at once.
-pub fn retry_on_reset(mut send: impl FnMut() -> io::Result<()>) -> io::Result<()> {
-    use std::time::Duration;
-
-    let mut delay = Duration::from_millis(1);
-    loop {
-        match send() {
-            // No duplicate: the collector keeps only a record it read whole, which a reset send is not.
-            Err(err) if err.kind() == io::ErrorKind::ConnectionReset && delay <= Duration::from_millis(8) => {
-                std::thread::sleep(delay);
-                delay *= 2;
-            }
-            result => return result,
+            Address::Unix(path) => connect_unix(path)?.write_all(&record)?,
         }
+        Ok(())
     }
 }
 
@@ -415,47 +393,6 @@ mod tests {
                     Err(err) => assert_eq!(err.kind(), ErrorKind::BrokenPipe),
                     other => panic!("expected BrokenPipe, got {other:?}"),
                 }
-            }
-        }
-    }
-
-    mod retry_on_reset {
-        use super::*;
-        use std::cell::Cell;
-        use std::io::ErrorKind::{ConnectionRefused, ConnectionReset};
-        use std::rc::Rc;
-
-        /// A send that fails with `error` the first `failures` times, then succeeds.
-        fn failing(
-            failures: usize,
-            error: io::ErrorKind,
-        ) -> (impl FnMut() -> io::Result<()>, Rc<Cell<usize>>) {
-            let calls = Rc::new(Cell::new(0));
-            let counter = Rc::clone(&calls);
-            let send = move || {
-                counter.set(counter.get() + 1);
-                if counter.get() <= failures { Err(io::Error::from(error)) } else { Ok(()) }
-            };
-            (send, calls)
-        }
-
-        // Requirements: interception-report-channel
-        #[test]
-        fn retries_a_reset_a_few_times() {
-            let cases = [
-                ("no failure", 0, ConnectionReset, Ok(()), 1),
-                ("resets then succeeds", 4, ConnectionReset, Ok(()), 5),
-                ("resets for good", 9, ConnectionReset, Err(ConnectionReset), 5),
-                ("other error", 9, ConnectionRefused, Err(ConnectionRefused), 1),
-            ];
-
-            for (case, failures, error, expected, expected_calls) in cases {
-                let (send, calls) = failing(failures, error);
-
-                let sut = retry_on_reset(send);
-
-                assert_eq!(sut.map_err(|err| err.kind()), expected, "case: {case}");
-                assert_eq!(calls.get(), expected_calls, "case: {case}");
             }
         }
     }
