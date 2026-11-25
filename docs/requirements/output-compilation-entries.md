@@ -1,6 +1,6 @@
 ---
 title: Compilation entries from an intercepted invocation
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -57,6 +57,11 @@ every compiler family.
   **then** the database holds no entry for either. The same holds for
   any invocation where argument parsing finds no recognized source:
   Bear never makes a best-effort guess.
+- **Given** a build that runs `cc -S foo.s`, where the invocation stops
+  before the pass that would use the input (an assembly file needs the
+  assembler, and `-S` stops before it), **when** Bear finishes, **then**
+  the database holds no entry for `foo.s`. The compiler ignores such an
+  input. `cc -c foo.s` assembles the file and gets an entry.
 - **Given** a build that runs `cc -MD -c src.c`, **when** Bear finishes,
   **then** the database holds one entry for `src.c`. `-MD`, `-MMD`, and
   `-fsyntax-only` do compile the source, so they produce an entry.

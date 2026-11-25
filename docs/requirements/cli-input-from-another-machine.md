@@ -1,6 +1,6 @@
 ---
 title: Input from another machine
-status: implemented
+status: accepted
 ---
 
 ## Intent
@@ -92,6 +92,11 @@ Configuration that needs the build's files:
   ([`output-response-file-inlining`](output-response-file-inlining.md)).
   The diagnostic format is owned by
   [`cli-diagnostic-format`](cli-diagnostic-format.md).
+- **Given** a configuration that does not set response-file inlining,
+  which is on by default, **when** Bear runs with the option, **then**
+  Bear runs, inlining is off, and every `@file` stays literal in the
+  entries. Only a configuration that turns inlining on itself is
+  rejected as above.
 
 ## Known limitations
 

@@ -7,14 +7,14 @@ status: implemented
 
 Some builds compile through a compiler launcher, such as ccache or
 distcc, that carries the real compiler in its own arguments. Bear
-records such a compilation as the real compiler's invocation, parsed
-with that compiler's flag semantics, not the launcher's.
+parses such a compilation with the real compiler's flag semantics, not
+the launcher's, and the entry records the real compiler's invocation.
 
 ## Acceptance criteria
 
-- **Given** `ccache gcc -c main.c`, **when** Bear recognizes it,
+- **Given** `ccache gcc -c main.c`, **when** Bear writes its entry,
   **then** the recorded compiler is `gcc`, and the recorded arguments
-  are `gcc -c main.c`. The launcher token is dropped; the real
+  are `gcc -c main.c`. The entry drops the launcher token; the real
   compiler's arguments survive.
 - **Given** `sccache clang -c main.c` or `icecc gcc -c main.c`, **when**
   Bear recognizes it, **then** the recorded compiler is the real
