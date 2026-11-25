@@ -158,5 +158,3 @@ flags:
     result: driver_option
   - match: {pattern: "-x*"}
     result: configures_compiling
-  - match: {pattern: "@*"}
-    result: configures_compiling

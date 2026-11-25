@@ -205,5 +205,3 @@ flags:
     result: driver_option
   - match: {pattern: "-Werror"}
     result: none
-  - match: {pattern: "@*"}
-    result: configures_compiling

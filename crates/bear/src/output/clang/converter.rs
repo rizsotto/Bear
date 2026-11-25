@@ -196,7 +196,8 @@ mod tests {
     use super::super::path_format::FormatError;
     use super::*;
     use crate::config::{ArgumentsFormat, EntryFormat, Format, PathFormat, PathResolver};
-    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
+    use semantic::testing::Item;
+    use semantic::{CompilerPass, PassEffect, Recognized};
     use std::ffi::OsStr;
     use std::io;
 
@@ -222,11 +223,11 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Other(PassEffect::None), vec!["-Wall"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Flag(PassEffect::None), vec!["-Wall"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Output, vec!["-o", "main.o"]),
             ],
         );
 
@@ -256,10 +257,10 @@ mod tests {
             "/home/user",
             "/usr/bin/g++",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/g++"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["file1.cpp"]),
-                (ArgumentKind::Source { binary: false }, vec!["file2.cpp"]),
+                (Item::Compiler, vec!["/usr/bin/g++"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["file1.cpp"]),
+                (Item::Source { binary: false }, vec!["file2.cpp"]),
             ],
         );
 
@@ -296,7 +297,7 @@ mod tests {
         let command = Recognized::from_strings(
             "/home/user",
             "gcc",
-            vec![(ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"])],
+            vec![(Item::Flag(PassEffect::InfoAndExit), vec!["--version"])],
         );
 
         let sut = {
@@ -320,10 +321,10 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Output, vec!["-o", "main.o"]),
             ],
         );
 
@@ -353,10 +354,10 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Output, vec!["-o", "main.o"]),
             ],
         );
 
@@ -389,9 +390,9 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         );
 
@@ -426,8 +427,8 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["test.c"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["test.c"]),
             ],
         );
 
@@ -448,7 +449,7 @@ mod tests {
         let cmd = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
+            vec![(Item::Source { binary: false }, vec!["main.c"])],
         );
         assert!(sut.convert(&cmd).is_empty());
     }
@@ -463,7 +464,7 @@ mod tests {
         let cmd = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source { binary: false }, vec!["nonexistent.c"])],
+            vec![(Item::Source { binary: false }, vec!["nonexistent.c"])],
         );
 
         let entries = sut.convert(&cmd);
@@ -482,10 +483,7 @@ mod tests {
         let cmd = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
+            vec![(Item::Source { binary: false }, vec!["main.c"]), (Item::Output, vec!["-o", "main.o"])],
         );
 
         let entries = sut.convert(&cmd);
@@ -506,8 +504,8 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         );
 
@@ -599,10 +597,10 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source { binary: true }, vec!["main.o"]),
-                (ArgumentKind::Source { binary: true }, vec!["lib.o"]),
-                (ArgumentKind::Output, vec!["-o", "program"]),
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
+                (Item::Source { binary: true }, vec!["main.o"]),
+                (Item::Source { binary: true }, vec!["lib.o"]),
+                (Item::Output, vec!["-o", "program"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
             ],
         );
 
@@ -621,9 +619,9 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Output, vec!["-o", "main.o"]),
             ],
         );
 
@@ -647,10 +645,10 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lmath"]),
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)), vec!["-Wall"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Linking)), vec!["-lmath"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Compiling)), vec!["-Wall"]),
             ],
         );
 
@@ -677,7 +675,7 @@ mod tests {
         let command = Recognized::from_strings(
             "/home/user",
             "gcc",
-            vec![(ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"])],
+            vec![(Item::Flag(PassEffect::InfoAndExit), vec!["--version"])],
         );
 
         let result = sut.convert(&command);
@@ -696,9 +694,9 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]), // Real source file
-                (ArgumentKind::Source { binary: false }, vec!["utils.cpp"]), // Real source file
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
+                (Item::Source { binary: false }, vec!["main.c"]), // Real source file
+                (Item::Source { binary: false }, vec!["utils.cpp"]), // Real source file
+                (Item::Flag(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
             ],
         );
 
@@ -710,9 +708,9 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source { binary: true }, vec!["main.o"]), // Object file
-                (ArgumentKind::Source { binary: true }, vec!["utils.a"]), // Static library
-                (ArgumentKind::Output, vec!["-o", "program"]),
+                (Item::Source { binary: true }, vec!["main.o"]),  // Object file
+                (Item::Source { binary: true }, vec!["utils.a"]), // Static library
+                (Item::Output, vec!["-o", "program"]),
             ],
         );
 
@@ -737,10 +735,10 @@ mod tests {
             "gcc",
             vec![
                 (
-                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
+                    Item::Flag(PassEffect::StopsAt(CompilerPass::Preprocessing)),
                     vec!["-E"], // Semantically classified as preprocessing
                 ),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         );
         let result = sut.convert(&command);
@@ -752,10 +750,10 @@ mod tests {
             "gcc",
             vec![
                 (
-                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
+                    Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)),
                     vec!["-c"], // Semantically classified as assembling
                 ),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         );
         let result = sut.convert(&command);
@@ -766,7 +764,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![(
-                ArgumentKind::Other(PassEffect::InfoAndExit),
+                Item::Flag(PassEffect::InfoAndExit),
                 vec!["--version"], // Semantically classified as info
             )],
         );
@@ -778,13 +776,13 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
                 (
-                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+                    Item::Flag(PassEffect::Configures(CompilerPass::Linking)),
                     vec!["-lmath"], // Semantically classified as linking
                 ),
                 (
-                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+                    Item::Flag(PassEffect::Configures(CompilerPass::Compiling)),
                     vec!["-O2"], // Compilation flag
                 ),
             ],
@@ -814,10 +812,10 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
+                (Item::Compiler, vec!["gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Output, vec!["-o", "main.o"]),
             ],
         );
 
@@ -856,13 +854,10 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["gcc"]),
-                (
-                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
-                    vec!["-DWRAPPER_FLAG"],
-                ),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["test.c"]),
+                (Item::Compiler, vec!["gcc"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Preprocessing)), vec!["-DWRAPPER_FLAG"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["test.c"]),
             ],
         );
 
@@ -894,13 +889,10 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
-                (
-                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
-                    vec!["-DSOME_DEFINE"],
-                ),
-                (ArgumentKind::Source { binary: false }, vec!["test.c"]),
+                (Item::Compiler, vec!["gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Preprocessing)), vec!["-DSOME_DEFINE"]),
+                (Item::Source { binary: false }, vec!["test.c"]),
             ],
         );
 
@@ -934,10 +926,10 @@ mod tests {
             working_dir,
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
+                (Item::Output, vec!["-o", "main.o"]),
             ],
         );
 
@@ -979,9 +971,9 @@ mod tests {
             working_dir_str,
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec![source_file.to_str().unwrap()]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec![source_file.to_str().unwrap()]),
             ],
         );
 
@@ -1017,9 +1009,9 @@ mod tests {
             working_dir,
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         );
 
@@ -1065,11 +1057,11 @@ mod tests {
             "/home/user",
             "valac",
             vec![
-                (ArgumentKind::Compiler, vec!["valac"]),
-                (ArgumentKind::Other(PassEffect::None), vec!["--library", "foo"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.vala"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.vala"]),
-                (ArgumentKind::Source { binary: false }, vec!["c.vala"]),
+                (Item::Compiler, vec!["valac"]),
+                (Item::Flag(PassEffect::None), vec!["--library", "foo"]),
+                (Item::Source { binary: false }, vec!["a.vala"]),
+                (Item::Source { binary: false }, vec!["b.vala"]),
+                (Item::Source { binary: false }, vec!["c.vala"]),
             ],
         ));
 
@@ -1107,10 +1099,10 @@ mod tests {
             "/home/user",
             "valac",
             vec![
-                (ArgumentKind::Compiler, vec!["valac"]),
-                (ArgumentKind::Other(PassEffect::None), vec!["--library", "foo"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.vala"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.vala"]),
+                (Item::Compiler, vec!["valac"]),
+                (Item::Flag(PassEffect::None), vec!["--library", "foo"]),
+                (Item::Source { binary: false }, vec!["a.vala"]),
+                (Item::Source { binary: false }, vec!["b.vala"]),
             ],
         ));
 
@@ -1142,10 +1134,10 @@ mod tests {
             "/home/user",
             "valac",
             vec![
-                (ArgumentKind::Compiler, vec!["valac"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.vala"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.vala"]),
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
+                (Item::Compiler, vec!["valac"]),
+                (Item::Source { binary: false }, vec!["a.vala"]),
+                (Item::Source { binary: false }, vec!["b.vala"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
             ],
         ));
 
@@ -1171,9 +1163,9 @@ mod tests {
             "/home/user",
             "/usr/bin/g++",
             vec![
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["file1.cpp"]),
-                (ArgumentKind::Source { binary: false }, vec!["file2.cpp"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["file1.cpp"]),
+                (Item::Source { binary: false }, vec!["file2.cpp"]),
             ],
         );
 
@@ -1199,10 +1191,10 @@ mod tests {
             "/home/user",
             "valac",
             vec![
-                (ArgumentKind::Compiler, vec!["valac"]),
-                (ArgumentKind::Source { binary: true }, vec!["prebuilt.o"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.vala"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.vala"]),
+                (Item::Compiler, vec!["valac"]),
+                (Item::Source { binary: true }, vec!["prebuilt.o"]),
+                (Item::Source { binary: false }, vec!["a.vala"]),
+                (Item::Source { binary: false }, vec!["b.vala"]),
             ],
         ));
 
@@ -1233,9 +1225,9 @@ mod tests {
             "/home/user",
             "valac",
             vec![
-                (ArgumentKind::Compiler, vec!["valac"]),
-                (ArgumentKind::Source { binary: true }, vec!["prebuilt.o"]),
-                (ArgumentKind::Output, vec!["-o", "program"]),
+                (Item::Compiler, vec!["valac"]),
+                (Item::Source { binary: true }, vec!["prebuilt.o"]),
+                (Item::Output, vec!["-o", "program"]),
             ],
         ));
 
@@ -1262,10 +1254,10 @@ mod tests {
             "/home/user",
             "swiftc",
             vec![
-                (ArgumentKind::Compiler, vec!["swiftc"]),
-                (ArgumentKind::Other(PassEffect::None), vec!["-module-name", "App"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.swift"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.swift"]),
+                (Item::Compiler, vec!["swiftc"]),
+                (Item::Flag(PassEffect::None), vec!["-module-name", "App"]),
+                (Item::Source { binary: false }, vec!["a.swift"]),
+                (Item::Source { binary: false }, vec!["b.swift"]),
             ],
         ));
 
@@ -1315,10 +1307,10 @@ mod tests {
             "/home/user",
             "swiftc",
             vec![
-                (ArgumentKind::Compiler, vec!["swiftc"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.swift"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.swift"]),
-                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
+                (Item::Compiler, vec!["swiftc"]),
+                (Item::Source { binary: false }, vec!["a.swift"]),
+                (Item::Source { binary: false }, vec!["b.swift"]),
+                (Item::Flag(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
             ],
         ));
 
@@ -1342,10 +1334,7 @@ mod tests {
         let command = per_source_full(Recognized::from_strings(
             "/home/user",
             "swiftc",
-            vec![
-                (ArgumentKind::Compiler, vec!["swiftc"]),
-                (ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"]),
-            ],
+            vec![(Item::Compiler, vec!["swiftc"]), (Item::Flag(PassEffect::InfoAndExit), vec!["--version"])],
         ));
 
         let result = sut.convert(&command);
@@ -1364,10 +1353,10 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["gcc"]),
-                (ArgumentKind::Other(PassEffect::DriverOption), vec!["-pipe"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Compiler, vec!["gcc"]),
+                (Item::Flag(PassEffect::DriverOption), vec!["-pipe"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         );
 

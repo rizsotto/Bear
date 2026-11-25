@@ -223,7 +223,8 @@ mod fixtures {
 mod tests {
     use super::*;
     use crate::config;
-    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
+    use semantic::testing::Item;
+    use semantic::{CompilerPass, PassEffect, Recognized};
     use std::sync::atomic::Ordering;
 
     fn make_compile_command(file: &str) -> semantic::Recognized {
@@ -231,9 +232,9 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec![file]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec![file]),
             ],
         )
     }

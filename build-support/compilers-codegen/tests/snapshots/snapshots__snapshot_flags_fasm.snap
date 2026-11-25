@@ -4,10 +4,10 @@ expression: "generate_flag_file(\"fasm\")"
 ---
 // Generated from compilers/fasm.yaml -- DO NOT EDIT
 static FASM_FLAGS: [FlagRule; 4] = [
-    FlagRule::new(FlagPattern::Exactly("-m", 1), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Exactly("-p", 1), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Exactly("-s", 1), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-d"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-m", 1), RuleKind::Effect(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-p", 1), RuleKind::Effect(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-s", 1), RuleKind::Effect(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-d"), RuleKind::Effect(PassEffect::Configures(CompilerPass::Preprocessing))),
 ];
 static FASM_IGNORE_EXECUTABLES: [&str; 0] = [];
 static FASM_IGNORE_FLAGS: [&str; 0] = [];

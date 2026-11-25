@@ -9,13 +9,13 @@
 
 use super::super::matchers::source::file_type_of;
 use super::super::matchers::{
-    EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule,
+    EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule, RuleKind,
 };
-use super::response_file::{Syntax, tokenize_msvc};
+use super::response_file::{Syntax, expand, tokenize_msvc};
 use crate::interpretation::{EnvironmentWords, Origin};
 use crate::{
-    Argument, ArgumentKind, Arguments, Command, CompilerPass, Execution, FileRef, Interpretation,
-    OutputSpelling, PassEffect, RecognizeResult, Recognized, Role, SourceMode,
+    Arguments, CompilerPass, Execution, FileRef, Interpretation, OutputSpelling, PassEffect, RecognizeResult,
+    Recognized, Role, SourceMode,
 };
 use std::path::{Path, PathBuf};
 
@@ -37,7 +37,7 @@ pub(super) struct FlagBasedInterpreter {
     /// recognized arguments (`format.arguments.from_environment`).
     from_environment: bool,
     /// How `env_rules` values that expand to words are split.
-    env_syntax: Syntax,
+    syntax: Syntax,
     /// How this family's invocations map to compilation database entries.
     /// See [`SourceMode`]. Comes from the family's YAML `source_mode:` (via the
     /// generated [`FamilyDef`]); it is a per-family datum, consumed at the
@@ -51,9 +51,8 @@ pub(super) struct Call {
     pub execution: Execution,
     /// How many argv tokens come before the compiler (a launcher and its options).
     pub launcher_len: usize,
-    /// The argv after the compiler with response files read, each token tagged
-    /// with its origin. `None` when response files are not read.
-    pub inlined: Option<Vec<(String, Origin)>>,
+    /// Whether `@file` response files are read before classification.
+    pub inline_response_files: bool,
 }
 
 impl FlagBasedInterpreter {
@@ -67,7 +66,7 @@ impl FlagBasedInterpreter {
             slash_prefix: def.slash_prefix,
             env_rules: def.env_rules,
             from_environment,
-            env_syntax: def.response_file_syntax,
+            syntax: def.response_file_syntax,
             source_mode: def.source_mode,
         }
     }
@@ -94,10 +93,9 @@ impl FlagBasedInterpreter {
         None
     }
 
-    /// Reads the call twice from one token stream: as the [`Command`] the
-    /// converter uses today, and as the [`Interpretation`].
+    /// Reads the call as an [`Interpretation`].
     pub(super) fn recognize(&self, call: Call) -> RecognizeResult {
-        let Call { execution, launcher_len, inlined } = call;
+        let Call { execution, launcher_len, inline_response_files } = call;
         let argv = execution.arguments.get(launcher_len..).unwrap_or_default();
 
         // The compiler token, then everything after it. Under a launcher the
@@ -106,39 +104,23 @@ impl FlagBasedInterpreter {
             Some(token) if launcher_len > 0 => PathBuf::from(token),
             _ => execution.executable.clone(),
         };
-        let (stream, origins): (Vec<String>, Option<Vec<Origin>>) = match inlined {
-            Some(tokens) => {
-                let (tokens, origins) = tokens.into_iter().unzip::<_, _, Vec<_>, Vec<_>>();
-                (argv.first().cloned().into_iter().chain(tokens).collect(), Some(origins))
-            }
-            None => (argv.to_vec(), None),
+        // Response files are read before classification, so their tokens are
+        // classified like any other argument. The family's own syntax splits them.
+        let (stream, origins): (Vec<String>, Option<Vec<Origin>>) = if inline_response_files {
+            let after_compiler = argv.get(1..).unwrap_or_default();
+            let tokens = expand(after_compiler, &execution.working_dir, self.syntax);
+            let (tokens, origins) = tokens.into_iter().unzip::<_, _, Vec<_>, Vec<_>>();
+            (argv.first().cloned().into_iter().chain(tokens).collect(), Some(origins))
+        } else {
+            (argv.to_vec(), None)
         };
 
         if let Some(reason) = self.should_ignore(&executable, &stream) {
             return RecognizeResult::Ignored { execution, reason };
         }
 
-        let command = self.command(&execution, &executable, &stream);
         let interpretation = self.interpretation(&execution, launcher_len, &executable, &stream, origins);
-        RecognizeResult::Recognized(Recognized { execution, command, interpretation })
-    }
-
-    fn command(&self, execution: &Execution, executable: &Path, stream: &[String]) -> Command {
-        let annotated_args = parse_arguments_owned(&self.analyzer, stream, self.slash_prefix);
-        let (prepend_args, append_args) = if self.from_environment {
-            parse_environment(&execution.environment, self.env_rules, self.env_syntax)
-        } else {
-            (Vec::new(), Vec::new())
-        };
-
-        // The compiler stays first; prepended words go right after it.
-        let mut annotated_args = annotated_args.into_iter();
-        let mut all_args: Vec<Argument> = annotated_args.next().into_iter().collect();
-        all_args.extend(prepend_args);
-        all_args.extend(annotated_args);
-        all_args.extend(append_args);
-
-        Command { executable: executable.to_path_buf(), arguments: all_args, source_mode: self.source_mode }
+        RecognizeResult::Recognized(Recognized { execution, interpretation })
     }
 
     fn interpretation(
@@ -159,13 +141,13 @@ impl FlagBasedInterpreter {
             (Some(origins), Some(position)) => origins.get(position).cloned().unwrap_or(Origin::CommandLine),
             _ => Origin::CommandLine,
         };
-        for parsed in classify(&self.analyzer, stream, self.slash_prefix, true) {
+        for parsed in classify(&self.analyzer, stream, self.slash_prefix) {
             let origin = origin_of(parsed.first);
             arguments.push((origin, parsed.into_arguments(executable)));
         }
 
         let (before, after) = if self.from_environment {
-            interpret_environment(&execution.environment, self.env_rules, self.env_syntax)
+            interpret_environment(&execution.environment, self.env_rules, self.syntax)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -196,19 +178,6 @@ struct Parsed {
 }
 
 impl Parsed {
-    fn into_argument(self) -> Argument {
-        match self.class {
-            Class::Compiler => Argument::Other { arguments: self.tokens, kind: ArgumentKind::Compiler },
-            Class::Source(path) => Argument::new_source(path),
-            Class::Output { flag, path, spelling } => Argument::Output { flag, path, spelling },
-            Class::Flag(effect) => {
-                Argument::Other { arguments: self.tokens, kind: ArgumentKind::Other(effect) }
-            }
-            // Only a classification that asks for `@file` items yields them.
-            Class::ArgumentsFile(_) => unreachable!("the command model has no @file items"),
-        }
-    }
-
     fn into_arguments(self, executable: &Path) -> Arguments {
         let role = match self.class {
             Class::Compiler => Role::Compiler { path: executable.to_path_buf() },
@@ -228,15 +197,10 @@ impl Parsed {
 
 /// Split argv (compiler first) into runs of tokens, each with its meaning.
 ///
-/// With `arguments_files`, a token at a token position that starts with `@`
-/// and has more after it is an `@file` item, checked before the flag table. A
-/// value a flag consumes never reaches that check.
-fn classify(
-    flag_analyzer: &FlagAnalyzer,
-    args: &[String],
-    slash_prefix: bool,
-    arguments_files: bool,
-) -> Vec<Parsed> {
+/// A token at a token position that starts with `@` and has more after it is
+/// an `@file` item, checked before the flag table. A value a flag consumes
+/// never reaches that check.
+fn classify(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -> Vec<Parsed> {
     let mut result: Vec<Parsed> = Vec::with_capacity(args.len());
     let mut i = 0;
 
@@ -249,8 +213,14 @@ fn classify(
         }
 
         let token = &args[i];
-        if arguments_files && token.len() > 1 && token.starts_with('@') {
-            let class = Class::ArgumentsFile(token[1..].to_string());
+        if let Some(path) = token.strip_prefix('@') {
+            // A bare `@` names no file; keep it as a plain flag so the entry
+            // still holds it.
+            let class = if path.is_empty() {
+                Class::Flag(PassEffect::None)
+            } else {
+                Class::ArgumentsFile(path.to_string())
+            };
             result.push(Parsed { first: i, tokens: vec![token.clone()], class });
             i += 1;
             continue;
@@ -258,7 +228,7 @@ fn classify(
 
         if let Some(match_result) = flag_analyzer.match_flag(&args[i..]) {
             // Handle pass-through first (early exit)
-            if matches!(match_result.rule.kind, ArgumentKind::Other(PassEffect::PassThrough)) {
+            if matches!(match_result.rule.kind, RuleKind::Effect(PassEffect::PassThrough)) {
                 result.push(Parsed {
                     first: i,
                     tokens: vec![token.clone()],
@@ -279,14 +249,7 @@ fn classify(
             let consumed_count = match_result.consumed_count;
             let tokens = args[i..i + consumed_count].to_vec();
             let class = match match_result.rule.kind {
-                // codegen's result_to_rust never emits ArgumentKind::Compiler.
-                ArgumentKind::Compiler => {
-                    unreachable!("Only argv[0] is the compiler, no flag table rule says so")
-                }
-                ArgumentKind::Source { .. } => {
-                    unreachable!("Source files should be detected by heuristic, not flag matching")
-                }
-                ArgumentKind::Output => match consumed_count {
+                RuleKind::Output => match consumed_count {
                     1 => {
                         let flag_str = match_result.rule.pattern.flag();
                         let after_flag = &token[flag_str.len()..];
@@ -311,7 +274,7 @@ fn classify(
                         unreachable!("Output file should be specified with glued or separate value")
                     }
                 },
-                ArgumentKind::Other(effect) => Class::Flag(effect),
+                RuleKind::Effect(effect) => Class::Flag(effect),
             };
 
             result.push(Parsed { first: i, tokens, class });
@@ -336,17 +299,12 @@ fn classify(
     result
 }
 
-/// Parse command line arguments (compiler first) for the [`Command`] model.
-fn parse_arguments_owned(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -> Vec<Argument> {
-    classify(flag_analyzer, args, slash_prefix, false).into_iter().map(Parsed::into_argument).collect()
-}
-
 /// The words one rule makes from its environment variable.
 struct EnvWords {
     variable: &'static str,
     position: EnvPosition,
     words: Vec<String>,
-    kind: ArgumentKind,
+    effect: PassEffect,
 }
 
 /// Turn the rules' variables into words, in rule order. `Flag` rules make a
@@ -370,7 +328,7 @@ fn environment_words(
                             variable: rule.variable,
                             position: EnvPosition::Append,
                             words: vec![flag.to_string(), part],
-                            kind: rule.kind,
+                            effect: rule.effect,
                         });
                     }
                 }
@@ -385,7 +343,7 @@ fn environment_words(
                         variable: rule.variable,
                         position,
                         words: vec![word],
-                        kind: rule.kind,
+                        effect: rule.effect,
                     });
                 }
             }
@@ -395,30 +353,9 @@ fn environment_words(
     result
 }
 
-/// Parse environment variables into compiler arguments using the given rules.
-///
-/// Returns `(prepend, append)` argument vectors. Prepend args go before command-line
-/// args (e.g., MSVC `CL`), append args go after (e.g., include paths, MSVC `_CL_`).
-fn parse_environment(
-    environment: &std::collections::HashMap<String, String>,
-    rules: &[EnvRule],
-    syntax: Syntax,
-) -> (Vec<Argument>, Vec<Argument>) {
-    let mut prepend = Vec::new();
-    let mut append = Vec::new();
-
-    for item in environment_words(environment, rules, syntax) {
-        let target = match item.position {
-            EnvPosition::Prepend => &mut prepend,
-            EnvPosition::Append => &mut append,
-        };
-        target.push(Argument::Other { arguments: item.words, kind: item.kind });
-    }
-
-    (prepend, append)
-}
-
-/// The same words as [`parse_environment`], kept per variable as `(before, after)`.
+/// The environment words kept per variable as `(before, after)`. Words that
+/// go before the command line args (e.g. MSVC `CL`) are `before`; the rest
+/// (include paths, MSVC `_CL_`) are `after`.
 fn interpret_environment(
     environment: &std::collections::HashMap<String, String>,
     rules: &[EnvRule],
@@ -428,15 +365,11 @@ fn interpret_environment(
     let mut after = EnvironmentWords::new();
 
     for item in environment_words(environment, rules, syntax) {
-        // Codegen accepts only pass effects for environment entries.
-        let ArgumentKind::Other(effect) = item.kind else {
-            unreachable!("Environment rules in the generated tables carry a pass effect")
-        };
         let target = match item.position {
             EnvPosition::Prepend => &mut before,
             EnvPosition::Append => &mut after,
         };
-        let words = Arguments { args: item.words, role: Role::Flag(effect) };
+        let words = Arguments { args: item.words, role: Role::Flag(item.effect) };
         match target.last_mut() {
             Some((variable, words_of)) if variable == item.variable => words_of.push(words),
             _ => target.push((item.variable.to_string(), vec![words])),
@@ -464,8 +397,8 @@ include!(concat!(env!("OUT_DIR"), "/families.rs"));
 /// One compiler family's generated data: references to its flag-table statics
 /// plus the two per-family behavior selectors. The generated `FAMILIES` array
 /// is a slice of these; `register_all` (in the parent module) loops over it,
-/// and `response_file::syntax_for` reads `response_file_syntax` back out, as
-/// does `FlagBasedInterpreter::new` to split environment-derived words.
+/// and `FlagBasedInterpreter::new` reads `response_file_syntax` to split
+/// response files and environment-derived words.
 pub(super) struct FamilyDef {
     pub(super) id: &'static str,
     pub(super) flags: &'static [FlagRule],
@@ -502,20 +435,14 @@ mod flag_table_invariants {
         }
 
         for rule in flags {
-            assert!(
-                !matches!(rule.kind, ArgumentKind::Source { .. }),
-                "Flag rule {:?} must not use ArgumentKind::Source",
-                rule.pattern.flag()
-            );
-
             let flag = rule.pattern.flag();
             assert!(
-                flag.starts_with('-') || flag.starts_with('@') || flag.starts_with('/'),
-                "Flag {:?} must start with '-', '@', or '/'",
+                flag.starts_with('-') || flag.starts_with('/'),
+                "Flag {:?} must start with '-' or '/'",
                 flag
             );
 
-            if matches!(rule.kind, ArgumentKind::Output) {
+            if matches!(rule.kind, RuleKind::Output) {
                 match rule.pattern {
                     FlagPattern::Exactly(_, n) => {
                         assert!(n <= 1, "Output rule {:?} must take 0 or 1 extra args", flag)
@@ -658,10 +585,10 @@ mod pass_through_tests {
             let mut flags = vec![
                 FlagRule::new(
                     FlagPattern::Exactly("-c", 0),
-                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
+                    RuleKind::Effect(PassEffect::StopsAt(CompilerPass::Assembling)),
                 ),
-                FlagRule::new(FlagPattern::Exactly("/link", 0), ArgumentKind::Other(PassEffect::PassThrough)),
-                FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
+                FlagRule::new(FlagPattern::Exactly("/link", 0), RuleKind::Effect(PassEffect::PassThrough)),
+                FlagRule::new(FlagPattern::Exactly("-o", 1), RuleKind::Output),
             ];
             flags.sort_by_key(|b| std::cmp::Reverse(b.pattern.flag().len()));
             flags
@@ -677,27 +604,25 @@ mod pass_through_tests {
             "/OUT:foo.exe".to_string(),
         ];
 
-        let result = parse_arguments_owned(&analyzer, &args, false);
+        let result = classify(&analyzer, &args, false);
 
         // cl (compiler)
-        assert!(matches!(result[0], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Compiler));
+        assert!(matches!(result[0].class, Class::Compiler));
         // -c (stops at assembling)
         assert!(
-            matches!(result[1], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)))
+            matches!(result[1].class, Class::Flag(effect) if effect == PassEffect::StopsAt(CompilerPass::Assembling))
         );
         // foo.c (source)
-        assert!(matches!(result[2], Argument::Source { .. }));
+        assert!(matches!(result[2].class, Class::Source(_)));
         // /link (pass-through marker)
-        assert!(
-            matches!(result[3], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::PassThrough))
-        );
+        assert!(matches!(result[3].class, Class::Flag(effect) if effect == PassEffect::PassThrough));
         // /SUBSYSTEM:CONSOLE (linker arg)
         assert!(
-            matches!(result[4], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)))
+            matches!(result[4].class, Class::Flag(effect) if effect == PassEffect::Configures(CompilerPass::Linking))
         );
         // /OUT:foo.exe (linker arg)
         assert!(
-            matches!(result[5], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)))
+            matches!(result[5].class, Class::Flag(effect) if effect == PassEffect::Configures(CompilerPass::Linking))
         );
     }
 }
@@ -716,20 +641,20 @@ mod vala_tests {
         let analyzer = FlagAnalyzer::new(&VALA_FLAGS);
         let args = vec!["valac".to_string(), "-X".to_string(), "-lm".to_string(), "foo.vala".to_string()];
 
-        let result = parse_arguments_owned(&analyzer, &args, false);
+        let result = classify(&analyzer, &args, false);
 
         // valac (compiler), [-X -lm] (one option), foo.vala (the only source)
-        assert_eq!(result.len(), 3, "expected exactly 3 parsed arguments, got {:?}", result);
-        assert!(matches!(result[0], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Compiler));
+        assert_eq!(result.len(), 3, "expected exactly 3 parsed arguments, got {}", result.len());
+        assert!(matches!(result[0].class, Class::Compiler));
         assert!(
-            matches!(&result[1], Argument::Other { arguments, .. } if arguments == &vec!["-X".to_string(), "-lm".to_string()]),
+            matches!(&result[1], Parsed { tokens, .. } if tokens == &vec!["-X".to_string(), "-lm".to_string()]),
             "-X must consume -lm as its value, got {:?}",
-            result[1]
+            result[1].tokens
         );
         assert!(
-            matches!(&result[2], Argument::Source { path, binary } if path == "foo.vala" && !*binary),
-            "foo.vala must be the sole compilable source, got {:?}",
-            result[2]
+            matches!(&result[2].class, Class::Source(path) if path == "foo.vala"),
+            "foo.vala must be the sole source, got {:?}",
+            result[2].tokens
         );
     }
 }
@@ -744,9 +669,9 @@ mod slash_prefix_tests {
         let flags: &[FlagRule] = &[];
         let analyzer = FlagAnalyzer::new(flags);
         let args = vec!["cl".to_string(), "/c".to_string(), "foo.c".to_string()];
-        let result = parse_arguments_owned(&analyzer, &args, false);
+        let result = classify(&analyzer, &args, false);
         // /c should be a source file since slash_prefix is false
-        assert!(matches!(result[1], Argument::Source { .. }));
+        assert!(matches!(result[1].class, Class::Source(_)));
     }
 
     #[test]
@@ -754,12 +679,9 @@ mod slash_prefix_tests {
         let flags: &[FlagRule] = &[];
         let analyzer = FlagAnalyzer::new(flags);
         let args = vec!["cl".to_string(), "/c".to_string(), "foo.c".to_string()];
-        let result = parse_arguments_owned(&analyzer, &args, true);
-        // /c should be an unrecognized flag (Other with None) since slash_prefix is true
-        assert!(matches!(
-            result[1],
-            Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::None)
-        ));
+        let result = classify(&analyzer, &args, true);
+        // /c should be an unrecognized flag (effect None) since slash_prefix is true
+        assert!(matches!(result[1].class, Class::Flag(PassEffect::None)));
     }
 
     #[test]
@@ -768,12 +690,12 @@ mod slash_prefix_tests {
         use std::sync::LazyLock;
 
         static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
-            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithEq("-o"), ArgumentKind::Output)]);
+            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithEq("-o"), RuleKind::Output)]);
 
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let args = vec!["gcc".to_string(), "-o=foo.o".to_string()];
-        let result = parse_arguments_owned(&analyzer, &args, false);
-        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+        let result = classify(&analyzer, &args, false);
+        assert!(matches!(result[1].class, Class::Output { ref flag, ref path, spelling }
                 if flag == "-o" && path == "foo.o" && spelling == OutputSpelling::Equals));
     }
 
@@ -783,12 +705,12 @@ mod slash_prefix_tests {
         use std::sync::LazyLock;
 
         static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
-            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithColon("/Fo"), ArgumentKind::Output)]);
+            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithColon("/Fo"), RuleKind::Output)]);
 
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let args = vec!["cl".to_string(), "/Fo:foo.obj".to_string()];
-        let result = parse_arguments_owned(&analyzer, &args, true);
-        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+        let result = classify(&analyzer, &args, true);
+        assert!(matches!(result[1].class, Class::Output { ref flag, ref path, spelling }
                 if flag == "/Fo" && path == "foo.obj" && spelling == OutputSpelling::Colon));
     }
 
@@ -797,14 +719,13 @@ mod slash_prefix_tests {
         use crate::interpreters::matchers::FlagPattern;
         use std::sync::LazyLock;
 
-        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
-            vec![FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output)]
-        });
+        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
+            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), RuleKind::Output)]);
 
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let args = vec!["gcc".to_string(), "-ofoo.o".to_string()];
-        let result = parse_arguments_owned(&analyzer, &args, false);
-        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+        let result = classify(&analyzer, &args, false);
+        assert!(matches!(result[1].class, Class::Output { ref flag, ref path, spelling }
                 if flag == "-o" && path == "foo.o" && spelling == OutputSpelling::Glued));
     }
 
@@ -814,14 +735,13 @@ mod slash_prefix_tests {
         use crate::interpreters::matchers::FlagPattern;
         use std::sync::LazyLock;
 
-        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
-            vec![FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output)]
-        });
+        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
+            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), RuleKind::Output)]);
 
         let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
         let args = vec!["gcc".to_string(), "-o".to_string(), "foo.o".to_string()];
-        let result = parse_arguments_owned(&analyzer, &args, false);
-        assert!(matches!(result[1], Argument::Output { ref flag, ref path, spelling }
+        let result = classify(&analyzer, &args, false);
+        assert!(matches!(result[1].class, Class::Output { ref flag, ref path, spelling }
                 if flag == "-o" && path == "foo.o" && spelling == OutputSpelling::Separate));
     }
 }
@@ -831,14 +751,8 @@ mod environment_mapping_tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn collect_args(args: &[Argument]) -> Vec<String> {
-        args.iter()
-            .flat_map(|a| match a {
-                Argument::Other { arguments, .. } => arguments.clone(),
-                Argument::Output { flag, path, .. } => vec![flag.clone(), path.clone()],
-                Argument::Source { path, .. } => vec![path.clone()],
-            })
-            .collect()
+    fn collect_args(words: &EnvironmentWords) -> Vec<String> {
+        words.iter().flat_map(|(_, items)| items).flat_map(|item| item.args.clone()).collect()
     }
 
     #[test]
@@ -846,7 +760,7 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "CPATH",
             EnvMapping::Flag { flag: "-I", separator: EnvSeparator::Path },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+            PassEffect::Configures(CompilerPass::Preprocessing),
         )];
         let mut env = HashMap::new();
         // std::env::split_paths uses `:` on Unix, `;` on Windows
@@ -854,7 +768,7 @@ mod environment_mapping_tests {
             if cfg!(windows) { (r"C:\a;C:\b", r"C:\a", r"C:\b") } else { ("/a:/b", "/a", "/b") };
         env.insert("CPATH".to_string(), value.to_string());
 
-        let (prepend, append) = parse_environment(&env, rules, Syntax::GnuClang);
+        let (prepend, append) = interpret_environment(&env, rules, Syntax::GnuClang);
         assert!(prepend.is_empty());
         let args = collect_args(&append);
         assert_eq!(args, vec!["-I", expected_a, "-I", expected_b]);
@@ -865,7 +779,7 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "CPATH",
             EnvMapping::Flag { flag: "-I", separator: EnvSeparator::Path },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+            PassEffect::Configures(CompilerPass::Preprocessing),
         )];
         let mut env = HashMap::new();
         // Leading/trailing/double separators produce empty elements that must be filtered
@@ -873,7 +787,7 @@ mod environment_mapping_tests {
             if cfg!(windows) { (r";C:\a;;C:\b;", r"C:\a", r"C:\b") } else { (":/a::/b:", "/a", "/b") };
         env.insert("CPATH".to_string(), value.to_string());
 
-        let (_prepend, append) = parse_environment(&env, rules, Syntax::GnuClang);
+        let (_prepend, append) = interpret_environment(&env, rules, Syntax::GnuClang);
         let args = collect_args(&append);
         assert_eq!(args, vec!["-I", expected_a, "-I", expected_b]);
     }
@@ -883,12 +797,12 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "INCLUDE",
             EnvMapping::Flag { flag: "/I", separator: EnvSeparator::Fixed(";") },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+            PassEffect::Configures(CompilerPass::Preprocessing),
         )];
         let mut env = HashMap::new();
         env.insert("INCLUDE".to_string(), r"C:\a;C:\b".to_string());
 
-        let (_prepend, append) = parse_environment(&env, rules, Syntax::Msvc);
+        let (_prepend, append) = interpret_environment(&env, rules, Syntax::Msvc);
         let args = collect_args(&append);
         assert_eq!(args, vec!["/I", r"C:\a", "/I", r"C:\b"]);
     }
@@ -899,12 +813,12 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "CL",
             EnvMapping::Expand { position: EnvPosition::Prepend },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+            PassEffect::Configures(CompilerPass::Compiling),
         )];
         let mut env = HashMap::new();
         env.insert("CL".to_string(), "/O2 /W4".to_string());
 
-        let (prepend, append) = parse_environment(&env, rules, Syntax::Msvc);
+        let (prepend, append) = interpret_environment(&env, rules, Syntax::Msvc);
         assert!(append.is_empty());
         let args = collect_args(&prepend);
         assert_eq!(args, vec!["/O2", "/W4"]);
@@ -916,12 +830,12 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "_CL_",
             EnvMapping::Expand { position: EnvPosition::Append },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+            PassEffect::Configures(CompilerPass::Compiling),
         )];
         let mut env = HashMap::new();
         env.insert("_CL_".to_string(), "/link foo.lib".to_string());
 
-        let (prepend, append) = parse_environment(&env, rules, Syntax::Msvc);
+        let (prepend, append) = interpret_environment(&env, rules, Syntax::Msvc);
         assert!(prepend.is_empty());
         let args = collect_args(&append);
         assert_eq!(args, vec!["/link", "foo.lib"]);
@@ -929,6 +843,19 @@ mod environment_mapping_tests {
 
     fn family(id: &str) -> &'static FamilyDef {
         FAMILIES.iter().find(|def| def.id == id).unwrap()
+    }
+
+    #[test]
+    fn response_file_syntax_follows_compiler_family() {
+        for id in ["msvc", "clang_cl"] {
+            assert!(matches!(family(id).response_file_syntax, Syntax::Msvc), "{id} should use MSVC syntax");
+        }
+        for id in ["gcc", "clang", "cuda", "vala"] {
+            assert!(
+                matches!(family(id).response_file_syntax, Syntax::GnuClang),
+                "{id} should use GNU/Clang syntax"
+            );
+        }
     }
 
     fn msvc() -> FlagBasedInterpreter {
@@ -968,9 +895,11 @@ mod environment_mapping_tests {
         for (interpreter, execution, expected) in cases {
             let input = execution.to_string();
 
-            let call = Call { execution, launcher_len: 0, inlined: None };
-            let sut = match interpreter.recognize(call) {
-                RecognizeResult::Recognized(Recognized { command, .. }) => collect_args(&command.arguments),
+            let call = Call { execution, launcher_len: 0, inline_response_files: false };
+            let sut: Vec<String> = match interpreter.recognize(call) {
+                RecognizeResult::Recognized(Recognized { interpretation, .. }) => {
+                    interpretation.arguments().flat_map(|item| item.args.clone()).collect()
+                }
                 _ => panic!("expected a recognized command for {input}"),
             };
 
@@ -1015,9 +944,11 @@ mod environment_mapping_tests {
         for (interpreter, execution, expected) in cases {
             let input = execution.to_string();
 
-            let call = Call { execution, launcher_len: 0, inlined: None };
-            let sut = match interpreter.recognize(call) {
-                RecognizeResult::Recognized(Recognized { command, .. }) => collect_args(&command.arguments),
+            let call = Call { execution, launcher_len: 0, inline_response_files: false };
+            let sut: Vec<String> = match interpreter.recognize(call) {
+                RecognizeResult::Recognized(Recognized { interpretation, .. }) => {
+                    interpretation.arguments().flat_map(|item| item.args.clone()).collect()
+                }
                 _ => panic!("expected a recognized command for {input}"),
             };
 
@@ -1030,11 +961,11 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "CPATH",
             EnvMapping::Flag { flag: "-I", separator: EnvSeparator::Path },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+            PassEffect::Configures(CompilerPass::Preprocessing),
         )];
         let env = HashMap::new();
 
-        let (prepend, append) = parse_environment(&env, rules, Syntax::GnuClang);
+        let (prepend, append) = interpret_environment(&env, rules, Syntax::GnuClang);
         assert!(prepend.is_empty());
         assert!(append.is_empty());
     }
@@ -1098,12 +1029,12 @@ mod environment_mapping_tests {
         let rules = &[EnvRule::new(
             "CL",
             EnvMapping::Expand { position: EnvPosition::Prepend },
-            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+            PassEffect::Configures(CompilerPass::Compiling),
         )];
         let mut env = HashMap::new();
         env.insert("CL".to_string(), r#"/DPATH="C:\Program Files" /W4"#.to_string());
 
-        let (prepend, _append) = parse_environment(&env, rules, Syntax::Msvc);
+        let (prepend, _append) = interpret_environment(&env, rules, Syntax::Msvc);
         let args = collect_args(&prepend);
         assert_eq!(args, vec![r"/DPATH=C:\Program Files", "/W4"]);
     }

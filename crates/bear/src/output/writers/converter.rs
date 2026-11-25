@@ -59,7 +59,8 @@ mod tests {
     use super::*;
     use crate::output::statistics::OutputStatistics;
     use crate::output::writers::fixtures::CollectingWriter;
-    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
+    use semantic::testing::Item;
+    use semantic::{CompilerPass, PassEffect, Recognized};
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
 
@@ -68,9 +69,9 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec![file]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec![file]),
             ],
         )
     }
@@ -80,8 +81,8 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
+                (Item::Source { binary: false }, vec!["main.c"]),
             ],
         )
     }
@@ -90,10 +91,7 @@ mod tests {
         Recognized::from_strings(
             "/home/user",
             "gcc",
-            vec![
-                (ArgumentKind::Source { binary: true }, vec!["main.o"]),
-                (ArgumentKind::Output, vec!["-o", "program"]),
-            ],
+            vec![(Item::Source { binary: true }, vec!["main.o"]), (Item::Output, vec!["-o", "program"])],
         )
     }
 
@@ -152,10 +150,10 @@ mod tests {
             "/nonexistent/bear/working/dir",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
-                (ArgumentKind::Source { binary: false }, vec!["a.c"]),
-                (ArgumentKind::Source { binary: false }, vec!["b.c"]),
+                (Item::Compiler, vec!["/usr/bin/gcc"]),
+                (Item::Flag(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
+                (Item::Source { binary: false }, vec!["a.c"]),
+                (Item::Source { binary: false }, vec!["b.c"]),
             ],
         );
 

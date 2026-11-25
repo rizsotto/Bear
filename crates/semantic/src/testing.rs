@@ -3,63 +3,66 @@
 use super::interpretation::Origin;
 use super::interpreters::matchers::source::file_type_of;
 use super::{
-    Argument, ArgumentKind, Arguments, Command, FileRef, FileType, Interpretation, OutputSpelling,
-    Recognized, Role, SourceMode,
+    Arguments, FileRef, FileType, Interpretation, OutputSpelling, PassEffect, Recognized, Role, SourceMode,
 };
 use intercept::Execution;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-impl Command {
-    /// Create a Command from string arguments for testing.
-    ///
-    /// An `ArgumentKind::Output` entry spelled as two tokens (`["-o", "a.o"]`)
-    /// becomes the separate form; one token becomes the glued form, which is
-    /// the spelling that token would re-emit as.
-    pub fn from_strings(executable: &str, arguments: Vec<(ArgumentKind, Vec<&str>)>) -> Self {
-        Self {
-            executable: PathBuf::from(executable),
-            source_mode: SourceMode::PerSourceStripped,
-            arguments: arguments
-                .into_iter()
-                .map(|(kind, args)| match kind {
-                    ArgumentKind::Source { binary } => Argument::Source { path: args[0].to_string(), binary },
-                    ArgumentKind::Output => Argument::Output {
-                        flag: args[0].to_string(),
-                        path: args.get(1).unwrap_or(&"").to_string(),
-                        spelling: if args.len() > 1 {
-                            OutputSpelling::Separate
-                        } else {
-                            OutputSpelling::Glued
-                        },
-                    },
-                    other_kind => Argument::Other {
-                        arguments: args.into_iter().map(String::from).collect(),
-                        kind: other_kind,
-                    },
-                })
-                .collect(),
-        }
-    }
-
-    /// Compare two CompilerCommands by their arguments for testing.
-    pub fn has_same_arguments(&self, other: &Command) -> bool {
-        self.arguments == other.arguments
-    }
+/// What a test item stands for. A test lists `(Item, tokens)` pairs instead of
+/// building an [`Interpretation`] by hand.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Item {
+    Compiler,
+    /// A file named on the command line. `binary: true` needs a name that is
+    /// an object file.
+    Source {
+        binary: bool,
+    },
+    /// An output flag. Two tokens (`["-o", "a.o"]`) are the separate form, one
+    /// token is the glued form.
+    Output,
+    /// An `@file` token that was not read.
+    ArgumentsFile,
+    Flag(PassEffect),
 }
 
 impl Interpretation {
-    /// Build an Interpretation from the same list `Command::from_strings` takes.
+    /// The call as `(item, tokens)` pairs in output order, without the
+    /// launcher. The inverse of the list `Recognized::from_strings` takes.
+    #[cfg(test)]
+    pub(crate) fn items(&self) -> Vec<(Item, Vec<String>)> {
+        self.arguments()
+            .filter_map(|argument| {
+                let item = match &argument.role {
+                    Role::Launcher => return None,
+                    Role::Compiler { .. } => Item::Compiler,
+                    Role::Input(FileRef::Resolved { file_type, .. }) => {
+                        Item::Source { binary: *file_type == FileType::Object }
+                    }
+                    Role::Input(FileRef::UnresolvedLibrary { .. }) => {
+                        panic!("a library input has no test item: {:?}", argument)
+                    }
+                    Role::ArgumentsFile { .. } => Item::ArgumentsFile,
+                    Role::Output { .. } => Item::Output,
+                    Role::Flag(effect) => Item::Flag(*effect),
+                };
+                Some((item, argument.as_arguments(&|path| std::borrow::Cow::Borrowed(path))))
+            })
+            .collect()
+    }
+
+    /// Build an Interpretation from a list of test items.
     ///
     /// An input is typed by its extension, so a `Source { binary }` flag must
     /// agree with it: `binary: true` needs a name that is an object.
-    fn from_strings(executable: &str, arguments: &[(ArgumentKind, Vec<&str>)]) -> Self {
+    fn from_strings(executable: &str, arguments: &[(Item, Vec<&str>)]) -> Self {
         let items = arguments
             .iter()
             .map(|(kind, args)| {
                 let role = match kind {
-                    ArgumentKind::Compiler => Role::Compiler { path: PathBuf::from(executable) },
-                    ArgumentKind::Source { binary } => {
+                    Item::Compiler => Role::Compiler { path: PathBuf::from(executable) },
+                    Item::Source { binary } => {
                         let file_type = file_type_of(args[0]);
                         assert_eq!(
                             *binary,
@@ -69,7 +72,7 @@ impl Interpretation {
                         );
                         Role::Input(FileRef::Resolved { path: PathBuf::from(args[0]), file_type })
                     }
-                    ArgumentKind::Output => Role::Output {
+                    Item::Output => Role::Output {
                         flag: args[0].to_string(),
                         path: PathBuf::from(args.get(1).unwrap_or(&"")),
                         spelling: if args.len() > 1 {
@@ -78,7 +81,10 @@ impl Interpretation {
                             OutputSpelling::Glued
                         },
                     },
-                    ArgumentKind::Other(effect) => Role::Flag(*effect),
+                    Item::ArgumentsFile => Role::ArgumentsFile {
+                        path: PathBuf::from(args[0].strip_prefix('@').unwrap_or(args[0])),
+                    },
+                    Item::Flag(effect) => Role::Flag(*effect),
                 };
                 let item = Arguments { args: args.iter().map(|arg| arg.to_string()).collect(), role };
                 (Origin::CommandLine, item)
@@ -93,20 +99,15 @@ impl Recognized {
     ///
     /// The execution's argv is every argument token in order. Call
     /// [`with_source_mode`](Self::with_source_mode) to change the mode.
-    pub fn from_strings(
-        working_dir: &str,
-        executable: &str,
-        arguments: Vec<(ArgumentKind, Vec<&str>)>,
-    ) -> Self {
+    pub fn from_strings(working_dir: &str, executable: &str, arguments: Vec<(Item, Vec<&str>)>) -> Self {
         let argv: Vec<&str> = arguments.iter().flat_map(|(_, tokens)| tokens.iter().copied()).collect();
         let execution = Execution::from_strings(executable, argv, working_dir, HashMap::new());
         let interpretation = Interpretation::from_strings(executable, &arguments);
-        Self { execution, command: Command::from_strings(executable, arguments), interpretation }
+        Self { execution, interpretation }
     }
 
-    /// Set the source mode on the command and on the interpretation.
+    /// Set the source mode on the interpretation.
     pub fn with_source_mode(mut self, source_mode: SourceMode) -> Self {
-        self.command.source_mode = source_mode;
         self.interpretation.set_source_mode(source_mode);
         self
     }
@@ -115,96 +116,8 @@ impl Recognized {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PassEffect;
     use std::borrow::Cow;
     use std::path::Path;
-
-    #[test]
-    fn test_compiler_command_comparison() {
-        let cmd1 = Command::from_strings(
-            "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
-        );
-
-        let cmd2 = Command::from_strings(
-            "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
-        );
-
-        let cmd3 = Command::from_strings(
-            "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source { binary: false }, vec!["other.c"]),
-                (ArgumentKind::Output, vec!["-o", "other.o"]),
-            ],
-        );
-
-        assert!(cmd1.has_same_arguments(&cmd2));
-        assert!(!cmd1.has_same_arguments(&cmd3));
-    }
-
-    #[test]
-    fn test_arguments_with_different_kinds() {
-        let cmd1 = Command::from_strings(
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
-        );
-
-        let cmd2 = Command::from_strings("/usr/bin/gcc", vec![(ArgumentKind::Output, vec!["main.c"])]);
-
-        assert!(!cmd1.has_same_arguments(&cmd2));
-    }
-
-    #[test]
-    fn test_arguments_with_different_lengths() {
-        let cmd1 = Command::from_strings(
-            "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
-        );
-
-        let cmd2 = Command::from_strings(
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
-        );
-
-        assert!(!cmd1.has_same_arguments(&cmd2));
-    }
-
-    #[test]
-    fn test_argument_enum_implementations() {
-        let source_arg = Argument::Source { path: "main.c".to_string(), binary: false };
-        let output_arg = Argument::Output {
-            flag: "-o".to_string(),
-            path: "main.o".to_string(),
-            spelling: OutputSpelling::Separate,
-        };
-        let other_arg = Argument::Other {
-            arguments: vec!["-Wall".to_string()],
-            kind: ArgumentKind::Other(PassEffect::None),
-        };
-
-        assert_eq!(source_arg.kind(), ArgumentKind::Source { binary: false });
-        assert_eq!(output_arg.kind(), ArgumentKind::Output);
-        assert_eq!(other_arg.kind(), ArgumentKind::Other(PassEffect::None));
-
-        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
-        assert_eq!(source_arg.as_arguments(path_updater), vec!["main.c"]);
-        assert_eq!(output_arg.as_arguments(path_updater), vec!["-o", "main.o"]);
-        assert_eq!(other_arg.as_arguments(path_updater), vec!["-Wall"]);
-
-        assert_eq!(source_arg.as_file(path_updater), Some(PathBuf::from("main.c")));
-        assert_eq!(output_arg.as_file(path_updater), Some(PathBuf::from("main.o")));
-        assert_eq!(other_arg.as_file(path_updater), None);
-    }
 
     /// Each spelling writes back the tokens it stands for: re-joining a glued
     /// or `=`/`:` written value as two tokens would produce a command line the
@@ -233,10 +146,13 @@ mod tests {
     #[test]
     fn output_argument_path_updater_reaches_a_glued_path() {
         // arrange
-        let sut = Argument::Output {
-            flag: "-o".to_string(),
-            path: "main.o".to_string(),
-            spelling: OutputSpelling::Glued,
+        let sut = Arguments {
+            args: vec!["-omain.o".to_string()],
+            role: Role::Output {
+                flag: "-o".to_string(),
+                path: PathBuf::from("main.o"),
+                spelling: OutputSpelling::Glued,
+            },
         };
         let path_updater: &dyn Fn(&Path) -> Cow<Path> =
             &|path: &Path| Cow::Owned(Path::new("/build").join(path));
@@ -250,6 +166,5 @@ mod tests {
 
         // assert
         assert_eq!(actual, vec![format!("-o{}", rewritten.display())]);
-        assert_eq!(sut.as_file(path_updater), Some(rewritten));
     }
 }

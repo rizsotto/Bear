@@ -68,8 +68,6 @@ flags:
     result: configures_compiling
   - match: {pattern: "-fplugin-arg-*"}
     result: configures_compiling
-  - match: {pattern: "@*"}
-    result: configures_compiling
   - match: {pattern: "-A{ }*"}
     result: configures_preprocessing
   - match: {pattern: "-D{ }*"}

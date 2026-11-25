@@ -97,20 +97,11 @@ impl Interpreter for CompilerInterpreter {
             return RecognizeResult::NotRecognized(execution);
         };
 
-        // Read @file response files before flag classification, so their
-        // tokens are classified, link-stripped, and split per source like any
-        // other argument. Tokenization follows the family just identified.
-        // The file is read once; the family derives both models from it.
-        let inlined = self.inline_response_files.then(|| {
-            let after_compiler = execution.arguments.get(launcher_len + 1..).unwrap_or_default();
-            response_file::expand(
-                after_compiler,
-                &execution.working_dir,
-                response_file::syntax_for(compiler_type),
-            )
+        let result = interpreter.recognize(Call {
+            execution,
+            launcher_len,
+            inline_response_files: self.inline_response_files,
         });
-
-        let result = interpreter.recognize(Call { execution, launcher_len, inlined });
         log_result(&compiler_type.to_string(), &result);
         result
     }
@@ -119,45 +110,70 @@ impl Interpreter for CompilerInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ArgumentKind, CompilerPass, PassEffect, Recognized};
+    use crate::testing::Item;
+    use crate::{CompilerPass, PassEffect, Recognized};
     use std::borrow::Cow;
     use std::collections::HashMap;
     use std::path::{Path, PathBuf};
 
-    use ArgumentKind::*;
+    use Item::*;
 
-    /// Short alias for `Other(PassEffect::StopsAt(pass))`.
-    fn stops_at(pass: CompilerPass) -> ArgumentKind {
-        Other(PassEffect::StopsAt(pass))
+    /// Short alias for `Flag(PassEffect::StopsAt(pass))`.
+    fn stops_at(pass: CompilerPass) -> Item {
+        Flag(PassEffect::StopsAt(pass))
     }
-    /// Short alias for `Other(PassEffect::Configures(pass))`.
-    fn configures(pass: CompilerPass) -> ArgumentKind {
-        Other(PassEffect::Configures(pass))
+    /// Short alias for `Flag(PassEffect::Configures(pass))`.
+    fn configures(pass: CompilerPass) -> Item {
+        Flag(PassEffect::Configures(pass))
     }
-    /// Short alias for `Other(PassEffect::None)`.
-    fn none() -> ArgumentKind {
-        Other(PassEffect::None)
+    /// Short alias for `Flag(PassEffect::None)`.
+    fn none() -> Item {
+        Flag(PassEffect::None)
     }
-    /// Short alias for `Other(PassEffect::DriverOption)`.
-    fn driver() -> ArgumentKind {
-        Other(PassEffect::DriverOption)
+    /// Short alias for `Flag(PassEffect::DriverOption)`.
+    fn driver() -> Item {
+        Flag(PassEffect::DriverOption)
     }
-    /// Short alias for `Other(PassEffect::InfoAndExit)`.
-    fn info() -> ArgumentKind {
-        Other(PassEffect::InfoAndExit)
+    /// Short alias for `Flag(PassEffect::InfoAndExit)`.
+    fn info() -> Item {
+        Flag(PassEffect::InfoAndExit)
     }
 
-    fn assert_command(result: RecognizeResult, expected: Vec<(ArgumentKind, Vec<&str>)>) {
+    /// The items of a recognized call, with the accessors the table tests read.
+    struct View {
+        arguments: Vec<ViewItem>,
+    }
+
+    #[derive(Debug)]
+    struct ViewItem {
+        kind: Item,
+        tokens: Vec<String>,
+    }
+
+    impl View {
+        fn of(recognized: &Recognized) -> Self {
+            let arguments =
+                recognized.interpretation.items().into_iter().map(|(kind, tokens)| ViewItem { kind, tokens });
+            Self { arguments: arguments.collect() }
+        }
+    }
+
+    impl ViewItem {
+        fn kind(&self) -> Item {
+            self.kind
+        }
+
+        fn as_arguments(&self, _path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {
+            self.tokens.clone()
+        }
+    }
+
+    fn assert_command(result: RecognizeResult, expected: Vec<(Item, Vec<&str>)>) {
         let RecognizeResult::Recognized(recognized) = result else {
             panic!("Expected Recognized, got {:?}", result);
         };
-        let actual: Vec<(ArgumentKind, Vec<String>)> = recognized
-            .command
-            .arguments
-            .iter()
-            .map(|a| (a.kind(), a.as_arguments(&|p| Cow::Borrowed(p))))
-            .collect();
-        let expected: Vec<(ArgumentKind, Vec<String>)> =
+        let actual = recognized.interpretation.items();
+        let expected: Vec<(Item, Vec<String>)> =
             expected.into_iter().map(|(k, args)| (k, args.into_iter().map(String::from).collect())).collect();
         assert_eq!(actual, expected);
     }
@@ -187,10 +203,6 @@ mod tests {
         std::env::join_paths(path_bufs).unwrap().to_string_lossy().to_string()
     }
 
-    fn noop(path: &Path) -> Cow<'_, Path> {
-        Cow::from(path)
-    }
-
     mod structural {
         use super::*;
 
@@ -201,7 +213,7 @@ mod tests {
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)), "GCC command should be recognized");
             if let RecognizeResult::Recognized(recognized) = result {
-                assert_eq!(recognized.command.executable, PathBuf::from("/usr/bin/gcc"));
+                assert_eq!(recognized.interpretation.items()[0].1, vec!["/usr/bin/gcc"]);
                 assert_eq!(recognized.execution.working_dir, PathBuf::from("/tmp"));
             } else {
                 panic!("Expected compiler command");
@@ -215,7 +227,7 @@ mod tests {
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)), "Clang command should be recognized");
             if let RecognizeResult::Recognized(recognized) = result {
-                assert_eq!(recognized.command.executable, PathBuf::from("clang"));
+                assert_eq!(recognized.interpretation.items()[0].1, vec!["clang"]);
                 assert_eq!(recognized.execution.working_dir, PathBuf::from("/tmp"));
             } else {
                 panic!("Expected compiler command");
@@ -290,13 +302,8 @@ mod tests {
             let ccache_execution = create_execution("ccache", vec!["ccache", "gcc", "-c", "test.c"], "/tmp");
             let result = sut.recognize(ccache_execution);
             if let RecognizeResult::Recognized(recognized) = result {
-                assert_eq!(*recognized.command.executable, *"gcc");
-                let arguments: Vec<String> = recognized
-                    .command
-                    .arguments
-                    .into_iter()
-                    .flat_map(|arg| arg.as_arguments(&noop))
-                    .collect();
+                let arguments: Vec<String> =
+                    recognized.interpretation.items().into_iter().flat_map(|(_, tokens)| tokens).collect();
                 assert_eq!(vec!["gcc".to_string(), "-c".to_string(), "test.c".to_string()], arguments);
             } else {
                 panic!("Expected compiler command");
@@ -317,7 +324,7 @@ mod tests {
             };
             assert_eq!(recognized.execution.executable, PathBuf::from("/usr/bin/ccache"));
             assert_eq!(recognized.execution.arguments, vec!["ccache", "gcc", "-c", "main.c"]);
-            assert_eq!(recognized.command.executable, PathBuf::from("gcc"));
+            assert_eq!(recognized.interpretation.items()[0].1, vec!["gcc"]);
         }
 
         // Requirements: output-response-file-inlining
@@ -336,7 +343,7 @@ mod tests {
             };
             assert_eq!(recognized.execution.arguments, vec!["gcc", "@flags.resp", "-c", "main.c"]);
             let inlined: Vec<String> =
-                recognized.command.arguments.iter().flat_map(|arg| arg.as_arguments(&noop)).collect();
+                recognized.interpretation.items().into_iter().flat_map(|(_, tokens)| tokens).collect();
             assert!(inlined.contains(&"-DEXTRA=1".to_string()));
         }
 
@@ -505,8 +512,24 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["gcc"]),
-                    (configures(CompilerPass::Compiling), vec!["@response.txt"]),
+                    (ArgumentsFile, vec!["@response.txt"]),
                     (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
+        }
+
+        // Requirements: output-response-file-inlining
+        #[test]
+        fn bare_at_sign_stays_a_flag() {
+            let sut = CompilerInterpreter::default();
+            let execution = create_execution("gcc", vec!["gcc", "-c", "main.c", "@"], "/project");
+            assert_command(
+                sut.recognize(execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                    (none(), vec!["@"]),
                 ],
             );
         }
@@ -538,7 +561,8 @@ mod tests {
             ] {
                 let execution = create_execution("gcc", args, "/project");
                 let result = sut.recognize(execution);
-                if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+                if let RecognizeResult::Recognized(recognized) = result {
+                    let cmd = View::of(&recognized);
                     assert_eq!(cmd.arguments[1].kind(), configures(CompilerPass::Compiling));
                     assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), expected_flag_args);
                 }
@@ -573,7 +597,8 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert!(cmd.arguments.len() >= 10);
                 let source_count = cmd.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
                 let output_count = cmd.arguments.iter().filter(|a| a.kind() == Output).count();
@@ -589,7 +614,7 @@ mod tests {
             let sut = CompilerInterpreter::default();
 
             // (flags, expected_kind) for prefix-matching flag groups
-            let cases: Vec<(Vec<&str>, ArgumentKind)> = vec![
+            let cases: Vec<(Vec<&str>, Item)> = vec![
                 (vec!["-O2", "-Os", "-Ofast", "-Og"], configures(CompilerPass::Compiling)),
                 (vec!["-g", "-g3", "-gdwarf-4", "-ggdb"], configures(CompilerPass::Compiling)),
                 (vec!["-Wall", "-Wextra", "-Wno-unused", "-Werror=format"], none()),
@@ -609,10 +634,11 @@ mod tests {
                 args.push("main.c");
                 let execution = create_execution("gcc", args, "/project");
                 let result = sut.recognize(execution);
-                if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
-                    assert!(cmd.arguments.len() > flags.len());
+                if let RecognizeResult::Recognized(Recognized { interpretation, .. }) = result {
+                    let items = interpretation.items();
+                    assert!(items.len() > flags.len());
                     for i in 1..=flags.len() {
-                        assert_eq!(cmd.arguments[i].kind(), expected_kind, "flag: {}", flags[i - 1]);
+                        assert_eq!(items[i].0, expected_kind, "flag: {}", flags[i - 1]);
                     }
                 }
             }
@@ -638,7 +664,8 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 for argument in &cmd.arguments[1..=3] {
                     assert_eq!(argument.kind(), configures(CompilerPass::Linking));
                 }
@@ -659,7 +686,8 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments[1].kind(), configures(CompilerPass::Preprocessing));
                 assert_eq!(cmd.arguments[2].kind(), configures(CompilerPass::Linking));
                 assert_eq!(cmd.arguments[3].kind(), configures(CompilerPass::Linking));
@@ -682,8 +710,9 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
-                assert_eq!(cmd.arguments[1].kind(), configures(CompilerPass::Compiling));
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
+                assert_eq!(cmd.arguments[1].kind(), ArgumentsFile);
                 assert_eq!(cmd.arguments[2].kind(), configures(CompilerPass::Compiling));
                 assert_eq!(cmd.arguments[3].kind(), configures(CompilerPass::Compiling));
                 assert_eq!(cmd.arguments[4].kind(), driver());
@@ -730,7 +759,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 6);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -756,7 +786,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -781,7 +812,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -809,7 +841,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 8);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -837,7 +870,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 6);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -866,7 +900,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 8);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -895,7 +930,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 4);
             } else {
                 panic!("Expected compiler command");
@@ -926,7 +962,8 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 // -E, -M and -MM stop the compiler after preprocessing (the
                 // latter two imply -E); the rest only configure it.
                 for i in [1, 9, 10] {
@@ -1013,12 +1050,12 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
-                assert!(cmd.arguments.len() >= 10);
-                let linking_count = cmd
-                    .arguments
+            if let RecognizeResult::Recognized(Recognized { interpretation, .. }) = result {
+                let items = interpretation.items();
+                assert!(items.len() >= 10);
+                let linking_count = items
                     .iter()
-                    .filter(|a| matches!(a.kind(), Other(PassEffect::Configures(CompilerPass::Linking))))
+                    .filter(|(kind, _)| matches!(kind, Flag(PassEffect::Configures(CompilerPass::Linking))))
                     .count();
                 assert_eq!(linking_count, 7);
             }
@@ -1042,7 +1079,8 @@ mod tests {
                 "/build",
             );
             let result = sut.recognize(pure_linking);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 let object_files: Vec<_> = cmd
                     .arguments
                     .iter()
@@ -1067,7 +1105,8 @@ mod tests {
                 "/project",
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 let arch_arg = cmd.arguments.iter().find(|a| {
                     let tokens = a.as_arguments(&|p| Cow::Borrowed(p));
                     tokens.len() == 2 && tokens[0] == "-arch" && tokens[1] == "arm64"
@@ -1189,7 +1228,8 @@ mod tests {
             ] {
                 let execution = create_execution("clang", args, "/project");
                 let result = sut.recognize(execution);
-                if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+                if let RecognizeResult::Recognized(recognized) = result {
+                    let cmd = View::of(&recognized);
                     assert_eq!(cmd.arguments.len(), 3);
                     assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), expected_flag_args);
                 }
@@ -1285,17 +1325,18 @@ mod tests {
                 ],
                 "/project",
             );
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = sut.recognize(execution) {
-                assert_eq!(cmd.arguments.len(), 13);
-                for (i, argument) in cmd.arguments.iter().enumerate().take(12).skip(1) {
-                    match argument.kind() {
-                        Other(PassEffect::Configures(_))
-                        | Other(PassEffect::StopsAt(_))
-                        | Other(PassEffect::None) => {}
+            if let RecognizeResult::Recognized(Recognized { interpretation, .. }) = sut.recognize(execution) {
+                let items = interpretation.items();
+                assert_eq!(items.len(), 13);
+                for (i, (kind, _)) in items.iter().enumerate().take(12).skip(1) {
+                    match kind {
+                        Flag(PassEffect::Configures(_))
+                        | Flag(PassEffect::StopsAt(_))
+                        | Flag(PassEffect::None) => {}
                         other => panic!("Unexpected argument kind at index {}: {:?}", i, other),
                     }
                 }
-                assert_eq!(cmd.arguments[12].kind(), Source { binary: false });
+                assert_eq!(items[12].0, Source { binary: false });
             } else {
                 panic!("Expected compiler command");
             }
@@ -1317,7 +1358,8 @@ mod tests {
                 ],
                 "/project",
             );
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = sut.recognize(execution) {
+            if let RecognizeResult::Recognized(recognized) = sut.recognize(execution) {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 6);
                 for argument in &cmd.arguments[1..5] {
                     assert_eq!(argument.kind(), configures(CompilerPass::Compiling));
@@ -1343,7 +1385,8 @@ mod tests {
                 ],
                 "/project",
             );
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = sut.recognize(execution) {
+            if let RecognizeResult::Recognized(recognized) = sut.recognize(execution) {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 7);
                 for argument in &cmd.arguments[1..6] {
                     assert_eq!(argument.kind(), configures(CompilerPass::Compiling));
@@ -1447,7 +1490,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 6);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -1473,7 +1517,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -1498,7 +1543,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -1526,7 +1572,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 8);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -1553,7 +1600,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 4);
             } else {
                 panic!("Expected compiler command");
@@ -1575,7 +1623,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 6);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -1604,7 +1653,8 @@ mod tests {
                 env,
             );
             let result = sut.recognize(execution);
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 8);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
@@ -1629,9 +1679,8 @@ mod tests {
                 vec!["clang++", "-c", "-std=c++23", "-o", "hello-world", "hello-world.cpp"],
                 "/home/user/project",
             );
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) =
-                sut.recognize(user_execution)
-            {
+            if let RecognizeResult::Recognized(recognized) = sut.recognize(user_execution) {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 5);
                 assert_eq!(cmd.arguments[0].kind(), Compiler);
             } else {
@@ -1754,7 +1803,8 @@ mod tests {
                 vec!["flang", "-fbackslash", "-ffree-form", "-J/path/to/modules", "-cpp", "main.f90"],
                 "/project",
             );
-            if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = sut.recognize(execution) {
+            if let RecognizeResult::Recognized(recognized) = sut.recognize(execution) {
+                let cmd = View::of(&recognized);
                 assert_eq!(cmd.arguments.len(), 6);
                 assert_eq!(cmd.arguments[1].kind(), configures(CompilerPass::Compiling));
                 assert_eq!(cmd.arguments[2].kind(), configures(CompilerPass::Compiling));
@@ -1885,7 +1935,8 @@ mod tests {
             ] {
                 let execution = create_execution("nvcc", args, "/test");
                 let result = sut.recognize(execution);
-                if let RecognizeResult::Recognized(Recognized { command: cmd, .. }) = result {
+                if let RecognizeResult::Recognized(recognized) = result {
+                    let cmd = View::of(&recognized);
                     assert_eq!(cmd.arguments.len(), 4);
                     assert_eq!(cmd.arguments[1].kind(), configures(CompilerPass::Compiling));
                 }
@@ -1916,7 +1967,8 @@ mod tests {
             let execution = create_execution("ifort", vec!["ifort", "-c", "test.f90"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
             }
@@ -1932,7 +1984,8 @@ mod tests {
             );
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), configures(CompilerPass::Preprocessing));
                 assert_eq!(parsed.arguments[2].kind(), configures(CompilerPass::Preprocessing));
             }
@@ -1945,7 +1998,8 @@ mod tests {
                 create_execution("ifort", vec!["ifort", "-shared-intel", "-lm", "test.o"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), configures(CompilerPass::Linking));
                 assert_eq!(parsed.arguments[2].kind(), configures(CompilerPass::Linking));
             }
@@ -1957,7 +2011,8 @@ mod tests {
             let execution = create_execution("ifort", vec!["ifort", "--version"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), info());
             }
         }
@@ -1972,7 +2027,8 @@ mod tests {
             let execution = create_execution("crayftn", vec!["crayftn", "-c", "test.f90"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
             }
@@ -1988,7 +2044,8 @@ mod tests {
             );
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), configures(CompilerPass::Preprocessing));
                 assert_eq!(parsed.arguments[2].kind(), configures(CompilerPass::Preprocessing));
             }
@@ -2001,7 +2058,8 @@ mod tests {
                 create_execution("crayftn", vec!["crayftn", "-add-rpath", "-lm", "test.o"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), configures(CompilerPass::Linking));
                 assert_eq!(parsed.arguments[2].kind(), configures(CompilerPass::Linking));
             }
@@ -2017,7 +2075,8 @@ mod tests {
             );
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 4);
                 assert_eq!(parsed.arguments[1].kind(), none());
                 assert_eq!(parsed.arguments[2].kind(), none());
@@ -2030,7 +2089,8 @@ mod tests {
             let execution = create_execution("crayftn", vec!["crayftn", "-openmp", "test.f90"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), none());
             }
@@ -2047,7 +2107,8 @@ mod tests {
             let execution = create_execution("mpicc", vec!["mpicc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
@@ -2063,7 +2124,8 @@ mod tests {
             let execution = create_execution("mpicc", vec!["mpicc", "-cc=gcc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 4);
                 assert_eq!(parsed.arguments[1].kind(), driver());
                 assert_eq!(
@@ -2090,7 +2152,8 @@ mod tests {
                 create_execution("mpicc", vec!["mpicc", "-cc", "gcc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 let source_count =
                     parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
                 assert_eq!(source_count, 1, "only hello.c must be a source, got {:?}", parsed.arguments);
@@ -2112,7 +2175,8 @@ mod tests {
                 let execution = create_execution("mpicc", args.clone(), "/project");
                 let result = sut.recognize(execution);
                 assert!(matches!(result, RecognizeResult::Recognized(_)), "args: {:?}", args);
-                if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+                if let RecognizeResult::Recognized(recognized) = result {
+                    let parsed = View::of(&recognized);
                     assert_eq!(parsed.arguments[1].kind(), info(), "args: {:?}", args);
                 }
             }
@@ -2129,7 +2193,8 @@ mod tests {
             let execution = create_execution("qcc", vec!["qcc", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
@@ -2148,7 +2213,8 @@ mod tests {
                 create_execution("qcc", vec!["qcc", "-Vgcc_ntoaarch64le", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 4);
                 assert_eq!(parsed.arguments[1].kind(), driver());
                 assert_eq!(
@@ -2174,7 +2240,8 @@ mod tests {
             let execution = create_execution("qcc", vec!["qcc", "-V", "-c", "hello.c"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), driver());
                 let source_count =
                     parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
@@ -2203,10 +2270,10 @@ mod tests {
             assert_command(
                 result,
                 vec![
-                    (ArgumentKind::Compiler, vec!["nasm"]),
+                    (Compiler, vec!["nasm"]),
                     (configures(CompilerPass::Compiling), vec!["-f", "elf64"]),
                     (Source { binary: false }, vec!["hello.asm"]),
-                    (ArgumentKind::Output, vec!["-o", "hello.o"]),
+                    (Output, vec!["-o", "hello.o"]),
                 ],
             );
         }
@@ -2228,7 +2295,7 @@ mod tests {
             assert_command(
                 result,
                 vec![
-                    (ArgumentKind::Compiler, vec!["nasm"]),
+                    (Compiler, vec!["nasm"]),
                     (configures(CompilerPass::Preprocessing), vec!["-d", "CONFIG=release.asm"]),
                     (configures(CompilerPass::Compiling), vec!["-f", "elf64"]),
                     (Source { binary: false }, vec!["hello.asm"]),
@@ -2247,7 +2314,7 @@ mod tests {
             assert_command(
                 result,
                 vec![
-                    (ArgumentKind::Compiler, vec!["nasm"]),
+                    (Compiler, vec!["nasm"]),
                     (configures(CompilerPass::Compiling), vec!["-felf64"]),
                     (Source { binary: false }, vec!["hello.asm"]),
                 ],
@@ -2263,7 +2330,8 @@ mod tests {
             let execution = create_execution("nasm", vec!["nasm", "-v"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments[1].kind(), info());
                 assert!(
                     !parsed.arguments.iter().any(|a| matches!(a.kind(), Source { .. })),
@@ -2283,7 +2351,8 @@ mod tests {
             let execution = create_execution("yasm", vec!["yasm", "--version"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert!(
                     !parsed.arguments.iter().any(|a| matches!(a.kind(), Source { .. })),
                     "got {:?}",
@@ -2308,7 +2377,8 @@ mod tests {
                 create_execution("fasm", vec!["fasm", "-m", "65536", "hello.asm", "hello.o"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 4);
                 assert_eq!(parsed.arguments[1].kind(), none());
                 assert_eq!(
@@ -2331,7 +2401,8 @@ mod tests {
             let execution = create_execution("swiftc", vec!["swiftc", "-c", "hello.swift"], "/project");
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
@@ -2400,7 +2471,8 @@ mod tests {
                 let execution = create_execution("swiftc", args.clone(), "/project");
                 let result = sut.recognize(execution);
                 assert!(matches!(result, RecognizeResult::Recognized(_)), "args: {:?}", args);
-                if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+                if let RecognizeResult::Recognized(recognized) = result {
+                    let parsed = View::of(&recognized);
                     assert_eq!(parsed.arguments[1].kind(), info(), "args: {:?}", args);
                     assert!(
                         !parsed.arguments.iter().any(|a| matches!(a.kind(), Source { .. })),
@@ -2435,7 +2507,8 @@ mod tests {
             );
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 let source_count =
                     parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
                 assert_eq!(source_count, 1, "only a.swift must be a source, got {:?}", parsed.arguments);
@@ -2496,7 +2569,8 @@ mod tests {
             );
             let result = sut.recognize(execution);
             assert!(matches!(result, RecognizeResult::Recognized(_)));
-            if let RecognizeResult::Recognized(Recognized { command: parsed, .. }) = result {
+            if let RecognizeResult::Recognized(recognized) = result {
+                let parsed = View::of(&recognized);
                 let source_count =
                     parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
                 assert_eq!(source_count, 1, "only a.swift must be a source, got {:?}", parsed.arguments);

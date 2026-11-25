@@ -15,9 +15,7 @@
 //!    [`interpreters::create`].
 //!
 //! 2. **Parsing** - a recognized call is a [`Recognized`]: the observed
-//!    [`Execution`] plus a [`Command`] with its source files, its
-//!    [`CompilerPass`], and its [`Argument`] list, and the same call as an
-//!    [`Interpretation`].
+//!    [`Execution`] plus the call read as an [`Interpretation`].
 //!
 //! # Interpretation
 //!
@@ -36,14 +34,10 @@
 //!
 //! # Core types
 //!
-//! - [`Recognized`] - an observed execution, its parsed [`Command`], and its
-//!   [`Interpretation`]
+//! - [`Recognized`] - an observed execution and its [`Interpretation`]
 //! - [`Interpretation`] - a recognized call as classified [`Arguments`]
 //! - [`Arguments`], [`Role`], [`FileRef`], [`FileType`] - one item and what
 //!   it means
-//! - [`Command`] - a structured compiler invocation
-//! - [`Argument`] - one command line argument with its classification
-//! - [`ArgumentKind`] - what an argument means to the compiler
 //! - [`PassEffect`] - how an argument affects the compilation pipeline
 //! - [`CompilerHints`] - caller-supplied overrides for which executables are
 //!   which compiler, built from the `compilers:` configuration section
@@ -52,7 +46,7 @@ pub mod interpreters;
 
 mod interpretation;
 
-/// Command factories and comparison helpers for tests. Compiled only for this
+/// Factories for recognized calls in tests. Compiled only for this
 /// crate's own tests and for dependents that turn on the `testing` feature.
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
@@ -65,8 +59,7 @@ pub use interpreters::matchers::{is_c_family_source, is_header_file, looks_like_
 
 use intercept::Execution;
 
-use std::borrow::Cow;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Responsible for recognizing the semantic meaning of an executed command.
 ///
@@ -95,38 +88,12 @@ pub enum RecognizeResult {
     NotRecognized(Execution),
 }
 
-/// A recognized call: the observed execution, its parsed command, and the
-/// same call as an interpretation. This is what the output writer streams.
+/// A recognized call: the observed execution and the call read as an
+/// interpretation. This is what the output writer streams.
 #[derive(Debug)]
 pub struct Recognized {
     pub execution: Execution,
-    pub command: Command,
     pub interpretation: Interpretation,
-}
-
-/// A parsed compiler invocation.
-///
-/// `executable` is the compiler itself. Under a launcher it is the inner
-/// compiler token, which differs from the observed `Recognized::execution`.
-#[derive(Debug)]
-pub struct Command {
-    pub executable: PathBuf,
-    pub arguments: Vec<Argument>,
-    pub source_mode: SourceMode,
-}
-
-/// A compiler command-line argument with semantic classification.
-#[derive(Debug, PartialEq)]
-pub enum Argument {
-    /// Flags and other non-file arguments (e.g. `-c`, `-Wall`, `-I /usr/include`).
-    Other { arguments: Vec<String>, kind: ArgumentKind },
-    /// A source or object file argument.
-    Source { path: String, binary: bool },
-    /// An output file argument (e.g. `-o main.o`). The flag and the path are
-    /// stored apart so the path stays individually addressable, and
-    /// [`OutputSpelling`] remembers how the build wrote them so they can be
-    /// spelled back the way the compiler accepts.
-    Output { flag: String, path: String, spelling: OutputSpelling },
 }
 
 /// How an output flag and its value were written on the observed command line.
@@ -159,60 +126,6 @@ impl OutputSpelling {
             Self::Colon => vec![format!("{flag}:{path}")],
         }
     }
-}
-
-impl Argument {
-    /// Creates a Source variant, auto-detecting binary vs compilable from extension.
-    pub fn new_source(path: String) -> Self {
-        let binary = !looks_like_a_source_file(&path);
-        Self::Source { path, binary }
-    }
-
-    pub fn kind(&self) -> ArgumentKind {
-        match self {
-            Self::Other { kind, .. } => *kind,
-            Self::Source { binary, .. } => ArgumentKind::Source { binary: *binary },
-            Self::Output { .. } => ArgumentKind::Output,
-        }
-    }
-
-    pub fn as_arguments(&self, path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {
-        match self {
-            Self::Other { arguments, .. } => arguments.clone(),
-            Self::Source { path, .. } => {
-                let p = Path::new(path);
-                let updated = path_updater(p);
-                vec![updated.to_string_lossy().to_string()]
-            }
-            Self::Output { flag, path, spelling } => {
-                let updated = path_updater(Path::new(path));
-                spelling.as_arguments(flag, &updated)
-            }
-        }
-    }
-
-    pub fn as_file(&self, path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Option<PathBuf> {
-        match self {
-            Self::Other { .. } => None,
-            Self::Source { path, .. } => {
-                let p = Path::new(path);
-                Some(path_updater(p).to_path_buf())
-            }
-            Self::Output { path, .. } => {
-                let p = Path::new(path);
-                Some(path_updater(p).to_path_buf())
-            }
-        }
-    }
-}
-
-/// Represents the meaning of the argument in the compiler call.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ArgumentKind {
-    Compiler,
-    Source { binary: bool },
-    Output,
-    Other(PassEffect),
 }
 
 /// Represents how an argument affects the compilation pipeline.

@@ -14,7 +14,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 
-use codegen::{pattern_to_rust, result_to_rust};
+use codegen::{effect_to_rust, pattern_to_rust, result_to_rust};
 use env_keys::generate_env_keys;
 use families::generate_families;
 use recognition::{generate_compiler_ids, generate_recognition_patterns};
@@ -126,7 +126,7 @@ impl ResolvedTable {
                 .mapping
                 .to_rust()
                 .with_context(|| format!("variable '{}' in {}", entry.variable, self.names.yaml_file))?;
-            let effect_rust = result_to_rust(&entry.effect)
+            let effect_rust = effect_to_rust(&entry.effect)
                 .with_context(|| format!("variable '{}' in {}", entry.variable, self.names.yaml_file))?;
             out.push_str(&format!(
                 "    EnvRule::new(\"{}\", {}, {}),\n",

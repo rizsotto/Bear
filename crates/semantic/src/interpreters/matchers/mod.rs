@@ -11,7 +11,7 @@
 
 pub(crate) mod source;
 
-use crate::ArgumentKind;
+use crate::PassEffect;
 
 pub use source::{is_c_family_source, is_header_file, looks_like_a_source_file};
 
@@ -58,7 +58,14 @@ impl FlagPattern {
     }
 }
 
-/// A flag definition combining the flag pattern and argument kind.
+/// What a flag table rule says about the flag it matches.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum RuleKind {
+    Output,
+    Effect(PassEffect),
+}
+
+/// A flag definition combining the flag pattern and what the flag means.
 /// This combines syntactic pattern matching with semantic meaning for compiler flags.
 #[derive(Debug, Clone)]
 pub(super) struct FlagRule {
@@ -66,7 +73,7 @@ pub(super) struct FlagRule {
     pub pattern: FlagPattern,
 
     /// What this flag represents semantically
-    pub kind: ArgumentKind,
+    pub kind: RuleKind,
 }
 
 /// Result of matching a flag against command line arguments.
@@ -218,7 +225,7 @@ impl FlagAnalyzer {
 
 impl FlagRule {
     /// Create a new flag definition
-    pub const fn new(pattern: FlagPattern, kind: ArgumentKind) -> Self {
+    pub const fn new(pattern: FlagPattern, kind: RuleKind) -> Self {
         Self { pattern, kind }
     }
 }
@@ -253,12 +260,12 @@ pub(super) enum EnvMapping {
 pub(super) struct EnvRule {
     pub variable: &'static str,
     pub mapping: EnvMapping,
-    pub kind: ArgumentKind,
+    pub effect: PassEffect,
 }
 
 impl EnvRule {
-    pub const fn new(variable: &'static str, mapping: EnvMapping, kind: ArgumentKind) -> Self {
-        Self { variable, mapping, kind }
+    pub const fn new(variable: &'static str, mapping: EnvMapping, effect: PassEffect) -> Self {
+        Self { variable, mapping, effect }
     }
 }
 
@@ -273,18 +280,18 @@ mod tests {
         let mut flags = vec![
             FlagRule::new(
                 FlagPattern::Exactly("-c", 0),
-                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
+                RuleKind::Effect(PassEffect::StopsAt(CompilerPass::Assembling)),
             ),
             FlagRule::new(
                 FlagPattern::ExactlyWithEqOrSep("-std"),
-                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+                RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling)),
             ),
             FlagRule::new(
                 FlagPattern::ExactlyWithGluedOrSep("-I"),
-                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+                RuleKind::Effect(PassEffect::Configures(CompilerPass::Preprocessing)),
             ),
-            FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::None)),
-            FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
+            FlagRule::new(FlagPattern::Prefix("-W", 0), RuleKind::Effect(PassEffect::None)),
+            FlagRule::new(FlagPattern::Exactly("-o", 1), RuleKind::Output),
         ];
 
         // Sort by flag length descending to ensure longer matches are tried first
@@ -359,9 +366,9 @@ mod tests {
             let mut flags = vec![
                 FlagRule::new(
                     FlagPattern::ExactlyWithColon("/std"),
-                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+                    RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling)),
                 ),
-                FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fe"), ArgumentKind::Output),
+                FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fe"), RuleKind::Output),
             ];
             flags.sort_by_key(|b| std::cmp::Reverse(b.pattern.flag().len()));
             flags

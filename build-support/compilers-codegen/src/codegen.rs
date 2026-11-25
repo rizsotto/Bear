@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 
 /// Parse a pattern string into a FlagPattern Rust expression.
 pub fn pattern_to_rust(pattern: &str, count: Option<u32>) -> String {
@@ -25,27 +25,31 @@ pub fn pattern_to_rust(pattern: &str, count: Option<u32>) -> String {
     }
 }
 
-/// Map a result string to its Rust ArgumentKind expression.
-pub fn result_to_rust(result: &str) -> Result<&'static str> {
+/// Map a pass-effect string to its Rust `PassEffect` expression.
+pub fn effect_to_rust(effect: &str) -> Result<&'static str> {
+    match effect {
+        "configures_preprocessing" => Ok("PassEffect::Configures(CompilerPass::Preprocessing)"),
+        "configures_compiling" => Ok("PassEffect::Configures(CompilerPass::Compiling)"),
+        "configures_assembling" => Ok("PassEffect::Configures(CompilerPass::Assembling)"),
+        "configures_linking" => Ok("PassEffect::Configures(CompilerPass::Linking)"),
+        "stops_at_preprocessing" => Ok("PassEffect::StopsAt(CompilerPass::Preprocessing)"),
+        "stops_at_compiling" => Ok("PassEffect::StopsAt(CompilerPass::Compiling)"),
+        "stops_at_assembling" => Ok("PassEffect::StopsAt(CompilerPass::Assembling)"),
+        "info_and_exit" => Ok("PassEffect::InfoAndExit"),
+        "driver_option" => Ok("PassEffect::DriverOption"),
+        "pass_through" => Ok("PassEffect::PassThrough"),
+        "none" => Ok("PassEffect::None"),
+        other => bail!("unknown effect value '{}'", other),
+    }
+}
+
+/// Map a flag result string to its Rust `RuleKind` expression.
+pub fn result_to_rust(result: &str) -> Result<String> {
     match result {
-        "output" => Ok("ArgumentKind::Output"),
-        "configures_preprocessing" => {
-            Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))")
-        }
-        "configures_compiling" => Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))"),
-        "configures_assembling" => {
-            Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling))")
-        }
-        "configures_linking" => Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))"),
-        "stops_at_preprocessing" => {
-            Ok("ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))")
-        }
-        "stops_at_compiling" => Ok("ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))"),
-        "stops_at_assembling" => Ok("ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))"),
-        "info_and_exit" => Ok("ArgumentKind::Other(PassEffect::InfoAndExit)"),
-        "driver_option" => Ok("ArgumentKind::Other(PassEffect::DriverOption)"),
-        "pass_through" => Ok("ArgumentKind::Other(PassEffect::PassThrough)"),
-        "none" => Ok("ArgumentKind::Other(PassEffect::None)"),
-        other => bail!("unknown result value '{}'", other),
+        "output" => Ok("RuleKind::Output".to_string()),
+        other => Ok(format!(
+            "RuleKind::Effect({})",
+            effect_to_rust(other).with_context(|| format!("unknown result value '{other}'"))?
+        )),
     }
 }

@@ -75,7 +75,6 @@ pub(super) fn log_result(name: &str, result: &RecognizeResult) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Command;
     use crate::Interpretation;
     use crate::MockInterpreter;
     use crate::Recognized;
@@ -127,11 +126,6 @@ mod test {
     fn command_fixture() -> RecognizeResult {
         RecognizeResult::Recognized(Recognized {
             execution: execution_fixture(),
-            command: Command {
-                executable: PathBuf::new(),
-                arguments: vec![],
-                source_mode: SourceMode::PerSourceStripped,
-            },
             interpretation: Interpretation::new(
                 "test",
                 SourceMode::PerSourceStripped,

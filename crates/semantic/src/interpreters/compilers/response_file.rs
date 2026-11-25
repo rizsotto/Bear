@@ -14,7 +14,6 @@
 //! entry; no new detection is introduced here. See the
 //! `output-response-file-inlining` requirement for the contract.
 
-use super::identity::CompilerType;
 use crate::interpretation::Origin;
 use log::warn;
 use std::path::{Path, PathBuf};
@@ -32,21 +31,6 @@ pub(super) enum Syntax {
     /// MSVC and clang-cl: Windows command-line rules; only double quotes group
     /// tokens; backslash escaping is positional, meaningful next to quotes.
     Msvc,
-}
-
-/// Selects the tokenization syntax for the compiler family Bear identified,
-/// reading the family's `response_file_syntax` from the generated
-/// [`super::flag_based::FAMILIES`] registry. A wrapper (no family id) and any
-/// id absent from the registry default to GNU/Clang syntax.
-pub(super) fn syntax_for(compiler_type: CompilerType) -> Syntax {
-    match compiler_type {
-        CompilerType::Compiler(id) => super::flag_based::FAMILIES
-            .iter()
-            .find(|def| def.id == id.as_str())
-            .map(|def| def.response_file_syntax)
-            .unwrap_or(Syntax::GnuClang),
-        CompilerType::Wrapper => Syntax::GnuClang,
-    }
 }
 
 /// Replaces every `@file` argument with the file's tokenized contents, each
@@ -332,21 +316,6 @@ mod tests {
         let sut = tokenize_gnu(r#""a\"b\\c\d""#);
 
         assert_eq!(sut, vec![r#"a"b\c\d"#]);
-    }
-
-    #[test]
-    fn syntax_selection_follows_compiler_family() {
-        for ty in [CompilerType::compiler("msvc"), CompilerType::compiler("clang_cl")] {
-            assert!(matches!(syntax_for(ty), Syntax::Msvc), "{ty} should use MSVC syntax");
-        }
-        for ty in [
-            CompilerType::compiler("gcc"),
-            CompilerType::compiler("clang"),
-            CompilerType::compiler("cuda"),
-            CompilerType::compiler("vala"),
-        ] {
-            assert!(matches!(syntax_for(ty), Syntax::GnuClang), "{ty} should use GNU/Clang syntax");
-        }
     }
 
     #[test]
