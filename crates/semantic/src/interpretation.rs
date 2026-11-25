@@ -581,7 +581,10 @@ mod tests {
             ),
             (output("/Fo", OutputSpelling::Colon, &["/Fo:main.o"]), vec!["/Fo:/b/main.o"]),
         ];
-        let updater: &dyn Fn(&Path) -> Cow<Path> = &|path| Cow::Owned(Path::new("/b").join(path));
+        // Joined by hand so the expected strings hold on every platform;
+        // `Path::join` would put a `\` between them on Windows.
+        let updater: &dyn Fn(&Path) -> Cow<Path> =
+            &|path| Cow::Owned(PathBuf::from(format!("/b/{}", path.display())));
 
         for (sut, expected) in cases {
             let actual = sut.as_arguments(updater);
