@@ -729,11 +729,11 @@ mod impls {
 
             let semantics =
                 executions.into_iter().filter_map(|execution| match self.interpreter.recognize(execution) {
-                    semantic::RecognizeResult::Recognized(cmd) => {
+                    semantic::RecognizeResult::Recognized(recognized) => {
                         stats.semantic_commands_received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        Some(cmd)
+                        Some(recognized)
                     }
-                    semantic::RecognizeResult::Ignored(_) => {
+                    semantic::RecognizeResult::Ignored { .. } => {
                         stats.semantic_commands_received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         None
                     }

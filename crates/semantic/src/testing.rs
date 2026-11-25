@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Argument, ArgumentKind, Command, OutputSpelling, SourceMode};
+use super::{Argument, ArgumentKind, Command, OutputSpelling, Recognized, SourceMode};
+use intercept::Execution;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 impl Command {
@@ -9,13 +11,8 @@ impl Command {
     /// An `ArgumentKind::Output` entry spelled as two tokens (`["-o", "a.o"]`)
     /// becomes the separate form; one token becomes the glued form, which is
     /// the spelling that token would re-emit as.
-    pub fn from_strings(
-        working_dir: &str,
-        executable: &str,
-        arguments: Vec<(ArgumentKind, Vec<&str>)>,
-    ) -> Self {
+    pub fn from_strings(executable: &str, arguments: Vec<(ArgumentKind, Vec<&str>)>) -> Self {
         Self {
-            working_dir: PathBuf::from(working_dir),
             executable: PathBuf::from(executable),
             source_mode: SourceMode::PerSourceStripped,
             arguments: arguments
@@ -46,6 +43,21 @@ impl Command {
     }
 }
 
+impl Recognized {
+    /// Create a Recognized from string arguments for testing.
+    ///
+    /// The execution's argv is every argument token in order. Set `command.source_mode` to change the mode.
+    pub fn from_strings(
+        working_dir: &str,
+        executable: &str,
+        arguments: Vec<(ArgumentKind, Vec<&str>)>,
+    ) -> Self {
+        let argv: Vec<&str> = arguments.iter().flat_map(|(_, tokens)| tokens.iter().copied()).collect();
+        let execution = Execution::from_strings(executable, argv, working_dir, HashMap::new());
+        Self { execution, command: Command::from_strings(executable, arguments) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -56,7 +68,6 @@ mod tests {
     #[test]
     fn test_compiler_command_comparison() {
         let cmd1 = Command::from_strings(
-            "/home/user",
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Source { binary: false }, vec!["main.c"]),
@@ -65,7 +76,6 @@ mod tests {
         );
 
         let cmd2 = Command::from_strings(
-            "/home/user",
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Source { binary: false }, vec!["main.c"]),
@@ -74,7 +84,6 @@ mod tests {
         );
 
         let cmd3 = Command::from_strings(
-            "/home/user",
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Source { binary: false }, vec!["other.c"]),
@@ -89,13 +98,11 @@ mod tests {
     #[test]
     fn test_arguments_with_different_kinds() {
         let cmd1 = Command::from_strings(
-            "/home/user",
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
         );
 
-        let cmd2 =
-            Command::from_strings("/home/user", "/usr/bin/gcc", vec![(ArgumentKind::Output, vec!["main.c"])]);
+        let cmd2 = Command::from_strings("/usr/bin/gcc", vec![(ArgumentKind::Output, vec!["main.c"])]);
 
         assert!(!cmd1.has_same_arguments(&cmd2));
     }
@@ -103,7 +110,6 @@ mod tests {
     #[test]
     fn test_arguments_with_different_lengths() {
         let cmd1 = Command::from_strings(
-            "/home/user",
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Source { binary: false }, vec!["main.c"]),
@@ -112,7 +118,6 @@ mod tests {
         );
 
         let cmd2 = Command::from_strings(
-            "/home/user",
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
         );

@@ -8,7 +8,7 @@ use crate::output::statistics::OutputStatistics;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-/// Converts `semantic::Command` instances into compilation database `Entry` objects,
+/// Converts `semantic::Recognized` instances into compilation database `Entry` objects,
 /// tracking pipeline statistics.
 pub(crate) struct ConverterClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     converter: clang::CommandConverter,
@@ -22,8 +22,8 @@ impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
     }
 }
 
-impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), SerializationError> {
+impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Recognized> for ConverterClangOutputWriter<T> {
+    fn write(self, semantics: impl Iterator<Item = semantic::Recognized>) -> Result<(), SerializationError> {
         let stats = Arc::clone(&self.stats);
 
         let dropped_stats = Arc::clone(&self.stats);
@@ -59,12 +59,12 @@ mod tests {
     use super::*;
     use crate::output::statistics::OutputStatistics;
     use crate::output::writers::fixtures::CollectingWriter;
-    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
 
-    fn make_compile_command(file: &str) -> Command {
-        Command::from_strings(
+    fn make_compile_command(file: &str) -> Recognized {
+        Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -75,8 +75,8 @@ mod tests {
         )
     }
 
-    fn make_preprocessing_command() -> Command {
-        Command::from_strings(
+    fn make_preprocessing_command() -> Recognized {
+        Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -86,8 +86,8 @@ mod tests {
         )
     }
 
-    fn make_link_only_command() -> Command {
-        Command::from_strings(
+    fn make_link_only_command() -> Recognized {
+        Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -148,7 +148,7 @@ mod tests {
             ..config::Format::default()
         };
         let sut = ConverterClangOutputWriter::new(writer, &format, Arc::clone(&stats));
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/nonexistent/bear/working/dir",
             "/usr/bin/gcc",
             vec![

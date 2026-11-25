@@ -94,7 +94,7 @@ impl SemanticCommandWriter {
     /// rolls it back, and the error names the output path.
     pub(crate) fn write(
         self,
-        semantics: impl Iterator<Item = semantic::Command>,
+        semantics: impl Iterator<Item = semantic::Recognized>,
     ) -> Result<AtomicFile, WriterError> {
         let Self { inner, path, output } = self;
         match inner {
@@ -223,11 +223,11 @@ mod fixtures {
 mod tests {
     use super::*;
     use crate::config;
-    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
     use std::sync::atomic::Ordering;
 
-    fn make_compile_command(file: &str) -> semantic::Command {
-        Command::from_strings(
+    fn make_compile_command(file: &str) -> semantic::Recognized {
+        Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![

@@ -38,7 +38,7 @@ use super::Entry;
 use super::path_format::{ResolveFn, resolver_for};
 use crate::config;
 use log::warn;
-use semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, SourceMode};
+use semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, Recognized, SourceMode};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
@@ -86,25 +86,27 @@ impl CommandConverter {
     ///
     /// Test helper: an unresolvable directory yields no entries.
     #[cfg(test)]
-    pub fn convert(&self, cmd: &Command) -> Vec<Entry> {
-        self.try_convert(cmd).unwrap_or_default()
+    pub fn convert(&self, recognized: &Recognized) -> Vec<Entry> {
+        self.try_convert(recognized).unwrap_or_default()
     }
 
     /// Converts a compiler command into compilation database entries.
     ///
     /// Fails when the working directory cannot be formatted; the error lists
     /// the source files whose entries are dropped because of it.
-    pub fn try_convert(&self, cmd: &Command) -> Result<Vec<Entry>, UnresolvedDirectory> {
+    pub fn try_convert(&self, recognized: &Recognized) -> Result<Vec<Entry>, UnresolvedDirectory> {
+        let cmd = &recognized.command;
+        let working_dir = &recognized.execution.working_dir;
         // Check if we should skip entry generation for this command
         if self.should_skip_entry_generation(cmd) {
             return Ok(vec![]);
         }
 
-        let formatted_directory = match (self.directory_resolver)(&cmd.working_dir, &cmd.working_dir) {
+        let formatted_directory = match (self.directory_resolver)(working_dir, working_dir) {
             Ok(dir) => dir,
             Err(e) => {
                 return Err(UnresolvedDirectory {
-                    directory: cmd.working_dir.clone(),
+                    directory: working_dir.clone(),
                     files: Self::entry_source_files(cmd),
                     reason: e.to_string(),
                 });
@@ -297,8 +299,9 @@ impl CommandConverter {
                 continue;
             }
 
-            // The compiler is recorded as the executable Bear observed, not as
-            // the token the command line carried; everything else spells itself.
+            // The compiler is recorded as the command's executable: the observed
+            // one, or the inner compiler under a launcher. Everything else spells
+            // itself.
             match arg.kind() {
                 ArgumentKind::Compiler => match cmd.executable.to_str() {
                     Some(exe_str) => command_args.push(exe_str.to_string()),
@@ -420,7 +423,7 @@ mod tests {
     use super::super::path_format::FormatError;
     use super::*;
     use crate::config::{ArgumentsFormat, EntryFormat, Format, PathFormat, PathResolver};
-    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
     use std::ffi::OsStr;
     use std::io;
 
@@ -442,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_compiler_command_to_entries_single_source() {
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -476,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_compiler_command_to_entries_multiple_sources() {
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/g++",
             vec![
@@ -517,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_compiler_command_to_entries_no_sources() {
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![(ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"])],
@@ -540,7 +543,7 @@ mod tests {
 
     #[test]
     fn test_to_entries_command_field_as_string() {
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -573,7 +576,7 @@ mod tests {
 
     #[test]
     fn test_to_entries_without_output_field() {
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -609,7 +612,7 @@ mod tests {
     fn test_output_field_absent_when_invocation_has_no_output_flag() {
         // Output field enabled, but the invocation carries no -o flag: the
         // entry must omit the field rather than invent a value.
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -646,7 +649,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -669,7 +672,7 @@ mod tests {
             resolver_always_fails,
             resolver_identity,
         );
-        let cmd = Command::from_strings(
+        let cmd = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
@@ -684,7 +687,7 @@ mod tests {
             resolver_identity,
             resolver_always_fails,
         );
-        let cmd = Command::from_strings(
+        let cmd = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source { binary: false }, vec!["nonexistent.c"])],
@@ -703,7 +706,7 @@ mod tests {
             resolver_identity,
             resolver_fail_for_object_files,
         );
-        let cmd = Command::from_strings(
+        let cmd = Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -726,7 +729,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -756,10 +759,10 @@ mod tests {
         // The same wiring the driver builds: no hints, nothing ignored, and
         // the default argument handling.
         let interpreter = semantic::interpreters::create(CompilerHints::new(), vec![], false, true);
-        let RecognizeResult::Recognized(command) = interpreter.recognize(execution) else {
+        let RecognizeResult::Recognized(recognized) = interpreter.recognize(execution) else {
             panic!("{executable} invocation must be recognized as a compiler command");
         };
-        CommandConverter::new(Format::default()).convert(&command)
+        CommandConverter::new(Format::default()).convert(&recognized)
     }
 
     // Requirements: output-compilation-entries
@@ -819,7 +822,7 @@ mod tests {
         };
 
         // Linking object files (no -c flag, object file inputs)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -841,7 +844,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -867,7 +870,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -898,7 +901,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![(ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"])],
@@ -916,7 +919,7 @@ mod tests {
         };
 
         // Test compile-and-link with real source files (should generate entries)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -930,7 +933,7 @@ mod tests {
         assert_eq!(result.len(), 2); // Should generate entries for both source files
 
         // Test linking with object files only (should not generate entries)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -956,7 +959,7 @@ mod tests {
         // is classified differently by semantic analysis
 
         // Test preprocessing flag properly classified
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -971,7 +974,7 @@ mod tests {
         assert_eq!(result.len(), 0); // Should skip preprocessing commands
 
         // Test compilation flag properly classified
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -986,7 +989,7 @@ mod tests {
         assert_eq!(result.len(), 1); // Should generate entry for compilation
 
         // Test info flag properly classified
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![(
@@ -998,7 +1001,7 @@ mod tests {
         assert_eq!(result.len(), 0); // Should skip info commands
 
         // Test that linking flags are filtered out (not raw string matching)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -1034,7 +1037,7 @@ mod tests {
         };
 
         // Test that all three formatting methods work consistently
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -1076,7 +1079,7 @@ mod tests {
         };
 
         // Test command with both preprocessing flags (-D) and compilation flags (-c)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -1114,7 +1117,7 @@ mod tests {
         };
 
         // Test command with only preprocessing flags (no -c flag)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![
@@ -1154,7 +1157,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             working_dir,
             "/usr/bin/gcc",
             vec![
@@ -1199,7 +1202,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             working_dir_str,
             "/usr/bin/gcc",
             vec![
@@ -1237,7 +1240,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             working_dir,
             "/usr/bin/gcc",
             vec![
@@ -1257,19 +1260,19 @@ mod tests {
         assert!(!entry.file.is_absolute(), "file should be relative: {:?}", entry.file);
     }
 
-    /// Builds a `Command` with `source_mode` set to `Combined`, mirroring what
+    /// Builds a `Recognized` with `source_mode` set to `Combined`, mirroring what
     /// the valac interpreter produces. `from_strings` always sets
     /// `PerSourceStripped`, so combined-path tests flip it here.
-    fn combined(mut cmd: Command) -> Command {
-        cmd.source_mode = semantic::SourceMode::Combined;
+    fn combined(mut cmd: Recognized) -> Recognized {
+        cmd.command.source_mode = semantic::SourceMode::Combined;
         cmd
     }
 
-    /// Builds a `Command` with `source_mode` set to `PerSourceFull`, mirroring
+    /// Builds a `Recognized` with `source_mode` set to `PerSourceFull`, mirroring
     /// what the swiftc interpreter produces. `from_strings` always sets
     /// `PerSourceStripped`, so whole-module tests flip it here.
-    fn per_source_full(mut cmd: Command) -> Command {
-        cmd.source_mode = semantic::SourceMode::PerSourceFull;
+    fn per_source_full(mut cmd: Recognized) -> Recognized {
+        cmd.command.source_mode = semantic::SourceMode::PerSourceFull;
         cmd
     }
 
@@ -1287,7 +1290,7 @@ mod tests {
 
         // valac-style: two sources compiled as one translation unit, producing a
         // library/binding. `--library`/`--vapi` classify as `none`, not stripped.
-        let command = combined(Command::from_strings(
+        let command = combined(Recognized::from_strings(
             "/home/user",
             "valac",
             vec![
@@ -1329,7 +1332,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = combined(Command::from_strings(
+        let command = combined(Recognized::from_strings(
             "/home/user",
             "valac",
             vec![
@@ -1364,7 +1367,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = combined(Command::from_strings(
+        let command = combined(Recognized::from_strings(
             "/home/user",
             "valac",
             vec![
@@ -1393,7 +1396,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "/usr/bin/g++",
             vec![
@@ -1421,7 +1424,7 @@ mod tests {
         // A binary input appears before the first compilable source: the
         // representative `file` must be the source, and the binary input is not
         // emitted as its own entry.
-        let command = combined(Command::from_strings(
+        let command = combined(Recognized::from_strings(
             "/home/user",
             "valac",
             vec![
@@ -1455,7 +1458,7 @@ mod tests {
         };
 
         // Only binary inputs: a pure link step yields no entry, same as separable.
-        let command = combined(Command::from_strings(
+        let command = combined(Recognized::from_strings(
             "/home/user",
             "valac",
             vec![
@@ -1484,7 +1487,7 @@ mod tests {
 
         // swiftc-style whole-module invocation: two sources compiled together,
         // each file's semantics depend on the whole module.
-        let command = per_source_full(Command::from_strings(
+        let command = per_source_full(Recognized::from_strings(
             "/home/user",
             "swiftc",
             vec![
@@ -1537,7 +1540,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = per_source_full(Command::from_strings(
+        let command = per_source_full(Recognized::from_strings(
             "/home/user",
             "swiftc",
             vec![
@@ -1565,7 +1568,7 @@ mod tests {
             CommandConverter::new(format)
         };
 
-        let command = per_source_full(Command::from_strings(
+        let command = per_source_full(Recognized::from_strings(
             "/home/user",
             "swiftc",
             vec![
@@ -1586,7 +1589,7 @@ mod tests {
         };
 
         // Test command with driver options like -pipe (should still generate entries)
-        let command = Command::from_strings(
+        let command = Recognized::from_strings(
             "/home/user",
             "gcc",
             vec![

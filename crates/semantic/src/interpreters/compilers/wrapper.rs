@@ -36,9 +36,7 @@ include!(concat!(env!("OUT_DIR"), "/wrappers.rs"));
 ///
 /// Returns `Err(execution)` -- handing the original execution back -- in
 /// every other case: not a wrapper, missing inner argument, inner not a
-/// compiler, or wrapper-of-wrapper (e.g. `ccache distcc gcc`). The Err
-/// arm lets the caller surface `RecognizeResult::NotRecognized` without
-/// re-cloning the execution.
+/// compiler, or wrapper-of-wrapper (e.g. `ccache distcc gcc`).
 #[allow(
     clippy::result_large_err,
     reason = "Err hands the input back by move; Execution only exceeds the limit on Windows"

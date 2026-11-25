@@ -70,6 +70,7 @@ mod test {
     use super::*;
     use crate::Command;
     use crate::MockInterpreter;
+    use crate::Recognized;
     use crate::SourceMode;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -116,13 +117,13 @@ mod test {
     }
 
     fn command_fixture() -> RecognizeResult {
-        RecognizeResult::Recognized({
-            Command {
-                working_dir: PathBuf::new(),
+        RecognizeResult::Recognized(Recognized {
+            execution: execution_fixture(),
+            command: Command {
                 executable: PathBuf::new(),
                 arguments: vec![],
                 source_mode: SourceMode::PerSourceStripped,
-            }
+            },
         })
     }
 

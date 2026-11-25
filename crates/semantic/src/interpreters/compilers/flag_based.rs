@@ -13,7 +13,7 @@ use super::super::matchers::{
 use super::response_file::{Syntax, tokenize_msvc};
 use crate::{
     Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, OutputSpelling, PassEffect,
-    RecognizeResult, SourceMode,
+    RecognizeResult, Recognized, SourceMode,
 };
 
 /// A generic compiler interpreter parameterized by a flag table and ignore filters.
@@ -79,13 +79,14 @@ impl FlagBasedInterpreter {
 impl Interpreter for FlagBasedInterpreter {
     fn recognize(&self, execution: Execution) -> RecognizeResult {
         if let Some(reason) = self.should_ignore(&execution) {
-            return RecognizeResult::Ignored(reason);
+            return RecognizeResult::Ignored { execution, reason };
         }
 
-        let Execution { executable, mut arguments, working_dir, environment } = execution;
+        // The execution goes back in the result, so parse from a copy.
+        let mut arguments = execution.arguments.clone();
         let annotated_args = parse_arguments_owned(&self.analyzer, &mut arguments, self.slash_prefix);
         let (prepend_args, append_args) = if self.from_environment {
-            parse_environment(&environment, self.env_rules, self.env_syntax)
+            parse_environment(&execution.environment, self.env_rules, self.env_syntax)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -97,12 +98,12 @@ impl Interpreter for FlagBasedInterpreter {
         all_args.extend(annotated_args);
         all_args.extend(append_args);
 
-        RecognizeResult::Recognized(Command {
-            working_dir,
-            executable,
+        let command = Command {
+            executable: execution.executable.clone(),
             arguments: all_args,
             source_mode: self.source_mode,
-        })
+        };
+        RecognizeResult::Recognized(Recognized { execution, command })
     }
 }
 
@@ -780,7 +781,7 @@ mod environment_mapping_tests {
             let input = execution.to_string();
 
             let sut = match interpreter.recognize(execution) {
-                RecognizeResult::Recognized(command) => collect_args(&command.arguments),
+                RecognizeResult::Recognized(Recognized { command, .. }) => collect_args(&command.arguments),
                 _ => panic!("expected a recognized command for {input}"),
             };
 
@@ -826,7 +827,7 @@ mod environment_mapping_tests {
             let input = execution.to_string();
 
             let sut = match interpreter.recognize(execution) {
-                RecognizeResult::Recognized(command) => collect_args(&command.arguments),
+                RecognizeResult::Recognized(Recognized { command, .. }) => collect_args(&command.arguments),
                 _ => panic!("expected a recognized command for {input}"),
             };
 

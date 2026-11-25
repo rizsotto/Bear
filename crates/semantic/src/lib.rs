@@ -14,11 +14,13 @@
 //!    ([`RecognizeResult`]). Build the configured chain with
 //!    [`interpreters::create`].
 //!
-//! 2. **Parsing** - a recognized call becomes a [`Command`]: its source files,
-//!    its [`CompilerPass`], and its [`Argument`] list.
+//! 2. **Parsing** - a recognized call is a [`Recognized`]: the observed
+//!    [`Execution`] plus a [`Command`] with its source files, its
+//!    [`CompilerPass`], and its [`Argument`] list.
 //!
 //! # Core types
 //!
+//! - [`Recognized`] - an observed execution and its parsed [`Command`]
 //! - [`Command`] - a structured compiler invocation
 //! - [`Argument`] - one command line argument with its classification
 //! - [`ArgumentKind`] - what an argument means to the compiler
@@ -56,20 +58,45 @@ pub trait Interpreter: Send {
 }
 
 /// Result of semantic recognition of an executed command.
+///
+/// Every outcome carries the execution exactly as it was observed, so a
+/// later stage can report what ran even when the entry names something else
+/// (a launcher's inner compiler, for one).
 #[derive(Debug)]
 pub enum RecognizeResult {
     /// A recognized compiler invocation with parsed, classified arguments.
-    Recognized(Command),
+    Recognized(Recognized),
     /// A command that is intentionally ignored (e.g. coreutils, excluded compilers).
-    Ignored(&'static str),
+    Ignored { execution: Execution, reason: &'static str },
     /// The interpreter did not recognize this execution. Ownership is returned.
     NotRecognized(Execution),
 }
 
-/// Represents a full compiler command invocation.
+impl RecognizeResult {
+    /// Replaces the execution carried by the result, whatever the outcome.
+    pub(crate) fn with_execution(self, execution: Execution) -> Self {
+        match self {
+            Self::Recognized(recognized) => Self::Recognized(Recognized { execution, ..recognized }),
+            Self::Ignored { reason, .. } => Self::Ignored { execution, reason },
+            Self::NotRecognized(_) => Self::NotRecognized(execution),
+        }
+    }
+}
+
+/// A recognized call: the observed execution and its parsed command. This is
+/// what the output writer streams.
+#[derive(Debug)]
+pub struct Recognized {
+    pub execution: Execution,
+    pub command: Command,
+}
+
+/// A parsed compiler invocation.
+///
+/// `executable` is the compiler itself. Under a launcher it is the inner
+/// compiler token, which differs from the observed `Recognized::execution`.
 #[derive(Debug)]
 pub struct Command {
-    pub working_dir: PathBuf,
     pub executable: PathBuf,
     pub arguments: Vec<Argument>,
     pub source_mode: SourceMode,

@@ -7,7 +7,7 @@
 //! handle duplicates, and format the output as needed.
 //!
 //! The `OutputWriter` struct represents the main entry point for writing output.
-//! The input to the `OutputWriter` is a stream of `semantic::Command` instances.
+//! The input to the `OutputWriter` is a stream of `semantic::Recognized` instances.
 
 mod atomic;
 pub mod clang;
@@ -66,7 +66,7 @@ impl OutputWriter {
     /// writing fails.
     pub fn write(
         self,
-        semantics: impl Iterator<Item = semantic::Command>,
+        semantics: impl Iterator<Item = semantic::Recognized>,
     ) -> Result<AtomicFile, WriterError> {
         let result = self.writer.write(semantics);
 
@@ -136,11 +136,11 @@ pub enum WriterError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
+    use semantic::{ArgumentKind, CompilerPass, PassEffect, Recognized};
     use std::sync::atomic::Ordering;
 
-    fn make_compile_command(file: &str) -> Command {
-        Command::from_strings(
+    fn make_compile_command(file: &str) -> Recognized {
+        Recognized::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![

@@ -100,7 +100,7 @@ mod test {
         let execution =
             Execution::from_strings("/usr/bin/ls", vec!["ls", "-la"], "/home/user", HashMap::new());
 
-        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Ignored(_)));
+        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Ignored { .. }));
     }
 
     #[test]
@@ -114,7 +114,7 @@ mod test {
             HashMap::new(),
         );
 
-        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Ignored(_)));
+        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Ignored { .. }));
     }
 
     #[test]
@@ -128,7 +128,7 @@ mod test {
 
         let gcc =
             Execution::from_strings("/usr/bin/gcc", vec!["gcc", "-c", "test.c"], "/tmp", HashMap::new());
-        assert!(matches!(interpreter.recognize(gcc), RecognizeResult::Ignored(_)));
+        assert!(matches!(interpreter.recognize(gcc), RecognizeResult::Ignored { .. }));
 
         let clang =
             Execution::from_strings("/usr/bin/clang", vec!["clang", "-c", "test.c"], "/tmp", HashMap::new());

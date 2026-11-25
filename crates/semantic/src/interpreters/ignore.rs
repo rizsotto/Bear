@@ -39,7 +39,7 @@ impl Default for IgnoreByPath {
 impl Interpreter for IgnoreByPath {
     fn recognize(&self, execution: Execution) -> RecognizeResult {
         if execution.executable.file_name().is_some_and(|f| self.filenames.contains(f)) {
-            return RecognizeResult::Ignored(self.reason);
+            return RecognizeResult::Ignored { execution, reason: self.reason };
         }
         RecognizeResult::NotRecognized(execution)
     }
@@ -170,7 +170,7 @@ mod test {
             HashMap::new(),
         );
         let sut = IgnoreByPath::new();
-        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored(_)));
+        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored { .. }));
     }
 
     #[test]
@@ -182,7 +182,7 @@ mod test {
             HashMap::new(),
         );
         let sut = IgnoreByPath::new();
-        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored(_)));
+        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored { .. }));
     }
 
     #[test]
@@ -208,6 +208,6 @@ mod test {
             "/home/user",
             HashMap::new(),
         );
-        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored(_)));
+        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored { .. }));
     }
 }
