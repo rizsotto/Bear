@@ -9,7 +9,7 @@
 //! The system supports various flag patterns including exact matches, prefix matches,
 //! and flags that require additional arguments in different forms (separate, glued, etc.).
 
-pub(super) mod source;
+pub(crate) mod source;
 
 use crate::ArgumentKind;
 

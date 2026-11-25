@@ -2,43 +2,18 @@
 
 //! Command to compilation database entry conversion functionality.
 //!
-//! This module provides the [`CommandConverter`] which is responsible for converting
-//! semantic [`Command`] instances into clang compilation database [`Entry`] objects.
-//! The converter encapsulates format configuration and conversion logic, providing
-//! a clean separation between domain objects and output formatting.
-//!
-//! The conversion process handles:
-//! - Extracting source files from compiler command arguments
-//! - Building properly formatted command lines for each source file
-//! - Computing output files based on command arguments
-//! - Applying format configuration (array vs string commands, output field inclusion)
-//! - Filtering out commands that should not generate compilation database entries
-//!
-//! # Compilation Database Entry Generation Rules
-//!
-//! The converter applies specific rules to determine when compilation database entries
-//! should be generated:
-//!
-//! ## Cases that generate NO entries:
-//! 1. **Preprocessing-only commands**: Commands with `PassEffect::StopsAt(Preprocessing)`
-//! 2. **Info-only commands**: Commands with `PassEffect::InfoAndExit` (e.g., `--version`, `--help`)
-//! 3. **Linking-only commands**: Commands without compilation flags and no compilable source files
-//! 4. **Commands without source files**: Any command that has no source files to process
-//!
-//! ## Cases that generate entries:
-//! 1. **Compilation commands**: Commands with `PassEffect::StopsAt(Compiling)` or `PassEffect::StopsAt(Assembling)`
-//! 2. **Compile-and-link commands**: Commands that both compile and link in one step
-//!    - Linking-specific flags (classified as `PassEffect::Configures(Linking)`) are filtered out from entries
-//!    - Only compilation-relevant flags are included in the database
-//!
-//! The converter relies on semantic analysis performed by compiler interpreters to properly
-//! classify command-line arguments instead of checking raw flag strings.
+//! The [`CommandConverter`] formats the compile steps of a recognized call
+//! into clang compilation database [`Entry`] objects. Which steps a call has,
+//! and which arguments belong to each, is decided by
+//! [`semantic::Interpretation::steps`]. The converter drops the launcher,
+//! writes the compiler as its path, resolves paths, and applies the format
+//! configuration (array or string command, `output` field).
 
 use super::Entry;
 use super::path_format::{ResolveFn, resolver_for};
 use crate::config;
 use log::warn;
-use semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, Recognized, SourceMode};
+use semantic::{Arguments, FileRef, Recognized, Role, Step};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
@@ -95,10 +70,18 @@ impl CommandConverter {
     /// Fails when the working directory cannot be formatted; the error lists
     /// the source files whose entries are dropped because of it.
     pub fn try_convert(&self, recognized: &Recognized) -> Result<Vec<Entry>, UnresolvedDirectory> {
-        let cmd = &recognized.command;
         let working_dir = &recognized.execution.working_dir;
-        // Check if we should skip entry generation for this command
-        if self.should_skip_entry_generation(cmd) {
+        let steps = recognized.interpretation.steps();
+        let compiles: Vec<(&Path, &[&Arguments])> = steps
+            .iter()
+            .filter_map(|step| match step {
+                Step::Compile { source: FileRef::Resolved { path, .. }, arguments } => {
+                    Some((path.as_path(), arguments.as_slice()))
+                }
+                _ => None,
+            })
+            .collect();
+        if compiles.is_empty() {
             return Ok(vec![]);
         }
 
@@ -107,139 +90,63 @@ impl CommandConverter {
             Err(e) => {
                 return Err(UnresolvedDirectory {
                     directory: working_dir.clone(),
-                    files: Self::entry_source_files(cmd),
+                    files: compiles.iter().map(|(source, _)| source.to_path_buf()).collect(),
                     reason: e.to_string(),
                 });
             }
         };
-        Ok(self.build_entries(cmd, &formatted_directory))
+        let output_file = self.create_output_file(&formatted_directory, recognized);
+        Ok(compiles
+            .into_iter()
+            .map(|(source, arguments)| {
+                self.build_entry(source, arguments, &formatted_directory, &output_file)
+            })
+            .collect())
     }
 
-    /// The source files that would each produce an entry for `cmd`.
-    fn entry_source_files(cmd: &Command) -> Vec<PathBuf> {
-        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
-        let sources = cmd
-            .arguments
-            .iter()
-            .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
-            .filter_map(|arg| arg.as_file(path_updater));
-        match cmd.source_mode {
-            SourceMode::Combined => sources.take(1).collect(),
-            SourceMode::PerSourceStripped | SourceMode::PerSourceFull => sources.collect(),
-        }
-    }
-
-    fn build_entries(&self, cmd: &Command, formatted_directory: &Path) -> Vec<Entry> {
-        // Create output file if needed
-        let output_file = self.create_output_file(formatted_directory, &cmd.arguments);
-
-        match cmd.source_mode {
-            SourceMode::PerSourceStripped => {
-                // Create one entry per source argument (only non-binary source files),
-                // each entry keeping only its own source (siblings stripped).
-                cmd.arguments
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, arg)| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
-                    .filter_map(|(source_idx, source_arg)| {
-                        self.build_entry(cmd, source_arg, Some(source_idx), formatted_directory, &output_file)
-                    })
-                    .collect()
-            }
-            SourceMode::PerSourceFull => {
-                // Whole-module compiler (e.g. swiftc): one entry per compilable
-                // source, but every entry keeps the complete invocation (no
-                // sibling stripping), because each file's semantics depend on
-                // every other source in the same invocation.
-                cmd.arguments
-                    .iter()
-                    .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
-                    .filter_map(|source_arg| {
-                        self.build_entry(cmd, source_arg, None, formatted_directory, &output_file)
-                    })
-                    .collect()
-            }
-            SourceMode::Combined => {
-                // Single-translation-unit compiler (e.g. valac): the whole invocation
-                // collapses to one entry whose `file` is the first compilable source.
-                // All sources are kept in the arguments (no sibling stripping).
-                let first_source = cmd
-                    .arguments
-                    .iter()
-                    .find(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }));
-                let Some(source_arg) = first_source else {
-                    // No compilable source; should_skip_entry_generation already
-                    // covers this, but keep the guard local to the branch.
-                    return vec![];
-                };
-
-                self.build_entry(cmd, source_arg, None, formatted_directory, &output_file)
-                    .into_iter()
-                    .collect()
-            }
-        }
-    }
-
-    /// Builds a single compilation database entry for `source_arg`.
-    ///
-    /// `selected` controls which sources are kept in the arguments:
-    /// `Some(idx)` keeps only the source at that index
-    /// (`SourceMode::PerSourceStripped`, one entry per source with siblings
-    /// stripped). `None` keeps every source -- used both for
-    /// `SourceMode::Combined` (one entry total) and `SourceMode::PerSourceFull`
-    /// (one entry per source, but each keeps the full invocation).
+    /// Builds a single compilation database entry for a compile step.
     fn build_entry(
         &self,
-        cmd: &Command,
-        source_arg: &Argument,
-        selected: Option<usize>,
+        source: &Path,
+        arguments: &[&Arguments],
         formatted_directory: &Path,
         output_file: &Option<PathBuf>,
-    ) -> Option<Entry> {
-        // Get and format source file
-        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
-        let source_file_path = source_arg.as_file(path_updater)?;
-        let formatted_source_file = self.format_source_file(formatted_directory, &source_file_path);
-
-        let command_args = self.build_command_args(cmd, selected, formatted_directory);
+    ) -> Entry {
+        let formatted_source_file = self.format_source_file(formatted_directory, source);
+        let command_args = self.build_command_args(arguments, formatted_directory);
 
         if self.format.use_array_format {
-            Some(Entry::with_arguments(
+            Entry::with_arguments(
                 formatted_source_file,
                 command_args,
                 formatted_directory,
                 output_file.as_ref(),
-            ))
+            )
         } else {
-            Some(Entry::with_command(
+            Entry::with_command(
                 formatted_source_file,
                 command_args,
                 formatted_directory,
                 output_file.as_ref(),
-            ))
+            )
         }
     }
 
     /// Creates the output file path if the format includes output fields.
     ///
-    /// Returns `Some(output_path)` if output should be included and found, `None` otherwise.
-    fn create_output_file(&self, formatted_directory: &Path, arguments: &[Argument]) -> Option<PathBuf> {
+    /// Returns the first output of the call, or `None` when the output field
+    /// is off or the call names no output.
+    fn create_output_file(&self, formatted_directory: &Path, recognized: &Recognized) -> Option<PathBuf> {
         if !self.format.include_output_field {
             return None;
         }
 
-        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
-        let output_path = arguments
-            .iter()
-            .filter(|arg| matches!(arg.kind(), ArgumentKind::Output))
-            .nth(0)
-            .and_then(|arg| arg.as_file(path_updater))?;
-
-        match (self.file_resolver)(formatted_directory, &output_path) {
+        let output_path = recognized.interpretation.outputs().next()?;
+        match (self.file_resolver)(formatted_directory, output_path) {
             Ok(formatted_path) => Some(formatted_path),
             Err(e) => {
                 warn!("Failed to format output file path {}: {}", output_path.display(), e);
-                Some(output_path)
+                Some(output_path.to_path_buf())
             }
         }
     }
@@ -257,164 +164,27 @@ impl CommandConverter {
         }
     }
 
-    /// Builds command arguments for an entry.
+    /// Builds the command arguments of an entry from the items of a compile step.
     ///
-    /// This method constructs the command arguments list that includes the executable,
-    /// all non-source arguments, and the selected source file(s).
-    /// It ensures that source files are placed in the correct position relative to output arguments.
-    ///
-    /// `selected` is `Some(idx)` for `SourceMode::PerSourceStripped` (keep only
-    /// the source at `idx`, strip the siblings) or `None` for
-    /// `SourceMode::Combined`/`SourceMode::PerSourceFull` (keep every source).
-    fn build_command_args(
-        &self,
-        cmd: &Command,
-        selected: Option<usize>,
-        formatted_directory: &Path,
-    ) -> Vec<String> {
-        let mut command_args = vec![];
-
+    /// The launcher is dropped and the compiler is written as its path. Every
+    /// other item spells itself, with its paths going through the resolver.
+    fn build_command_args(&self, arguments: &[&Arguments], formatted_directory: &Path) -> Vec<String> {
         // Every path goes through the resolver, the same one the `output` field
         // uses, so an entry cannot disagree with itself about a path.
         let format_path: &dyn Fn(&Path) -> Cow<Path> =
             &|path: &Path| Cow::Owned(self.format_source_file(formatted_directory, path));
 
-        for (idx, arg) in cmd.arguments.iter().enumerate() {
-            // For separable compilers, skip the other source arguments (keep only
-            // the one we are building for). For combined compilers (`None`), keep all.
-            if let Some(source_arg_idx) = selected
-                && matches!(arg.kind(), ArgumentKind::Source { .. })
-                && idx != source_arg_idx
-            {
-                continue;
-            }
-
-            // Filter out linking-specific arguments for compilation database entries
-            if matches!(
-                arg.kind(),
-                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
-                    | ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Linking))
-                    | ArgumentKind::Other(PassEffect::PassThrough)
-            ) {
-                continue;
-            }
-
-            // The compiler is recorded as the command's executable: the observed
-            // one, or the inner compiler under a launcher. Everything else spells
-            // itself.
-            match arg.kind() {
-                ArgumentKind::Compiler => match cmd.executable.to_str() {
-                    Some(exe_str) => command_args.push(exe_str.to_string()),
-                    None => command_args.extend(arg.as_arguments(format_path)),
+        arguments
+            .iter()
+            .flat_map(|item| match &item.role {
+                Role::Launcher => Vec::new(),
+                Role::Compiler { path } => match path.to_str() {
+                    Some(path) => vec![path.to_string()],
+                    None => item.args.clone(),
                 },
-                _ => command_args.extend(arg.as_arguments(format_path)),
-            }
-        }
-
-        command_args
-    }
-
-    /// Returns arguments of a specific kind from the command.
-    ///
-    /// This method filters arguments by their kind and returns their values as strings.
-    /// For `ArgumentKind::Source`, this matches any source regardless of the `binary` flag.
-    fn find_arguments_by_kind(cmd: &Command, kind: ArgumentKind) -> impl Iterator<Item = &Argument> {
-        cmd.arguments.iter().filter(move |arg| {
-            match (arg.kind(), kind) {
-                // For Source, match any source regardless of binary flag
-                (ArgumentKind::Source { .. }, ArgumentKind::Source { .. }) => true,
-                // For other kinds, use exact equality
-                (a, b) => a == b,
-            }
-        })
-    }
-
-    /// Determines if we should skip generating compilation database entries for a command.
-    ///
-    /// Returns true if the command should not generate entries for any of these reasons:
-    /// 1. Preprocessing-only commands (`PassEffect::StopsAt(Preprocessing)`)
-    /// 2. Info-only commands (`PassEffect::InfoAndExit`)
-    /// 3. Commands without source files
-    /// 4. Linking-only commands (no compilation flags and has source files)
-    fn should_skip_entry_generation(&self, cmd: &Command) -> bool {
-        // Check if this is an info-only command (e.g., --version, --help)
-        if self.is_info_only(cmd) {
-            return true;
-        }
-
-        // Check if this is a preprocessing-only command (e.g., -E)
-        if self.is_preprocessing_only(cmd) {
-            return true;
-        }
-
-        // Find all source arguments (using binary: false as a placeholder, find_arguments_by_kind matches any source)
-        let source_arguments = Self::find_arguments_by_kind(cmd, ArgumentKind::Source { binary: false })
-            .collect::<Vec<&Argument>>();
-
-        // If no source files found, skip entry generation
-        if source_arguments.is_empty() {
-            return true;
-        }
-
-        // Check if this is a linking-only command
-        if self.is_linking_only(cmd) {
-            return true;
-        }
-
-        false
-    }
-
-    /// Determines if a compiler command is preprocessing-only.
-    ///
-    /// A command is considered preprocessing-only if it has a `PassEffect::StopsAt(Preprocessing)` flag.
-    /// This is the `-E` flag which explicitly stops the compiler after preprocessing.
-    fn is_preprocessing_only(&self, cmd: &Command) -> bool {
-        cmd.arguments.iter().any(|arg| {
-            matches!(arg.kind(), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)))
-        })
-    }
-
-    /// Determines if a compiler command is info-only.
-    ///
-    /// A command is considered info-only if it contains arguments
-    /// classified as `PassEffect::InfoAndExit` by the semantic analysis.
-    /// These commands typically display information and don't perform compilation.
-    fn is_info_only(&self, cmd: &Command) -> bool {
-        cmd.arguments.iter().any(|arg| matches!(arg.kind(), ArgumentKind::Other(PassEffect::InfoAndExit)))
-    }
-
-    /// Determines if a compiler command is linking-only.
-    ///
-    /// A command is considered linking-only if:
-    /// 1. It does NOT have a `PassEffect::StopsAt(Compiling)` or `PassEffect::StopsAt(Assembling)` flag
-    /// 2. AND it has no compilable source files (only object files, libraries, etc.)
-    ///
-    /// This typically happens when linking pre-compiled object files or libraries.
-    ///
-    /// The `binary` flag on `ArgumentKind::Source` is set during semantic analysis
-    /// by the interpreter, so we can simply check it here.
-    fn is_linking_only(&self, cmd: &Command) -> bool {
-        // Check if the command has a flag that stops before linking (-c or -S)
-        let stops_before_linking = cmd.arguments.iter().any(|arg| {
-            matches!(
-                arg.kind(),
-                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
-                    | ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))
-            )
-        });
-
-        // If there's a -c or -S flag, it's not linking-only
-        if stops_before_linking {
-            return false;
-        }
-
-        // Check if there are any compilable source files (not binary files)
-        // The binary flag is set by the interpreter during semantic analysis
-        let has_compilable_sources =
-            cmd.arguments.iter().any(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }));
-
-        // If no -c/-S flag and no compilable sources, it's linking-only
-        !has_compilable_sources
+                _ => item.as_arguments(format_path),
+            })
+            .collect()
     }
 }
 
@@ -1266,17 +1036,15 @@ mod tests {
     /// Builds a `Recognized` with `source_mode` set to `Combined`, mirroring what
     /// the valac interpreter produces. `from_strings` always sets
     /// `PerSourceStripped`, so combined-path tests flip it here.
-    fn combined(mut cmd: Recognized) -> Recognized {
-        cmd.command.source_mode = semantic::SourceMode::Combined;
-        cmd
+    fn combined(cmd: Recognized) -> Recognized {
+        cmd.with_source_mode(semantic::SourceMode::Combined)
     }
 
     /// Builds a `Recognized` with `source_mode` set to `PerSourceFull`, mirroring
     /// what the swiftc interpreter produces. `from_strings` always sets
     /// `PerSourceStripped`, so whole-module tests flip it here.
-    fn per_source_full(mut cmd: Recognized) -> Recognized {
-        cmd.command.source_mode = semantic::SourceMode::PerSourceFull;
-        cmd
+    fn per_source_full(cmd: Recognized) -> Recognized {
+        cmd.with_source_mode(semantic::SourceMode::PerSourceFull)
     }
 
     // Requirements: output-compilation-entries

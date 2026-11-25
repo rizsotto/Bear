@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Argument, ArgumentKind, Command, Interpretation, OutputSpelling, Recognized, SourceMode};
+use super::interpretation::Origin;
+use super::interpreters::matchers::source::file_type_of;
+use super::{
+    Argument, ArgumentKind, Arguments, Command, FileRef, FileType, Interpretation, OutputSpelling,
+    Recognized, Role, SourceMode,
+};
 use intercept::Execution;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -43,11 +48,51 @@ impl Command {
     }
 }
 
+impl Interpretation {
+    /// Build an Interpretation from the same list `Command::from_strings` takes.
+    ///
+    /// An input is typed by its extension, so a `Source { binary }` flag must
+    /// agree with it: `binary: true` needs a name that is an object.
+    fn from_strings(executable: &str, arguments: &[(ArgumentKind, Vec<&str>)]) -> Self {
+        let items = arguments
+            .iter()
+            .map(|(kind, args)| {
+                let role = match kind {
+                    ArgumentKind::Compiler => Role::Compiler { path: PathBuf::from(executable) },
+                    ArgumentKind::Source { binary } => {
+                        let file_type = file_type_of(args[0]);
+                        assert_eq!(
+                            *binary,
+                            file_type == FileType::Object,
+                            "the binary flag disagrees with the extension of {:?}",
+                            args[0]
+                        );
+                        Role::Input(FileRef::Resolved { path: PathBuf::from(args[0]), file_type })
+                    }
+                    ArgumentKind::Output => Role::Output {
+                        flag: args[0].to_string(),
+                        path: PathBuf::from(args.get(1).unwrap_or(&"")),
+                        spelling: if args.len() > 1 {
+                            OutputSpelling::Separate
+                        } else {
+                            OutputSpelling::Glued
+                        },
+                    },
+                    ArgumentKind::Other(effect) => Role::Flag(*effect),
+                };
+                let item = Arguments { args: args.iter().map(|arg| arg.to_string()).collect(), role };
+                (Origin::CommandLine, item)
+            })
+            .collect();
+        Interpretation::new("test", SourceMode::PerSourceStripped, items, Vec::new(), Vec::new())
+    }
+}
+
 impl Recognized {
     /// Create a Recognized from string arguments for testing.
     ///
-    /// The execution's argv is every argument token in order. Set `command.source_mode` to change the mode.
-    /// The interpretation is empty: the converter still reads `command`.
+    /// The execution's argv is every argument token in order. Call
+    /// [`with_source_mode`](Self::with_source_mode) to change the mode.
     pub fn from_strings(
         working_dir: &str,
         executable: &str,
@@ -55,9 +100,15 @@ impl Recognized {
     ) -> Self {
         let argv: Vec<&str> = arguments.iter().flat_map(|(_, tokens)| tokens.iter().copied()).collect();
         let execution = Execution::from_strings(executable, argv, working_dir, HashMap::new());
-        let interpretation =
-            Interpretation::new("test", SourceMode::PerSourceStripped, Vec::new(), Vec::new(), Vec::new());
+        let interpretation = Interpretation::from_strings(executable, &arguments);
         Self { execution, command: Command::from_strings(executable, arguments), interpretation }
+    }
+
+    /// Set the source mode on the command and on the interpretation.
+    pub fn with_source_mode(mut self, source_mode: SourceMode) -> Self {
+        self.command.source_mode = source_mode;
+        self.interpretation.set_source_mode(source_mode);
+        self
     }
 }
 

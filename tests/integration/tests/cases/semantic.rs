@@ -2407,6 +2407,80 @@ fn driver_compiled_assembly_yields_driver_entry() -> Result<()> {
     Ok(())
 }
 
+// Requirements: output-compilation-entries
+//
+// gcc does nothing for `-S foo.s`, since the input is already assembly, so
+// the call gets no entry.
+#[test]
+fn driver_assembling_assembly_yields_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("driver_assembling_assembly")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-S", "foo.s"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("foo.s", ".text\n.globl main\nmain:\n    ret\n"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    Ok(())
+}
+
+// Requirements: output-response-file-inlining
+//
+// With inlining off, the `@args.rsp` token stays in the entry for a family
+// without an `@file` rule of its own.
+#[test]
+fn semantic_unread_response_file_stays_in_msvc_entry() -> Result<()> {
+    let env = TestEnvironment::new("semantic_unread_response_file_msvc")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": "cl.exe",
+        "arguments": ["cl.exe", "@args.rsp", "/c", "a.cpp"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let config = "schema: \"4.2\"\nformat:\n  arguments:\n    from_response_files: false\n";
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("args.rsp", "/DFROM_FILE"),
+        ("a.cpp", "int main() { return 0; }"),
+    ])?;
+    let config_path = env.create_config(config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "a.cpp".to_string(),
+        directory: temp_dir,
+        arguments: vec!["cl.exe", "@args.rsp", "/c", "a.cpp"].into_iter().map(String::from).collect::<Vec<_>>()
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: recognition-compiler-names
 //
 // A `swiftc -c hello.swift` execution yields one entry, using the Swift

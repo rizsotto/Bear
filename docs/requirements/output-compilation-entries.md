@@ -1,6 +1,6 @@
 ---
 title: Compilation entries from an intercepted invocation
-status: accepted
+status: implemented
 ---
 
 ## Intent

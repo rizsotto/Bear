@@ -170,6 +170,11 @@ impl Interpretation {
         Self { interpreted_by, source_mode, arguments, environment_before, environment_after }
     }
 
+    #[cfg(any(test, feature = "testing"))]
+    pub(crate) fn set_source_mode(&mut self, source_mode: SourceMode) {
+        self.source_mode = source_mode;
+    }
+
     /// The items in output order: launcher, compiler, environment words that
     /// go first, the command line, environment words that go last.
     pub fn arguments(&self) -> impl Iterator<Item = &Arguments> {
@@ -236,6 +241,22 @@ impl Interpretation {
     }
 
     /// The compile steps first, then one link step when an input reaches linking.
+    ///
+    /// These steps decide which entries the compilation database gets: one per
+    /// compile step. An input is compiled when it starts before linking and
+    /// its passes go past preprocessing. So these calls have no compile step:
+    ///
+    /// - information only (`--version`, `--help`)
+    /// - preprocessing only (`-E`), including a dependency scan (`-M`)
+    /// - link only: objects and libraries, with no source to compile
+    /// - an input that starts after the last pass (`-c a.o`, `-S foo.s`)
+    ///
+    /// A call that stops early (`-c`, `-S`) has one compile step per source.
+    /// So does a compile-and-link call, and the link-only flags and libraries
+    /// stay out of its steps. The source mode decides what happens to the
+    /// call's other inputs: each step keeps only its own input
+    /// (`PerSourceStripped`), keeps every input (`PerSourceFull`), or the
+    /// whole call is one step for the first source (`Combined`).
     pub fn steps(&self) -> Vec<Step<'_>> {
         let compiled: Vec<&FileRef> = self
             .inputs()
