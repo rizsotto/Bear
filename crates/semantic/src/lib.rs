@@ -16,11 +16,31 @@
 //!
 //! 2. **Parsing** - a recognized call is a [`Recognized`]: the observed
 //!    [`Execution`] plus a [`Command`] with its source files, its
-//!    [`CompilerPass`], and its [`Argument`] list.
+//!    [`CompilerPass`], and its [`Argument`] list, and the same call as an
+//!    [`Interpretation`].
+//!
+//! # Interpretation
+//!
+//! An [`Interpretation`] is a list of [`Arguments`]. Each item keeps its raw
+//! tokens and a [`Role`]: launcher, compiler, input, output, flag, or an
+//! `@file` that was not read. Response files that were read are spliced in
+//! where the `@file` stood, and environment-derived words are kept per
+//! variable. Everything else is a view over that list:
+//!
+//! - `arguments()` and `provenance()` - the items in output order, and where
+//!   each came from ([`Provenance`])
+//! - `inputs()` and `outputs()` - the files the call reads and writes
+//! - `passes()` and `runs()` - the [`CompilerPass`]es each input goes through
+//! - `steps()` - the [`Step`]s: one compile step per translation unit, and a
+//!   link step when an input reaches linking
 //!
 //! # Core types
 //!
-//! - [`Recognized`] - an observed execution and its parsed [`Command`]
+//! - [`Recognized`] - an observed execution, its parsed [`Command`], and its
+//!   [`Interpretation`]
+//! - [`Interpretation`] - a recognized call as classified [`Arguments`]
+//! - [`Arguments`], [`Role`], [`FileRef`], [`FileType`] - one item and what
+//!   it means
 //! - [`Command`] - a structured compiler invocation
 //! - [`Argument`] - one command line argument with its classification
 //! - [`ArgumentKind`] - what an argument means to the compiler
@@ -30,11 +50,14 @@
 
 pub mod interpreters;
 
+mod interpretation;
+
 /// Command factories and comparison helpers for tests. Compiled only for this
 /// crate's own tests and for dependents that turn on the `testing` feature.
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+pub use interpretation::{Arguments, FileRef, FileType, Interpretation, Provenance, Role, Step};
 pub use interpreters::compilers::compiler_recognition::{CompilerHints, CompilerRecognizer};
 pub use interpreters::compilers::identity::SpellingError;
 pub use interpreters::compilers::print_compilers;
@@ -72,23 +95,13 @@ pub enum RecognizeResult {
     NotRecognized(Execution),
 }
 
-impl RecognizeResult {
-    /// Replaces the execution carried by the result, whatever the outcome.
-    pub(crate) fn with_execution(self, execution: Execution) -> Self {
-        match self {
-            Self::Recognized(recognized) => Self::Recognized(Recognized { execution, ..recognized }),
-            Self::Ignored { reason, .. } => Self::Ignored { execution, reason },
-            Self::NotRecognized(_) => Self::NotRecognized(execution),
-        }
-    }
-}
-
-/// A recognized call: the observed execution and its parsed command. This is
-/// what the output writer streams.
+/// A recognized call: the observed execution, its parsed command, and the
+/// same call as an interpretation. This is what the output writer streams.
 #[derive(Debug)]
 pub struct Recognized {
     pub execution: Execution,
     pub command: Command,
+    pub interpretation: Interpretation,
 }
 
 /// A parsed compiler invocation.
@@ -216,7 +229,8 @@ pub enum PassEffect {
 }
 
 /// Represents different compiler passes that an argument might affect.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// The declared order is the pipeline order.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CompilerPass {
     Preprocessing,
     Compiling,

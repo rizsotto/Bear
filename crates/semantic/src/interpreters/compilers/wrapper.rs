@@ -5,9 +5,9 @@
 //! Wrappers sit between the build system and the real compiler:
 //! `ccache gcc -c main.c`. The job here is small: detect the wrapper by
 //! basename, locate the real compiler in argv (skipping wrapper-specific
-//! flags like `distcc -j 4`), and produce a fresh [`Execution`] that
-//! names the real compiler. The caller (`CompilerInterpreter::recognize`)
-//! then dispatches that execution as if the wrapper had never been there.
+//! flags like `distcc -j 4`), and report how many argv tokens belong to the
+//! launcher. The caller (`CompilerInterpreter::recognize`) keeps the launcher
+//! as a fact about the call and dispatches on the inner compiler.
 //!
 //! This module is the authority on what counts as a wrapper:
 //! [`WRAPPER_NAMES`] is shared with `compiler_recognition`, which consults
@@ -22,54 +22,30 @@ use super::compiler_recognition::CompilerRecognizer;
 use super::identity::CompilerType;
 use intercept::Execution;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 include!(concat!(env!("OUT_DIR"), "/wrappers.rs"));
 
-/// Try to strip a wrapper from `execution`, returning the inner compiler
-/// invocation along with its recognized [`CompilerType`].
+/// Find the launcher in `execution`: how many argv tokens come before the
+/// inner compiler, and the inner compiler's recognized [`CompilerType`] so the
+/// caller can dispatch without re-running the recognizer.
 ///
-/// Returns `Ok((inner, ty))` when `execution` is a wrapper invocation we
-/// recognize and the inner argv names a real (non-wrapper) compiler;
-/// `ty` is the inner compiler's type so the caller can dispatch without
-/// re-running the recognizer.
-///
-/// Returns `Err(execution)` -- handing the original execution back -- in
-/// every other case: not a wrapper, missing inner argument, inner not a
-/// compiler, or wrapper-of-wrapper (e.g. `ccache distcc gcc`).
-#[allow(
-    clippy::result_large_err,
-    reason = "Err hands the input back by move; Execution only exceeds the limit on Windows"
-)]
+/// Returns `None` when `execution` is not a wrapper invocation we recognize,
+/// or when the inner argv names no real compiler: missing inner argument,
+/// inner not a compiler, or wrapper-of-wrapper (e.g. `ccache distcc gcc`).
 pub(super) fn unwrap(
-    execution: Execution,
+    execution: &Execution,
     recognizer: &CompilerRecognizer,
-) -> Result<(Execution, CompilerType), Execution> {
-    let Some(wrapper_name) = detect_wrapper_name(&execution.executable) else {
-        return Err(execution);
-    };
-
-    let Some((real_compiler, filtered_args)) = extract_real_compiler(wrapper_name, &execution.arguments)
-    else {
-        return Err(execution);
-    };
+) -> Option<(usize, CompilerType)> {
+    let wrapper_name = detect_wrapper_name(&execution.executable)?;
+    let launcher_len = launcher_len(wrapper_name, &execution.arguments)?;
 
     // The inner argv must name a real compiler; reject wrapper-of-wrapper
     // (which would otherwise loop) and unknown executables.
-    let inner_type = match recognizer.recognize(&real_compiler) {
-        Some(CompilerType::Wrapper) | None => return Err(execution),
-        Some(ty) => ty,
-    };
-
-    Ok((
-        Execution {
-            executable: real_compiler,
-            arguments: filtered_args,
-            working_dir: execution.working_dir,
-            environment: execution.environment,
-        },
-        inner_type,
-    ))
+    match recognizer.recognize(Path::new(&execution.arguments[launcher_len])) {
+        Some(CompilerType::Wrapper) | None => None,
+        Some(inner_type) => Some((launcher_len, inner_type)),
+    }
 }
 
 /// Identify the wrapper by basename. Returns the static name string so
@@ -79,17 +55,17 @@ fn detect_wrapper_name(executable: &Path) -> Option<&'static str> {
     WRAPPER_NAMES.iter().copied().find(|&w| w == name)
 }
 
-/// Locate the real compiler in a wrapper invocation's argv and return the
-/// surviving argv slice (compiler at index 0). Pure argv parsing -- does
-/// not consult the recognizer; callers are responsible for validating that
-/// the returned path is actually a compiler.
+/// Count the argv tokens before the real compiler in a wrapper invocation:
+/// the wrapper itself and its own options. The compiler is the token at that
+/// index. Pure argv parsing -- does not consult the recognizer; callers are
+/// responsible for validating that the token is actually a compiler.
 ///
 /// Generic across every wrapper: skip `wrapper_name`'s own options (each
 /// consuming `1 + arity` argv slots), then the next slot is the real
 /// compiler. Most wrappers (ccache, sccache, icecc) have no options of
-/// their own, so the loop body never matches and `i` stays 1 -- argv[1] is
-/// the compiler, exactly as before this became data-driven.
-fn extract_real_compiler(wrapper_name: &str, args: &[String]) -> Option<(PathBuf, Vec<String>)> {
+/// their own, so the loop body never matches and the count stays 1 -- argv[1]
+/// is the compiler.
+fn launcher_len(wrapper_name: &str, args: &[String]) -> Option<usize> {
     let opts = wrapper_options(wrapper_name);
     let mut i = 1;
     while i < args.len() {
@@ -98,8 +74,7 @@ fn extract_real_compiler(wrapper_name: &str, args: &[String]) -> Option<(PathBuf
             None => break,
         }
     }
-    let inner = args.get(i)?;
-    Some((PathBuf::from(inner), args[i..].to_vec()))
+    (i < args.len()).then_some(i)
 }
 
 /// The `(option, arity)` pairs `wrapper_name` accepts before its inner
@@ -178,9 +153,9 @@ mod tests {
 
         for (args, expected_inner) in cases {
             let exec = create_execution(args.clone());
-            let (inner, _ty) =
-                unwrap(exec, &recognizer).unwrap_or_else(|_| panic!("unwrap should succeed for {:?}", args));
-            assert_eq!(inner.executable, PathBuf::from(expected_inner));
+            let (len, _ty) =
+                unwrap(&exec, &recognizer).unwrap_or_else(|| panic!("unwrap should succeed for {:?}", args));
+            assert_eq!(exec.arguments[len], expected_inner, "case {args:?}");
         }
     }
 
@@ -201,33 +176,30 @@ mod tests {
 
         for args in cases {
             let exec = create_execution(args.clone());
-            assert!(unwrap(exec, &recognizer).is_err(), "unwrap should reject {:?}", args);
+            assert!(unwrap(&exec, &recognizer).is_none(), "unwrap should reject {:?}", args);
         }
     }
 
     // Requirements: recognition-compiler-launchers
     #[test]
-    fn test_unwrap_preserves_working_dir_and_environment() {
+    fn test_unwrap_returns_the_inner_compiler_type() {
         let recognizer = CompilerRecognizer::new();
-        let mut env = HashMap::new();
-        env.insert("CC", "gcc");
         let exec = Execution::from_strings(
             "/usr/bin/ccache",
             vec!["ccache", "gcc", "-c", "main.c"],
             "/custom/dir",
-            env,
+            HashMap::new(),
         );
 
-        let (inner, ty) = unwrap(exec, &recognizer).expect("unwrap should succeed");
+        let (len, ty) = unwrap(&exec, &recognizer).expect("unwrap should succeed");
 
-        assert_eq!(inner.working_dir, PathBuf::from("/custom/dir"));
-        assert_eq!(inner.environment.get("CC"), Some(&"gcc".to_string()));
+        assert_eq!(len, 1);
         assert_eq!(ty, CompilerType::compiler("gcc"));
     }
 
     // Requirements: recognition-compiler-launchers
     #[test]
-    fn test_unwrap_strips_distcc_flags_from_filtered_args() {
+    fn test_unwrap_counts_the_launcher_options() {
         let recognizer = CompilerRecognizer::new();
         let exec = Execution::from_strings(
             "/usr/bin/distcc",
@@ -236,9 +208,9 @@ mod tests {
             HashMap::new(),
         );
 
-        let (inner, _ty) = unwrap(exec, &recognizer).expect("unwrap should succeed");
+        let (len, _ty) = unwrap(&exec, &recognizer).expect("unwrap should succeed");
 
-        assert_eq!(inner.executable, PathBuf::from("gcc"));
-        assert_eq!(inner.arguments, vec!["gcc", "-c", "main.c", "-o", "main.o"]);
+        assert_eq!(len, 3);
+        assert_eq!(exec.arguments[len..], ["gcc", "-c", "main.c", "-o", "main.o"]);
     }
 }

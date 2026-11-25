@@ -17,8 +17,9 @@ mod wrapper;
 pub use print::print_compilers;
 
 use super::super::{Interpreter, RecognizeResult};
-use super::combinators::OutputLogger;
+use super::combinators::log_result;
 use compiler_recognition::{CompilerHints, CompilerRecognizer};
+use flag_based::{Call, FlagBasedInterpreter};
 use identity::CompilerType;
 use intercept::Execution;
 use std::collections::HashMap;
@@ -30,7 +31,7 @@ use std::collections::HashMap;
 /// then dispatches to the per-type flag interpreter.
 pub struct CompilerInterpreter {
     recognizer: CompilerRecognizer,
-    interpreters: HashMap<CompilerType, Box<dyn Interpreter>>,
+    interpreters: HashMap<CompilerType, FlagBasedInterpreter>,
     inline_response_files: bool,
 }
 
@@ -66,11 +67,9 @@ impl CompilerInterpreter {
         }
     }
 
-    /// Registers an interpreter for a specific compiler type, wrapping it
-    /// with [`OutputLogger`] so its recognition result is traced.
-    fn register(&mut self, compiler_type: CompilerType, interpreter: impl Interpreter + 'static) {
-        let logged_interpreter = OutputLogger::new(interpreter, compiler_type.to_string());
-        self.interpreters.insert(compiler_type, Box::new(logged_interpreter));
+    /// Registers the interpreter for a specific compiler type.
+    fn register(&mut self, compiler_type: CompilerType, interpreter: FlagBasedInterpreter) {
+        self.interpreters.insert(compiler_type, interpreter);
     }
 }
 
@@ -82,42 +81,38 @@ impl Default for CompilerInterpreter {
 
 impl Interpreter for CompilerInterpreter {
     fn recognize(&self, execution: Execution) -> RecognizeResult {
-        // Classify the executable, peeling off a wrapper layer in place if
-        // needed. ccache/distcc/sccache aren't real compilers; they exist
-        // to carry one in argv. wrapper::unwrap returns both the unwrapped
-        // execution and the inner compiler's type so we don't have to
-        // re-run the recognizer after unwrapping.
-        //
-        // Every outcome reports the execution as observed. A launcher or
-        // response-file inlining works on a copy, and the original replaces
-        // the copy in the result. Without either, nothing is cloned.
-        let (work, compiler_type, original) = match self.recognizer.recognize(&execution.executable) {
-            Some(CompilerType::Wrapper) => match wrapper::unwrap(execution.clone(), &self.recognizer) {
-                Ok((unwrapped, ty)) => (unwrapped, ty, Some(execution)),
-                Err(_) => return RecognizeResult::NotRecognized(execution),
+        // Classify the executable. A launcher (ccache/distcc/sccache) is not a
+        // compiler; it carries one in argv. wrapper::unwrap says how many
+        // argv tokens belong to it and what the inner compiler is, so we
+        // don't have to re-run the recognizer.
+        let (launcher_len, compiler_type) = match self.recognizer.recognize(&execution.executable) {
+            Some(CompilerType::Wrapper) => match wrapper::unwrap(&execution, &self.recognizer) {
+                Some(found) => found,
+                None => return RecognizeResult::NotRecognized(execution),
             },
-            Some(ty) => (execution, ty, None),
+            Some(ty) => (0, ty),
             None => return RecognizeResult::NotRecognized(execution),
         };
+        let Some(interpreter) = self.interpreters.get(&compiler_type) else {
+            return RecognizeResult::NotRecognized(execution);
+        };
 
-        // Inline @file response files before flag classification, so their
+        // Read @file response files before flag classification, so their
         // tokens are classified, link-stripped, and split per source like any
         // other argument. Tokenization follows the family just identified.
-        let (work, original) = if self.inline_response_files {
-            let original = original.unwrap_or_else(|| work.clone());
-            (response_file::expand(work, response_file::syntax_for(compiler_type)), Some(original))
-        } else {
-            (work, original)
-        };
+        // The file is read once; the family derives both models from it.
+        let inlined = self.inline_response_files.then(|| {
+            let after_compiler = execution.arguments.get(launcher_len + 1..).unwrap_or_default();
+            response_file::expand(
+                after_compiler,
+                &execution.working_dir,
+                response_file::syntax_for(compiler_type),
+            )
+        });
 
-        let result = match self.interpreters.get(&compiler_type) {
-            Some(interpreter) => interpreter.recognize(work),
-            None => RecognizeResult::NotRecognized(work),
-        };
-        match original {
-            Some(original) => result.with_execution(original),
-            None => result,
-        }
+        let result = interpreter.recognize(Call { execution, launcher_len, inlined });
+        log_result(&compiler_type.to_string(), &result);
+        result
     }
 }
 

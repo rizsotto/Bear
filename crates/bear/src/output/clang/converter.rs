@@ -419,6 +419,9 @@ impl CommandConverter {
 }
 
 #[cfg(test)]
+mod equivalence;
+
+#[cfg(test)]
 mod tests {
     use super::super::path_format::FormatError;
     use super::*;

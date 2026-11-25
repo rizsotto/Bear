@@ -60,15 +60,23 @@ impl<T: Interpreter> OutputLogger<T> {
 impl<T: Interpreter> Interpreter for OutputLogger<T> {
     fn recognize(&self, execution: Execution) -> RecognizeResult {
         let result = self.inner.recognize(execution);
-        log::debug!("{:20}: {result:?}", self.name);
+        log_result(&self.name, &result);
         result
     }
+}
+
+/// Logs a recognition result under the name of the interpreter that made it.
+/// The debug log is read by integration tests, which match this module's
+/// target and the `name: Recognized(` shape.
+pub(super) fn log_result(name: &str, result: &RecognizeResult) {
+    log::debug!("{name:20}: {result:?}");
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::Command;
+    use crate::Interpretation;
     use crate::MockInterpreter;
     use crate::Recognized;
     use crate::SourceMode;
@@ -124,6 +132,13 @@ mod test {
                 arguments: vec![],
                 source_mode: SourceMode::PerSourceStripped,
             },
+            interpretation: Interpretation::new(
+                "test",
+                SourceMode::PerSourceStripped,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
         })
     }
 

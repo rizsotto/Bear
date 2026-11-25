@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Argument, ArgumentKind, Command, OutputSpelling, Recognized, SourceMode};
+use super::{Argument, ArgumentKind, Command, Interpretation, OutputSpelling, Recognized, SourceMode};
 use intercept::Execution;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -47,6 +47,7 @@ impl Recognized {
     /// Create a Recognized from string arguments for testing.
     ///
     /// The execution's argv is every argument token in order. Set `command.source_mode` to change the mode.
+    /// The interpretation is empty: the converter still reads `command`.
     pub fn from_strings(
         working_dir: &str,
         executable: &str,
@@ -54,7 +55,9 @@ impl Recognized {
     ) -> Self {
         let argv: Vec<&str> = arguments.iter().flat_map(|(_, tokens)| tokens.iter().copied()).collect();
         let execution = Execution::from_strings(executable, argv, working_dir, HashMap::new());
-        Self { execution, command: Command::from_strings(executable, arguments) }
+        let interpretation =
+            Interpretation::new("test", SourceMode::PerSourceStripped, Vec::new(), Vec::new(), Vec::new());
+        Self { execution, command: Command::from_strings(executable, arguments), interpretation }
     }
 }
 

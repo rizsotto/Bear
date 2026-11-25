@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use crate::FileType;
 use std::path::Path;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -56,6 +57,25 @@ fn file_kind(extension: &str) -> Option<FileKind> {
 
 pub fn looks_like_a_source_file(argument: &str) -> bool {
     argument.rsplit_once('.').is_some_and(|(_, extension)| file_kind(extension).is_some())
+}
+
+/// The type of an input, by extension, from the one table every compiler
+/// family shares. An extension outside the table is an object.
+pub(crate) fn file_type_of(argument: &str) -> FileType {
+    let Some((_, extension)) = argument.rsplit_once('.') else {
+        return FileType::Object;
+    };
+    match extension {
+        "i" | "ii" | "mi" | "mii" => FileType::PreprocessedSource,
+        "s" | "asm" => FileType::Assembly,
+        "S" | "sx" => FileType::AssemblyWithCpp,
+        _ => match file_kind(extension) {
+            Some(FileKind::CFamilyHeader) => FileType::SourceHeader,
+            Some(FileKind::CxxModule) => FileType::SourceModule,
+            Some(_) => FileType::Source,
+            None => FileType::Object,
+        },
+    }
 }
 
 /// True when the path's extension is a C-family header (.h, .hpp, ...).
@@ -143,6 +163,34 @@ mod test {
 
             assert_eq!(sut, expected, "extension: {extension}");
         }
+    }
+
+    // Requirements: output-compilation-entries
+    #[test]
+    fn test_file_type_agrees_with_the_source_list() {
+        let cases = [
+            ("a.h", FileType::SourceHeader),
+            ("a.c", FileType::Source),
+            ("a.mm", FileType::Source),
+            ("a.cppm", FileType::SourceModule),
+            ("a.ii", FileType::PreprocessedSource),
+            ("a.mi", FileType::PreprocessedSource),
+            ("a.asm", FileType::Assembly),
+            ("a.sx", FileType::AssemblyWithCpp),
+            ("a.swift", FileType::Source),
+            ("a.vapi", FileType::Object),
+            ("a.o", FileType::Object),
+            ("a", FileType::Object),
+        ];
+
+        for (file, expected) in cases {
+            let sut = file_type_of(file);
+
+            assert_eq!(sut, expected, "file: {file}");
+            assert_eq!(looks_like_a_source_file(file), expected != FileType::Object, "file: {file}");
+        }
+        // `mi` and `mii` are preprocessed, and still count as Objective-C donors.
+        assert!(is_c_family_source(Path::new("a.mi")));
     }
 
     // Requirements: recognition-cpp20-modules
