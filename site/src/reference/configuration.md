@@ -176,8 +176,10 @@ format:
 
 - **`format.arguments.from_response_files`**: expand `@file`
   response-file references into their tokenized contents. Default:
-  `true`, except with `--no-local-lookups`, where it is off unless set.
-  Setting it to `true` is rejected with `--no-local-lookups`.
+  `true`. With `--no-local-lookups` it is always off, and an explicit
+  `true` is an error. A missing file stays as the `@file` argument, with
+  a warning. Some build tools delete the file once the compile is done
+  (Ninja does), so a later `bear semantic` run may find it gone.
 - **`format.arguments.from_environment`**: fold compiler environment
   variables (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
   `OBJC_INCLUDE_PATH`, MSVC's `CL` / `_CL_`) into the recorded arguments.

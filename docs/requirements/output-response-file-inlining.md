@@ -102,6 +102,10 @@ another machine), Bear decides from the rest of the command line. Then:
 - In a compiler family that does not take response files, an argument
   that starts with `@` is still treated as one.
 
+A file can be missing even on the build's machine: some build tools
+delete it once the compile is done, Ninja among them, and semantic mode
+reads it later.
+
 When a response file is read:
 
 - Bear reads the file as it is when Bear runs. A file changed after the

@@ -498,11 +498,12 @@ entries.
 - **arguments.from_response_files**: Replace `@file` response-file
 references with the file's tokenized contents (resolved relative to the
 compilation's working directory, expanded recursively, using the
-compiler's quoting convention). Enabled by default, except with
-`--no-local-lookups`, where it is off unless set. When off, an `@file`
-argument is recorded verbatim; a missing or unreadable file is left
-literal with a warning. Setting it to `true` is rejected with
-`--no-local-lookups`.
+compiler's quoting convention). Enabled by default. With
+`--no-local-lookups` it is always off, and an explicit `true` is an
+error. When off, an `@file` argument is recorded verbatim. A missing or
+unreadable file is left literal with a warning. Some build tools delete
+the file once the compile is done (Ninja does), so a later
+`bear semantic` run may find it gone.
 - **arguments.from_environment**: Fold compiler environment variables
 that act as implicit flags into the arguments. GCC/Clang header-search
 paths (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,

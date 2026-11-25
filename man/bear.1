@@ -558,12 +558,13 @@ field in entries.
 response\-file references with the file\(cqs tokenized contents
 (resolved relative to the compilation\(cqs working directory, expanded
 recursively, using the compiler\(cqs quoting convention).
-Enabled by default, except with \f[CR]\-\-no\-local\-lookups\f[R], where
-it is off unless set.
-When off, an \f[CR]\(atfile\f[R] argument is recorded verbatim; a
-missing or unreadable file is left literal with a warning.
-Setting it to \f[CR]true\f[R] is rejected with
-\f[CR]\-\-no\-local\-lookups\f[R].
+Enabled by default.
+With \f[CR]\-\-no\-local\-lookups\f[R] it is always off, and an explicit
+\f[CR]true\f[R] is an error.
+When off, an \f[CR]\(atfile\f[R] argument is recorded verbatim.
+A missing or unreadable file is left literal with a warning.
+Some build tools delete the file once the compile is done (Ninja does),
+so a later \f[CR]bear semantic\f[R] run may find it gone.
 .IP \(bu 2
 \f[B]arguments.from_environment\f[R]: Fold compiler environment
 variables that act as implicit flags into the arguments.

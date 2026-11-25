@@ -7,8 +7,11 @@ inside the file gets no entry. A `-E` or `--version` inside it goes
 unseen, so a call that compiles nothing can get an entry. The
 requirement lists these failures for the case where inlining is off.
 
-Reading is safe in the modes that run on the build's machine. The files
-are there.
+On the build's machine the files are usually there. Not always: some
+build tools delete a response file once the compile is done (Ninja
+does), and Bear may read it later. Then the `@file` stays literal with a
+warning, which is what inlining off gives anyway, so reading by default
+costs nothing in that case.
 
 Input from another machine is different, because the files are not
 there. That mode needs "not set" to be told from "set". An unset value
