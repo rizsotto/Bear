@@ -153,7 +153,7 @@ format:
     use_array_format: true
     include_output_field: true
   arguments:
-    from_response_files: false
+    from_response_files: true
     from_environment: true
 ```
 
@@ -176,7 +176,8 @@ format:
 
 - **`format.arguments.from_response_files`**: expand `@file`
   response-file references into their tokenized contents. Default:
-  `false`. Rejected with `--no-local-lookups`.
+  `true`, except with `--no-local-lookups`, where it is off unless set.
+  Setting it to `true` is rejected with `--no-local-lookups`.
 - **`format.arguments.from_environment`**: fold compiler environment
   variables (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
   `OBJC_INCLUDE_PATH`, MSVC's `CL` / `_CL_`) into the recorded arguments.

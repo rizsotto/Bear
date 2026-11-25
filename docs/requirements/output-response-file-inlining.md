@@ -1,6 +1,6 @@
 ---
 title: Inline response files in compilation entries
-status: accepted
+status: implemented
 ---
 
 ## Intent

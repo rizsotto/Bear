@@ -234,9 +234,10 @@ pub struct Format {
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct ArgumentsFormat {
     /// Replace `@file` response-file references with their tokenized contents.
-    /// Disabled by default: an `@file` argument is recorded verbatim.
-    #[serde(default)]
-    pub from_response_files: bool,
+    /// Unset means on, except off when the input comes from another machine.
+    /// Off records an `@file` argument verbatim.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_response_files: Option<bool>,
     /// Fold compiler environment variables (e.g. `CPATH`) into each entry's
     /// arguments as explicit flags. Enabled by default.
     #[serde(default = "default_enabled")]
@@ -245,7 +246,7 @@ pub struct ArgumentsFormat {
 
 impl Default for ArgumentsFormat {
     fn default() -> Self {
-        Self { from_response_files: false, from_environment: true }
+        Self { from_response_files: None, from_environment: true }
     }
 }
 

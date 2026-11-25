@@ -11,9 +11,9 @@ but only works with SIP disabled.
 
 ## Building through Xcode or `xcodebuild`
 
-Xcode passes many flags through an `@file` response file, and Bear's
-default recording keeps that argument literal. Turn on
-[`format.arguments.from_response_files`](../reference/configuration.md#formatarguments)
+Xcode passes many flags through an `@file` response file. Bear's
+default recording inlines it
+([`format.arguments.from_response_files`](../reference/configuration.md#formatarguments)),
 so an entry built through `xcodebuild` carries the actual flags.
 
 ## Homebrew-installed compilers

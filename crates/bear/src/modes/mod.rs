@@ -67,6 +67,9 @@ impl Mode {
         }
         log::info!("{config}");
 
+        // Unset inlines response files, unless their files are on another machine.
+        let inline_response_files = config.format.arguments.from_response_files.unwrap_or(local_lookups);
+
         // Resolve every configured `as:` spelling once, here, so a typo fails
         // at startup in every mode that reads configuration -- before a build
         // starts. This is also the only place that sees both the config types
@@ -105,8 +108,9 @@ impl Mode {
                 log::debug!("Mode: replay events and semantic analysis");
 
                 let source = impls::RawEventReader::create(&input.path)?;
-                let consumer = impls::SemanticEventWriter::create(output, &config, hints, true)
-                    .map_err(ConfigurationError::ConsumerCreation)?;
+                let consumer =
+                    impls::SemanticEventWriter::create(output, &config, hints, true, inline_response_files)
+                        .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(source), Box::new(consumer));
 
@@ -126,8 +130,9 @@ impl Mode {
                     std::collections::HashMap::new()
                 };
                 let producer = impls::ShellScriptReader::create(&input.path, directory, environment)?;
-                let consumer = impls::SemanticEventWriter::create(output, &config, hints, true)
-                    .map_err(ConfigurationError::ConsumerCreation)?;
+                let consumer =
+                    impls::SemanticEventWriter::create(output, &config, hints, true, inline_response_files)
+                        .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let replayer = execution::Replayer::new(Box::new(producer), Box::new(consumer));
 
@@ -159,8 +164,9 @@ impl Mode {
 
                 // Read before the consumer exists: it may create files beside the output.
                 let (append, path, existed) = (output.append, output.path.clone(), output.path.exists());
-                let consumer = impls::SemanticEventWriter::create(output, &config, hints, false)
-                    .map_err(ConfigurationError::ConsumerCreation)?;
+                let consumer =
+                    impls::SemanticEventWriter::create(output, &config, hints, false, inline_response_files)
+                        .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
                     Arc::new(impls::SocketEventProducer::create(producer)),
@@ -697,6 +703,7 @@ mod impls {
             config: &config::Main,
             hints: CompilerHints,
             suggest_no_local_lookups: bool,
+            inline_response_files: bool,
         ) -> Result<Self, WriterCreationError> {
             let ignored: Vec<PathBuf> = config
                 .compilers
@@ -708,7 +715,7 @@ mod impls {
             let interpreter = semantic::interpreters::create(
                 hints,
                 ignored,
-                config.format.arguments.from_response_files,
+                inline_response_files,
                 config.format.arguments.from_environment,
             );
             let writer = output::OutputWriter::try_from((&output, config))?

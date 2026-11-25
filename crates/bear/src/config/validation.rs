@@ -113,7 +113,10 @@ pub(super) fn reject_local_file_settings(config: &Main) -> Result<(), Validation
         ("format.paths.directory: canonical", config.format.paths.directory == PathResolver::Canonical),
         ("format.paths.file: canonical", config.format.paths.file == PathResolver::Canonical),
         ("headers.enabled: true", config.headers.enabled),
-        ("format.arguments.from_response_files: true", config.format.arguments.from_response_files),
+        (
+            "format.arguments.from_response_files: true",
+            config.format.arguments.from_response_files == Some(true),
+        ),
     ];
     let errors = settings
         .iter()
@@ -322,14 +325,16 @@ mod tests {
             ("headers", with(|c| c.headers.enabled = true), vec!["headers.enabled"]),
             (
                 "response files",
-                with(|c| c.format.arguments.from_response_files = true),
+                with(|c| c.format.arguments.from_response_files = Some(true)),
                 vec!["format.arguments.from_response_files"],
             ),
+            ("response files unset", with(|c| c.format.arguments.from_response_files = None), vec![]),
+            ("response files off", with(|c| c.format.arguments.from_response_files = Some(false)), vec![]),
             (
                 "several",
                 with(|c| {
                     c.headers.enabled = true;
-                    c.format.arguments.from_response_files = true;
+                    c.format.arguments.from_response_files = Some(true);
                 }),
                 vec!["headers.enabled", "format.arguments.from_response_files"],
             ),

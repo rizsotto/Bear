@@ -178,6 +178,8 @@ and the error names the setting and the configuration file:
 \f[CR]format.paths.file: canonical\f[R],
 \f[CR]headers.enabled: true\f[R], and
 \f[CR]format.arguments.from_response_files: true\f[R].
+Leaving \f[CR]format.arguments.from_response_files\f[R] unset is fine:
+it runs with inlining off under this option.
 A configuration file found automatically applies as usual, so if it has
 one of these settings, pass \f[CR]\-\-config\f[R] with another file.
 .SS bear parse\-sh
@@ -366,7 +368,7 @@ format\f[B]:\f[R]
     use_array_format\f[B]:\f[R] true
     include_output_field\f[B]:\f[R] true
   arguments\f[B]:\f[R]
-    from_response_files\f[B]:\f[R] false
+    from_response_files\f[B]:\f[R] true\f[I]    # default: true, false with \-\-no\-local\-lookups\f[R]
     from_environment\f[B]:\f[R] true
 headers\f[B]:\f[R]
   enabled\f[B]:\f[R] true\f[I]               # default: false\f[R]
@@ -556,10 +558,12 @@ field in entries.
 response\-file references with the file\(cqs tokenized contents
 (resolved relative to the compilation\(cqs working directory, expanded
 recursively, using the compiler\(cqs quoting convention).
-Disabled by default, in which case an \f[CR]\(atfile\f[R] argument is
-recorded verbatim; a missing or unreadable file is left literal with a
-warning.
-Rejected with \f[CR]\-\-no\-local\-lookups\f[R].
+Enabled by default, except with \f[CR]\-\-no\-local\-lookups\f[R], where
+it is off unless set.
+When off, an \f[CR]\(atfile\f[R] argument is recorded verbatim; a
+missing or unreadable file is left literal with a warning.
+Setting it to \f[CR]true\f[R] is rejected with
+\f[CR]\-\-no\-local\-lookups\f[R].
 .IP \(bu 2
 \f[B]arguments.from_environment\f[R]: Fold compiler environment
 variables that act as implicit flags into the arguments.

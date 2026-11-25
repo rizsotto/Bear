@@ -367,6 +367,22 @@ mod test {
     }
 
     #[test]
+    fn test_response_file_inlining_parses_unset_false_and_true() {
+        let cases = [
+            ("schema: \"4.2\"\n", None),
+            ("schema: \"4.2\"\nformat:\n  arguments:\n    from_response_files: false\n", Some(false)),
+            ("schema: \"4.2\"\nformat:\n  arguments:\n    from_response_files: true\n", Some(true)),
+        ];
+
+        for (yaml, expected) in cases {
+            let sut: Main = Loader::from_reader(yaml.as_bytes()).unwrap();
+
+            assert_eq!(sut.format.arguments.from_response_files, expected, "yaml: {yaml:?}");
+        }
+        assert_eq!(Main::default().format.arguments.from_response_files, None);
+    }
+
+    #[test]
     fn test_default_config() {
         let result = Main::default();
 

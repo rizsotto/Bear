@@ -1,6 +1,6 @@
 ---
 title: Input from another machine
-status: accepted
+status: implemented
 ---
 
 ## Intent

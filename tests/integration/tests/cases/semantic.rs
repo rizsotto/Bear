@@ -2481,6 +2481,48 @@ fn semantic_unread_response_file_stays_in_msvc_entry() -> Result<()> {
     Ok(())
 }
 
+// Requirements: cli-input-from-another-machine, output-response-file-inlining
+//
+// With the option and no inlining setting, the `@flags.resp` token stays
+// literal, even when the file exists here.
+#[test]
+fn semantic_no_local_lookups_keeps_response_file_literal() -> Result<()> {
+    let env = TestEnvironment::new("semantic_no_local_lookups_response_file")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "@flags.resp", "-c", "a.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("flags.resp", "-DFROM_FILE"),
+        ("a.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&[
+        "semantic",
+        "--no-local-lookups",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "a.c".to_string(),
+        directory: temp_dir,
+        arguments: vec!["gcc", "@flags.resp", "-c", "a.c"].into_iter().map(String::from).collect::<Vec<_>>()
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: recognition-compiler-names
 //
 // A `swiftc -c hello.swift` execution yields one entry, using the Swift

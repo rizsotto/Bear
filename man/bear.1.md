@@ -173,8 +173,10 @@ this machine.
 and the error names the setting and the configuration file:
 `format.paths.directory: canonical`, `format.paths.file: canonical`,
 `headers.enabled: true`, and `format.arguments.from_response_files:
-true`. A configuration file found automatically applies as usual, so if
-it has one of these settings, pass `--config` with another file.
+true`. Leaving `format.arguments.from_response_files` unset is fine: it
+runs with inlining off under this option. A configuration file found
+automatically applies as usual, so if it has one of these settings, pass
+`--config` with another file.
 
 ## bear parse-sh
 
@@ -343,7 +345,7 @@ format:
     use_array_format: true
     include_output_field: true
   arguments:
-    from_response_files: false
+    from_response_files: true    # default: true, false with --no-local-lookups
     from_environment: true
 headers:
   enabled: true               # default: false
@@ -496,9 +498,11 @@ entries.
 - **arguments.from_response_files**: Replace `@file` response-file
 references with the file's tokenized contents (resolved relative to the
 compilation's working directory, expanded recursively, using the
-compiler's quoting convention). Disabled by default, in which case an
-`@file` argument is recorded verbatim; a missing or unreadable file is
-left literal with a warning. Rejected with `--no-local-lookups`.
+compiler's quoting convention). Enabled by default, except with
+`--no-local-lookups`, where it is off unless set. When off, an `@file`
+argument is recorded verbatim; a missing or unreadable file is left
+literal with a warning. Setting it to `true` is rejected with
+`--no-local-lookups`.
 - **arguments.from_environment**: Fold compiler environment variables
 that act as implicit flags into the arguments. GCC/Clang header-search
 paths (`CPATH`, `C_INCLUDE_PATH`, `CPLUS_INCLUDE_PATH`,
