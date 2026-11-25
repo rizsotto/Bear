@@ -168,7 +168,7 @@ static CLANG_CL_FLAGS: [FlagRule; 174] = [
     FlagRule::new(FlagPattern::Exactly("/FS", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("/?", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
-    FlagRule::new(FlagPattern::Exactly("/c", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("/c", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))),
     FlagRule::new(FlagPattern::Exactly("/E", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("/P", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/I"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),

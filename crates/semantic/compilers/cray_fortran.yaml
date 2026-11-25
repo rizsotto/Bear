@@ -125,7 +125,7 @@ flags:
   - match: {pattern: "-cray*"}
     result: none
   - match: {pattern: "-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-E"}
     result: stops_at_preprocessing
   - match: {pattern: "-F"}
@@ -133,7 +133,7 @@ flags:
   - match: {pattern: "-g"}
     result: configures_compiling
   - match: {pattern: "-S"}
-    result: stops_at_assembling
+    result: stops_at_compiling
   - match: {pattern: "-T"}
     result: driver_option
   - match: {pattern: "-v"}

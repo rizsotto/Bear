@@ -382,7 +382,7 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["gcc"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (Source { binary: false }, vec!["main.c"]),
                     (Output, vec!["-o", "main.o"]),
                 ],
@@ -400,7 +400,7 @@ mod tests {
                     sut.recognize(execution),
                     vec![
                         (Compiler, vec!["gcc"]),
-                        (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                        (stops_at(CompilerPass::Assembling), vec!["-c"]),
                         (configures(CompilerPass::Compiling), vec!["-x", "ada"]),
                         (configures(CompilerPass::Compiling), vec!["-gnatA"]),
                         (Source { binary: false }, vec![source]),
@@ -659,7 +659,7 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["gcc"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (Source { binary: false }, vec!["main.c"]),
                     (Output, vec!["-o", "main.o"]),
                 ],
@@ -1050,7 +1050,7 @@ mod tests {
                     (Compiler, vec!["g++"]),
                     (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
                     (configures(CompilerPass::Compiling), vec!["-fmodules-ts"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (Source { binary: false }, vec!["mod.cppm"]),
                 ],
             );
@@ -1068,7 +1068,7 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["clang"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (configures(CompilerPass::Compiling), vec!["-O2"]),
                     (Source { binary: false }, vec!["main.c"]),
                 ],
@@ -1685,7 +1685,7 @@ mod tests {
                     (Compiler, vec!["clang++"]),
                     (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
                     (configures(CompilerPass::Compiling), vec!["-fmodule-file=foo=foo.pcm"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (Source { binary: false }, vec!["main.cpp"]),
                 ],
             );
@@ -1727,7 +1727,7 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["nvcc"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (Source { binary: false }, vec!["kernel.cu"]),
                     (Output, vec!["-o", "kernel.o"]),
                 ],
@@ -1756,7 +1756,7 @@ mod tests {
                     (configures(CompilerPass::Compiling), vec!["--gpu-architecture=sm_80"]),
                     (configures(CompilerPass::Compiling), vec!["-arch=sm_70"]),
                     (configures(CompilerPass::Compiling), vec!["--gpu-code=sm_80,compute_80"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-c"]),
                     (Source { binary: false }, vec!["kernel.cu"]),
                 ],
             );
@@ -1774,7 +1774,7 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["nvcc"]),
-                    (stops_at(CompilerPass::Compiling), vec!["--device-c"]),
+                    (stops_at(CompilerPass::Assembling), vec!["--device-c"]),
                     (configures(CompilerPass::Compiling), vec!["--relocatable-device-code=true"]),
                     (Source { binary: false }, vec!["kernel.cu"]),
                     (Output, vec!["-o", "kernel.o"]),
@@ -1849,7 +1849,7 @@ mod tests {
                 sut.recognize(execution),
                 vec![
                     (Compiler, vec!["nvcc"]),
-                    (stops_at(CompilerPass::Compiling), vec!["--compile"]),
+                    (stops_at(CompilerPass::Assembling), vec!["--compile"]),
                     (Source { binary: false }, vec!["kernel.cu"]),
                 ],
             );
@@ -1867,7 +1867,7 @@ mod tests {
             assert!(matches!(result, RecognizeResult::Recognized(_)));
             if let RecognizeResult::Recognized(parsed) = result {
                 assert_eq!(parsed.arguments.len(), 3);
-                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
             }
         }
 
@@ -1923,7 +1923,7 @@ mod tests {
             assert!(matches!(result, RecognizeResult::Recognized(_)));
             if let RecognizeResult::Recognized(parsed) = result {
                 assert_eq!(parsed.arguments.len(), 3);
-                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
             }
         }
 
@@ -1998,7 +1998,7 @@ mod tests {
             assert!(matches!(result, RecognizeResult::Recognized(_)));
             if let RecognizeResult::Recognized(parsed) = result {
                 assert_eq!(parsed.arguments.len(), 3);
-                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
             }
         }
@@ -2020,7 +2020,7 @@ mod tests {
                     vec!["-cc=gcc".to_string()],
                     "-cc=gcc must be retained as a single token"
                 );
-                assert_eq!(parsed.arguments[2].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[2].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[3].kind(), Source { binary: false });
                 assert_eq!(
                     parsed.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
@@ -2080,7 +2080,7 @@ mod tests {
             assert!(matches!(result, RecognizeResult::Recognized(_)));
             if let RecognizeResult::Recognized(parsed) = result {
                 assert_eq!(parsed.arguments.len(), 3);
-                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
             }
         }
@@ -2105,7 +2105,7 @@ mod tests {
                     vec!["-Vgcc_ntoaarch64le".to_string()],
                     "-Vgcc_ntoaarch64le must be retained as a single token"
                 );
-                assert_eq!(parsed.arguments[2].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[2].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[3].kind(), Source { binary: false });
                 assert_eq!(
                     parsed.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
@@ -2282,7 +2282,7 @@ mod tests {
             assert!(matches!(result, RecognizeResult::Recognized(_)));
             if let RecognizeResult::Recognized(parsed) = result {
                 assert_eq!(parsed.arguments.len(), 3);
-                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Assembling));
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
             }
         }
@@ -2307,7 +2307,7 @@ mod tests {
                 vec![
                     (Compiler, vec!["swiftc"]),
                     (configures(CompilerPass::Compiling), vec!["-module-name", "App"]),
-                    (stops_at(CompilerPass::Compiling), vec!["-emit-object"]),
+                    (stops_at(CompilerPass::Assembling), vec!["-emit-object"]),
                     (Source { binary: false }, vec!["a.swift"]),
                     (Source { binary: false }, vec!["b.swift"]),
                 ],

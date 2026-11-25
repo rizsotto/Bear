@@ -145,7 +145,7 @@ mod tests {
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)), vec!["-c"]),
                 (ArgumentKind::Source { binary: false }, vec![file]),
             ],
         )

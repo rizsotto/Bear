@@ -52,13 +52,13 @@ flags:
   # follows to the linker, which is how a CCS makefile spells its link
   # step: same driver, object files and linker options after the `-z`.
   - match: {pattern: "--compile_only"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "--skip_assembler"}
-    result: stops_at_assembling
+    result: stops_at_compiling
   - match: {pattern: "-n"}
-    result: stops_at_assembling
+    result: stops_at_compiling
   - match: {pattern: "--run_linker"}
     result: pass_through
   - match: {pattern: "-z"}

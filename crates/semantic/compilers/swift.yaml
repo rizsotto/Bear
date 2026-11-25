@@ -38,11 +38,11 @@ flags:
   - match: {pattern: "-o{ }*"}
     result: output
 
-  # --- Stops at compiling (object-file-only output) ---
+  # --- Stops at assembling (object-file-only output) ---
   - match: {pattern: "-emit-object"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
 
   # --- Compilation-configuring, separate-token value only (Options.td: Separate) ---
   - match: {pattern: "-module-name", count: 1}

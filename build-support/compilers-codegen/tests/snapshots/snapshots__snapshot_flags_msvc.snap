@@ -132,7 +132,7 @@ static MSVC_FLAGS: [FlagRule; 138] = [
     FlagRule::new(FlagPattern::Prefix("/MP", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("/FS", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("/?", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
-    FlagRule::new(FlagPattern::Exactly("/c", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("/c", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))),
     FlagRule::new(FlagPattern::Exactly("/E", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("/P", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/I"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),

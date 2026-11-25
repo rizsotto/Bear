@@ -31,9 +31,9 @@ flags:
   - match: {pattern: "-x", count: 1}
     result: configures_compiling
   - match: {pattern: "-c"}
-    result: stops_at_compiling
-  - match: {pattern: "-S"}
     result: stops_at_assembling
+  - match: {pattern: "-S"}
+    result: stops_at_compiling
   - match: {pattern: "-E"}
     result: stops_at_preprocessing
   - match: {pattern: "-o{ }*"}

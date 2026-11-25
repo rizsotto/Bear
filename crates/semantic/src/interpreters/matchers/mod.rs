@@ -273,7 +273,7 @@ mod tests {
         let mut flags = vec![
             FlagRule::new(
                 FlagPattern::Exactly("-c", 0),
-                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
             ),
             FlagRule::new(
                 FlagPattern::ExactlyWithEqOrSep("-std"),

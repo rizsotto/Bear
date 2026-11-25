@@ -70,7 +70,7 @@ flags:
   - match: {pattern: "-o{ }*"}
     result: output
   - match: {pattern: "-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-I{ }*"}
     result: configures_preprocessing
 ```

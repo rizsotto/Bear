@@ -35,9 +35,9 @@ flags:
   - match: {pattern: "--ccode"}
     result: stops_at_compiling
   - match: {pattern: "-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "--compile"}
-    result: stops_at_compiling
+    result: stops_at_assembling
 
   # Compilation-configuring options that take a value
   - match: {pattern: "--pkg{=}*"}

@@ -709,11 +709,11 @@ mod tests {
     fn resolve_flags_dedup_same_result() {
         let mut tables = HashMap::new();
         let mut parent = make_empty_table();
-        parent.flags = vec![make_test_flag("-c", "stops_at_compiling")];
+        parent.flags = vec![make_test_flag("-c", "stops_at_assembling")];
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
         child.compiler.extends = Some("parent".to_string());
-        child.flags = vec![make_test_flag("-c", "stops_at_compiling")];
+        child.flags = vec![make_test_flag("-c", "stops_at_assembling")];
         tables.insert("child".to_string(), child);
         let flags = resolve_flags("child", &tables).unwrap();
         assert_eq!(flags.len(), 1);
@@ -723,7 +723,7 @@ mod tests {
     fn resolve_flags_conflict_is_err() {
         let mut tables = HashMap::new();
         let mut parent = make_empty_table();
-        parent.flags = vec![make_test_flag("-c", "stops_at_compiling")];
+        parent.flags = vec![make_test_flag("-c", "stops_at_assembling")];
         tables.insert("parent".to_string(), parent);
         let mut child = make_empty_table();
         child.compiler.extends = Some("parent".to_string());

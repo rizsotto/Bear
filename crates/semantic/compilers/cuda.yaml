@@ -24,17 +24,17 @@ flags:
   - match: {pattern: "-gencode{=}*"}
     result: configures_compiling
   - match: {pattern: "--compile"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "--device-c"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-dc"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "--device-w"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "-dw"}
-    result: stops_at_compiling
+    result: stops_at_assembling
   - match: {pattern: "--device-link"}
     result: configures_linking
   - match: {pattern: "-dlink"}

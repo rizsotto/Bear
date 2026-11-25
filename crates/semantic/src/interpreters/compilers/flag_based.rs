@@ -469,7 +469,7 @@ mod pass_through_tests {
             let mut flags = vec![
                 FlagRule::new(
                     FlagPattern::Exactly("-c", 0),
-                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
                 ),
                 FlagRule::new(FlagPattern::Exactly("/link", 0), ArgumentKind::Other(PassEffect::PassThrough)),
                 FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
@@ -492,9 +492,9 @@ mod pass_through_tests {
 
         // cl (compiler)
         assert!(matches!(result[0], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Compiler));
-        // -c (stops at compiling)
+        // -c (stops at assembling)
         assert!(
-            matches!(result[1], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)))
+            matches!(result[1], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)))
         );
         // foo.c (source)
         assert!(matches!(result[2], Argument::Source { .. }));
