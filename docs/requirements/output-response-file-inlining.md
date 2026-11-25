@@ -110,6 +110,12 @@ When a response file is read:
 
 - Bear reads the file as it is when Bear runs. A file changed after the
   build gives the new contents.
+- Each file is read on its own. A flag at the end of the file does not
+  take its value from the argument after the `@file`, and a flag in the
+  file that hands the rest of the command line to the linker (MSVC
+  `/link`) does not affect the arguments after the `@file`.
+- An argument a flag takes as its value is never read as a response
+  file, even when it starts with `@` (`-install_name @rpath/libfoo.dylib`).
 
 - Response-file flags with a syntax other than `@file`, such as nvcc's
   `--options-file` and `-optf` or IBM XL's `-qoptfile`, are not inlined.

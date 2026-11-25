@@ -8,37 +8,44 @@ where `@file` stood. Some environment variables add words before argv
 keep these in output order, and tools that show a call want to say where
 each item came from.
 
-GCC expands `@file` before it parses options. A flag in the file can take
-its value from argv, and the reverse.
+Not every argument that starts with `@` is a response file. On macOS
+`-install_name @rpath/libfoo.dylib` and `-rpath @loader_path/..` are
+common, and the `@` part is a flag's value.
 
 Options considered:
 
-- Parse each response file apart from argv and keep the items in a map
-  keyed by path. This adds a boundary GCC does not have. A flag at the
-  end of the file loses its value. `/link` inside a file does not affect
-  the argv after it. A path can mean two things, before and after
-  `/link`. Every view of the call needs a lookup into the map.
+- Splice every `@` argument's file into argv before parsing, as GCC
+  does. A flag in the file can then take its value from argv. But it also
+  tries to read flag values like `@rpath/libfoo.dylib`, and with inlining
+  on by default every such call logs a warning about a missing file.
+  Build tools put whole flags in a response file, so the exact pairing
+  buys little.
+- Keep read files in a map keyed by path. Every view of the call needs a
+  lookup, and one path can mean two things, before and after `/link`.
 - Keep separate per-variable environment lists next to the main list.
   This treats two kinds of extra tokens in two ways.
 - Tag each token with its origin. It is exact, but nothing needs that.
 
 ## Decision
 
-A read response file is spliced into the token stream where the `@file`
-stood, and parsed with argv as one stream. The interpretation keeps one
-list of items in output order. Each item is tagged with where it came
-from: the command line, a response file, or an environment variable.
-Environment words are placed once, some before argv and some after, and
-carry their variable name.
+Argv is classified first, so only an `@file` at a token position counts.
+Then each such file is read, its tokens are classified on their own with
+the same compiler family, and the items take the place of the `@file`.
+Nested files are read the same way, up to a depth limit. The
+interpretation keeps one list of items in output order. Each item is
+tagged with where it came from: the command line, a response file, or an
+environment variable. Environment words are placed once, some before
+argv and some after, and carry their variable name.
 
 An `@file` that is not read (inlining off, file missing, depth limit,
 input from another machine) stays an item in every compiler family.
 
 ## Consequences
 
-Views of the call need no lookup, and edge cases that cross a file
-boundary behave as in GCC. An item whose flag and value come from
-different places shows one origin. The output is still right.
+Flag values are never read as files, and views of the call need no
+lookup. A flag split across the file boundary is not paired, and a
+`/link` inside a file does not reach the argv after it. The requirement
+lists both as known limitations.
 
 ## References
 
