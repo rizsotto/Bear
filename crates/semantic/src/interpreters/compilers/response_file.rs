@@ -4,17 +4,15 @@
 //!
 //! Some build systems (notably Xcode) keep part of a compiler's flags in a
 //! separate "response file" and pass it as `@/path/to/args.resp`. Unless the
-//! user turns it off (`format.arguments.from_response_files`), [`expand`]
-//! replaces each `@file` token with the file's tokenized contents *before* flag
-//! classification, so the inlined tokens are classified, link-stripped, and
-//! split per source exactly like any other argument. Each token carries the
-//! file it came from.
+//! user turns it off (`format.arguments.from_response_files`), the interpreter
+//! classifies argv first. Each `@file` it finds is then read with [`read`] and
+//! its tokens are classified on their own, so they are link-stripped and split
+//! per source like any other argument. Flag values never count as `@file`.
 //!
 //! Tokenization follows the compiler family Bear already identified for the
 //! entry; no new detection is introduced here. See the
 //! `output-response-file-inlining` requirement for the contract.
 
-use crate::interpretation::Provenance;
 use log::warn;
 use std::path::{Path, PathBuf};
 
@@ -33,65 +31,28 @@ pub(super) enum Syntax {
     Msvc,
 }
 
-/// Replaces every `@file` argument with the file's tokenized contents, each
-/// token tagged with where it came from.
+/// Reads and tokenizes one `@file` reference.
 ///
-/// `arguments` is the argv after the compiler token, so the compiler is never
-/// treated as a response file. `@file` paths are resolved relative to
-/// `working_dir`, matching how the compiler itself opens them. A token from a
-/// file is tagged with that file as written (the innermost one when nested).
-/// Missing/unreadable files and references past [`MAX_DEPTH`] are left as the
-/// literal `@path` token with a warning, so a single stale build artefact
-/// never fails the whole database.
-pub(super) fn expand(arguments: &[String], working_dir: &Path, syntax: Syntax) -> Vec<(String, Provenance)> {
-    let mut expanded = Vec::with_capacity(arguments.len());
-    for argument in arguments {
-        match argument.strip_prefix('@') {
-            Some(path) if !path.is_empty() => {
-                expand_reference(&mut expanded, path, working_dir, syntax, 1, &Provenance::CommandLine);
-            }
-            _ => expanded.push((argument.clone(), Provenance::CommandLine)),
-        }
-    }
-    expanded
-}
-
-/// Reads, tokenizes, and recursively expands a single `@file` reference into
-/// `out`. On any failure the `@path` token is appended unchanged, tagged with
-/// `parent`, the place the reference was written in.
-fn expand_reference(
-    out: &mut Vec<(String, Provenance)>,
-    raw_path: &str,
-    base: &Path,
-    syntax: Syntax,
-    depth: usize,
-    parent: &Provenance,
-) {
+/// `raw_path` is the path as written after the `@`, resolved relative to
+/// `working_dir` like the compiler does. `depth` is how many `@file` levels
+/// deep this reference is, starting at 1. Returns `None`, with a warning, when
+/// the file cannot be read or `depth` is past [`MAX_DEPTH`], so a single stale
+/// build artefact never fails the whole database. The caller keeps the
+/// reference as an item then.
+pub(super) fn read(raw_path: &str, working_dir: &Path, syntax: Syntax, depth: usize) -> Option<Vec<String>> {
     if depth > MAX_DEPTH {
         warn!(
             "response file expansion exceeded depth limit ({MAX_DEPTH}); leaving @{raw_path} literal (possible cycle)"
         );
-        out.push((format!("@{raw_path}"), parent.clone()));
-        return;
+        return None;
     }
 
-    let path = resolve(base, raw_path);
-    let content = match std::fs::read_to_string(&path) {
-        Ok(content) => content,
+    let path = resolve(working_dir, raw_path);
+    match std::fs::read_to_string(&path) {
+        Ok(content) => Some(tokenize(&content, syntax)),
         Err(error) => {
             warn!("cannot read response file {}: {error}; leaving @{raw_path} literal", path.display());
-            out.push((format!("@{raw_path}"), parent.clone()));
-            return;
-        }
-    };
-
-    let provenance = Provenance::ResponseFile(PathBuf::from(raw_path));
-    for token in tokenize(&content, syntax) {
-        match token.strip_prefix('@') {
-            Some(nested) if !nested.is_empty() => {
-                expand_reference(out, nested, base, syntax, depth + 1, &provenance);
-            }
-            _ => out.push((token, provenance.clone())),
+            None
         }
     }
 }
@@ -246,16 +207,6 @@ mod tests {
     use super::*;
     use std::fs;
 
-    /// Expands the arguments after the first one, which stands for the compiler.
-    fn args_of(arguments: Vec<&str>, working_dir: &Path) -> Vec<String> {
-        tokens_of(arguments, working_dir).into_iter().map(|(token, _)| token).collect()
-    }
-
-    fn tokens_of(arguments: Vec<&str>, working_dir: &Path) -> Vec<(String, Provenance)> {
-        let argv: Vec<String> = arguments.iter().map(|a| a.to_string()).collect();
-        expand(&argv[1..], working_dir, Syntax::GnuClang)
-    }
-
     #[test]
     fn gnu_tokenizer_splits_on_whitespace() {
         let sut = tokenize_gnu("-I/opt/include -DEXTRA=2");
@@ -319,85 +270,41 @@ mod tests {
     }
 
     #[test]
-    fn expand_inlines_response_file_at_token_position() {
+    fn read_tokenizes_a_file_relative_to_the_working_dir() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("flags.resp"), "-I/opt/include -DEXTRA=2").unwrap();
 
-        let sut = args_of(vec!["cc", "-DBASE=1", "@flags.resp", "-c", "src.c"], dir.path());
+        let sut = read("flags.resp", dir.path(), Syntax::GnuClang, 1);
 
-        assert_eq!(sut, vec!["-DBASE=1", "-I/opt/include", "-DEXTRA=2", "-c", "src.c"]);
-        assert!(sut.iter().all(|a| !a.starts_with('@')));
+        assert_eq!(sut, Some(vec!["-I/opt/include".to_string(), "-DEXTRA=2".to_string()]));
     }
 
     #[test]
-    fn expand_tags_tokens_with_the_file_they_came_from() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("outer.resp"), "-DOUTER @inner.resp -DTAIL").unwrap();
-        fs::write(dir.path().join("inner.resp"), "-DINNER").unwrap();
-
-        let sut = tokens_of(vec!["cc", "-DBASE", "@outer.resp", "src.c"], dir.path());
-
-        let file = |name: &str| Provenance::ResponseFile(PathBuf::from(name));
-        let expected = vec![
-            ("-DBASE".to_string(), Provenance::CommandLine),
-            ("-DOUTER".to_string(), file("outer.resp")),
-            ("-DINNER".to_string(), file("inner.resp")),
-            ("-DTAIL".to_string(), file("outer.resp")),
-            ("src.c".to_string(), Provenance::CommandLine),
-        ];
-        assert_eq!(sut, expected);
-    }
-
-    #[test]
-    fn expand_resolves_absolute_paths_as_is() {
+    fn read_uses_absolute_paths_as_is() {
         let dir = tempfile::tempdir().unwrap();
         let resp = dir.path().join("abs.resp");
         fs::write(&resp, "-DONLY").unwrap();
 
-        let sut = args_of(vec!["cc", &format!("@{}", resp.display()), "src.c"], Path::new("/elsewhere"));
+        let sut = read(&resp.display().to_string(), Path::new("/elsewhere"), Syntax::GnuClang, 1);
 
-        assert_eq!(sut, vec!["-DONLY", "src.c"]);
+        assert_eq!(sut, Some(vec!["-DONLY".to_string()]));
     }
 
     #[test]
-    fn expand_follows_nested_references() {
+    fn read_gives_none_for_a_missing_file() {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("outer.resp"), "-DOUTER @inner.resp -DTAIL").unwrap();
-        fs::write(dir.path().join("inner.resp"), "-DINNER").unwrap();
 
-        let sut = args_of(vec!["cc", "@outer.resp", "src.c"], dir.path());
+        let sut = read("gone.resp", dir.path(), Syntax::GnuClang, 1);
 
-        assert_eq!(sut, vec!["-DOUTER", "-DINNER", "-DTAIL", "src.c"]);
-        assert!(sut.iter().all(|a| !a.starts_with('@')));
+        assert_eq!(sut, None);
     }
 
     #[test]
-    fn expand_keeps_missing_file_literal() {
+    fn read_stops_past_the_depth_limit() {
         let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("a.resp"), "-DA").unwrap();
 
-        let sut = tokens_of(vec!["cc", "@gone.resp", "src.c"], dir.path());
-
-        assert_eq!(
-            sut,
-            vec![
-                ("@gone.resp".to_string(), Provenance::CommandLine),
-                ("src.c".to_string(), Provenance::CommandLine)
-            ]
-        );
-    }
-
-    #[test]
-    fn expand_stops_at_depth_limit_on_cycle() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("loop.resp"), "-DBEFORE @loop.resp").unwrap();
-
-        let sut = args_of(vec!["cc", "@loop.resp", "src.c"], dir.path());
-
-        // The self-reference is left literal once the depth limit is hit; the
-        // tokens before it on each level are still emitted, and the trailing
-        // source argument is preserved.
-        assert_eq!(sut.last().map(String::as_str), Some("src.c"));
-        assert!(sut.iter().any(|a| a == "@loop.resp"), "offending token should remain literal: {sut:?}");
-        assert!(sut.iter().filter(|a| *a == "-DBEFORE").count() <= MAX_DEPTH);
+        assert!(read("a.resp", dir.path(), Syntax::GnuClang, MAX_DEPTH).is_some());
+        assert_eq!(read("a.resp", dir.path(), Syntax::GnuClang, MAX_DEPTH + 1), None);
     }
 }

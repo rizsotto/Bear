@@ -11,7 +11,7 @@ use super::super::matchers::source::file_type_of;
 use super::super::matchers::{
     EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule, RuleKind,
 };
-use super::response_file::{Syntax, expand, tokenize_msvc};
+use super::response_file::{Syntax, read, tokenize_msvc};
 use crate::interpretation::Provenance;
 use crate::{
     Arguments, CompilerPass, Execution, FileRef, Interpretation, OutputSpelling, PassEffect, RecognizeResult,
@@ -51,7 +51,7 @@ pub(super) struct Call {
     pub execution: Execution,
     /// How many argv tokens come before the compiler (a launcher and its options).
     pub launcher_len: usize,
-    /// Whether `@file` response files are read before classification.
+    /// Whether `@file` response files are read and inlined.
     pub inline_response_files: bool,
 }
 
@@ -72,8 +72,9 @@ impl FlagBasedInterpreter {
     }
 
     /// `executable` and `arguments` are the compiler call as the family sees
-    /// it: without the launcher, with response files read.
-    fn should_ignore(&self, executable: &Path, arguments: &[String]) -> Option<&'static str> {
+    /// it: without the launcher, with the tokens of every response file read
+    /// added.
+    fn should_ignore(&self, executable: &Path, arguments: &[&String]) -> Option<&'static str> {
         // Check executable name against ignore list
         if !self.ignore_executables.is_empty()
             && let Some(filename) = executable.file_name()
@@ -85,7 +86,7 @@ impl FlagBasedInterpreter {
 
         // Check arguments against ignore flags
         if !self.ignore_flags.is_empty()
-            && self.ignore_flags.iter().any(|flag| arguments.iter().any(|arg| arg == flag))
+            && self.ignore_flags.iter().any(|flag| arguments.iter().any(|arg| *arg == flag))
         {
             return Some("internal invocation");
         }
@@ -104,23 +105,57 @@ impl FlagBasedInterpreter {
             Some(token) if launcher_len > 0 => PathBuf::from(token),
             _ => execution.executable.clone(),
         };
-        // Response files are read before classification, so their tokens are
-        // classified like any other argument. The family's own syntax splits them.
-        let (stream, provenances): (Vec<String>, Option<Vec<Provenance>>) = if inline_response_files {
-            let after_compiler = argv.get(1..).unwrap_or_default();
-            let tokens = expand(after_compiler, &execution.working_dir, self.syntax);
-            let (tokens, provenances) = tokens.into_iter().unzip::<_, _, Vec<_>, Vec<_>>();
-            (argv.first().cloned().into_iter().chain(tokens).collect(), Some(provenances))
+        // Response files are read after classification, only where it found an
+        // `@file`. Their tokens are classified on their own.
+        let mut items: Vec<(Provenance, Parsed)> = Vec::with_capacity(argv.len());
+        let mut parsed = classify(&self.analyzer, argv, self.slash_prefix).into_iter();
+        let compiler = parsed.next();
+        if inline_response_files {
+            for item in parsed {
+                self.resolve(item, &execution.working_dir, 1, &Provenance::CommandLine, &mut items);
+            }
         } else {
-            (argv.to_vec(), None)
-        };
+            items.extend(parsed.map(|item| (Provenance::CommandLine, item)));
+        }
 
-        if let Some(reason) = self.should_ignore(&executable, &stream) {
+        // The ignore check sees argv and the tokens of every file that was read.
+        let seen: Vec<&String> = compiler
+            .iter()
+            .map(|parsed| &parsed.tokens)
+            .chain(items.iter().map(|(_, parsed)| &parsed.tokens))
+            .flatten()
+            .collect();
+        if let Some(reason) = self.should_ignore(&executable, &seen) {
             return RecognizeResult::Ignored { execution, reason };
         }
 
-        let interpretation = self.interpretation(&execution, launcher_len, &executable, &stream, provenances);
+        let interpretation = self.interpretation(&execution, launcher_len, &executable, compiler, items);
         RecognizeResult::Recognized(Recognized { execution, interpretation })
+    }
+
+    /// Puts `item` into `out`. An `@file` item is replaced by the classified
+    /// tokens of the file, tagged with that file; one that cannot be read stays
+    /// as it is, tagged with `parent`.
+    fn resolve(
+        &self,
+        item: Parsed,
+        working_dir: &Path,
+        depth: usize,
+        parent: &Provenance,
+        out: &mut Vec<(Provenance, Parsed)>,
+    ) {
+        let Class::ArgumentsFile(path) = &item.class else {
+            out.push((parent.clone(), item));
+            return;
+        };
+        let Some(tokens) = read(path, working_dir, self.syntax, depth) else {
+            out.push((parent.clone(), item));
+            return;
+        };
+        let provenance = Provenance::ResponseFile(PathBuf::from(path));
+        for inner in classify_tokens(&self.analyzer, &tokens, self.slash_prefix) {
+            self.resolve(inner, working_dir, depth + 1, &provenance, out);
+        }
     }
 
     fn interpretation(
@@ -128,8 +163,8 @@ impl FlagBasedInterpreter {
         execution: &Execution,
         launcher_len: usize,
         executable: &Path,
-        stream: &[String],
-        provenances: Option<Vec<Provenance>>,
+        compiler: Option<Parsed>,
+        items: Vec<(Provenance, Parsed)>,
     ) -> Interpretation {
         let (before, after) = if self.from_environment {
             interpret_environment(&execution.environment, self.env_rules, self.syntax)
@@ -137,27 +172,18 @@ impl FlagBasedInterpreter {
             (Vec::new(), Vec::new())
         };
 
-        let mut arguments: Tagged = Vec::with_capacity(stream.len() + before.len() + after.len() + 1);
+        let mut arguments: Tagged = Vec::with_capacity(items.len() + before.len() + after.len() + 1);
         if launcher_len > 0 {
             let launcher = execution.arguments.get(..launcher_len).unwrap_or_default().to_vec();
             arguments.push((Provenance::CommandLine, Arguments { args: launcher, role: Role::Launcher }));
         }
-        // Tokens after the compiler carry the provenance of their own position.
-        let provenance_of = |index: usize| match (&provenances, index.checked_sub(1)) {
-            (Some(provenances), Some(position)) => {
-                provenances.get(position).cloned().unwrap_or(Provenance::CommandLine)
-            }
-            _ => Provenance::CommandLine,
-        };
-        let mut parsed = classify(&self.analyzer, stream, self.slash_prefix).into_iter();
-        // The compiler stays first (classify yields it first, and a launcher
-        // always has one after it); environment words that go first follow it.
-        if let Some(compiler) = parsed.next() {
+        // The compiler stays first (a launcher always has one after it);
+        // environment words that go first follow it.
+        if let Some(compiler) = compiler {
             arguments.push((Provenance::CommandLine, compiler.into_arguments(executable)));
         }
         arguments.extend(before);
-        for item in parsed {
-            let provenance = provenance_of(item.first);
+        for (provenance, item) in items {
             arguments.push((provenance, item.into_arguments(executable)));
         }
         arguments.extend(after);
@@ -184,9 +210,8 @@ enum Class {
 /// Items tagged with where they came from, in output order.
 type Tagged = Vec<(Provenance, Arguments)>;
 
-/// A run of argv tokens that mean one thing, and where the run starts.
+/// A run of argv tokens that mean one thing.
 struct Parsed {
-    first: usize,
     tokens: Vec<String>,
     class: Class,
 }
@@ -210,22 +235,26 @@ impl Parsed {
 }
 
 /// Split argv (compiler first) into runs of tokens, each with its meaning.
+fn classify(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -> Vec<Parsed> {
+    let Some((compiler, rest)) = args.split_first() else {
+        return Vec::new();
+    };
+    let mut result = vec![Parsed { tokens: vec![compiler.clone()], class: Class::Compiler }];
+    result.extend(classify_tokens(flag_analyzer, rest, slash_prefix));
+    result
+}
+
+/// Split tokens that have no compiler in front (the rest of argv, or the
+/// contents of a response file) into runs of tokens, each with its meaning.
 ///
 /// A token at a token position that starts with `@` and has more after it is
 /// an `@file` item, checked before the flag table. A value a flag consumes
 /// never reaches that check.
-fn classify(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -> Vec<Parsed> {
+fn classify_tokens(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -> Vec<Parsed> {
     let mut result: Vec<Parsed> = Vec::with_capacity(args.len());
     let mut i = 0;
 
     while i < args.len() {
-        // Handle the first argument (compiler name)
-        if i == 0 {
-            result.push(Parsed { first: 0, tokens: vec![args[0].clone()], class: Class::Compiler });
-            i += 1;
-            continue;
-        }
-
         let token = &args[i];
         if let Some(path) = token.strip_prefix('@') {
             // A bare `@` names no file; keep it as a plain flag so the entry
@@ -235,7 +264,7 @@ fn classify(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -
             } else {
                 Class::ArgumentsFile(path.to_string())
             };
-            result.push(Parsed { first: i, tokens: vec![token.clone()], class });
+            result.push(Parsed { tokens: vec![token.clone()], class });
             i += 1;
             continue;
         }
@@ -244,14 +273,12 @@ fn classify(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -
             // Handle pass-through first (early exit)
             if matches!(match_result.rule.kind, RuleKind::Effect(PassEffect::PassThrough)) {
                 result.push(Parsed {
-                    first: i,
                     tokens: vec![token.clone()],
                     class: Class::Flag(PassEffect::PassThrough),
                 });
                 i += 1;
                 while i < args.len() {
                     result.push(Parsed {
-                        first: i,
                         tokens: vec![args[i].clone()],
                         class: Class::Flag(PassEffect::Configures(CompilerPass::Linking)),
                     });
@@ -291,21 +318,13 @@ fn classify(flag_analyzer: &FlagAnalyzer, args: &[String], slash_prefix: bool) -
                 RuleKind::Effect(effect) => Class::Flag(effect),
             };
 
-            result.push(Parsed { first: i, tokens, class });
+            result.push(Parsed { tokens, class });
             i += consumed_count;
         } else if token.starts_with('-') || (slash_prefix && token.starts_with('/')) {
-            result.push(Parsed {
-                first: i,
-                tokens: vec![token.clone()],
-                class: Class::Flag(PassEffect::None),
-            });
+            result.push(Parsed { tokens: vec![token.clone()], class: Class::Flag(PassEffect::None) });
             i += 1;
         } else {
-            result.push(Parsed {
-                first: i,
-                tokens: vec![token.clone()],
-                class: Class::Source(token.clone()),
-            });
+            result.push(Parsed { tokens: vec![token.clone()], class: Class::Source(token.clone()) });
             i += 1;
         }
     }

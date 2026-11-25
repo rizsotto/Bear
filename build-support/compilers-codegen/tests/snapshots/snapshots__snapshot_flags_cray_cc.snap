@@ -3,7 +3,7 @@ source: build-support/compilers-codegen/tests/snapshots.rs
 expression: generated
 ---
 // Generated from compilers/cray_cc.yaml -- DO NOT EDIT
-static CRAY_CC_FLAGS: [FlagRule; 199] = [
+static CRAY_CC_FLAGS: [FlagRule; 200] = [
     FlagRule::new(FlagPattern::Exactly("-iwithprefixbefore", 1), RuleKind::Effect(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-allowable_client", 1), RuleKind::Effect(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("--analyzer-output"), RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling))),
@@ -127,6 +127,7 @@ static CRAY_CC_FLAGS: [FlagRule; 199] = [
     FlagRule::new(FlagPattern::Prefix("-Xcuda", 1), RuleKind::Effect(PassEffect::None)),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-mllvm"), RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--pipe", 0), RuleKind::Effect(PassEffect::DriverOption)),
+    FlagRule::new(FlagPattern::Exactly("-rpath", 1), RuleKind::Effect(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Prefix("--save", 0), RuleKind::Effect(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Prefix("--help", 0), RuleKind::Effect(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::ExactlyWithEq("-specs"), RuleKind::Effect(PassEffect::DriverOption)),

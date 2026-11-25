@@ -3,7 +3,7 @@ source: build-support/compilers-codegen/tests/snapshots.rs
 expression: generated
 ---
 // Generated from compilers/armclang.yaml -- DO NOT EDIT
-static ARMCLANG_FLAGS: [FlagRule; 206] = [
+static ARMCLANG_FLAGS: [FlagRule; 207] = [
     FlagRule::new(FlagPattern::Exactly("--no_depend_system_headers", 0), RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--depend_system_headers", 0), RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--depend_single_line", 0), RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling))),
@@ -134,6 +134,7 @@ static ARMCLANG_FLAGS: [FlagRule; 206] = [
     FlagRule::new(FlagPattern::Prefix("-Xcuda", 1), RuleKind::Effect(PassEffect::None)),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-mllvm"), RuleKind::Effect(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--pipe", 0), RuleKind::Effect(PassEffect::DriverOption)),
+    FlagRule::new(FlagPattern::Exactly("-rpath", 1), RuleKind::Effect(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Prefix("--save", 0), RuleKind::Effect(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Prefix("--help", 0), RuleKind::Effect(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::ExactlyWithEq("-specs"), RuleKind::Effect(PassEffect::DriverOption)),

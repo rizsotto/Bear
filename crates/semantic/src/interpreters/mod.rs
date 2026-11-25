@@ -26,7 +26,7 @@ use std::path::PathBuf;
 ///
 /// * `hints` - classification overrides for known compiler paths
 /// * `ignored` - paths whose invocations are dropped, matched by filename
-/// * `from_response_files` - inline `@file` references before parsing
+/// * `from_response_files` - read and inline `@file` references
 /// * `from_environment` - fold compiler environment variables into arguments
 ///
 /// The interpreter chain is built as follows:

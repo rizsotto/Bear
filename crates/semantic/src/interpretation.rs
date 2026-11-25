@@ -739,22 +739,180 @@ mod tests {
         );
     }
 
+    /// Recognizes `argv` with response files read, in `dir`.
+    fn inlined(dir: &tempfile::TempDir, executable: &str, argv: &[&str]) -> Interpretation {
+        let execution =
+            Execution::from_strings(executable, argv.to_vec(), dir.path().to_str().unwrap(), HashMap::new());
+        recognize(&CompilerInterpreter::new_with_format(Default::default(), true, true), execution)
+    }
+
     // Requirements: output-response-file-inlining
     #[test]
-    fn a_flag_in_the_file_takes_its_value_from_argv_like_the_compiler_does() {
+    fn a_flag_at_the_end_of_a_file_does_not_take_its_value_from_argv() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("m.rsp"), "-c -o").unwrap();
+
+        let sut = inlined(&dir, "/usr/bin/gcc", &["gcc", "@m.rsp", "mixed.o", "a.c"]);
+
+        // The lone -o is a plain flag; the next argv token is classified on its own.
+        let items: Vec<(&Role, &[String])> =
+            sut.arguments().skip(1).map(|i| (&i.role, &i.args[..])).collect();
+        assert_eq!(items[1].0, &Role::Flag(PassEffect::None));
+        assert_eq!(items[1].1, ["-o"]);
+        assert_eq!(sut.outputs().count(), 0);
+        assert_eq!(items[2].1, ["mixed.o"]);
+        assert!(matches!(items[2].0, Role::Input(_)));
+        assert_eq!(compiled_files(&sut), ["a.c"]);
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn a_flag_value_starting_with_at_is_not_read_even_when_the_file_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("rpath")).unwrap();
+        std::fs::write(dir.path().join("rpath/libfoo.dylib"), "-DFROM_FILE").unwrap();
+        let argv = ["clang", "-dynamiclib", "-install_name", "@rpath/libfoo.dylib", "a.c"];
+
+        let present = inlined(&dir, "/usr/bin/clang", &argv);
+        let absent = inlined(&tempfile::tempdir().unwrap(), "/usr/bin/clang", &argv);
+
+        for sut in [present, absent] {
+            let item =
+                sut.arguments().find(|item| item.args.first().map(String::as_str) == Some("-install_name"));
+            assert_eq!(item.expect("the flag item").args, ["-install_name", "@rpath/libfoo.dylib"]);
+            assert!(sut.arguments().all(|item| !matches!(item.role, Role::ArgumentsFile { .. })));
+            assert!(provenance_of(&sut).iter().all(|(origin, _)| origin == "argv"));
+        }
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn an_rpath_value_starting_with_at_is_not_read() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("loader_path"), "-DFROM_FILE").unwrap();
+
+        let sut = inlined(&dir, "/usr/bin/clang", &["clang", "-rpath", "@loader_path", "a.o", "-o", "app"]);
+
+        let item = sut.arguments().find(|item| item.args.first().map(String::as_str) == Some("-rpath"));
+        assert_eq!(item.expect("the flag item").args, ["-rpath", "@loader_path"]);
+        assert!(sut.arguments().all(|item| !matches!(item.role, Role::ArgumentsFile { .. })));
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn a_response_file_after_link_is_not_read() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("x.rsp"), "/DFROM_FILE").unwrap();
+
+        let sut = inlined(&dir, "cl", &["cl", "/c", "a.cpp", "/link", "@x.rsp"]);
+
+        let last = sut.arguments().last().expect("an item");
+        assert_eq!(last.args, ["@x.rsp"]);
+        assert_eq!(last.role, Role::Flag(PassEffect::Configures(Linking)));
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn nested_files_carry_the_innermost_path() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("outer.rsp"), "-DOUTER @inner.rsp -DTAIL").unwrap();
+        std::fs::write(dir.path().join("inner.rsp"), "-DINNER b.c").unwrap();
+
+        let sut = inlined(&dir, "/usr/bin/gcc", &["gcc", "@outer.rsp", "-c", "a.c"]);
+
+        let pair = |a: &str, b: &str| (a.to_string(), b.to_string());
+        assert_eq!(
+            provenance_of(&sut),
+            [
+                pair("argv", "gcc"),
+                pair("file outer.rsp", "-DOUTER"),
+                pair("file inner.rsp", "-DINNER"),
+                pair("file inner.rsp", "b.c"),
+                pair("file outer.rsp", "-DTAIL"),
+                pair("argv", "-c"),
+                pair("argv", "a.c"),
+            ]
+        );
+        assert_eq!(compiled_files(&sut), ["b.c", "a.c"]);
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn a_missing_file_stays_an_item_with_the_provenance_of_where_it_was_written() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("outer.rsp"), "-DOUTER @gone.rsp").unwrap();
+
+        let sut = inlined(&dir, "/usr/bin/gcc", &["gcc", "@outer.rsp", "@gone2.rsp", "-c", "a.c"]);
+
+        let pair = |a: &str, b: &str| (a.to_string(), b.to_string());
+        assert_eq!(
+            provenance_of(&sut),
+            [
+                pair("argv", "gcc"),
+                pair("file outer.rsp", "-DOUTER"),
+                pair("file outer.rsp", "@gone.rsp"),
+                pair("argv", "@gone2.rsp"),
+                pair("argv", "-c"),
+                pair("argv", "a.c"),
+            ]
+        );
+        let kept: Vec<&Role> =
+            sut.arguments().filter(|i| i.args[0].starts_with('@')).map(|i| &i.role).collect();
+        assert_eq!(
+            kept,
+            [
+                &Role::ArgumentsFile { path: PathBuf::from("gone.rsp") },
+                &Role::ArgumentsFile { path: PathBuf::from("gone2.rsp") },
+            ]
+        );
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn a_file_that_names_itself_is_read_up_to_the_depth_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("loop.rsp"), "-DBEFORE @loop.rsp").unwrap();
+
+        let sut = inlined(&dir, "/usr/bin/gcc", &["gcc", "@loop.rsp", "-c", "a.c"]);
+
+        let words = words(&sut);
+        assert_eq!(words.iter().filter(|w| *w == "-DBEFORE").count(), 16);
+        assert_eq!(words.iter().filter(|w| *w == "@loop.rsp").count(), 1);
+        assert_eq!(compiled_files(&sut), ["a.c"]);
+        let last = sut.arguments().find(|i| i.args[0] == "@loop.rsp").expect("the left over reference");
+        assert_eq!(last.role, Role::ArgumentsFile { path: PathBuf::from("loop.rsp") });
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn link_in_a_file_affects_only_the_rest_of_that_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("l.rsp"), "/c /link foo.lib").unwrap();
+
+        let sut = inlined(&dir, "cl", &["cl", "@l.rsp", "a.cpp"]);
+
+        let roles: Vec<&Role> = sut.arguments().skip(1).map(|item| &item.role).collect();
+        assert_eq!(roles[1], &Role::Flag(PassEffect::PassThrough));
+        assert_eq!(roles[2], &Role::Flag(PassEffect::Configures(Linking)));
+        assert!(matches!(roles[3], Role::Input(_)));
+        assert_eq!(compiled_files(&sut), ["a.cpp"]);
+    }
+
+    // Requirements: output-response-file-inlining
+    #[test]
+    fn an_ignore_flag_inside_a_response_file_is_seen() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("s.rsp"), "-frontend -c a.swift").unwrap();
         let execution = Execution::from_strings(
-            "/usr/bin/gcc",
-            vec!["gcc", "@m.rsp", "mixed.o", "a.c"],
+            "/usr/bin/swiftc",
+            vec!["swiftc", "@s.rsp"],
             dir.path().to_str().unwrap(),
             HashMap::new(),
         );
 
-        let sut = recognize(&CompilerInterpreter::new_with_format(Default::default(), true, true), execution);
+        let sut = CompilerInterpreter::new_with_format(Default::default(), true, true).recognize(execution);
 
-        assert_eq!(sut.outputs().collect::<Vec<_>>(), [Path::new("mixed.o")]);
-        assert_eq!(compiled_files(&sut), ["a.c"]);
+        assert!(matches!(sut, RecognizeResult::Ignored { .. }), "got {sut:?}");
     }
 
     // Requirements: output-response-file-inlining

@@ -2481,6 +2481,42 @@ fn semantic_unread_response_file_stays_in_msvc_entry() -> Result<()> {
     Ok(())
 }
 
+// Requirements: output-response-file-inlining
+//
+// A flag's value is never read as a response file, even when a file of
+// that name exists: `-rpath @loader_path` is a link flag with its value,
+// and the entry drops both.
+#[test]
+fn semantic_rpath_value_is_not_read_as_a_response_file() -> Result<()> {
+    let env = TestEnvironment::new("semantic_rpath_value_not_read")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": "clang",
+        "arguments": ["clang", "-rpath", "@loader_path", "a.c", "-o", "app"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("loader_path", "-DFROM_FILE"),
+        ("a.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "a.c".to_string(),
+        directory: temp_dir,
+        arguments: vec!["clang", "a.c", "-o", "app"].into_iter().map(String::from).collect::<Vec<_>>()
+    ))?;
+
+    Ok(())
+}
+
 // Requirements: cli-input-from-another-machine, output-response-file-inlining
 //
 // With the option and no inlining setting, the `@flags.resp` token stays

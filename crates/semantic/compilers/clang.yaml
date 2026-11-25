@@ -163,6 +163,9 @@ flags:
     result: configures_compiling
   - match: {pattern: "--pipe"}
     result: driver_option
+  # Separate value only, often an `@rpath` / `@loader_path` path on macOS.
+  - match: {pattern: "-rpath", count: 1}
+    result: configures_linking
   - match: {pattern: "-r*"}
     result: configures_linking
   - match: {pattern: "--save*"}
