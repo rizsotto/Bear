@@ -103,3 +103,5 @@ every compiler family.
 - [Entry shapes for clang tooling](../rationale/compilation-entry-shapes.md)
 - [Recording Vala (valac) builds in the compilation database](../rationale/vala-transpiler-database.md)
 - [Swift whole-module entries: one per source, full arguments](../rationale/swift-whole-module-entries.md)
+- [Interpretation steps carry the kind of work](../rationale/interpretation-steps-carry-the-kind.md)
+- [Compiler passes are worked out per input](../rationale/compiler-passes-per-input.md)

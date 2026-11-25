@@ -117,3 +117,4 @@ Configuration that needs the build's files:
 ## Rationale
 
 - [One option for input from another machine](../rationale/input-from-another-machine-switch.md)
+- [Response-file inlining is on by default](../rationale/response-file-inlining-on-by-default.md)

@@ -61,3 +61,4 @@ basename does not make it recognized either.
 
 - [Some compiler-adjacent names are deliberately not recognized](../rationale/names-deliberately-not-recognized.md)
 - [A compiler family is defined by its YAML file](../rationale/compiler-family-definition.md)
+- [Recognition keeps the execution](../rationale/recognition-keeps-the-execution.md)

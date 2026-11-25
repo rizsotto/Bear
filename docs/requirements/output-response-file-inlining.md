@@ -114,3 +114,5 @@ When a response file is read:
 ## Rationale
 
 - [Response-file inlining is best effort](../rationale/response-file-inlining-best-effort.md)
+- [One tagged list of arguments](../rationale/one-tagged-list-of-arguments.md)
+- [Response-file inlining is on by default](../rationale/response-file-inlining-on-by-default.md)
