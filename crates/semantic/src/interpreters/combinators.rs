@@ -126,13 +126,7 @@ mod test {
     fn command_fixture() -> RecognizeResult {
         RecognizeResult::Recognized(Recognized {
             execution: execution_fixture(),
-            interpretation: Interpretation::new(
-                "test",
-                SourceMode::PerSourceStripped,
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-            ),
+            interpretation: Interpretation::new("test", SourceMode::PerSourceStripped, Vec::new()),
         })
     }
 

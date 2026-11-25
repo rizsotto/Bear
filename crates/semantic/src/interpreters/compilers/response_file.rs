@@ -14,7 +14,7 @@
 //! entry; no new detection is introduced here. See the
 //! `output-response-file-inlining` requirement for the contract.
 
-use crate::interpretation::Origin;
+use crate::interpretation::Provenance;
 use log::warn;
 use std::path::{Path, PathBuf};
 
@@ -43,14 +43,14 @@ pub(super) enum Syntax {
 /// Missing/unreadable files and references past [`MAX_DEPTH`] are left as the
 /// literal `@path` token with a warning, so a single stale build artefact
 /// never fails the whole database.
-pub(super) fn expand(arguments: &[String], working_dir: &Path, syntax: Syntax) -> Vec<(String, Origin)> {
+pub(super) fn expand(arguments: &[String], working_dir: &Path, syntax: Syntax) -> Vec<(String, Provenance)> {
     let mut expanded = Vec::with_capacity(arguments.len());
     for argument in arguments {
         match argument.strip_prefix('@') {
             Some(path) if !path.is_empty() => {
-                expand_reference(&mut expanded, path, working_dir, syntax, 1, &Origin::CommandLine);
+                expand_reference(&mut expanded, path, working_dir, syntax, 1, &Provenance::CommandLine);
             }
-            _ => expanded.push((argument.clone(), Origin::CommandLine)),
+            _ => expanded.push((argument.clone(), Provenance::CommandLine)),
         }
     }
     expanded
@@ -60,12 +60,12 @@ pub(super) fn expand(arguments: &[String], working_dir: &Path, syntax: Syntax) -
 /// `out`. On any failure the `@path` token is appended unchanged, tagged with
 /// `parent`, the place the reference was written in.
 fn expand_reference(
-    out: &mut Vec<(String, Origin)>,
+    out: &mut Vec<(String, Provenance)>,
     raw_path: &str,
     base: &Path,
     syntax: Syntax,
     depth: usize,
-    parent: &Origin,
+    parent: &Provenance,
 ) {
     if depth > MAX_DEPTH {
         warn!(
@@ -85,13 +85,13 @@ fn expand_reference(
         }
     };
 
-    let origin = Origin::ResponseFile(PathBuf::from(raw_path));
+    let provenance = Provenance::ResponseFile(PathBuf::from(raw_path));
     for token in tokenize(&content, syntax) {
         match token.strip_prefix('@') {
             Some(nested) if !nested.is_empty() => {
-                expand_reference(out, nested, base, syntax, depth + 1, &origin);
+                expand_reference(out, nested, base, syntax, depth + 1, &provenance);
             }
-            _ => out.push((token, origin.clone())),
+            _ => out.push((token, provenance.clone())),
         }
     }
 }
@@ -251,7 +251,7 @@ mod tests {
         tokens_of(arguments, working_dir).into_iter().map(|(token, _)| token).collect()
     }
 
-    fn tokens_of(arguments: Vec<&str>, working_dir: &Path) -> Vec<(String, Origin)> {
+    fn tokens_of(arguments: Vec<&str>, working_dir: &Path) -> Vec<(String, Provenance)> {
         let argv: Vec<String> = arguments.iter().map(|a| a.to_string()).collect();
         expand(&argv[1..], working_dir, Syntax::GnuClang)
     }
@@ -337,13 +337,13 @@ mod tests {
 
         let sut = tokens_of(vec!["cc", "-DBASE", "@outer.resp", "src.c"], dir.path());
 
-        let file = |name: &str| Origin::ResponseFile(PathBuf::from(name));
+        let file = |name: &str| Provenance::ResponseFile(PathBuf::from(name));
         let expected = vec![
-            ("-DBASE".to_string(), Origin::CommandLine),
+            ("-DBASE".to_string(), Provenance::CommandLine),
             ("-DOUTER".to_string(), file("outer.resp")),
             ("-DINNER".to_string(), file("inner.resp")),
             ("-DTAIL".to_string(), file("outer.resp")),
-            ("src.c".to_string(), Origin::CommandLine),
+            ("src.c".to_string(), Provenance::CommandLine),
         ];
         assert_eq!(sut, expected);
     }
@@ -379,7 +379,10 @@ mod tests {
 
         assert_eq!(
             sut,
-            vec![("@gone.resp".to_string(), Origin::CommandLine), ("src.c".to_string(), Origin::CommandLine)]
+            vec![
+                ("@gone.resp".to_string(), Provenance::CommandLine),
+                ("src.c".to_string(), Provenance::CommandLine)
+            ]
         );
     }
 

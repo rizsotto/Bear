@@ -16,22 +16,17 @@ use std::path::{Path, PathBuf};
 const PIPELINE: [CompilerPass; 4] =
     [CompilerPass::Preprocessing, CompilerPass::Compiling, CompilerPass::Assembling, CompilerPass::Linking];
 
-/// The words a family takes from environment variables: `(variable, items)`.
-pub(crate) type EnvironmentWords = Vec<(String, Vec<Arguments>)>;
-
 /// A recognized call, read as a list of classified arguments.
 #[derive(Debug)]
 pub struct Interpretation {
     /// The id of the compiler family that read the flags.
     pub interpreted_by: &'static str,
     source_mode: SourceMode,
-    /// Launcher (if any), compiler, then the rest. Read response files are
-    /// spliced in where the `@file` stood.
-    arguments: Vec<(Origin, Arguments)>,
-    /// `(variable, items)` in rule order, placed right after the compiler.
-    environment_before: EnvironmentWords,
-    /// `(variable, items)` in rule order, placed after the command line.
-    environment_after: EnvironmentWords,
+    /// Every item in output order, each with where it came from: launcher
+    /// (if any), compiler, environment words that go first, the command line
+    /// with read response files spliced in where the `@file` stood,
+    /// environment words that go last.
+    arguments: Vec<(Provenance, Arguments)>,
 }
 
 /// One item of a call: the raw tokens as written, and what they mean.
@@ -66,19 +61,17 @@ pub enum Role {
     Flag(PassEffect),
 }
 
-/// Where the first token of an item came from.
+/// Where an item came from. For an item whose tokens come from two places
+/// (a flag at the end of a response file, its value on the command line),
+/// it is where the first token came from.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Origin {
+pub enum Provenance {
     CommandLine,
+    /// A response file, as written after the `@`. The innermost one when
+    /// files nest.
     ResponseFile(PathBuf),
-}
-
-/// Where an item came from, as shown to consumers.
-#[derive(Debug, PartialEq)]
-pub enum Provenance<'a> {
-    CommandLine,
-    ResponseFile(&'a Path),
-    Environment(&'a str),
+    /// An environment variable, by name.
+    Environment(String),
 }
 
 /// A file the compiler is asked to process.
@@ -243,11 +236,9 @@ impl Interpretation {
     pub(crate) fn new(
         interpreted_by: &'static str,
         source_mode: SourceMode,
-        arguments: Vec<(Origin, Arguments)>,
-        environment_before: EnvironmentWords,
-        environment_after: EnvironmentWords,
+        arguments: Vec<(Provenance, Arguments)>,
     ) -> Self {
-        Self { interpreted_by, source_mode, arguments, environment_before, environment_after }
+        Self { interpreted_by, source_mode, arguments }
     }
 
     #[cfg(any(test, feature = "testing"))]
@@ -258,23 +249,12 @@ impl Interpretation {
     /// The items in output order: launcher, compiler, environment words that
     /// go first, the command line, environment words that go last.
     pub fn arguments(&self) -> impl Iterator<Item = &Arguments> {
-        self.provenance().map(|(_, arguments)| arguments)
+        self.arguments.iter().map(|(_, item)| item)
     }
 
     /// The same items as [`arguments`](Self::arguments), each with where it came from.
-    pub fn provenance(&self) -> impl Iterator<Item = (Provenance<'_>, &Arguments)> {
-        let head = self
-            .arguments
-            .iter()
-            .position(|(_, item)| matches!(item.role, Role::Compiler { .. }))
-            .map_or(0, |index| index + 1);
-        let (prefix, rest) = self.arguments.split_at(head);
-        prefix
-            .iter()
-            .map(from_command_line)
-            .chain(from_environment(&self.environment_before))
-            .chain(rest.iter().map(from_command_line))
-            .chain(from_environment(&self.environment_after))
+    pub fn provenance(&self) -> impl Iterator<Item = (&Provenance, &Arguments)> {
+        self.arguments.iter().map(|(provenance, item)| (provenance, item))
     }
 
     pub fn inputs(&self) -> impl Iterator<Item = &FileRef> {
@@ -389,22 +369,6 @@ impl Interpretation {
             })
             .collect()
     }
-}
-
-fn from_command_line((origin, item): &(Origin, Arguments)) -> (Provenance<'_>, &Arguments) {
-    let provenance = match origin {
-        Origin::CommandLine => Provenance::CommandLine,
-        Origin::ResponseFile(path) => Provenance::ResponseFile(path),
-    };
-    (provenance, item)
-}
-
-fn from_environment(
-    groups: &[(String, Vec<Arguments>)],
-) -> impl Iterator<Item = (Provenance<'_>, &Arguments)> {
-    groups
-        .iter()
-        .flat_map(|(name, items)| items.iter().map(move |item| (Provenance::Environment(name), item)))
 }
 
 #[cfg(test)]
@@ -697,7 +661,7 @@ mod tests {
     }
 
     fn provenance_of(sut: &Interpretation) -> Vec<(String, String)> {
-        let name = |provenance: Provenance<'_>| match provenance {
+        let name = |provenance: &Provenance| match provenance {
             Provenance::CommandLine => "argv".to_string(),
             Provenance::ResponseFile(path) => format!("file {}", path.display()),
             Provenance::Environment(variable) => format!("env {variable}"),
@@ -739,13 +703,13 @@ mod tests {
 
         assert_eq!(words(&sut), ["gcc", "-c", "a.c", "-I", "/a"]);
         let (provenance, item) = sut.provenance().last().expect("an item");
-        assert_eq!(provenance, Provenance::Environment("CPATH"));
+        assert_eq!(provenance, &Provenance::Environment("CPATH".to_string()));
         assert_eq!(item.role, Role::Flag(PassEffect::Configures(Preprocessing)));
     }
 
     // Requirements: output-response-file-inlining
     #[test]
-    fn a_read_response_file_is_spliced_in_with_its_origin() {
+    fn a_read_response_file_is_spliced_in_with_its_provenance() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("f.rsp"), "-I/opt extra.c").unwrap();
         let execution = Execution::from_strings(

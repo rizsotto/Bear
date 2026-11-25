@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::interpretation::Origin;
+use super::interpretation::Provenance;
 use super::interpreters::matchers::source::file_type_of;
 use super::{
     Arguments, FileRef, FileType, Interpretation, OutputSpelling, PassEffect, Recognized, Role, SourceMode,
@@ -87,10 +87,10 @@ impl Interpretation {
                     Item::Flag(effect) => Role::Flag(*effect),
                 };
                 let item = Arguments { args: args.iter().map(|arg| arg.to_string()).collect(), role };
-                (Origin::CommandLine, item)
+                (Provenance::CommandLine, item)
             })
             .collect();
-        Interpretation::new("test", SourceMode::PerSourceStripped, items, Vec::new(), Vec::new())
+        Interpretation::new("test", SourceMode::PerSourceStripped, items)
     }
 }
 

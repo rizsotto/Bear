@@ -12,7 +12,7 @@ use super::super::matchers::{
     EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule, RuleKind,
 };
 use super::response_file::{Syntax, expand, tokenize_msvc};
-use crate::interpretation::{EnvironmentWords, Origin};
+use crate::interpretation::Provenance;
 use crate::{
     Arguments, CompilerPass, Execution, FileRef, Interpretation, OutputSpelling, PassEffect, RecognizeResult,
     Recognized, Role, SourceMode,
@@ -106,11 +106,11 @@ impl FlagBasedInterpreter {
         };
         // Response files are read before classification, so their tokens are
         // classified like any other argument. The family's own syntax splits them.
-        let (stream, origins): (Vec<String>, Option<Vec<Origin>>) = if inline_response_files {
+        let (stream, provenances): (Vec<String>, Option<Vec<Provenance>>) = if inline_response_files {
             let after_compiler = argv.get(1..).unwrap_or_default();
             let tokens = expand(after_compiler, &execution.working_dir, self.syntax);
-            let (tokens, origins) = tokens.into_iter().unzip::<_, _, Vec<_>, Vec<_>>();
-            (argv.first().cloned().into_iter().chain(tokens).collect(), Some(origins))
+            let (tokens, provenances) = tokens.into_iter().unzip::<_, _, Vec<_>, Vec<_>>();
+            (argv.first().cloned().into_iter().chain(tokens).collect(), Some(provenances))
         } else {
             (argv.to_vec(), None)
         };
@@ -119,7 +119,7 @@ impl FlagBasedInterpreter {
             return RecognizeResult::Ignored { execution, reason };
         }
 
-        let interpretation = self.interpretation(&execution, launcher_len, &executable, &stream, origins);
+        let interpretation = self.interpretation(&execution, launcher_len, &executable, &stream, provenances);
         RecognizeResult::Recognized(Recognized { execution, interpretation })
     }
 
@@ -129,29 +129,40 @@ impl FlagBasedInterpreter {
         launcher_len: usize,
         executable: &Path,
         stream: &[String],
-        origins: Option<Vec<Origin>>,
+        provenances: Option<Vec<Provenance>>,
     ) -> Interpretation {
-        let mut arguments: Vec<(Origin, Arguments)> = Vec::with_capacity(stream.len() + 1);
-        if launcher_len > 0 {
-            let launcher = execution.arguments.get(..launcher_len).unwrap_or_default().to_vec();
-            arguments.push((Origin::CommandLine, Arguments { args: launcher, role: Role::Launcher }));
-        }
-        // Tokens after the compiler carry the origin of their own position.
-        let origin_of = |index: usize| match (&origins, index.checked_sub(1)) {
-            (Some(origins), Some(position)) => origins.get(position).cloned().unwrap_or(Origin::CommandLine),
-            _ => Origin::CommandLine,
-        };
-        for parsed in classify(&self.analyzer, stream, self.slash_prefix) {
-            let origin = origin_of(parsed.first);
-            arguments.push((origin, parsed.into_arguments(executable)));
-        }
-
         let (before, after) = if self.from_environment {
             interpret_environment(&execution.environment, self.env_rules, self.syntax)
         } else {
             (Vec::new(), Vec::new())
         };
-        Interpretation::new(self.id, self.source_mode, arguments, before, after)
+
+        let mut arguments: Tagged = Vec::with_capacity(stream.len() + before.len() + after.len() + 1);
+        if launcher_len > 0 {
+            let launcher = execution.arguments.get(..launcher_len).unwrap_or_default().to_vec();
+            arguments.push((Provenance::CommandLine, Arguments { args: launcher, role: Role::Launcher }));
+        }
+        // Tokens after the compiler carry the provenance of their own position.
+        let provenance_of = |index: usize| match (&provenances, index.checked_sub(1)) {
+            (Some(provenances), Some(position)) => {
+                provenances.get(position).cloned().unwrap_or(Provenance::CommandLine)
+            }
+            _ => Provenance::CommandLine,
+        };
+        let mut parsed = classify(&self.analyzer, stream, self.slash_prefix).into_iter();
+        // The compiler stays first (classify yields it first, and a launcher
+        // always has one after it); environment words that go first follow it.
+        if let Some(compiler) = parsed.next() {
+            arguments.push((Provenance::CommandLine, compiler.into_arguments(executable)));
+        }
+        arguments.extend(before);
+        for item in parsed {
+            let provenance = provenance_of(item.first);
+            arguments.push((provenance, item.into_arguments(executable)));
+        }
+        arguments.extend(after);
+
+        Interpretation::new(self.id, self.source_mode, arguments)
     }
 }
 
@@ -169,6 +180,9 @@ enum Class {
     /// A `@file` token, with the path as written after the `@`.
     ArgumentsFile(String),
 }
+
+/// Items tagged with where they came from, in output order.
+type Tagged = Vec<(Provenance, Arguments)>;
 
 /// A run of argv tokens that mean one thing, and where the run starts.
 struct Parsed {
@@ -353,16 +367,16 @@ fn environment_words(
     result
 }
 
-/// The environment words kept per variable as `(before, after)`. Words that
-/// go before the command line args (e.g. MSVC `CL`) are `before`; the rest
-/// (include paths, MSVC `_CL_`) are `after`.
+/// Environment words, each tagged with its variable, as `(before, after)`.
+/// Words that go before the command line args (e.g. MSVC `CL`) are `before`;
+/// the rest (include paths, MSVC `_CL_`) are `after`.
 fn interpret_environment(
     environment: &std::collections::HashMap<String, String>,
     rules: &[EnvRule],
     syntax: Syntax,
-) -> (EnvironmentWords, EnvironmentWords) {
-    let mut before = EnvironmentWords::new();
-    let mut after = EnvironmentWords::new();
+) -> (Tagged, Tagged) {
+    let mut before = Vec::new();
+    let mut after = Vec::new();
 
     for item in environment_words(environment, rules, syntax) {
         let target = match item.position {
@@ -370,10 +384,7 @@ fn interpret_environment(
             EnvPosition::Append => &mut after,
         };
         let words = Arguments { args: item.words, role: Role::Flag(item.effect) };
-        match target.last_mut() {
-            Some((variable, words_of)) if variable == item.variable => words_of.push(words),
-            _ => target.push((item.variable.to_string(), vec![words])),
-        }
+        target.push((Provenance::Environment(item.variable.to_string()), words));
     }
 
     (before, after)
@@ -751,8 +762,8 @@ mod environment_mapping_tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn collect_args(words: &EnvironmentWords) -> Vec<String> {
-        words.iter().flat_map(|(_, items)| items).flat_map(|item| item.args.clone()).collect()
+    fn collect_args(words: &[(Provenance, Arguments)]) -> Vec<String> {
+        words.iter().flat_map(|(_, item)| item.args.clone()).collect()
     }
 
     #[test]
