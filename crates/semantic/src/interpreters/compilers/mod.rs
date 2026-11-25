@@ -51,8 +51,9 @@ impl CompilerInterpreter {
         result
     }
 
-    /// Convenience constructor with the default argument handling (response-file
-    /// inlining off, environment-flag folding on). Used by [`Default`] and tests.
+    /// Convenience constructor for tests: response-file inlining off (so no
+    /// test reads files by accident), environment-flag folding on. The
+    /// product default for inlining is on; the `bear` crate decides it.
     pub fn new_with_hints(hints: CompilerHints) -> Self {
         Self::new_with_format(hints, false, true)
     }

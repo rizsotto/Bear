@@ -40,8 +40,8 @@ pub(super) struct FlagBasedInterpreter {
     syntax: Syntax,
     /// How this family's invocations map to compilation database entries.
     /// See [`SourceMode`]. Comes from the family's YAML `source_mode:` (via the
-    /// generated [`FamilyDef`]); it is a per-family datum, consumed at the
-    /// converter (post-parse).
+    /// generated [`FamilyDef`]); it is a per-family datum, consumed by
+    /// [`Interpretation::steps`].
     source_mode: SourceMode,
 }
 

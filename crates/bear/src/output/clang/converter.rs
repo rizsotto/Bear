@@ -189,7 +189,7 @@ impl CommandConverter {
 }
 
 #[cfg(test)]
-mod equivalence;
+mod argv_regression;
 
 #[cfg(test)]
 mod tests {

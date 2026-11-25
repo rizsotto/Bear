@@ -22,8 +22,9 @@
 //! An [`Interpretation`] is a list of [`Arguments`]. Each item keeps its raw
 //! tokens and a [`Role`]: launcher, compiler, input, output, flag, or an
 //! `@file` that was not read. Response files that were read are spliced in
-//! where the `@file` stood, and environment-derived words are kept per
-//! variable. Everything else is a view over that list:
+//! where the `@file` stood, and environment-derived words sit before or
+//! after the command line, each tagged with its variable. Everything else
+//! is a view over that list:
 //!
 //! - `arguments()` and `provenance()` - the items in output order, and where
 //!   each came from ([`Provenance`])

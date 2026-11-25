@@ -3,9 +3,9 @@
 //! Response-file (`@file`) inlining for intercepted compiler invocations.
 //!
 //! Some build systems (notably Xcode) keep part of a compiler's flags in a
-//! separate "response file" and pass it as `@/path/to/args.resp`. When the
-//! user opts in (`format.arguments.from_response_files`), [`expand`] replaces
-//! each `@file` token with the file's tokenized contents *before* flag
+//! separate "response file" and pass it as `@/path/to/args.resp`. Unless the
+//! user turns it off (`format.arguments.from_response_files`), [`expand`]
+//! replaces each `@file` token with the file's tokenized contents *before* flag
 //! classification, so the inlined tokens are classified, link-stripped, and
 //! split per source exactly like any other argument. Each token carries the
 //! file it came from.

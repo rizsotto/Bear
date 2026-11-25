@@ -176,22 +176,21 @@ pub enum CompilerPass {
 /// See the `output-compilation-entries` requirement for the full contract.
 #[derive(Copy, Clone, Debug)]
 pub enum SourceMode {
-    /// Each source is a separable translation unit: the converter emits one
-    /// entry per source, and each entry's arguments keep only that source
+    /// Each source is a separable translation unit: one compile step per
+    /// source, and each step's arguments keep only that source
     /// (sibling sources in the same invocation are stripped). The default
     /// for GCC, Clang, and most other families.
     PerSourceStripped,
     /// Every source in the invocation is analyzed together as a single
     /// "whole module", but per-file consuming tooling still looks up a
-    /// compile command by file path: the converter emits one entry per
-    /// source, and every entry's arguments are the complete invocation (no
+    /// compile command by file path: one compile step per source, and every
+    /// step's arguments are the complete invocation (no
     /// sibling stripping). Used by Swift's whole-module compilation
     /// (`swiftc`).
     PerSourceFull,
     /// All sources in the invocation form a single translation unit and
-    /// produce one combined output: the converter emits exactly one entry
-    /// per invocation, with `file` set to the first source and every source
-    /// retained. Used by `valac`.
+    /// produce one combined output: one compile step per invocation, for the
+    /// first source, with every source retained. Used by `valac`.
     Combined,
 }
 

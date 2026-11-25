@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Argv-driven regression tests for the converter: real argv goes through the
-//! interpreters and the entries come out of the converter. The expected
-//! entries are the ones the converter wrote before it read the steps, apart
-//! from the two cases that changed on purpose (`gcc -S foo.s` and an unread
-//! `@file`), which have their own tests.
+//! interpreters, and the entries the converter writes are checked against
+//! literal expected entries.
 //!
 //! Requirements: output-compilation-entries, recognition-compiler-launchers, output-response-file-inlining, output-env-derived-flags
 
@@ -306,7 +304,6 @@ fn a_read_response_file_is_part_of_the_entry_for_msvc() {
 }
 
 // Requirements: output-response-file-inlining
-// The converter used to drop the token here (bug bear-zq3.2).
 #[test]
 fn an_unread_response_file_stays_in_the_entry_for_msvc() {
     let fixture = Fixture::new();
@@ -317,7 +314,7 @@ fn an_unread_response_file_stays_in_the_entry_for_msvc() {
 }
 
 // Requirements: output-compilation-entries
-// gcc does nothing for it, and the converter used to write an entry.
+// `-S` stops before the assembler, so gcc does nothing for `foo.s`.
 #[test]
 fn assembling_an_assembly_file_gets_no_entry() {
     for inline in [false, true] {
