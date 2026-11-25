@@ -51,15 +51,16 @@ mod interpretation;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
-pub use interpretation::{Arguments, FileRef, FileType, Interpretation, Provenance, Role, Step};
+pub use interpretation::{
+    Arguments, CompilerPass, FileRef, FileType, Interpretation, OutputSpelling, PassEffect, Provenance, Role,
+    SourceMode, Step,
+};
 pub use interpreters::compilers::compiler_recognition::{CompilerHints, CompilerRecognizer};
 pub use interpreters::compilers::identity::SpellingError;
 pub use interpreters::compilers::print_compilers;
 pub use interpreters::matchers::{is_c_family_source, is_header_file, looks_like_a_source_file};
 
 use intercept::Execution;
-
-use std::path::Path;
 
 /// Responsible for recognizing the semantic meaning of an executed command.
 ///
@@ -94,85 +95,4 @@ pub enum RecognizeResult {
 pub struct Recognized {
     pub execution: Execution,
     pub interpretation: Interpretation,
-}
-
-/// How an output flag and its value were written on the observed command line.
-///
-/// Compilers do not all accept the same spelling: `cl.exe` documents that
-/// `/Fo` takes no space before its value, and TI's long options glue their
-/// value after `=`. Re-spelling one form as another produces a database entry
-/// the compiler would reject, so the observed form is kept.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum OutputSpelling {
-    /// Two tokens: `-o main.o`.
-    Separate,
-    /// One token, value glued straight onto the flag: `-omain.o`, `/FoX.obj`.
-    Glued,
-    /// One token, flag and value joined by `=`: `--output_file=x.obj`.
-    Equals,
-    /// One token, flag and value joined by `:`: `/Fo:X.obj`.
-    Colon,
-}
-
-impl OutputSpelling {
-    /// Writes `flag` and `path` back as the command line tokens this spelling
-    /// stands for: one joined token, or the two the build passed separately.
-    fn as_arguments(self, flag: &str, path: &Path) -> Vec<String> {
-        let path = path.to_string_lossy();
-        match self {
-            Self::Separate => vec![flag.to_string(), path.to_string()],
-            Self::Glued => vec![format!("{flag}{path}")],
-            Self::Equals => vec![format!("{flag}={path}")],
-            Self::Colon => vec![format!("{flag}:{path}")],
-        }
-    }
-}
-
-/// Represents how an argument affects the compilation pipeline.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum PassEffect {
-    Configures(CompilerPass),
-    StopsAt(CompilerPass),
-    InfoAndExit,
-    DriverOption,
-    /// Indicates remaining arguments should be passed through without interpretation.
-    /// Used for flags like MSVC's `/link` that forward all subsequent args to a different tool.
-    PassThrough,
-    None,
-}
-
-/// Represents different compiler passes that an argument might affect.
-/// The declared order is the pipeline order.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CompilerPass {
-    Preprocessing,
-    Compiling,
-    Assembling,
-    Linking,
-}
-
-/// How the sources named in one invocation map to compilation database
-/// entries. Set per compiler family by the family YAML's top-level
-/// `source_mode:` key (default `per-source-stripped`). It is not used at
-/// parse time; the converter consumes it (post-parse).
-/// See the `output-compilation-entries` requirement for the full contract.
-#[derive(Copy, Clone, Debug)]
-pub enum SourceMode {
-    /// Each source is a separable translation unit: the converter emits one
-    /// entry per source, and each entry's arguments keep only that source
-    /// (sibling sources in the same invocation are stripped). The default
-    /// for GCC, Clang, and most other families.
-    PerSourceStripped,
-    /// Every source in the invocation is analyzed together as a single
-    /// "whole module", but per-file consuming tooling still looks up a
-    /// compile command by file path: the converter emits one entry per
-    /// source, and every entry's arguments are the complete invocation (no
-    /// sibling stripping). Used by Swift's whole-module compilation
-    /// (`swiftc`).
-    PerSourceFull,
-    /// All sources in the invocation form a single translation unit and
-    /// produce one combined output: the converter emits exactly one entry
-    /// per invocation, with `file` set to the first source and every source
-    /// retained. Used by `valac`.
-    Combined,
 }
